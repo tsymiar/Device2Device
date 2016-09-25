@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:background="@drawable/active_bkg"
+              android:gravity="center">
+
+    <Button
+        android:text="@string/action_settings"
+        android:scaleType="centerCrop"
+        android:id="@+id/item_setting"
+        android:layout_marginRight="10dp"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:textColor="@drawable/text_color_primary_invertible"
+        android:layout_gravity="center"
+        android:gravity="center"
+        tools:ignore="RtlHardcoded" />
+
+    <Button
+              android:id="@+id/item_theme"
+              android:layout_width="wrap_content"
+              android:layout_height="40dp"
+              android:text="@string/theme"
+              android:textColor="@drawable/text_color_primary_invertible"
+              android:layout_gravity="center"
+              android:gravity="center"/>
+
+</LinearLayout>

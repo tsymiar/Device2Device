@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="item_title">
+        <item>图表</item>
+        <item>产品</item>
+        <item>更多</item>
+    </string-array>
+
+    <integer-array name="item_icon_res">
+        <item>1</item>
+        <item>@drawable/ic_drawer_follow</item>
+        <item>@drawable/ic_drawer_question</item>
+    </integer-array>
+</resources>

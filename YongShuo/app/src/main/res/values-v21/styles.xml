@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--style name="AppTheme" parent="android:Theme.Material.Light">
+		<item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:fitsSystemWindows">true</item>
+        <item name="android:statusBarColor">@color/deep_green</item>
+        <item name="android:actionBarStyle">@style/my_actionbar_style</item>
+    </style-->
+    <style name="my_actionbar_style" parent="android:Widget.Material.ActionBar">
+        <item name="android:background">@drawable/actionbar_bkg</item>
+    </style>
+    <style name="AppTheme" parent="@style/AppBaseTheme">
+        <item name="android:navigationBarColor">#4876FF</item>
+    </style>
+</resources>
