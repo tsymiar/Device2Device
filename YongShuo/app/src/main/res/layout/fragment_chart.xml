@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+    <RelativeLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        tools:ignore="UselessParent"
+        android:layout_gravity="center_horizontal|bottom">
+
+        <android.support.v7.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:minHeight="?attr/actionBarSize"
+            android:layout_gravity="center_horizontal|top"
+            android:background="@drawable/actionbar_bkg"
+            android:layout_alignParentTop="true">
+        </android.support.v7.widget.Toolbar>
+
+        <com.TsyQi.MyClasses.ChartView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/click"
+            android:layout_toRightOf="@+id/notification"
+            android:layout_alignBottom="@+id/stop_bn"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:id="@+id/view" />
+
+        <ImageView
+            android:layout_width="36sp"
+            android:layout_height="wrap_content"
+            android:src="@mipmap/finger"
+            android:id="@+id/image2"
+            android:layout_below="@+id/toolbar"
+            android:layout_toLeftOf="@+id/out_bn"
+            android:layout_toStartOf="@+id/out_bn"
+            tools:ignore="ContentDescription" />
+
+        <Button
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/stop_bn"
+            android:text="@string/stop"
+            android:layout_gravity="bottom|right"
+            tools:ignore="RtlHardcoded"
+            android:layout_marginTop="97dp"
+            android:layout_below="@+id/imageView"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true" />
+
+        <Button
+            style="?android:attr/buttonStyleSmall"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="@string/hide"
+            android:id="@+id/out_bn"
+            android:layout_gravity="bottom"
+            tools:ignore="RtlHardcoded"
+            android:layout_alignTop="@+id/stop_bn"
+            android:layout_toLeftOf="@+id/stop_bn"
+            android:layout_toStartOf="@+id/stop_bn" />
+
+        <TextView
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:id="@+id/notification"
+            android:textColor="#ffffe9d5"
+            android:typeface="monospace"
+            tools:ignore="RtlCompat"
+            android:layout_alignTop="@+id/click"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:src="@mipmap/ic_drawer"
+            tools:ignore="ContentDescription,RtlHardcoded"
+            android:layout_below="@+id/image2"
+            android:layout_alignRight="@+id/textView"
+            android:layout_alignEnd="@+id/textView"
+            android:layout_marginTop="111dp"/>
+
+        <TextView
+            android:layout_height="9dp"
+            android:layout_width="wrap_content"
+            android:text="@string/min"
+            android:textColor="#ffff0000"
+            android:textSize="9sp"
+            tools:ignore="RtlHardcoded,SmallSp"
+            android:id="@+id/textView"
+            android:layout_alignTop="@+id/imageView"
+            android:layout_alignRight="@+id/click"
+            android:layout_alignEnd="@+id/click" />
+
+        <TextView
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="@string/pull"
+            android:id="@+id/click"
+            android:textColor="#FF8D00"
+            android:textSize="15sp"
+            android:layout_gravity="right|top"
+            android:layout_alignBottom="@+id/image2"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:layout_below="@+id/toolbar"
+            android:gravity="center" />
+
+    </RelativeLayout>
+

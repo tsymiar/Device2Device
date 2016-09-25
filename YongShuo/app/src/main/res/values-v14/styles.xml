@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="MyTheme" parent="android:Theme.Holo.Light.DarkActionBar">
+
+            <!--item name="textColorPrimary">@android:color/primary_text_dark</item>
+            <item name="textColorSecondary">@android:color/secondary_text_dark</item>
+            <item name="textColorTertiary">@android:color/tertiary_text_dark</item>
+            <item name="textColorPrimaryInverse">@android:color/primary_text_light</item>
+            <item name="textColorSecondaryInverse">@android:color/secondary_text_light</item>
+            <item name="textColorTertiaryInverse">@android:color/tertiary_text_light</item>
+            <item name="textColorPrimaryDisableOnly">@android:color/primary_text_dark_disable_only</item>
+            <item name="textColorPrimaryInverseDisableOnly">@android:color/primary_text_light_disable_only</item>
+            <item name="textColorPrimaryNoDisable">@android:color/primary_text_dark_nodisable</item>
+            <item name="textColorSecondaryNoDisable">@android:color/secondary_text_dark_nodisable</item>
+            <item name="textColorPrimaryInverseNoDisable">@android:color/primary_text_light_nodisable</item>
+            <item name="textColorSecondaryInverseNoDisable">@android:color/secondary_text_light_nodisable</item>
+            <item name="textColorHint">@android:color/hint_foreground_dark</item>
+            <item name="textColorHintInverse">@android:color/hint_foreground_light</item>
+            <item name="textColorSearchUrl">@android:color/search_url_text</item>
+
+            <item name="listChoiceIndicatorSingle">@android:drawable/btn_radio</item>
+            <item name="listChoiceIndicatorMultiple">@android:drawable/btn_check</item>
+            <item name="galleryItemBackground">@android:drawable/gallery_item_background</item>
+            <item name="panelBackground">@android:drawable/menu_background</item>
+            <item name="panelFullBackground">@android:drawable/menu_background_fill_parent_width</item>
+            <item name="panelColorBackground">#000</item>
+            <item name="scrollbarThumbHorizontal">@android:drawable/scrollbar_handle_horizontal</item>
+            <item name="scrollbarThumbVertical">@android:drawable/scrollbar_handle_vertical</item>
+            <item name="textSelectHandleLeft">@android:drawable/text_select_handle_left</item>
+            <item name="textSelectHandleRight">@android:drawable/text_select_handle_right</item>
+            <item name="textSelectHandle">@android:drawable/text_select_handle_middle</item>
+            <item name="searchWidgetCorpusItemBackground">@android:color/search_widget_corpus_item_background</item-->
+    </style>
+
+        <style name="MyTitleStyle" parent="@android:style/TextAppearance.Holo.Widget.ActionBar.Title.Inverse">
+                <item name="android:textSize">20dp</item>
+        </style>
+</resources>
