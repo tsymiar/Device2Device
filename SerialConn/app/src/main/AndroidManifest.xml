@@ -1,0 +1,106 @@
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.tsymiar.connect"
+    tools:ignore="MissingVersion">
+
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/AppName"
+        android:theme="@style/AppTheme"
+        tools:targetApi="donut">
+
+        <activity
+            android:name="com.tsymiar.connect.MainActivity"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <service android:name="com.tsymiar.connect.ReceiverService"/>
+
+        <activity
+            android:name="com.tsymiar.connect.NewActivity"
+            android:label="@string/more" />
+
+        <activity
+            android:name="com.tsymiar.connect.ConnectActivity"
+            android:label="@string/title">
+            <intent-filter>
+                <action android:name="android.intent.action.CONNECTION" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.tsymiar.connect.TransferActivity"
+            android:alwaysRetainTaskState="true"
+            android:theme="@style/AppDialog"
+            android:label="@string/window"
+            tools:ignore="NewApi">
+            <intent-filter>
+                <action android:name="android.intent.action.NEW" />
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.tsymiar.connect.DeviceListActivity"
+            android:label="@string/title_activity_e"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Holo.Dialog"
+            android:configChanges="orientation|keyboardHidden"
+            tools:ignore="NewApi"/>
+
+        <activity
+            android:name="com.tsymiar.connect.MoreActivity"
+            android:label="@string/more"
+            android:theme="@android:style/Theme.Material.Dialog.Alert"
+            android:configChanges="orientation|keyboardHidden"
+            tools:ignore="NewApi"/>
+
+        <activity
+            android:name="com.tsymiar.connect.MyGitActivity"
+            android:theme="@style/AppDialog"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </activity>
+
+        <service android:name="com.tsymiar.connect.SaveDataService" />
+
+        <activity
+            android:name="com.tsymiar.connect.BuggerActivity"
+            android:theme="@style/AppDialog"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SENDTO"/>
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mail's" />
+            </intent-filter>
+        </activity>
+
+        <meta-data android:name="InstallChannel" android:value="play" />
+
+    </application>
+
+    <uses-permission android:name="android.permission.INTERNET" tools:ignore="ManifestOrder"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+
+</manifest>

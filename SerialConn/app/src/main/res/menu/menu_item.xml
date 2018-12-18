@@ -1,0 +1,19 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<item
+		android:id="@+id/item"
+		android:title="@string/item"
+		android:visible="false"/>
+    <item
+        android:id="@+id/url"
+        android:title="@string/url"/>
+	<item
+        android:id="@+id/feedback"
+        android:title="@string/feedback"/>   
+	<item
+        android:id="@+id/more"
+        android:title="@string/more"/>
+
+	<item
+        android:id="@+id/exit"
+        android:title="@string/exit"/>
+</menu>
