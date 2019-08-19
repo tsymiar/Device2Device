@@ -1,6 +1,6 @@
 ﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.tsymiar.connect"
+    package="com.tsymiar.SerialConn"
     tools:ignore="MissingVersion">
 
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
@@ -16,22 +16,16 @@
         tools:targetApi="donut">
 
         <activity
-            android:name="com.tsymiar.connect.MainActivity"
+            android:name="com.tsymiar.SerialConn.MainActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <service android:name="com.tsymiar.connect.ReceiverService"/>
-
         <activity
-            android:name="com.tsymiar.connect.NewActivity"
-            android:label="@string/more" />
-
-        <activity
-            android:name="com.tsymiar.connect.ConnectActivity"
+            android:name="com.tsymiar.SerialConn.ConnectActivity"
             android:label="@string/title">
             <intent-filter>
                 <action android:name="android.intent.action.CONNECTION" />
@@ -39,68 +33,98 @@
         </activity>
 
         <activity
-            android:name="com.tsymiar.connect.TransferActivity"
+            android:name="com.tsymiar.SerialConn.TransferActivity"
             android:alwaysRetainTaskState="true"
-            android:theme="@style/AppDialog"
             android:label="@string/window"
+            android:theme="@style/AppDialog"
             tools:ignore="NewApi">
             <intent-filter>
                 <action android:name="android.intent.action.NEW" />
-                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
         <activity
-            android:name="com.tsymiar.connect.DeviceListActivity"
+            android:name="com.tsymiar.SerialConn.DeviceListActivity"
+            android:configChanges="orientation|keyboardHidden"
             android:label="@string/title_activity_e"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.Holo.Dialog"
-            android:configChanges="orientation|keyboardHidden"
-            tools:ignore="NewApi"/>
+            tools:ignore="NewApi" />
 
         <activity
-            android:name="com.tsymiar.connect.MoreActivity"
-            android:label="@string/more"
-            android:theme="@android:style/Theme.Material.Dialog.Alert"
-            android:configChanges="orientation|keyboardHidden"
-            tools:ignore="NewApi"/>
-
-        <activity
-            android:name="com.tsymiar.connect.MyGitActivity"
-            android:theme="@style/AppDialog"
-            android:screenOrientation="unspecified">
+            android:name="com.tsymiar.SerialConn.MyGitActivity"
+            android:screenOrientation="unspecified"
+            android:theme="@style/AppDialog">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="file" />
             </intent-filter>
         </activity>
 
-        <service android:name="com.tsymiar.connect.SaveDataService" />
-
         <activity
-            android:name="com.tsymiar.connect.BuggerActivity"
-            android:theme="@style/AppDialog"
-            android:screenOrientation="unspecified">
+            android:name="com.tsymiar.SerialConn.BuggerActivity"
+            android:screenOrientation="unspecified"
+            android:theme="@style/AppDialog">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SENDTO"/>
+                <action android:name="android.intent.action.SENDTO" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
                 <data android:scheme="mail's" />
             </intent-filter>
         </activity>
 
-        <meta-data android:name="InstallChannel" android:value="play" />
+        <activity
+            android:name="com.tsymiar.SerialConn.ThankActivity"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/_new"
+            android:theme="@android:style/Theme.Material.Dialog.Alert"
+            tools:ignore="NewApi" />
+
+        <service android:name="com.tsymiar.SerialConn.Sensor.SensorIntentService" />
+
+        <service android:name="com.tsymiar.SerialConn.Voice.Voice" />
+
+        <activity
+            android:name=".Sensor.SensorActivity"
+            android:label="@string/sensor_title"
+            tools:ignore="DuplicateActivity" />
+
+        <activity
+            android:name=".Sensor.SensorListActivity"
+            android:label="@string/AppName"
+            android:smoothScrollbar="true"
+            android:theme="@android:style/Theme.Holo.Light" />
+
+        <activity android:name="org.achartengine.GraphicalActivity" />
+
+        <service android:name="com.tsymiar.SerialConn.SaveDataService" />
+        <service android:name="com.tsymiar.SerialConn.ReceiverService" />
+        <service android:name="com.tsymiar.SerialConn.Sensor.SensorService" />
+        <service android:name="com.tsymiar.SerialConn.ShowViewService" />
+        <service android:name="com.tsymiar.SerialConn.MiniService" />
+
+        <meta-data
+            android:name="InstallChannel"
+            android:value="play" />
 
     </application>
 
-    <uses-permission android:name="android.permission.INTERNET" tools:ignore="ManifestOrder"/>
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:ignore="ManifestOrder" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
 </manifest>

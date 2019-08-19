@@ -18,7 +18,9 @@
 
     <!-- Activity themes -->
     <style name="AppTheme" parent="AppTheme" tools:ignore="ResourceCycle" />
+
     <style name="AppDialog" parent="AppDialog" tools:ignore="ResourceCycle" />
+
     <style name="MainTheme" parent="MainTheme" tools:ignore="ResourceCycle" />
 
 </resources>

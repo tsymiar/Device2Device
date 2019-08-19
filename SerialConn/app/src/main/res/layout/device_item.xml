@@ -2,6 +2,6 @@
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:textSize="17sp"
     android:padding="5dp"
-	android:typeface="monospace"/>
+    android:textSize="17sp"
+    android:typeface="monospace" />

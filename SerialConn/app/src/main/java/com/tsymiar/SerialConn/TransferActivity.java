@@ -1,4 +1,4 @@
-package com.tsymiar.connect;
+package com.tsymiar.SerialConn;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -109,29 +109,7 @@ public class TransferActivity extends Activity {
     }
 
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.item: {
-                Intent intent = new Intent(this, NewActivity.class);
-                startActivity(intent);
-            }
-        }
-        // Handle item selection
-        switch (item.getItemId()) {
-            case R.id.url:
-                mainActivity.writer(this);
-                return true;
-            case R.id.feedback:
-                mainActivity.feedback(this);
-                return true;
-            case R.id.more:
-                mainActivity.more(this);
-                return true;
-            case R.id.exit:
-                mainActivity.exit(this);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
-        }
+        return mainActivity.ItemSelected(item, this);
     }
 
     @SuppressLint({"RtlHardcoded", "WrongConstant", "ClickableViewAccessibility"})
@@ -141,7 +119,7 @@ public class TransferActivity extends Activity {
         super.onResume();
         Intent hint = new Intent(TransferActivity.this, ReceiverService.class);
         Bundle ble = new Bundle();
-        ble.putString("temp", getString(R.string.datarecv));
+        ble.putString("temp", getString(R.string.data_recvd));
         hint.putExtras(ble);
         sendBroadcast(hint);
         startService(hint);
@@ -518,7 +496,7 @@ public class TransferActivity extends Activity {
         private final InputStream mmInStream;
 
         @TargetApi(Build.VERSION_CODES.ECLAIR)
-        protected RecieveThread(BluetoothSocket socket) {
+        RecieveThread(BluetoothSocket socket) {
             InputStream tmpIn = null;
             // Get the input and output streams, using temp objects because
             // member streams are final
@@ -541,7 +519,7 @@ public class TransferActivity extends Activity {
                     // Send the obtained bytes to the UI activity
                     String str = new String(buffer, 0, bytes);
                     handler.obtainMessage(READ, bytes, -1, str)
-                            .sendToTarget();     // 压入消息队列
+                            .sendToTarget(); // 压入消息队列
                 } catch (Exception e) {
                     s = e.getMessage();
                     System.out.print(s);
@@ -554,13 +532,15 @@ public class TransferActivity extends Activity {
     }
 
     @SuppressLint("HandlerLeak")
-    Handler handler = new Handler() {  //处理消息队列的Handler对象
+    Handler handler = new Handler() {
+        //处理消息队列的Handler对象
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             //处理消息
             if (msg.what == READ) {
-                String str = (String) msg.obj;    // 类型转化
+                String str = (String) msg.obj;
+                // 类型转化
                 Intent ss = new Intent(TransferActivity.this, SaveDataService.class);
                 Intent rs = new Intent(TransferActivity.this, ReceiverService.class);
                 Bundle ble = new Bundle();
@@ -578,19 +558,19 @@ public class TransferActivity extends Activity {
 
     private BluetoothSocket createBluetoothSocket(BluetoothDevice device) throws IOException {
         try {
-            final Method  m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class);
+            final Method m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class);
             return (BluetoothSocket) m.invoke(device, MY_UUID);
         } catch (Exception e) {
-            Log.e(TAG, "Could not create Insecure RFComm Connection",e);
+            Log.e(TAG, "Could not create Insecure RFComm Connection", e);
         }
-        return  device.createRfcommSocketToServiceRecord(MY_UUID);
+        return device.createRfcommSocketToServiceRecord(MY_UUID);
     }
 
     private void checkBTState() {
 
         // Check for Bluetooth support and then check to make sure it is turned on
         // Emulator doesn't support Bluetooth and will return null
-        if(btAdapter==null) {
+        if (btAdapter == null) {
             errorExit("Fatal Error", "Bluetooth not support");
         } else {
             if (btAdapter.isEnabled()) {
@@ -604,7 +584,7 @@ public class TransferActivity extends Activity {
         }
     }
 
-    private void errorExit(String title, String message){
+    private void errorExit(String title, String message) {
         Toast.makeText(getBaseContext(), title + " - " + message, Toast.LENGTH_LONG).show();
         finish();
     }
@@ -612,14 +592,14 @@ public class TransferActivity extends Activity {
     @SuppressLint("WrongConstant")
     private void sendData(String message) {
         byte[] msgBuffer = message.getBytes();
-        String hint="数据发送不成功。";
+        String hint = "数据发送不成功。";
         Log.d(TAG, "...Send data: " + message + "...");
         try {
             outStream.write(msgBuffer);
-            if(message.equals(null)||message.equals(" ")||message.equals(""))message="null";
-            if(!(btAdapter.getState()== BluetoothAdapter.STATE_DISCONNECTED)) {
-                toast=Toast.makeText(getBaseContext(), message+"\n已发送。", Toast.LENGTH_SHORT);
-                toast.setGravity(53,50,100);
+            if (message == null || message.equals(" ") || message.equals("")) message = "null";
+            if (!(btAdapter.getState() == BluetoothAdapter.STATE_DISCONNECTED)) {
+                toast = Toast.makeText(getBaseContext(), message + "\n已发送。", Toast.LENGTH_SHORT);
+                toast.setGravity(53, 50, 100);
                 toast.show();
             }
         } catch (IOException e) {

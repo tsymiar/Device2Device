@@ -1,4 +1,4 @@
-package com.tsymiar.connect;
+package com.tsymiar.SerialConn;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -6,12 +6,16 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.view.KeyEvent;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.Toast;
+
+import com.tsymiar.SerialConn.Sensor.SensorActivity;
+import com.tsymiar.SerialConn.Sensor.SensorListActivity;
 
 public class MainActivity extends Activity {
 
@@ -60,9 +64,8 @@ public class MainActivity extends Activity {
         if (i != 0) {
             animation = AnimationUtils.loadAnimation(this, i);
             toTestAnimation.startAnimation(animation);
-        }
-        else {
-            AnimationUtils.makeOutAnimation(this,true);
+        } else {
+            AnimationUtils.makeOutAnimation(this, true);
         }
     }
 
@@ -81,19 +84,41 @@ public class MainActivity extends Activity {
         ExitApplication.getInstance().exit();
     }
 
-    public void writer(Activity activity) {
-        Intent intent = new Intent(activity, MyGitActivity.class);
-        activity.startActivity(intent);
-    }
-
-    public void feedback(Activity activity) {
-        Intent intent = new Intent(activity, BuggerActivity.class);
-        activity.startActivity(intent);
-    }
-
-    public void more(Activity activity) {
-        Intent intent = new Intent(activity, MoreActivity.class);
-        activity.startActivity(intent);
+    public boolean ItemSelected(MenuItem item, Activity activity) {
+        switch (item.getItemId()) {
+            case R.id.item: {
+                //
+            }
+        }
+        Intent intent;
+        // Handle item selection
+        switch (item.getItemId()) {
+            case R.id.sensor:
+                intent = new Intent(activity, SensorListActivity.class);
+                activity.startActivity(intent);
+                return true;
+            case R.id.chart:
+                intent = new Intent(activity, SensorActivity.class);
+                activity.startActivity(intent);
+                return true;
+            case R.id.feedback:
+                intent = new Intent(activity, BuggerActivity.class);
+                activity.startActivity(intent);
+                return true;
+            case R.id.url:
+                intent = new Intent(activity, MyGitActivity.class);
+                activity.startActivity(intent);
+                return true;
+            case R.id.more:
+                intent = new Intent(activity, ThankActivity.class);
+                activity.startActivity(intent);
+                return true;
+            case R.id.exit:
+                this.exit(activity);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override

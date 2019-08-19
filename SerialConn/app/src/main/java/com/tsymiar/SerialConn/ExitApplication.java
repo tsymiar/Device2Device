@@ -1,4 +1,4 @@
-package com.tsymiar.connect;
+package com.tsymiar.SerialConn;
 
 import android.app.Activity;
 import android.app.Application;
@@ -13,29 +13,35 @@ public class ExitApplication extends Application {
     private List<Activity> mList = new LinkedList<>();
     private List<Service> vList = new LinkedList<>();
     private static ExitApplication instance;
-    ExitApplication(){}
-    public synchronized static ExitApplication getInstance(){
+
+    ExitApplication() {
+    }
+
+    public synchronized static ExitApplication getInstance() {
         if (null == instance) {
             instance = new ExitApplication();
         }
         return instance;
     }
+
     // add Activity
     public void addActivity(Activity activity) {
         mList.add(activity);
     }
+
     // add Service
     public void addService(Service service) {
         vList.add(service);
     }
+
     //close every listed-activity/service
     public void exit() {
         try {
-            for (Activity activity:mList) {
+            for (Activity activity : mList) {
                 if (activity != null)
                     activity.finish();
             }
-            for (Service service:vList) {
+            for (Service service : vList) {
                 if (service != null)
                     service.onDestroy();
             }
@@ -45,6 +51,7 @@ public class ExitApplication extends Application {
             System.exit(0);
         }
     }
+
     //kill the process
     public void onLowMemory() {
         super.onLowMemory();
