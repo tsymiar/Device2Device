@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:tools="http://schemas.android.com/tools"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:transitionGroup="false"
+            tools:ignore="UnusedAttribute">
+
+    <android.support.v7.widget.Toolbar
+        android:id="@+id/about_tool"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:minHeight="?attr/actionBarSize"
+        android:layout_gravity="center_horizontal|top"
+        android:background="@drawable/actionbar_bkg">
+
+    </android.support.v7.widget.Toolbar>
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@mipmap/logo"
+        android:id="@+id/imageView3"
+        tools:ignore="ContentDescription"
+        android:layout_marginTop="50dp"
+        android:layout_below="@+id/about_tool"
+        android:layout_centerHorizontal="true" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/gov"
+        android:text="@string/gov"
+        android:layout_below="@+id/imageView3"
+        android:layout_centerHorizontal="true" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/release"
+        android:text="@string/release"
+        android:layout_below="@+id/gov"
+        android:layout_centerHorizontal="true" />
+
+    <ImageView
+        android:layout_width="60sp"
+        android:layout_height="60sp"
+        android:id="@+id/imageView4"
+        android:src="@mipmap/tel"
+        tools:ignore="ContentDescription"
+        android:layout_below="@+id/release"
+        android:layout_toLeftOf="@+id/release"
+        android:layout_toStartOf="@+id/release" />
+
+    <ImageView
+        android:layout_width="60sp"
+        android:layout_height="60sp"
+        android:id="@+id/imageView5"
+        android:src="@mipmap/map"
+        tools:ignore="ContentDescription,RtlHardcoded"
+        android:layout_below="@+id/release"
+        android:layout_toRightOf="@+id/release"
+        android:layout_toEndOf="@+id/release" />
+
+</RelativeLayout>

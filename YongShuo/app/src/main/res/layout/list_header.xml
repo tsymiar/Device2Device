@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools"
+              android:orientation="horizontal"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:paddingTop="10dp"
+              android:paddingBottom="10dp"
+              android:paddingLeft="10dp"
+              android:gravity="center_vertical"
+              android:background="@drawable/active_bkg">
+
+    <ImageView
+        android:src="@drawable/ic_drawer_login"
+        android:scaleType="centerCrop"
+        android:id="@+id/item_icon"
+        android:layout_marginRight="10dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription=""
+        tools:ignore="ContentDescription"/>
+
+    <TextView xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/item_title"
+              android:layout_width="wrap_content"
+              android:textSize="20sp"
+              android:text="@string/login"
+              android:layout_height="wrap_content"
+              android:textColor="@drawable/text_color_primary_invertible"
+        android:layout_gravity="bottom" />
+
+</LinearLayout>
