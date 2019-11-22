@@ -1,15 +1,57 @@
-language: android  
+language: android
+
+jdk:
+  - oraclejdk8
+  
+sudo: required
+  
 android:
   components:
+    - tools
+    - platform-tools
     - tools
     - build-tools-29.0.2
     - android-28
     - extra-android-m2repository
     - extra-android-support
+    - add-on
+    - extra
 
-before_install:
-  - cd IPCroid
+licenses:
+  - 'android-sdk-preview-license-.+'
+  - 'android-sdk-license-.+'
+  
+before_install:  
+# Skip build if the commit message contains [skip travis] or [travis skip]
+  - >
+       echo "$TRAVIS_COMMIT_MESSAGE"
+       | grep -E  '\[(skip travis|travis skip)\]'
+       && echo "[skip travis] has been found, exiting."
+       && exit 0 || true
   - chmod +x gradlew
-
+  
+install:
+  - echo y | sdkmanager "ndk-bundle"
+  - echo y | sdkmanager --channel=3 --channel=1 "cmake;3.10.2.4988404" 
+  - echo y | sdkmanager "lldb;3.1"
+  
+before_script:
+  - export ANDROID_NDK_HOME=$ANDROID_HOME/ndk-bundle
+  
 script:  
-  - ./gradlew assembleRelease
+  - ./gradlew clean assembleDebug --no-daemon --stacktrace
+  
+before_cache:
+  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -rf $HOME/.gradle/caches/*/plugin-resolution/
+
+notifications:
+  email: false
+  
+cache:
+  directories:
+    - "$HOME/.gradle/caches/"
+    - "$HOME/.gradle/wrapper/"
+    - "$HOME/.m2"
+    - "$HOME/.cache"
+    
