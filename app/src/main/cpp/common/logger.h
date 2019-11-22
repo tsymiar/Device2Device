@@ -36,7 +36,7 @@
 #else
 #ifndef LogDebug
 #define logger(fm, ...) do { va_list args; va_start(args, fm); (void) vprintf(fm, args); va_end(args); (void) printf("\n"); } while(0)
-#define LogDebug(module, format, ...) do{ \
+#define LogDebug(module, format, ...) do { \
     time_t now = time(NULL); \
     struct tm * local = localtime(&now); \
     logger(TIME_FORMAT "Debug:" LOCATE_FORMAT format,TIME_ARGS(local),LOCATE_ARGS(module),##__VA_ARGS__); \
@@ -44,8 +44,8 @@
 #endif
 #endif
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG,__VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 #endif
 #endif //IPCROID_LOGGER_H
