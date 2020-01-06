@@ -1,5 +1,5 @@
-#ifndef IPCROID_CALLJAVAMETHOD_H
-#define IPCROID_CALLJAVAMETHOD_H
+#ifndef DEVIDROID_CALLJAVAMETHOD_H
+#define DEVIDROID_CALLJAVAMETHOD_H
 
 #include <string>
 
@@ -16,9 +16,7 @@ private:
 public:
     static CallJavaMethod *getInstance();
 
-    void callStaticMethod(const std::string &method, int action, const char *content);
-
-    void callNonstaticMethod(const std::string &method, int action, const char *content);
+    void callMethodBack(const std::string &method, int action, const char *content, bool statics);
 };
 
-#endif //IPCROID_CALLJAVAMETHOD_H
+#endif //DEVIDROID_CALLJAVAMETHOD_H

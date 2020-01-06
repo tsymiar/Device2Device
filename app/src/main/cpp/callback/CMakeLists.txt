@@ -6,8 +6,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS} -g -ftest-coverage -fprofile-arcs -Wno-deprecated")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 
-add_library(callback SHARED ../jniComm.cpp CallJavaMethod.cpp)
-add_library(callback_static STATIC ../jniComm.cpp CallJavaMethod.cpp)
+add_library(callback SHARED CallJavaMethod.cpp)
+add_library(callback_static STATIC CallJavaMethod.cpp)
 
 target_link_libraries(callback log)
 

@@ -4,7 +4,7 @@
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
-PROJECT(IPCroid CXX)
+PROJECT(Devidroid CXX)
 
 set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
@@ -15,6 +15,7 @@ include_directories(
         ${PROJECT_SOURCE_DIR}
 )
 
+add_subdirectory(runtime)
 add_subdirectory(callback)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
 # Creates and names a library, sets it as either STATIC
@@ -29,7 +30,7 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        jniComm.cpp callback/CallJavaMethod.cpp)
+        jniComm.cpp texture/TextureView.cpp callback/CallJavaMethod.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -43,12 +44,16 @@ find_library( # Sets the name of the path variable.
         # you want CMake to locate.
         log)
 
+find_library(android android)
+find_library(EGL EGL)
+find_library(GLESv2 GLESv2)
+
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-        jniComm
+        jniComm callback timestamp
         # Links the target library to the log library
         # included in the NDK.
-        ${log-lib} )
+        ${log-lib} ${android} ${EGL} ${GLESv2})

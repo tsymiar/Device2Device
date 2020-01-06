@@ -93,14 +93,12 @@ CallJavaMethod::callback(const std::string &method, int action, const char *cont
         g_jniJVM->DetachCurrentThread();
 }
 
-void CallJavaMethod::callStaticMethod(const std::string &method, int action, const char *content)
+void CallJavaMethod::callMethodBack(const std::string &method,
+                                    int action,
+                                    const char *content,
+                                    bool statics)
 {
     std::lock_guard<std::mutex> lock(g_lock);
-    callback(method, action, content, true);
+    callback(method, action, content, statics);
 }
 
-void CallJavaMethod::callNonstaticMethod(const std::string &method, int action, const char *content)
-{
-    std::lock_guard<std::mutex> lock(g_lock);
-    callback(method, action, content, false);
-}

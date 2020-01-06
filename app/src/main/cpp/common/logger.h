@@ -2,8 +2,8 @@
 // Created by dell-pc on 2019/11/9.
 //
 
-#ifndef IPCROID_LOGGER_H
-#define IPCROID_LOGGER_H
+#ifndef DEVIDROID_LOGGER_H
+#define DEVIDROID_LOGGER_H
 
 #ifndef LOG_TAG
 #error Please define 'LOG_TAG' constant at first.
@@ -30,7 +30,6 @@
 #define LOCATE_FORMAT " %s %s %s():%d "
 #endif
 
-
 #ifdef NOLOGDEBUG
 #define LogDebug(...)
 #else
@@ -48,4 +47,4 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 #endif
-#endif //IPCROID_LOGGER_H
+#endif //DEVIDROID_LOGGER_H

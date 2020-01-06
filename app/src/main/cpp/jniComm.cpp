@@ -2,19 +2,48 @@
 #define LOG_TAG "jniComm"
 #endif
 
-#include <mutex>
-#include <string>
 #include <common/logger.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "../jni/jniInc.h"
-#ifdef __cplusplus
-}
-#endif
+#include <mutex>
+#include <string>
+#include <android/native_window.h>
+#include <runtime/TimeStamp.h>
 
+#include "../jni/jniInc.h"
+#include "texture/TextureView.h"
 #include "callback/CallJavaMethod.h"
+
+static jint JNI_RESULT = -1;
+
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
+{
+    typedef union {
+        JNIEnv *env;
+        void *rsv;
+    } UnionJNIEnvToVoid;
+    UnionJNIEnvToVoid envToVoid;
+    LOGI("Media Tag: JNI OnLoad\n");
+
+#ifdef JNI_VERSION_1_6
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_6\n");
+        JNI_RESULT = JNI_VERSION_1_6;
+    }
+#endif
+#ifdef JNI_VERSION_1_4
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_4\n");
+        JNI_RESULT = JNI_VERSION_1_4;
+    }
+#endif
+#ifdef JNI_VERSION_1_2
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_2\n");
+        JNI_RESULT = JNI_VERSION_1_2;
+    }
+#endif
+    return JNI_RESULT;
+}
 
 jstring cstring2jstring(JNIEnv *env, const char *pat)
 {
@@ -76,7 +105,6 @@ jstring getPackageName(JNIEnv *env)
     return package;
 }
 
-extern "C" {
 extern jclass g_jniCls;
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
@@ -100,27 +128,52 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
 {
     std::string hello = "C++ string of JNI!";
     char text[16] = {0x1a, 0x13, 0x00, 0x07,
-                    static_cast<char>(0xcc), static_cast<char>(0xff),
-                    static_cast<char>(0xe0), static_cast<char>(0x88)};
+                     static_cast<char>(0xcc), static_cast<char>(0xff),
+                     static_cast<char>(0xe0), static_cast<char>(0x88)};
     Statics::printBuffer(text, 32);
     return env->NewStringUTF(hello.c_str());
 }
 
 JNIEXPORT void
-CPP_FUNC_CALL(callJavaStaticMethod)(JNIEnv *env, jclass, jstring method, jint action,
-                                    jstring content)
+CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, jstring content,
+                              jboolean statics)
 {
-    CallJavaMethod::getInstance()->callStaticMethod(jstring2cstring(env, method),
-                                                    static_cast<int>(action),
-                                                    jstring2cstring(env, content).c_str());
+    CallJavaMethod::getInstance()->callMethodBack(jstring2cstring(env, method),
+                                                  static_cast<int>(action),
+                                                  jstring2cstring(env, content).c_str(),
+                                                  statics);
 }
 
-JNIEXPORT void
-CPP_FUNC_CALL(callJavaNonstaticMethod)(JNIEnv *env, jclass, jstring method, jint action,
-                                       jstring content)
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint selection)
 {
-    CallJavaMethod::getInstance()->callNonstaticMethod(jstring2cstring(env, method),
-                                                       static_cast<int>(action),
-                                                       jstring2cstring(env, content).c_str());
+    static int iteration = 0;
+    static constexpr uint32_t colors[] = {
+            0x88bf360c,
+            0xcc3e2723,
+            0xaaffdd60,
+            0x6664dd17,
+            0x880277ac,
+            0xff880e4f
+    };
+
+    using namespace TextureView;
+    int jvs = loadSurfaceView(env);
+    if (jvs > 0) {
+        LOGI("loaded Surface class: %x", jvs);
+    }
+    ANativeWindow *window = updateTextureWindow(env, texture, selection);
+    if (window != nullptr) {
+        drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+    }
 }
+
+JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass)
+{
+    return TimeStamp::get()->AbsoluteTime();
+}
+
+JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
+{
+    return TimeStamp::get()->BootTime();
 }
