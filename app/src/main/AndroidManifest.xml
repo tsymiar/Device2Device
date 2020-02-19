@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
         <activity android:name="com.tsymiar.devidroid.activity.TextureActivity"/>
-        <!--<activity android:name="com.tsymiar.devidroid.activity.WaveActivity"/>-->
+        <activity android:name="com.tsymiar.devidroid.activity.WaveActivity"/>
     </application>
 
 </manifest>

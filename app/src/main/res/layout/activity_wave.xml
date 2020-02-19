@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal">
+
+    <com.tsymiar.devidroid.view.WaveSurfaceView
+        android:id="@+id/wave_surface"
+        android:layout_width="fill_parent"
+        android:layout_height="240dp" />
+
+    <com.tsymiar.devidroid.view.WaveformView
+        android:id="@+id/wave_form"
+        android:layout_width="fill_parent"
+        android:layout_height="240dp"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/wave_status"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/wave_surface"
+        android:layout_marginStart="10dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="10dp"
+        android:text="@string/status" />
+
+    <Button
+        android:id="@+id/wave_read"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/wave_status"
+        android:text="@string/read"
+        android:layout_marginRight="@android:dimen/thumbnail_width"
+        android:layout_marginEnd="@android:dimen/thumbnail_width" />
+
+    <Button
+        android:id="@+id/wave_record"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/wave_status"
+        android:text="@string/record"
+        android:layout_marginLeft="@android:dimen/thumbnail_width"
+        android:layout_marginStart="@android:dimen/thumbnail_width" />
+
+</RelativeLayout>
