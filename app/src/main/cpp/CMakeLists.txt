@@ -45,6 +45,7 @@ find_library( # Sets the name of the path variable.
         log)
 
 find_library(android android)
+find_library(SLES OpenSLES)
 find_library(EGL EGL)
 find_library(GLESv2 GLESv2)
 
@@ -56,4 +57,4 @@ target_link_libraries( # Specifies the target library.
         jniComm callback timestamp
         # Links the target library to the log library
         # included in the NDK.
-        ${log-lib} ${android} ${EGL} ${GLESv2})
+        ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

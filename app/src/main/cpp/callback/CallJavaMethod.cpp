@@ -101,4 +101,3 @@ void CallJavaMethod::callMethodBack(const std::string &method,
     std::lock_guard<std::mutex> lock(g_lock);
     callback(method, action, content, statics);
 }
-

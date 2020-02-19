@@ -31,9 +31,11 @@ public class MainActivity extends AppCompatActivity {
         button.setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, TextureActivity.class))
         );
+        /*
         Button btnAudio = findViewById(R.id.btn_audio);
         btnAudio.setOnClickListener(
-                v -> startActivity(new Intent(MainActivity.this, AudioActivity.class))
+                v -> startActivity(new Intent(MainActivity.this, WaveActivity.class))
         );
+         */
     }
 }

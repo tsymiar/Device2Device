@@ -16,5 +16,4 @@ public:
     unsigned long long AbsoluteTime();
 };
 
-
 #endif //DEVIDROID_TIMESTAMP_H

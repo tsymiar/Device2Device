@@ -127,9 +127,10 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
         jobject /* this */)
 {
     std::string hello = "C++ string of JNI!";
-    char text[16] = {0x1a, 0x13, 0x00, 0x07,
-                     static_cast<char>(0xcc), static_cast<char>(0xff),
-                     static_cast<char>(0xe0), static_cast<char>(0x88)};
+    char text[16] = {
+            0x1a, 0x13, 0x00, 0x07,
+            static_cast<char>(0xcc), static_cast<char>(0xff),
+            static_cast<char>(0xe0), static_cast<char>(0x88)};
     Statics::printBuffer(text, 32);
     return env->NewStringUTF(hello.c_str());
 }
@@ -144,27 +145,64 @@ CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, 
                                                   statics);
 }
 
-JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint selection)
+JNIEXPORT jboolean JNICALL
+CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
 {
-    static int iteration = 0;
-    static constexpr uint32_t colors[] = {
-            0x88bf360c,
-            0xcc3e2723,
-            0xaaffdd60,
-            0x6664dd17,
-            0x880277ac,
-            0xff880e4f
-    };
+    const char *file_in = jstring2cstring(env, filename).c_str();
+    FILE *fp_in = fopen(file_in, "rbe");
+    if (nullptr == fp_in) {
+        LOGE("open input h264 video file failed, filename [%s]", file_in);
+        return (jboolean) JNI_FALSE;
+    }
+    return JNI_TRUE;
+}
 
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring url)
+{
     using namespace TextureView;
-    int jvs = loadSurfaceView(env);
+    int jvs = loadSurfaceView(env, texture);
     if (jvs > 0) {
         LOGI("loaded Surface class: %x", jvs);
     }
-    ANativeWindow *window = updateTextureWindow(env, texture, selection);
+    const char *filename = env->GetStringUTFChars(url, JNI_FALSE);
+    ANativeWindow *window = initOpenGL(filename);
     if (window != nullptr) {
+        LOGD("OpenGL rendering initialized");
+        drawRGBColor(1280, 720);
+    } else {
+        LOGE("native window = null while initOpenGL");
+    }
+    env->ReleaseStringUTFChars(url, filename);
+}
+
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item)
+{
+    if (item == 0) {
+        // No implementation selected
+        LOGD("De-initialized");
+        return;
+    }
+    using namespace TextureView;
+    int jvs = loadSurfaceView(env, texture);
+    if (jvs > 0) {
+        LOGI("loaded Surface class: %x", jvs);
+    }
+    if (item == 1) {
+        LOGD("CPU rendering initialized");
+        static constexpr uint32_t colors[] = {
+                0x88bf360c,
+                0xcc3e2723,
+                0xaaffdd60,
+                0x6664dd17,
+                0x880277ac,
+                0xff880e4f
+        };
+        static int iteration = 0;
         drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+    } else {
+        LOGE("Rendering initialize fail");
     }
 }
 

@@ -43,8 +43,8 @@
 #endif
 #endif
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG,__VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#define LOGI(fmt,...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG,"[%s:%s]",basename(__FILE__),__FUNCTION__,##__VA_ARGS__)
+#define LOGD(fmt,...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,"[%s:%s]",basename(__FILE__),__FUNCTION__,##__VA_ARGS__)
+#define LOGE(fmt,...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,"[%s:%s]",basename(__FILE__),__FUNCTION__,##__VA_ARGS__)
 #endif
 #endif //DEVIDROID_LOGGER_H

@@ -7,6 +7,7 @@ public class ViewWrapper {
     static {
         System.loadLibrary("jniComm");
     }
+    public static native void updateEglSurface(SurfaceTexture tex, String url);
 
-    public static native void updateSurfaceView(SurfaceTexture tex, int i);
+    public static native void updateSurfaceView(SurfaceTexture tex, int item);
 }

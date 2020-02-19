@@ -2,6 +2,7 @@ package com.tsymiar.devidroid.activity;
 
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.AdapterView;
@@ -116,13 +117,19 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
         // Each draw updates the texture and logs on its own
     }
+    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
+            + "/Android/data/" + "com.tsymiar.devidroid" + "/cache/";
 
-    public void updateSurfaceView(@IntRange(from = 0) int selection) {
+    public void updateSurfaceView(@IntRange(from = 0) int item) {
         final SurfaceTexture texture = mTextureView.getSurfaceTexture();
         String[] selValue = getResources().getStringArray(R.array.types);
-        log(String.format(Locale.ROOT, "updateSurfaceView (%d, %s)", selection, selValue[selection]));
-        if (texture != null)
-            ViewWrapper.updateSurfaceView(texture, selection);
+        log(String.format(Locale.ROOT, "updateSurfaceView (%d, %s)", item, selValue[item]));
+        if (texture != null && item != 2) {
+            ViewWrapper.updateSurfaceView(texture, item);
+        }
+        if (item == 2) {
+            ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY + "test.h264");
+        }
     }
 
     public void ReLoad(@NonNull View view) {

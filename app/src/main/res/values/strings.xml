@@ -8,5 +8,8 @@
 
     <string name="reload">Re-init</string>
     <string name="texture">Texture</string>
-    <string name="audio">Audio</string>
+    <string name="wave">Wave</string>
+    <string name="status">status</string>
+    <string name="read">read</string>
+    <string name="record">record</string>
 </resources>

@@ -6,11 +6,13 @@
 
 namespace TextureView {
 
-    int loadSurfaceView(JNIEnv *env);
+    int loadSurfaceView(JNIEnv *env, jobject texture);
 
-    ANativeWindow *updateTextureWindow(JNIEnv *env, jobject texture, jint selection);
+    ANativeWindow *initOpenGL(const char* filename);
 
     void drawRGBColor(uint32_t color);
+
+    int drawRGBColor(int height, int width);
 
 }
 
