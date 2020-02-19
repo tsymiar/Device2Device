@@ -9,3 +9,4 @@ captures
 .cxx
 app/src/main/jniLibs
 *.zip
+gradle/wrapper/gradle-wrapper.properties
