@@ -14,12 +14,15 @@ import android.view.SurfaceView;
 import android.view.View;
 
 import com.tsymiar.devidroid.view.WaveSurfaceView;
+import com.tsymiar.devidroid.wrapper.FileWrapper;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+
+import static android.media.AudioRecord.STATE_INITIALIZED;
 
 /**
  * 波形和写入文件使用了两个不同的线程，以免造成卡机现象
@@ -38,7 +41,7 @@ public class WaveCanvas {
     private int line_off;//上下边距的距离
     private int rateX = 100;//控制多少帧取一帧
     private int baseLine = 0;// Y轴基线
-    private AudioRecord audioRecord;
+    private PaintingTask audioTask = null;
     private int marginRight = 30;//波形图绘制距离右边的距离
     private float divider = 0.2f;//为了节约绘画时间，每0.2个像素画一个数据
     private long c_time;//当前时间戳
@@ -66,7 +69,8 @@ public class WaveCanvas {
         savePcmPath = path + audioName + ".pcm";
         saveWavPath = path + audioName + ".wav";
         new Thread(new WriteRunnable()).start();//开线程写文件
-        new PaintingTask(audioRecord, recBufSize, sfv, mPaint, callback).execute();
+        audioTask = new PaintingTask(audioRecord, recBufSize, sfv, mPaint, callback);
+        audioTask.execute();
     }
 
     private void init() {
@@ -104,7 +108,9 @@ public class WaveCanvas {
      */
     public void Stop() {
         isRecording = false;
-        audioRecord.stop();
+        if (audioTask != null) {
+            audioTask.StopRecord();
+        }
         //inBuf.clear();// 清除
     }
 
@@ -273,6 +279,12 @@ public class WaveCanvas {
             }
             sfv.getHolder().unlockCanvasAndPost(canvas);// 解锁画布，提交画好的图像
         }
+
+        void StopRecord() {
+            if (audioRecord.getState() == STATE_INITIALIZED) {
+                audioRecord.stop();
+            }
+        }
     }
 
     /**
@@ -314,8 +326,8 @@ public class WaveCanvas {
                 }
                 assert fos2wav != null;
                 fos2wav.close();
-                Pcm2Wav p2w = new Pcm2Wav();//将pcm格式转换成wav一个44字节的头信息
-                p2w.convertAudioFiles(savePcmPath, saveWavPath);
+                //将pcm格式转换成wav一个44字节的头信息
+                FileWrapper.convertAudioFiles(savePcmPath, saveWavPath);
             } catch (Throwable t) {
                 Log.e(TAG, t.toString());
             }

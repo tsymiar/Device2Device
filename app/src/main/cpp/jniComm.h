@@ -10,6 +10,9 @@
 #define Time_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_TimeWrapper_##func
 #define CPP_FUNC_TIME(func) JNICALL Time_WRAPPER(func)
 
+#define File_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_FileWrapper_##func
+#define CPP_FUNC_FILE(func) JNICALL File_WRAPPER(func)
+
 #include <jni.h>
 
 #ifdef __cplusplus
@@ -31,6 +34,8 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint sele
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);
+
+JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *, jclass, jstring, jstring);
 #ifdef __cplusplus
 }
 #endif

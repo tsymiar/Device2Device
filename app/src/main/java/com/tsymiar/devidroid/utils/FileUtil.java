@@ -10,7 +10,7 @@ public class FileUtil {
 
     public static void createDirectory(String fullPath) {
         if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-            Log.e(TAG, "ExternalStorageState = '" + Environment.MEDIA_MOUNTED);
+            Log.i(TAG, "ExternalStorageState = " + Environment.MEDIA_MOUNTED);
         }
         File file = new File(fullPath);
         if (!file.exists()) {

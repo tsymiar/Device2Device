@@ -15,6 +15,7 @@ include_directories(
         ${PROJECT_SOURCE_DIR}
 )
 
+add_subdirectory(file)
 add_subdirectory(runtime)
 add_subdirectory(callback)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
@@ -54,7 +55,7 @@ find_library(GLESv2 GLESv2)
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-        jniComm callback timestamp
+        jniComm callback timestamp fileIO
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

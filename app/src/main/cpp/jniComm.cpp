@@ -215,3 +215,10 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 {
     return TimeStamp::get()->BootTime();
 }
+
+#include <file/Pcm2Wav.h>
+
+JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv * env, jclass, jstring from, jstring save)
+{
+    return convertAudioFiles(jstring2cstring(env, from).c_str(), jstring2cstring(env, save).c_str());
+}
