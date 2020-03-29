@@ -12,7 +12,7 @@ namespace TextureView {
 
     void drawRGBColor(uint32_t color);
 
-    int drawRGBColor(int height, int width);
+    int drawRGBColor(size_t height, size_t width);
 
 }
 

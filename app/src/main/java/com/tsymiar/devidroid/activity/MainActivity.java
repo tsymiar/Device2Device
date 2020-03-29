@@ -2,7 +2,6 @@ package com.tsymiar.devidroid.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -27,13 +26,14 @@ public class MainActivity extends AppCompatActivity {
 
         TimeWrapper.getBootTimestamp();
 
-        Button button = findViewById(R.id.button);
-        button.setOnClickListener(
+        findViewById(R.id.button).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, TextureActivity.class))
         );
-        Button btnAudio = findViewById(R.id.btn_audio);
-        btnAudio.setOnClickListener(
+        findViewById(R.id.btn_audio).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, WaveActivity.class))
+        );
+        findViewById(R.id.btn_chart).setOnClickListener(
+                v -> startActivity(new Intent(MainActivity.this, ChartActivity.class))
         );
     }
 }

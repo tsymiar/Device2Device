@@ -4,6 +4,7 @@
         <item>None</item>
         <item>CPU rendering</item>
         <item>OpenGL</item>
+        <item>OpenGL-file</item>
     </string-array>
 
     <string name="reload">Re-init</string>
@@ -12,4 +13,7 @@
     <string name="status">status</string>
     <string name="read">read</string>
     <string name="record">record</string>
+    <string name="chart">chart</string>
+    <string name="viewGithub">View on GitHub</string>
+    <string name="close">Close</string>
 </resources>

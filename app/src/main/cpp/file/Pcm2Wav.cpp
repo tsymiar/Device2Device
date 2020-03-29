@@ -10,7 +10,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "Pcm2Wav"
 #endif
-#include <common/logger.h>
+#include <utils/logger.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};
 const char fileID[] = {'R', 'I', 'F', 'F'};

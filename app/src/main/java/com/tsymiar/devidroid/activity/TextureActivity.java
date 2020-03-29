@@ -124,10 +124,10 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         final SurfaceTexture texture = mTextureView.getSurfaceTexture();
         String[] selValue = getResources().getStringArray(R.array.types);
         log(String.format(Locale.ROOT, "updateSurfaceView (%d, %s)", item, selValue[item]));
-        if (texture != null && item != 2) {
+        if (texture != null && item != 3) {
             ViewWrapper.updateSurfaceView(texture, item);
         }
-        if (item == 2) {
+        if (item == 3) {
             ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY + "test.h264");
         }
     }

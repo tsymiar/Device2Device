@@ -11,7 +11,7 @@
 #define LOG_TAG "SurfaceTexture"
 #endif
 
-#include <common/logger.h>
+#include <utils/logger.h>
 
 /** Classes and methods from JNI. */
 namespace JNI {
@@ -262,7 +262,7 @@ void TextureView::drawRGBColor(uint32_t argb)
  *
  * @param color Color to draw (ARGB).
  */
-int TextureView::drawRGBColor(int height, int width)
+int TextureView::drawRGBColor(size_t height, size_t width)
 {
     // -*-*-*-*-*-*- OpenGL rendering -*-*-*-*-*-*-
     if (EGL2::surface == nullptr) {
@@ -292,9 +292,9 @@ int TextureView::drawRGBColor(int height, int width)
     // auto contextCurrentGuard = guard([=]{ eglMakeCurrent(EGL2::display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT); });
 
     //定点shader初始化
-    GLuint vuShader = initShader(vertexShader, GL_VERTEX_SHADER);
+    GLuint vuShader = static_cast<GLuint>(initShader(vertexShader, GL_VERTEX_SHADER));
     //片元yuv420 shader初始化
-    GLuint fuShader = initShader(fragYUV420P, GL_FRAGMENT_SHADER);
+    GLuint fuShader = static_cast<GLuint>(initShader(fragYUV420P, GL_FRAGMENT_SHADER));
     //创建渲染程序
     GLuint program = glCreateProgram();
     if (program == 0) {
@@ -530,7 +530,7 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
 {
     g_fpUrl = fopen(filename, "rbe");
     if (!g_fpUrl) {
-        LOGE("[%s] open file '%s' failed!", __FUNCTION__, filename);
+        LOGE("open file '%s' failed!", filename);
         return nullptr;
     }
     // Display and config need to be initialized only once

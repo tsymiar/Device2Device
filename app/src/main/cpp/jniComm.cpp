@@ -2,7 +2,7 @@
 #define LOG_TAG "jniComm"
 #endif
 
-#include <common/logger.h>
+#include <utils/logger.h>
 
 #include <mutex>
 #include <string>
@@ -120,7 +120,7 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name
     LOGI("class_name = %s, state = %d.", g_className.c_str(), state);
 }
 
-#include "common/statics.h"
+#include "utils/statics.h"
 
 JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
         JNIEnv *env,
@@ -135,6 +135,12 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
     return env->NewStringUTF(hello.c_str());
 }
 
+int callback(const char *c, int i)
+{
+    LOGE("param1 = %s, param2 = %d.", c, i);
+    return i;
+}
+
 JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, jstring content,
                               jboolean statics)
@@ -143,6 +149,9 @@ CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, 
                                                   static_cast<int>(action),
                                                   jstring2cstring(env, content).c_str(),
                                                   statics);
+    CallJavaMethod::CALLBACK call = callback;
+    int val = CallJavaMethod::getInstance()->registerCallBack(const_cast<char *>("aaa"), call);
+    LOGI("callback = %p, val = %d.", call, val);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -171,7 +180,7 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring ur
         LOGD("OpenGL rendering initialized");
         drawRGBColor(1280, 720);
     } else {
-        LOGE("native window = null while initOpenGL");
+        LOGE("native window = null while initOpenGL.");
     }
     env->ReleaseStringUTFChars(url, filename);
 }
@@ -189,7 +198,7 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
     if (jvs > 0) {
         LOGI("loaded Surface class: %x", jvs);
     }
-    if (item == 1) {
+    if (item < 3) {
         LOGD("CPU rendering initialized");
         static constexpr uint32_t colors[] = {
                 0x88bf360c,
@@ -218,7 +227,9 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <file/Pcm2Wav.h>
 
-JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv * env, jclass, jstring from, jstring save)
+JNIEXPORT jint JNICALL
+CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
 {
-    return convertAudioFiles(jstring2cstring(env, from).c_str(), jstring2cstring(env, save).c_str());
+    return convertAudioFiles(jstring2cstring(env, from).c_str(),
+                             jstring2cstring(env, save).c_str());
 }

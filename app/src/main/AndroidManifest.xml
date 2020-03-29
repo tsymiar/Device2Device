@@ -4,7 +4,7 @@
     package="com.tsymiar.devidroid">
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
@@ -15,15 +15,17 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning">
-        <activity android:name="com.tsymiar.devidroid.activity.MainActivity">
+
+        <activity android:name=".activity.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.tsymiar.devidroid.activity.TextureActivity"/>
-        <activity android:name="com.tsymiar.devidroid.activity.WaveActivity"/>
+        <activity android:name=".activity.TextureActivity" />
+        <activity android:name=".activity.WaveActivity" />
+        <activity android:name=".activity.ChartActivity" />
     </application>
 
 </manifest>

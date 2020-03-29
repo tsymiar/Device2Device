@@ -205,7 +205,10 @@ public class WaveActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        mPlayer.stop();
         super.onStop();
+        if (mPlayer == null) {
+            return;
+        }
+        mPlayer.stop();
     }
 }

@@ -12,7 +12,7 @@
     <com.tsymiar.devidroid.view.WaveformView
         android:id="@+id/wave_form"
         android:layout_width="fill_parent"
-        android:layout_height="240dp"
+        android:layout_height="wrap_content"
         android:visibility="invisible" />
 
     <TextView

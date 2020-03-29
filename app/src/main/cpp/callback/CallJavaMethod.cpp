@@ -3,7 +3,8 @@
 #endif
 
 #include <algorithm>
-#include <common/logger.h>
+#include <thread>
+#include <utils/logger.h>
 
 #include "CallJavaMethod.h"
 
@@ -100,4 +101,18 @@ void CallJavaMethod::callMethodBack(const std::string &method,
 {
     std::lock_guard<std::mutex> lock(g_lock);
     callback(method, action, content, statics);
+}
+
+int CallJavaMethod::registerCallBack(char *method, CALLBACK call)
+{
+    int a = 999;
+    std::thread th1([](CALLBACK callback, int a, const char *c) {
+        LOGI("a = %d", a);
+        a--;
+        callback(c, a);
+        LOGI("has call 'call': %p, (%d, %s)", callback, a, c);
+    }, call, /*std::ref*/(a), method);
+    if (th1.joinable())
+        th1.detach();
+    return a;
 }
