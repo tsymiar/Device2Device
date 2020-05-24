@@ -6,6 +6,7 @@
 
 #include <mutex>
 #include <string>
+#include <thread>
 #include <android/native_window.h>
 #include <runtime/TimeStamp.h>
 
@@ -226,10 +227,38 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 }
 
 #include <file/Pcm2Wav.h>
+#include <network/SocketNet.h>
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
 {
     return convertAudioFiles(jstring2cstring(env, from).c_str(),
                              jstring2cstring(env, save).c_str());
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
+                                                     jstring text, jint len)
+{
+    std::string txt = jstring2cstring(env, text);
+    const char *tx = txt.c_str();
+    LOGI("text = %s, %d", tx, len);
+    SocketNet *sock = new SocketNet("127.0.0.1", 9999);
+    sock->Send(tx, (unsigned int) len);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
+{
+    std::thread th(
+            []() -> int {
+                SocketNet *sock = new SocketNet();
+                sock->Init();
+                char buff[36];
+                sock->Recv(buff, 36);
+                return 0;
+            }
+    );
+    if (th.joinable())
+        th.detach();
+    return 0;
 }

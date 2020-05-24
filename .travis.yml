@@ -29,11 +29,13 @@ before_install:
        && echo "[skip travis] has been found, exiting."
        && exit 0 || true
   - chmod +x gradlew
+  - touch ~/.android/repositories.cfg
   
 install:
   - echo y | sdkmanager "ndk-bundle"
-  - echo y | sdkmanager --channel=3 --channel=1 "cmake;3.10.2.4988404" 
-  - echo y | sdkmanager "lldb;3.1"
+  - echo y | sdkmanager --channel=3 --channel=1 "cmake;3.10.2.4988404"
+  - echo y | sdkmanager 'ndk;21.1.6352462'
+  - echo y | sdkmanager "cmake;3.10.2.4988404"
   
 before_script:
   - export ANDROID_NDK_HOME=$ANDROID_HOME/ndk-bundle

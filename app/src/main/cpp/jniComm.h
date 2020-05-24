@@ -13,6 +13,9 @@
 #define File_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_FileWrapper_##func
 #define CPP_FUNC_FILE(func) JNICALL File_WRAPPER(func)
 
+#define Network_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_NetWrapper_##func
+#define CPP_FUNC_NETWORK(func) JNICALL Network_WRAPPER(func)
+
 #include <jni.h>
 
 #ifdef __cplusplus
@@ -36,6 +39,8 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);
 
 JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *, jclass, jstring, jstring);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *, jclass, jstring text, jint len);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *env, jclass);
 #ifdef __cplusplus
 }
 #endif

@@ -16,4 +16,6 @@
     <string name="chart">chart</string>
     <string name="viewGithub">View on GitHub</string>
     <string name="close">Close</string>
+    <string name="server">server</string>
+    <string name="client">client</string>
 </resources>
