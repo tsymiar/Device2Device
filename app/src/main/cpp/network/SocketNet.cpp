@@ -73,20 +73,32 @@ int SocketNet::Send(const char *sendBuff, size_t length)
 
 int SocketNet::Recv(char *rcvBuff, int len)
 {
+    fd_set fds;
+    int maxFdp = m_socket + 1;
     struct sockaddr_in remote;
+    struct timeval timeout;
     socklen_t size = sizeof(remote);
-    while (1) {
-        ssize_t _s = recvfrom(m_socket, rcvBuff, static_cast<size_t>(len), 0, (struct sockaddr *) &remote, &size);
-        if (_s > 0) {
-            rcvBuff[_s] = '\0';
-            LOGI("client:[%s:%d]  %s, len = %d.", inet_ntoa(remote.sin_addr),
-                 ntohs(remote.sin_port), rcvBuff, strlen(rcvBuff));
-        } else if (_s == 0) {
-            LOGI("client close");
-            break;
-        } else
-            break;
+    while (!m_flag) {
+        FD_ZERO(&fds);
+        FD_SET(m_socket, &fds);
+        timeout.tv_usec = 0;
+        timeout.tv_sec = 3;
+        if (0 < select(maxFdp, &fds, NULL, NULL, &timeout)) {
+            if (FD_ISSET(m_socket, &fds)) {
+                ssize_t _s = recvfrom(m_socket, rcvBuff, static_cast<size_t>(len), 0,
+                                      (struct sockaddr *) &remote, &size);
+                if (_s > 0) {
+                    rcvBuff[_s] = '\0';
+                    LOGI("client:[%s:%d]  %s, len = %d.", inet_ntoa(remote.sin_addr),
+                         ntohs(remote.sin_port), rcvBuff, strlen(rcvBuff));
+                } else if (_s == 0) {
+                    LOGI("client close");
+                    break;
+                } else
+                    break;
+            }
+        }
+        close(m_socket);
+        return 0;
     }
-    close(m_socket);
-    return 0;
 }

@@ -280,10 +280,10 @@ int TextureView::drawRGBColor(size_t height, size_t width)
     }
     // Note the dot after divide, the division has to be floating-point
     glClearColor(
+            0xff000000 / 4294967296.f,
             0x00ff0000 / 16777216.f,
             0x0000ff00 / 65536.f,
-            0x000000ff / 256.f,
-            0xff000000 / 4294967296.f);
+            0x000000ff / 256.f);
     glClear(GL_COLOR_BUFFER_BIT);
     glFinish();
     /* If you move eglMakeCurrent(EGL::context) to initialization, eglMakeCurrent(EGL_NO_CONTEXT)

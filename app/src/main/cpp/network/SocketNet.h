@@ -12,6 +12,7 @@ private:
     int m_socket = -1;
     std::string m_ip = {};
     int m_port = 0;
+    int m_flag = false;
 public:
     SocketNet();
 

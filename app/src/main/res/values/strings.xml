@@ -3,7 +3,6 @@
     <string-array name="types">
         <item>None</item>
         <item>CPU rendering</item>
-        <item>OpenGL</item>
         <item>OpenGL-file</item>
     </string-array>
 

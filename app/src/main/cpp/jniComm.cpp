@@ -189,30 +189,35 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring ur
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item)
 {
-    if (item == 0) {
-        // No implementation selected
-        LOGD("De-initialized");
-        return;
-    }
     using namespace TextureView;
-    int jvs = loadSurfaceView(env, texture);
-    if (jvs > 0) {
-        LOGI("loaded Surface class: %x", jvs);
+    if (item != 1 && item != 2) {
+        int jvs = loadSurfaceView(env, texture);
+        if (jvs > 0) {
+            LOGI("loaded Surface class: %x", jvs);
+        }
     }
-    if (item < 3) {
-        LOGD("CPU rendering initialized");
-        static constexpr uint32_t colors[] = {
-                0x88bf360c,
-                0xcc3e2723,
-                0xaaffdd60,
-                0x6664dd17,
-                0x880277ac,
-                0xff880e4f
-        };
-        static int iteration = 0;
-        drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
-    } else {
-        LOGE("Rendering initialize fail");
+    switch (item) {
+        case 0:
+            // No implementation selected
+            LOGD("De-initialized");
+            return;
+        case 1: {
+            LOGD("CPU rendering initialized");
+            static int iteration = 0;
+            static constexpr uint32_t colors[] = {
+                    0x88bf360c,
+                    0xcc3e2723,
+                    0xaaffdd60,
+                    0x6664dd17,
+                    0x880277ac,
+                    0xff880e4f
+            };
+            drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+            break;
+        }
+        default:
+            LOGE("Rendering initialize fail");
+            return;
     }
 }
 

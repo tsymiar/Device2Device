@@ -124,10 +124,10 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         final SurfaceTexture texture = mTextureView.getSurfaceTexture();
         String[] selValue = getResources().getStringArray(R.array.types);
         log(String.format(Locale.ROOT, "updateSurfaceView (%d, %s)", item, selValue[item]));
-        if (texture != null && item != 3) {
+        if (texture != null && item != 2) {
             ViewWrapper.updateSurfaceView(texture, item);
         }
-        if (item == 3) {
+        if (item == 2) {
             ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY + "test.h264");
         }
     }
@@ -137,6 +137,9 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     }
 
     private void log(@NonNull String message) {
+        for (TextView textView : mLog) {
+            textView.setTextSize(14);
+        }
         mLog[2].setText(mLog[1].getText());
         mLog[1].setText(mLog[0].getText());
         mLog[0].setText(String.format(Locale.ROOT, "%s [%d]", message, TimeWrapper.getAbsoluteTimestamp()));
