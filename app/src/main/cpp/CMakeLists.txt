@@ -32,7 +32,10 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        jniComm.cpp texture/TextureView.cpp callback/CallJavaMethod.cpp network/SocketNet.cpp)
+        jniComm.cpp
+        texture/TextureView.cpp
+        callback/CallJavaMethod.cpp
+        network/SocketNet.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by

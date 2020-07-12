@@ -1,0 +1,11 @@
+
+#ifndef DEVIDROID_SOCKETTRANS_H
+#define DEVIDROID_SOCKETTRANS_H
+
+
+class SocketTrans {
+
+};
+
+
+#endif //DEVIDROID_SOCKETTRANS_H

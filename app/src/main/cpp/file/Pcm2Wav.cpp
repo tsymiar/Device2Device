@@ -2,7 +2,7 @@
 // Created by tsymiar on 2020-02-23.
 //
 
-#include <stdarg.h>
+#include <cstdarg>
 #include <sys/stat.h>
 #include <cstring>
 #include <unistd.h>
@@ -149,7 +149,7 @@ int convertAudioFiles(const char* from, const char* target)
 
     //get data from stream
     FILE *fp = fopen(from, "r");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         LOGE("can not load '%s' file!", from);
         return -2;
     }
@@ -166,7 +166,7 @@ int convertAudioFiles(const char* from, const char* target)
         return -3;
     };
     fp = fopen(target, "w");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         LOGE("can not load '%s' file!", target);
         return -4;
     }

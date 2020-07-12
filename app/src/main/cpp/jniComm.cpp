@@ -48,7 +48,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
 
 jstring cstring2jstring(JNIEnv *env, const char *pat)
 {
-    jclass clz = (env)->FindClass("Ljava/lang/String;");
+    jclass clz = (env)->FindClass("java/lang/String");
     jmethodID jmId = (env)->GetMethodID(clz, "<init>", "([BLjava/lang/String;)V");
     jbyteArray bytes = (env)->NewByteArray(strlen(pat));
     (env)->SetByteArrayRegion(bytes, 0, strlen(pat), (jbyte *) pat);
@@ -131,7 +131,8 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
     char text[16] = {
             0x1a, 0x13, 0x00, 0x07,
             static_cast<char>(0xcc), static_cast<char>(0xff),
-            static_cast<char>(0xe0), static_cast<char>(0x88)};
+            static_cast<char>(0xe0), static_cast<char>(0x88)
+    };
     Statics::printBuffer(text, 32);
     return env->NewStringUTF(hello.c_str());
 }
@@ -233,6 +234,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <file/Pcm2Wav.h>
 #include <network/SocketNet.h>
+#include <unistd.h>
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
@@ -247,20 +249,20 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     std::string txt = jstring2cstring(env, text);
     const char *tx = txt.c_str();
     LOGI("text = %s, %d", tx, len);
-    SocketNet *sock = new SocketNet("127.0.0.1", 9999);
-    sock->Send(tx, (unsigned int) len);
+    auto *sock = new SocketNet("127.0.0.1", 9999);
+    sock->Sender(tx, (unsigned int) len);
     return 0;
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
 {
     std::thread th(
-            []() -> int {
-                SocketNet *sock = new SocketNet();
-                sock->Init();
+            []() -> void {
+                auto *sock = new SocketNet();
                 char buff[36];
-                sock->Recv(buff, 36);
-                return 0;
+                while (sock->Receiver(buff, 36) != 0) {
+                    usleep(10000);
+                }
             }
     );
     if (th.joinable())
