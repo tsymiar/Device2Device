@@ -1,15 +1,13 @@
-//
-// Created by tsymiar on 2020-02-23.
-//
-
 #include <cstdarg>
 #include <sys/stat.h>
 #include <cstring>
 #include <unistd.h>
 #include <cstdio>
+
 #ifndef LOG_TAG
 #define LOG_TAG "Pcm2Wav"
 #endif
+
 #include <utils/logger.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};
@@ -22,10 +20,10 @@ int makeDirs(const char *fullPath)
     int i = 0;
     int iRet;
     size_t len = strlen(fullPath) + 1;
-    char* pszDir = new char(len);
+    char *pszDir = new char(len);
     memcpy(pszDir, fullPath, len);
     int iLen = strlen(pszDir);
-    if(access(fullPath, F_OK) == 0) {
+    if (access(fullPath, F_OK) == 0) {
         LOGI("fullPath '%s' already exist.", fullPath);
         return 1;
     }
@@ -53,8 +51,8 @@ int makeDirs(const char *fullPath)
 int writeShort(char *l, int s)
 {
     char byte[2];
-    byte[1] = (char) ((s << 16) >> 24);
-    byte[0] = (char) ((s << 24) >> 24);
+    byte[1] = (char) (s << 16 >> 24);
+    byte[0] = (char) (s << 24 >> 24);
     memset(l, s, 2);
     return 2;
 }
@@ -63,9 +61,9 @@ int writeInt(char *l, int n)
 {
     char buf[4];
     buf[3] = (char) (n >> 24);
-    buf[2] = (char) ((n << 8) >> 24);
-    buf[1] = (char) ((n << 16) >> 24);
-    buf[0] = (char) ((n << 24) >> 24);
+    buf[2] = (char) (n << 8 >> 24);
+    buf[1] = (char) (n << 16 >> 24);
+    buf[0] = (char) (n << 24 >> 24);
     memcpy(l, buf, 4);
     return 4;
 }
@@ -123,12 +121,12 @@ public:
 
 };
 
-int convertAudioFiles(const char* from, const char* target)
+int convertAudioFiles(const char *from, const char *target)
 {
     size_t len = 1024 * 1000;
     char buf[len];
     int PCMSize = 0;
-    WaveHeader::Content content;
+    WaveHeader::Content content{};
     content.FileLen = PCMSize + (44 - 8);
     content.FmtHdrLen = 16;
     content.BitsPerSample = 16;
@@ -154,7 +152,7 @@ int convertAudioFiles(const char* from, const char* target)
         return -2;
     }
     char c;
-    while ((c = (char) (getc(fp))) != EOF) {
+    while (EOF != (c = (char) (getc(fp)))) {
         memset(buf + size, c, 1);
         size++;
     }

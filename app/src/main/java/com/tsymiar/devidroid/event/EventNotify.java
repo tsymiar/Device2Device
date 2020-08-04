@@ -16,7 +16,7 @@ public class EventNotify {
         list.remove(eventHandle);
     }
 
-    private void notifyAll(EventObject event) {
+    public void notifyListeners(EventEntity event) {
         for (EventHandle mel : list) {
             mel.handle(event);
         }

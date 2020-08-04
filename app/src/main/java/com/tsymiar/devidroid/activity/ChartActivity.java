@@ -39,13 +39,13 @@ public class ChartActivity extends AppCompatActivity {
 
             LineData data = getData(36, 100);
             //data.setValueTypeface(mTf);
-            if(i!=2)continue;
+            if (i != 2) continue;
             // add some transparency to the color with "& 0x90FFFFFF"
             setupChart(charts[i], data, colors[i % colors.length]);
         }
     }
 
-    private final int[] colors = new int[] {
+    private final int[] colors = new int[]{
             Color.rgb(137, 230, 81),
             Color.rgb(240, 240, 30),
             Color.rgb(89, 199, 250),
@@ -104,7 +104,7 @@ public class ChartActivity extends AppCompatActivity {
 
         for (int i = 0; i < count; i++) {
             float val = (float) (Math.random() * range) + 3;
-            values.add(new Entry(i,  val));
+            values.add(new Entry(i, val));
         }
 
         // create a dataset and give it a type
@@ -122,8 +122,8 @@ public class ChartActivity extends AppCompatActivity {
 
         values.clear();
         for (int i = 0; i < count; i++) {
-            float val = (float) (Math.random() *(range-1)) + 3;
-            values.add(new Entry(i,  val));
+            float val = (float) (Math.random() * (range - 1)) + 3;
+            values.add(new Entry(i, val));
         }
         LineDataSet set2 = new LineDataSet(values, "拟合数据");
         //set2.isDrawValuesEnabled();

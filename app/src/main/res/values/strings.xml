@@ -17,4 +17,5 @@
     <string name="close">Close</string>
     <string name="server">server</string>
     <string name="client">client</string>
+    <string name="event">event</string>
 </resources>

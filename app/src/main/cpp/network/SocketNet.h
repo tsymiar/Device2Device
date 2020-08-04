@@ -1,7 +1,3 @@
-//
-// Created by tsymiar on 2020-05-10.
-//
-
 #ifndef DEVIDROID_SOCKETNET_H
 #define DEVIDROID_SOCKETNET_H
 

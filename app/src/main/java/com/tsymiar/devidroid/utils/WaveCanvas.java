@@ -34,7 +34,7 @@ public class WaveCanvas {
 
     private static final String TAG = WaveCanvas.class.getSimpleName();
     private final ArrayList<Short> inBuf = new ArrayList<Short>();//缓冲区数据
-    private ArrayList<byte[]> write_data = new ArrayList<byte[]>();//写入文件数据
+    private final ArrayList<byte[]> write_data = new ArrayList<byte[]>();//写入文件数据
     private boolean isWriting = false;// 录音线程控制标记
     private boolean isRecording = false;// 录音线程控制标记
     private ArrayList<String> filePathList = new ArrayList<>();
@@ -134,7 +134,7 @@ public class WaveCanvas {
         private Callback callback;
 
         PaintingTask(AudioRecord audioRecord, int recBufSize,
-                   SurfaceView sfv, Paint mPaint, Callback callback) {
+                     SurfaceView sfv, Paint mPaint, Callback callback) {
             this.audioRecord = audioRecord;
             this.recBufSize = recBufSize;
             this.sfv = sfv;
@@ -162,10 +162,10 @@ public class WaveCanvas {
                     publishProgress();
                     if (AudioRecord.ERROR_INVALID_OPERATION != readsize) {
                         synchronized (write_data) {
-                            byte bys[] = new byte[readsize * 2];
+                            byte[] bys = new byte[readsize * 2];
                             //因为arm字节序问题，所以需要高低位交换
                             for (int i = 0; i < readsize; i++) {
-                                byte ss[] = getBytes(buffer[i]);
+                                byte[] ss = getBytes(buffer[i]);
                                 bys[i * 2] = ss[0];
                                 bys[i * 2 + 1] = ss[1];
                             }
@@ -230,8 +230,8 @@ public class WaveCanvas {
             int rateY = (65535 / 2 / (sfv.getHeight() - line_off));
 
             for (int i = 0; i < buf.size(); i++) {
-                byte bus[] = getBytes(buf.get(i));
-                buf.set(i, (short) ((0x0000 | bus[1]) << 8 | bus[0]));//高低位交换
+                byte[] bus = getBytes(buf.get(i));
+                buf.set(i, (short) ((bus[1]) << 8 | bus[0]));//高低位交换
             }
             Canvas canvas = sfv.getHolder().lockCanvas(
                     new Rect(0, 0, sfv.getWidth(), sfv.getHeight()));// 关键:获取画布
@@ -245,35 +245,35 @@ public class WaveCanvas {
             if (sfv.getWidth() - start <= marginRight) {//如果超过预留的右边距距离
                 start = sfv.getWidth() - marginRight;//画的位置x坐标
             }
-            canvas.drawLine(0, line_off / 2, sfv.getWidth(), line_off / 2, paintLine);//最上面的那根线
-            canvas.drawLine(0, sfv.getHeight() - line_off / 2 - 1, sfv.getWidth(), sfv.getHeight() - line_off / 2 - 1, paintLine);//最下面的那根线
-            canvas.drawCircle(start, line_off / 2, line_off / 10, circlePaint);// 上圆
-            canvas.drawCircle(start, sfv.getHeight() - line_off / 2 - 1, line_off / 10, circlePaint);// 下圆
-            canvas.drawLine(start, line_off / 2, start, sfv.getHeight() - line_off / 2, circlePaint);//垂直的线
+            canvas.drawLine(0, line_off >> 1, sfv.getWidth(), line_off >> 1, paintLine);//最上面的那根线
+            canvas.drawLine(0, sfv.getHeight() - (line_off >> 1) - 1, sfv.getWidth(), sfv.getHeight() - (line_off >> 1) - 1, paintLine);//最下面的那根线
+            canvas.drawCircle(start, line_off >> 1, line_off / 10.f, circlePaint);// 上圆
+            canvas.drawCircle(start, sfv.getHeight() - (line_off >> 1) - 1, line_off / 10.f, circlePaint);// 下圆
+            canvas.drawLine(start, line_off >> 1, start, sfv.getHeight() - (line_off >> 1), circlePaint);//垂直的线
             int height = sfv.getHeight() - line_off;
-            canvas.drawLine(0, height * 0.5f + line_off / 2, sfv.getWidth(), height * 0.5f + line_off / 2, center);//中心线
+            canvas.drawLine(0, height * 0.5f + (line_off >> 1), sfv.getWidth(), height * 0.5f + (line_off >> 1), center);//中心线
 
 //	         canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, paintLine);//第二根线
 //	         canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, paintLine);//第3根线
             for (int i = 0; i < buf.size(); i++) {
-                y = buf.get(i) / rateY + baseLine;// 调节缩小比例，调节基准线
+                y = 1.f * buf.get(i) / rateY + baseLine;// 调节缩小比例，调节基准线
                 float x = (i) * divider;
                 if (sfv.getWidth() - (i - 1) * divider <= marginRight) {
                     x = sfv.getWidth() - marginRight;
                 }
                 float y1 = sfv.getHeight() - y;
-                if (y < line_off / 2) {
-                    y = line_off / 2;
+                if (y < line_off >> 1) {
+                    y = line_off >> 1;
                 }
-                if (y > sfv.getHeight() - line_off / 2 - 1) {
-                    y = sfv.getHeight() - line_off / 2 - 1;
+                if (y > sfv.getHeight() - (line_off >> 1) - 1) {
+                    y = sfv.getHeight() - (line_off >> 1) - 1;
 
                 }
-                if (y1 < line_off / 2) {
-                    y1 = line_off / 2;
+                if (y1 < line_off >> 1) {
+                    y1 = line_off >> 1;
                 }
-                if (y1 > (sfv.getHeight() - line_off / 2 - 1)) {
-                    y1 = (sfv.getHeight() - line_off / 2 - 1);
+                if (y1 > (sfv.getHeight() - (line_off >> 1) - 1)) {
+                    y1 = (sfv.getHeight() - (line_off >> 1) - 1);
                 }
                 canvas.drawLine(x, y, x, y1, mPaint);//中间出波形
             }
@@ -297,7 +297,7 @@ public class WaveCanvas {
         public void run() {
             try {
                 FileOutputStream fos2wav = null;
-                File file2wav = null;
+                File file2wav;
                 try {
                     file2wav = new File(savePcmPath);
                     if (file2wav.exists()) {

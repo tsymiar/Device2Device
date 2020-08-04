@@ -1,5 +1,5 @@
 package com.tsymiar.devidroid.event;
 
 public interface EventHandle {
-    void handle(EventObject event);
+    void handle(EventEntity... event);
 }

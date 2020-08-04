@@ -31,7 +31,6 @@ public class MP4Header {
     // Creates a new MP4Header object that should be used to generate an .m4a file header.
     private MP4Header(int sampleRate, int numChannels, int[] frame_size, int bitrate) {
         if (frame_size == null || frame_size.length < 2 || frame_size[0] != 2) {
-            //TODO(nfaralli): log something here
             return;
         }
         mSampleRate = sampleRate;
@@ -388,7 +387,6 @@ public class MP4Header {
             }
         }
         if (index == samplingFrequencies.length) {
-            // TODO(nfaralli): log something here.
             // Invalid sampling frequency. Default to 44100Hz...
             index = 4;
         }

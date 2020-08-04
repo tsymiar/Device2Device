@@ -71,24 +71,21 @@ class Atom {  // note: latest versions of spec simply call it 'box' instead of '
         return type;
     }
 
-    boolean setData(byte[] data) {
+    void setData(byte[] data) {
         if (mChildren != null || data == null) {
-            // TODO(nfaralli): log something here
-            return false;
+            return;
         }
         mData = data;
         setSize();
-        return true;
     }
 
     byte[] getData() {
         return mData;
     }
 
-    boolean addChild(Atom child) {
+    void addChild(Atom child) {
         if (mData != null || child == null) {
-            // TODO(nfaralli): log something here
-            return false;
+            return;
         }
         int numChildren = 1;
         if (mChildren != null) {
@@ -101,7 +98,6 @@ class Atom {  // note: latest versions of spec simply call it 'box' instead of '
         children[numChildren - 1] = child;
         mChildren = children;
         setSize();
-        return true;
     }
 
     // return the child atom of the corresponding type.
@@ -158,22 +154,22 @@ class Atom {  // note: latest versions of spec simply call it 'box' instead of '
 
     // Used for debugging purpose only.
     public String toString() {
-        String str = "";
+        StringBuilder str = new StringBuilder();
         byte[] atom_bytes = getBytes();
 
         for (int i = 0; i < atom_bytes.length; i++) {
             if (i % 8 == 0 && i > 0) {
-                str += '\n';
+                str.append('\n');
             }
-            str += String.format("0x%02X", atom_bytes[i]);
+            str.append(String.format("0x%02X", atom_bytes[i]));
             if (i < atom_bytes.length - 1) {
-                str += ',';
+                str.append(',');
                 if (i % 8 < 7) {
-                    str += ' ';
+                    str.append(' ');
                 }
             }
         }
-        str += '\n';
-        return str;
+        str.append('\n');
+        return str.toString();
     }
 }

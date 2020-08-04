@@ -4,18 +4,25 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
+import com.tsymiar.devidroid.event.EventEntity;
+import com.tsymiar.devidroid.event.EventHandle;
+import com.tsymiar.devidroid.event.EventNotify;
 import com.tsymiar.devidroid.utils.MethodUtil;
 import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 import com.tsymiar.devidroid.wrapper.NetWrapper;
 import com.tsymiar.devidroid.wrapper.TimeWrapper;
 
-public class MainActivity extends AppCompatActivity {
-    private int aaa = 1;
+import java.util.Arrays;
+
+public class MainActivity extends AppCompatActivity implements EventHandle {
+    private static final String TAG = MainActivity.class.getCanonicalName();
+    private int gValue = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +47,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btn_chart).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, ChartActivity.class))
         );
+        findViewById(R.id.btn_event).setOnClickListener(
+                view -> {
+                    EventNotify notify = new EventNotify();
+                    notify.register(this);
+                    EventEntity event = new EventEntity();
+                    event.setEvent("event: " + gValue);
+                    notify.notifyListeners(event);
+                    gValue++;
+                }
+        );
         WifiManager manager = (WifiManager) this.getApplicationContext()
                 .getSystemService(Context.WIFI_SERVICE);
         assert manager != null;
@@ -52,12 +69,17 @@ public class MainActivity extends AppCompatActivity {
         );
         findViewById(R.id.client).setOnClickListener(
                 v -> {
-                    NetWrapper.sendUdpData(aaa + " - aaa", 8);
-                    aaa++;
-                    if(wifiLock.isHeld()) {
+                    NetWrapper.sendUdpData(gValue + " - aaa", 8);
+                    gValue++;
+                    if (wifiLock.isHeld()) {
                         wifiLock.release();
                     }
                 }
         );
+    }
+
+    @Override
+    public void handle(EventEntity... event) {
+        Log.i(TAG, Arrays.toString(event));
     }
 }

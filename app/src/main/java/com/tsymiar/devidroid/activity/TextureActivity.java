@@ -117,6 +117,7 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
         // Each draw updates the texture and logs on its own
     }
+
     public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
             + "/Android/data/" + "com.tsymiar.devidroid" + "/cache/";
 
