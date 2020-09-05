@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.4.1)
 PROJECT(Devidroid CXX)
 
 set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
+set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -std=c++11")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS} -g -ftest-coverage -fprofile-arcs -Wno-deprecated")
 
@@ -19,6 +19,7 @@ add_subdirectory(file)
 add_subdirectory(runtime)
 add_subdirectory(network)
 add_subdirectory(callback)
+add_subdirectory(template)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -59,7 +60,7 @@ find_library(GLESv2 GLESv2)
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-        jniComm Network callback timestamp fileIO
+        jniComm template Network callback timestamp fileIO
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

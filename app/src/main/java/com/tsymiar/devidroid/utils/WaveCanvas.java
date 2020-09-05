@@ -7,11 +7,14 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.media.AudioRecord;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Handler.Callback;
 import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
+
+import androidx.annotation.RequiresApi;
 
 import com.tsymiar.devidroid.view.WaveSurfaceView;
 import com.tsymiar.devidroid.wrapper.FileWrapper;
@@ -102,7 +105,6 @@ public class WaveCanvas {
         mPaint.setStyle(Paint.Style.FILL);
     }
 
-
     /**
      * 停止绘制
      */
@@ -126,6 +128,7 @@ public class WaveCanvas {
      *
      * @author cokus
      */
+    @RequiresApi(api = Build.VERSION_CODES.CUPCAKE)
     class PaintingTask extends AsyncTask<Object, Object, Object> {
         private int recBufSize;
         private AudioRecord audioRecord;

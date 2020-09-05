@@ -16,7 +16,6 @@ struct NetProtocol {
 
 class SocketNet {
 private:
-    int m_conv = 0x11223344;
     int m_socket = -1;
     std::string m_ip = {};
     int m_port = 0;

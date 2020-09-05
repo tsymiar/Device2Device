@@ -232,9 +232,11 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
     return TimeStamp::get()->BootTime();
 }
 
+#include <unistd.h>
 #include <file/Pcm2Wav.h>
 #include <network/SocketNet.h>
-#include <unistd.h>
+#include <template/Clazz1.h>
+#include <template/Clazz2.h>
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
@@ -251,6 +253,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     LOGI("text = %s, %d", tx, len);
     auto *sock = new SocketNet("127.0.0.1", 9999);
     sock->Sender(tx, (unsigned int) len);
+    auto *clz1 = new Clazz1();
+    clz1->setBase<Clazz1>("AAA", 3);
+    auto *clz2 = new Clazz2();
+    clz2->setBase<Clazz2>("22", 2);
     return 0;
 }
 
