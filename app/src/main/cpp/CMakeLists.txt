@@ -19,7 +19,7 @@ add_subdirectory(file)
 add_subdirectory(runtime)
 add_subdirectory(network)
 add_subdirectory(callback)
-add_subdirectory(template)
+# add_subdirectory(template)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -60,7 +60,9 @@ find_library(GLESv2 GLESv2)
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-        jniComm template Network callback timestamp fileIO
+        jniComm
+        # template
+        Network callback timestamp fileIO
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})
