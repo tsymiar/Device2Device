@@ -4,7 +4,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class EventNotify {
-    private List<EventHandle> list = new LinkedList<>();
+    private final List<EventHandle> list = new LinkedList<>();
 
     public void register(EventHandle eventHandle) {
         if (!list.contains(eventHandle)) {

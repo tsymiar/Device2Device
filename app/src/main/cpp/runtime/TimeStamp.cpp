@@ -45,7 +45,7 @@ unsigned long long TimeStamp::BootTime()
 unsigned long long TimeStamp::AbsoluteTime()
 {
     timeval time{};
-    gettimeofday(&time, NULL);
+    gettimeofday(&time, nullptr);
     char stm[TIME_LANG] = "";
     strftime(stm, sizeof(stm), "%Y-%m-%d %T", localtime(&time.tv_sec));
     unsigned long long micro = (unsigned long long) time.tv_sec * KILO + time.tv_usec / KILO;

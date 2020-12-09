@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_SOCKETNET_H
-#define DEVIDROID_SOCKETNET_H
+#ifndef DEVIDROID_UdpSocket_H
+#define DEVIDROID_UdpSocket_H
 
 #include <arpa/inet.h>
 #include <string>
@@ -14,7 +14,7 @@ struct NetProtocol {
     uint64_t remain;
 };
 
-class SocketNet {
+class UdpSocket {
 private:
     int m_socket = -1;
     std::string m_ip = {};
@@ -26,16 +26,16 @@ private:
     const uint32_t m_proSize = sizeof(NetProtocol);
     const uint32_t m_addLen = sizeof(struct sockaddr);
 public:
-    SocketNet();
+    UdpSocket();
 
-    SocketNet(const std::string &, int);
+    UdpSocket(const std::string &, int);
 
     int Sender(const char *, size_t);
 
     int Receiver(char *, int);
 
 private:
-    int SliceSend(const char *, size_t);
+    int SendBySlice(const char *, size_t);
 };
 
-#endif //DEVIDROID_SOCKETNET_H
+#endif //DEVIDROID_UdpSocket_H

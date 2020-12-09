@@ -24,13 +24,48 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
     private int gValue = 1;
 
+    public static class Time {
+        int x;
+        short y;
+        char z;
+        long t;
+
+        public static int length = 16;
+
+        byte[] toByte() {
+            byte[] b = new byte[16];
+            int v = x;
+            for (int i = 0; i < 4; i++) {
+                b[i] = Integer.valueOf(v & 0xff).byteValue();
+                v = v >> 8;
+            }
+            v = y;
+            for (int i = b.length - 14; i > -1; i--) {
+                b[i] = Integer.valueOf(v & 0xff).byteValue();
+                v = v >> 8;
+            }
+            b[6] = (byte) (z >>> 8);
+            b[7] = (byte) z;
+            b[8] = (byte) (t);
+            b[9] = (byte) (t >>> 8);
+            b[10] = (byte) (t >>> 16);
+            b[11] = (byte) (t >>> 24);
+            b[12] = (byte) (t >>> 32);
+            b[13] = (byte) (t >>> 40);
+            b[14] = (byte) (t >>> 48);
+            b[15] = (byte) (t >>> 56);
+            return b;
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // a call to a native method
         TextView tv = findViewById(R.id.sample_text);
-        tv.setText((new CallbackWrapper()).stringFromJNI());
+        tv.setText((new CallbackWrapper()).stringGetJNI());
+        Time time = new Time();
 
         CallbackWrapper.initJvmEnv(MethodUtil.TAG);
         CallbackWrapper.callJavaMethod("hello", 0, "non-static call", false);
@@ -46,6 +81,14 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_chart).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, ChartActivity.class))
+        );
+        findViewById(R.id.btn_time).setOnClickListener(
+                v -> {
+                    time.x = (int) tv.getX();
+                    time.t = System.currentTimeMillis();
+                    Log.i(TAG, time.t + "----" + Arrays.toString(time.toByte()));
+                    tv.setText(String.valueOf(new CallbackWrapper().timeSetJNI(time.toByte(), Time.length)));
+                }
         );
         findViewById(R.id.btn_event).setOnClickListener(
                 view -> {

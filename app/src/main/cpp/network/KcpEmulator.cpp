@@ -1,12 +1,14 @@
-#include "KcpSocket.h"
+#include "KcpEmulator.h"
 
 // 模拟网络
-KcpSocket *vnet;
+KcpEmulator *vnet;
+
+class iterator;
 
 // lostrate: 往返一周丢包率的百分比，默认 10%
 // rttmin：rtt最小值，默认 60
 // rttmax：rtt最大值，默认 125
-KcpSocket::KcpSocket(int lostrate, int rttmin, int rttmax, int nmax) :
+KcpEmulator::KcpEmulator(int lostrate, int rttmin, int rttmax, int nmax) :
         r12(100), r21(100)
 {
     current = iclock();
@@ -17,7 +19,7 @@ KcpSocket::KcpSocket(int lostrate, int rttmin, int rttmax, int nmax) :
     tx1 = tx2 = 0;
 }
 
-KcpSocket::~KcpSocket()
+KcpEmulator::~KcpEmulator()
 {
     DelayTunnel::iterator it;
     for (it = p12.begin(); it != p12.end(); it++) {
@@ -32,7 +34,7 @@ KcpSocket::~KcpSocket()
 
 // 发送数据
 // peer - 端点0/1，从0发送，从1接收；从1发送从0接收
-void KcpSocket::Send(int peer, const void *data, int size)
+void KcpEmulator::Sender(int peer, const void *data, int size)
 {
     if (peer == 0) {
         tx1++;
@@ -55,7 +57,7 @@ void KcpSocket::Send(int peer, const void *data, int size)
     }
 }
 
-int KcpSocket::Recv(int peer, void *data, int maxsize)
+int KcpEmulator::Receiver(int peer, void *data, int maxsize)
 {
     DelayTunnel::iterator it;
     if (peer == 0) {
@@ -88,15 +90,15 @@ int udp_output(const char *buf, int len, ikcpcb *kcp, void *user)
         void *ptr;
     } parameter{};
     parameter.ptr = user;
-    vnet->Send(parameter.id, buf, len);
+    vnet->Sender(parameter.id, buf, len);
     return 0;
 }
 
 // 测试用例
-void KcpSocket::KcpRun(int mode)
+void KcpEmulator::KcpRun(int mode)
 {
     // 创建模拟网络：丢包率10%，Rtt 60ms~125ms
-    vnet = new KcpSocket(10, 60, 125);
+    vnet = new KcpEmulator(10, 60, 125);
 
     // 创建两个端点的 kcp对象，第一个参数 conv是会话编号，同一个会话需要相同
     // 最后一个是 user参数，用来传递标识
@@ -163,7 +165,7 @@ void KcpSocket::KcpRun(int mode)
 
         // 处理虚拟网络：检测是否有udp包从p1->p2
         while (1) {
-            hr = vnet->Recv(1, buffer, 2000);
+            hr = vnet->Receiver(1, buffer, 2000);
             if (hr < 0) break;
             // 如果 p2收到udp，则作为下层协议输入到kcp2
             ikcp_input(kcp2, buffer, hr);
@@ -171,7 +173,7 @@ void KcpSocket::KcpRun(int mode)
 
         // 处理虚拟网络：检测是否有udp包从p2->p1
         while (1) {
-            hr = vnet->Recv(0, buffer, 2000);
+            hr = vnet->Receiver(0, buffer, 2000);
             if (hr < 0) break;
             // 如果 p1收到udp，则作为下层协议输入到kcp1
             ikcp_input(kcp1, buffer, hr);

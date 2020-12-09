@@ -7,7 +7,9 @@ public class CallbackWrapper {
 
     public static native void initJvmEnv(String className);
 
-    public native String stringFromJNI();
+    public native String stringGetJNI();
+
+    public native long timeSetJNI(byte[] time, int len);
 
     public static native void callJavaMethod(String method, int action, String content, boolean statics);
 }

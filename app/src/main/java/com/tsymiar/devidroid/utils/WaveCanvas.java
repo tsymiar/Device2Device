@@ -1,5 +1,6 @@
 package com.tsymiar.devidroid.utils;
 
+import android.annotation.SuppressLint;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -40,12 +41,11 @@ public class WaveCanvas {
     private final ArrayList<byte[]> write_data = new ArrayList<byte[]>();//写入文件数据
     private boolean isWriting = false;// 录音线程控制标记
     private boolean isRecording = false;// 录音线程控制标记
-    private ArrayList<String> filePathList = new ArrayList<>();
     private int line_off;//上下边距的距离
-    private int rateX = 100;//控制多少帧取一帧
+    private final int rateX = 100;//控制多少帧取一帧
     private int baseLine = 0;// Y轴基线
     private PaintingTask audioTask = null;
-    private int marginRight = 30;//波形图绘制距离右边的距离
+    private final int marginRight = 30;//波形图绘制距离右边的距离
     private float divider = 0.2f;//为了节约绘画时间，每0.2个像素画一个数据
     private long c_time;//当前时间戳
     private String savePcmPath;//保存pcm文件路径
@@ -128,13 +128,14 @@ public class WaveCanvas {
      *
      * @author cokus
      */
+    @SuppressLint("StaticFieldLeak")
     @RequiresApi(api = Build.VERSION_CODES.CUPCAKE)
     class PaintingTask extends AsyncTask<Object, Object, Object> {
-        private int recBufSize;
-        private AudioRecord audioRecord;
-        private SurfaceView sfv;// 画板
-        private Paint mPaint;// 画笔
-        private Callback callback;
+        private final int recBufSize;
+        private final AudioRecord audioRecord;
+        private final SurfaceView sfv;// 画板
+        private final Paint mPaint;// 画笔
+        private final Callback callback;
 
         PaintingTask(AudioRecord audioRecord, int recBufSize,
                      SurfaceView sfv, Paint mPaint, Callback callback) {
@@ -320,6 +321,7 @@ public class WaveCanvas {
                     }
                     try {
                         if (buffer != null) {
+                            assert fos2wav != null;
                             fos2wav.write(buffer);
                             fos2wav.flush();
                         }

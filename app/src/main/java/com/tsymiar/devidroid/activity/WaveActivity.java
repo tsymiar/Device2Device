@@ -1,5 +1,6 @@
 package com.tsymiar.devidroid.activity;
 
+import android.annotation.SuppressLint;
 import android.graphics.PixelFormat;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -39,6 +40,7 @@ public class WaveActivity extends AppCompatActivity {
     WaveCanvas waveCanvas = null;
     TextView status;
 
+    @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -151,6 +153,7 @@ public class WaveActivity extends AppCompatActivity {
         updateWaveTime.sendMessage(msg);
     }
 
+    @SuppressLint("HandlerLeak")
     Handler updateWaveTime = new Handler() {
         public void handleMessage(Message msg) {
             setDisplaySpeed();
@@ -158,7 +161,9 @@ public class WaveActivity extends AppCompatActivity {
         }
     };
 
+    @SuppressLint("HandlerLeak")
     Handler statusHandle = new Handler() {
+        @SuppressLint("HandlerLeak")
         public void handleMessage(Message msg) {
             status.setText(String.valueOf(msg.obj));
         }

@@ -6,26 +6,26 @@
 #include <string>
 
 #ifndef LOG_TAG
-#define LOG_TAG "SocketNet"
+#define LOG_TAG "UdpSocket"
 #endif
 
 #include <utils/logger.h>
 #include <cerrno>
 
-#include "SocketNet.h"
+#include "UdpSocket.h"
 
 constexpr const int LOCAL_PORT = 9999;
 
-SocketNet::SocketNet() = default;
+UdpSocket::UdpSocket() = default;
 
-SocketNet::SocketNet(const std::string &_ip, int _port)
+UdpSocket::UdpSocket(const std::string &_ip, int _port)
 {
     this->m_ip = _ip;
     this->m_port = _port;
-    LOGI("construct of SocketNet, %s:%d.", _ip.c_str(), _port);
+    LOGI("construct of UdpSocket, %s:%d.", _ip.c_str(), _port);
 }
 
-int SocketNet::Sender(const char *sendBuff, size_t length)
+int UdpSocket::Sender(const char *sendBuff, size_t length)
 {
     m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (m_socket < 0) {
@@ -51,14 +51,14 @@ int SocketNet::Sender(const char *sendBuff, size_t length)
     if (iRet > 0)
         LOGI("Udp send: %s", message + m_proSize);
     else {
-        if (SliceSend(sendBuff, length) < 0)
+        if (SendBySlice(sendBuff, length) < 0)
             LOGE("Udp send error![%d]", iRet);
     }
     close(m_socket);
     return 0;
 }
 
-int SocketNet::Receiver(char *rcvBuff, int len)
+int UdpSocket::Receiver(char *rcvBuff, int len)
 {
     if (m_socket != -1 && m_flag) {
         LOGE("socket %d already in receiving.", m_socket);
@@ -82,7 +82,7 @@ int SocketNet::Receiver(char *rcvBuff, int len)
         LOGE("bind: %s", strerror(errno));
         return -1;
     }
-    LOGI("SocketNet Receiver bind success");
+    LOGI("UdpSocket Receiver bind success");
 
     fd_set fds;
     int maxFdp = m_socket + 1;
@@ -90,15 +90,16 @@ int SocketNet::Receiver(char *rcvBuff, int len)
     struct timeval timeout{};
     socklen_t size = sizeof(remote);
     while (!m_flag) {
-        ssize_t _s = recvfrom(m_socket, rcvBuff, static_cast<size_t>(len), 0,
-                              (struct sockaddr *) &remote, &size);
+        int _s = recvfrom(m_socket, rcvBuff, static_cast<size_t>(len), 0,
+                          (struct sockaddr *) &remote, &size);
         if (_s > 0) {
             rcvBuff[_s] = '\0';
             LOGI("client:[%s:%d]  %s, len = %d.", inet_ntoa(remote.sin_addr),
                  ntohs(remote.sin_port), rcvBuff + m_proSize, _s);
         } else if (_s == 0) {
             LOGI("client close");
-        } else break;
+        } else
+            break;
         FD_ZERO(&fds);
         FD_SET(m_socket, &fds);
         timeout.tv_usec = 0;
@@ -113,7 +114,7 @@ int SocketNet::Receiver(char *rcvBuff, int len)
     return 0;
 }
 
-int SocketNet::SliceSend(const char *sliceBuffer, size_t length)
+int UdpSocket::SendBySlice(const char *sliceBuffer, size_t length)
 {
     int iRet = 0;
     protocol.s_idx = 0;

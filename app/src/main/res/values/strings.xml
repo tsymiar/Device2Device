@@ -4,6 +4,7 @@
         <item>None</item>
         <item>CPU rendering</item>
         <item>OpenGL-file</item>
+        <item> </item>
     </string-array>
 
     <string name="reload">Re-init</string>
@@ -18,4 +19,5 @@
     <string name="server">server</string>
     <string name="client">client</string>
     <string name="event">event</string>
+    <string name="time">time</string>
 </resources>

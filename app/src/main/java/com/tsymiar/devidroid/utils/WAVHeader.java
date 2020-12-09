@@ -18,10 +18,10 @@ package com.tsymiar.devidroid.utils;
 
 public class WAVHeader {
     private byte[] mHeader;          // the complete header.
-    private int mSampleRate;         // sampling frequency in Hz (e.g. 44100).
-    private int mChannels;           // number of channels.
-    private int mNumSamples;         // total number of samples per channel.
-    private int mNumBytesPerSample;  // number of bytes per sample, all channels included.
+    private final int mSampleRate;         // sampling frequency in Hz (e.g. 44100).
+    private final int mChannels;           // number of channels.
+    private final int mNumSamples;         // total number of samples per channel.
+    private final int mNumBytesPerSample;  // number of bytes per sample, all channels included.
 
     private WAVHeader(int sampleRate, int numChannels, int numSamples) {
         mSampleRate = sampleRate;

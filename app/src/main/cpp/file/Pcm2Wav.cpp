@@ -151,8 +151,8 @@ int convertAudioFiles(const char *from, const char *target)
         LOGE("can not load '%s' file!", from);
         return -2;
     }
-    char c;
-    while (EOF != (c = (char) (getc(fp)))) {
+    int c = 0;
+    while (EOF != (c = getc(fp))) {
         memset(buf + size, c, 1);
         size++;
     }
@@ -170,4 +170,5 @@ int convertAudioFiles(const char *from, const char *target)
     }
     fwrite(buf, 1, size, fp);
     fclose(fp);
+    return 0;
 }

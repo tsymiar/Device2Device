@@ -10,9 +10,11 @@ set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -std=c++11")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS} -g -ftest-coverage -fprofile-arcs -Wno-deprecated")
+set(TOOLCHAIN ${NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot)
 
 include_directories(
         ${PROJECT_SOURCE_DIR}
+        ${TOOLCHAIN}/usr/include
 )
 
 add_subdirectory(file)
@@ -35,8 +37,7 @@ add_library( # Sets the name of the library.
         # Provides a relative path to your source file(s).
         jniComm.cpp
         texture/TextureView.cpp
-        callback/CallJavaMethod.cpp
-        network/SocketNet.cpp)
+        callback/CallJavaMethod.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by

@@ -123,7 +123,7 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name
 
 #include "utils/statics.h"
 
-JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
+JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
         JNIEnv *env,
         jobject /* this */)
 {
@@ -135,6 +135,26 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringFromJNI)(
     };
     Statics::printBuffer(text, 32);
     return env->NewStringUTF(hello.c_str());
+}
+
+JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len)
+{
+    unsigned char *byte = (unsigned char *) env->GetByteArrayElements(time, 0);
+    unsigned char stamp[len * 3];
+    for (size_t i = 0; i < len; i++) {
+        sprintf(reinterpret_cast<char *>(stamp + i * 3), "%02x ", byte[i]);
+    }
+    LOGI("time hex = %s", stamp);
+    uint64_t val =
+            (byte[8] & 0xff)
+            | (byte[9] << 8 & 0xff00)
+            | (byte[10] << 16 & 0xff0000)
+            | (byte[11] << 24 & 0xff000000)
+            | ((uint64_t) byte[12] << 32 & 0xff00000000)
+            | ((uint64_t) byte[13] << 40 & 0xff0000000000)
+            | ((uint64_t) byte[14] << 48 & 0xff000000000000)
+            | ((uint64_t) byte[15] << 56 & 0xff00000000000000);
+    return val;
 }
 
 int callback(const char *c, int i)
@@ -234,7 +254,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <unistd.h>
 #include <file/Pcm2Wav.h>
-#include <network/SocketNet.h>
+#include <network/UdpSocket.h>
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>
 
@@ -251,7 +271,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     std::string txt = jstring2cstring(env, text);
     const char *tx = txt.c_str();
     LOGI("text = %s, %d", tx, len);
-    auto *sock = new SocketNet("127.0.0.1", 9999);
+    auto *sock = new UdpSocket("127.0.0.1", 9999);
     sock->Sender(tx, (unsigned int) len);
 /*
     auto *clz1 = new Clazz1();
@@ -266,7 +286,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
 {
     std::thread th(
             []() -> void {
-                auto *sock = new SocketNet();
+                auto *sock = new UdpSocket();
                 char buff[36];
                 while (sock->Receiver(buff, 36) != 0) {
                     usleep(10000);

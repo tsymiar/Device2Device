@@ -36,7 +36,7 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     /**
      * Log text views.
      */
-    private TextView[] mLog = new TextView[3];
+    private final TextView[] mLog = new TextView[3];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_KCPSOCKET_H
-#define DEVIDROID_KCPSOCKET_H
+#ifndef DEVIDROID_KCPEMULATOR_H
+#define DEVIDROID_KCPEMULATOR_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -155,15 +155,15 @@ protected:
 };
 
 // 网络延迟模拟器
-class KcpSocket {
+class KcpEmulator {
 public:
-    KcpSocket(int lostrate = 10, int rttmin = 60, int rttmax = 125, int nmax = 1000);
+    KcpEmulator(int lostrate = 10, int rttmin = 60, int rttmax = 125, int nmax = 1000);
 
-    void Send(int peer, const void *data, int size);
+    void Sender(int peer, const void *data, int size);
 
-    int Recv(int peer, void *data, int maxsize);
+    int Receiver(int peer, void *data, int maxsize);
 
-    virtual ~KcpSocket();
+    virtual ~KcpEmulator();
 
 public:
     int tx1;
@@ -188,4 +188,4 @@ public:
 
 #endif
 
-#endif //DEVIDROID_KCPSOCKET_H
+#endif //DEVIDROID_KCPEMULATOR_H

@@ -2,11 +2,11 @@ package com.tsymiar.devidroid.utils;
 
 class Atom {  // note: latest versions of spec simply call it 'box' instead of 'atom'.
     private int mSize;  // includes atom header (8 bytes)
-    private int mType;
+    private final int mType;
     private byte[] mData;  // an atom can either contain data or children, but not both.
     private Atom[] mChildren;
-    private byte mVersion;  // if negative, then the atom does not contain version and flags data.
-    private int mFlags;
+    private final byte mVersion;  // if negative, then the atom does not contain version and flags data.
+    private final int mFlags;
 
     // create an empty atom of the given type.
     Atom(String type) {

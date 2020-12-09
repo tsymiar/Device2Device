@@ -5,8 +5,7 @@
     android:orientation="vertical">
 
     <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/chart3"
+        android:id="@+id/colored_chart"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="440dp" />
 </LinearLayout>

@@ -13,10 +13,8 @@ public class FileUtil {
             Log.i(TAG, "ExternalStorageState = " + Environment.MEDIA_MOUNTED);
         }
         File file = new File(fullPath);
-        if (!file.exists()) {
-            if (!file.mkdirs()) {
-                Log.e(TAG, "File.mkdirs '" + fullPath + "' not created.");
-            }
+        if (!file.exists() && !file.mkdirs()) {
+            Log.e(TAG, "File.mkdirs '" + fullPath + "' not created.");
         }
     }
 }

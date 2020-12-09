@@ -31,7 +31,7 @@ public class ChartActivity extends AppCompatActivity {
 
         setTitle("LineChartActivityColored");
 
-        charts[2] = findViewById(R.id.chart3);
+        charts[2] = findViewById(R.id.colored_chart);
 
         //Typeface mTf = Typeface.createFromAsset(getAssets(), "OpenSans-Bold.ttf");
 
