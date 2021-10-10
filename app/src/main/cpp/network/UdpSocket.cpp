@@ -9,7 +9,7 @@
 #define LOG_TAG "UdpSocket"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 #include <cerrno>
 
 #include "UdpSocket.h"

@@ -4,22 +4,18 @@
 
 #include <algorithm>
 #include <thread>
-#include <utils/logger.h>
+#include <utils/logging.h>
 
 #include "CallJavaMethod.h"
-
-CallJavaMethod *CallJavaMethod::m_Instance = nullptr;
 
 CallJavaMethod::CallJavaMethod() = default;;
 
 CallJavaMethod::~CallJavaMethod() = default;
 
-CallJavaMethod *CallJavaMethod::getInstance()
+CallJavaMethod& CallJavaMethod::GetInstance()
 {
-    if (m_Instance == nullptr) {
-        m_Instance = new CallJavaMethod();
-    }
-    return m_Instance;
+    static CallJavaMethod instance;
+    return instance;
 }
 
 #include <jni.h>

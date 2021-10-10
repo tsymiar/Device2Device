@@ -2,7 +2,7 @@
 #define LOG_TAG "jniComm"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 
 #include <mutex>
 #include <string>
@@ -46,7 +46,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
     return JNI_RESULT;
 }
 
-jstring cstring2jstring(JNIEnv *env, const char *pat)
+jstring Cstring2Jstring(JNIEnv *env, const char *pat)
 {
     jclass clz = (env)->FindClass("java/lang/String");
     jmethodID jmId = (env)->GetMethodID(clz, "<init>", "([BLjava/lang/String;)V");
@@ -56,7 +56,7 @@ jstring cstring2jstring(JNIEnv *env, const char *pat)
     return (jstring) (env)->NewObject(clz, jmId, bytes, encoding);
 }
 
-std::string jstring2cstring(JNIEnv *env, jstring jstr)
+std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
 {
     char *rtn = nullptr;
     jclass clz = env->FindClass("java/lang/String");
@@ -76,7 +76,7 @@ std::string jstring2cstring(JNIEnv *env, jstring jstr)
     return temp;
 }
 
-jstring getPackageName(JNIEnv *env)
+jstring GetPackageName(JNIEnv *env)
 {
     jobject context = nullptr;
     jclass activity_thread_clz = env->FindClass("android/app/ActivityThread");
@@ -115,9 +115,9 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name
 {
     int state = env->GetJavaVM(&g_jniJVM);
     g_className =
-            // jstring2cstring(env, getPackageName(env))
+            // Jstring2Cstring(env, getPackageName(env))
             // + "." +
-            jstring2cstring(env, class_name);
+            Jstring2Cstring(env, class_name);
     LOGI("class_name = %s, state = %d.", g_className.c_str(), state);
 }
 
@@ -137,9 +137,9 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
     return env->NewStringUTF(hello.c_str());
 }
 
-JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len)
+JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time, jint len)
 {
-    unsigned char *byte = (unsigned char *) env->GetByteArrayElements(time, 0);
+    auto *byte = (unsigned char *) env->GetByteArrayElements(time, nullptr);
     unsigned char stamp[len * 3];
     for (size_t i = 0; i < len; i++) {
         sprintf(reinterpret_cast<char *>(stamp + i * 3), "%02x ", byte[i]);
@@ -167,22 +167,22 @@ JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, jstring content,
                               jboolean statics)
 {
-    CallJavaMethod::getInstance()->callMethodBack(jstring2cstring(env, method),
+    CallJavaMethod::GetInstance().callMethodBack(Jstring2Cstring(env, method),
                                                   static_cast<int>(action),
-                                                  jstring2cstring(env, content).c_str(),
+                                                 Jstring2Cstring(env, content).c_str(),
                                                   statics);
     CallJavaMethod::CALLBACK call = callback;
-    int val = CallJavaMethod::getInstance()->registerCallBack(const_cast<char *>("aaa"), call);
+    int val = CallJavaMethod::GetInstance().registerCallBack(const_cast<char *>("aaa"), call);
     LOGI("callback = %p, val = %d.", call, val);
 }
 
 JNIEXPORT jboolean JNICALL
 CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
 {
-    const char *file_in = jstring2cstring(env, filename).c_str();
-    FILE *fp_in = fopen(file_in, "rbe");
+    std::string file_in = Jstring2Cstring(env, filename);
+    FILE *fp_in = fopen(file_in.c_str(), "rbe");
     if (nullptr == fp_in) {
-        LOGE("open input h264 video file failed, filename [%s]", file_in);
+        LOGE("open input h264 video file failed, filename [%s]", file_in.c_str());
         return (jboolean) JNI_FALSE;
     }
     return JNI_TRUE;
@@ -261,14 +261,14 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
 {
-    return convertAudioFiles(jstring2cstring(env, from).c_str(),
-                             jstring2cstring(env, save).c_str());
+    return convertAudioFiles(Jstring2Cstring(env, from).c_str(),
+                             Jstring2Cstring(env, save).c_str());
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
                                                      jstring text, jint len)
 {
-    std::string txt = jstring2cstring(env, text);
+    std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
     LOGI("text = %s, %d", tx, len);
     auto *sock = new UdpSocket("127.0.0.1", 9999);

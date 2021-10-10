@@ -27,12 +27,12 @@ public class SamplePlayer {
         void onCompletion();
     }
 
-    private ShortBuffer mSamples;
-    private int mSampleRate;
-    private int mChannels;
-    private int mNumSamples;  // Number of samples per channel.
-    private AudioTrack mAudioTrack;
-    private short[] mBuffer;
+    private final ShortBuffer mSamples;
+    private final int mSampleRate;
+    private final int mChannels;
+    private final int mNumSamples;  // Number of samples per channel.
+    private final AudioTrack mAudioTrack;
+    private final short[] mBuffer;
     private int mPlaybackStart;  // Start offset, in samples.
     private Thread mPlayThread;
     private boolean mKeepPlaying;

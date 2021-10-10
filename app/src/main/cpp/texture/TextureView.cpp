@@ -1,5 +1,8 @@
 #include "TextureView.h"
 
+#include <cerrno>
+#include <cstring>
+
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 
@@ -11,7 +14,7 @@
 #define LOG_TAG "SurfaceTexture"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 
 /** Classes and methods from JNI. */
 namespace JNI {
@@ -104,7 +107,7 @@ int TextureView::loadSurfaceView(JNIEnv *env, jobject texture)
         return 0;
     } else {
         jobject global = env->NewGlobalRef(surface);
-        JNI::surface_class = static_cast<jclass>(global);
+        JNI::surface_class = reinterpret_cast<jclass>(global);
         if (JNI::surface_class == nullptr) {
             LOGE("Surface reference cast with error");
             return 0;
@@ -193,7 +196,7 @@ GLint initShader(const char *code, GLenum type)
     glShaderSource(static_cast<GLuint>(shader),
                    1, // shader数量
                    &code,
-                   0 // 代码长度
+                   nullptr // 代码长度
     );
 
     //编译shader
@@ -242,7 +245,7 @@ void TextureView::drawRGBColor(uint32_t argb)
         return;
     }
     // TODO Locked bounds can be larger than requested, we should check them
-    uint32_t *dest = static_cast<uint32_t *>(surface.bits);
+    auto *dest = static_cast<uint32_t *>(surface.bits);
     // Value in color is ARGB but the surface expects RGBA
     dest[0] = argb >> 16;
     dest[1] = argb >> 8;
@@ -530,7 +533,7 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
 {
     g_fpUrl = fopen(filename, "rbe");
     if (!g_fpUrl) {
-        LOGE("open file '%s' failed!", filename);
+        LOGE("open file '%s' failed: %s!", filename, strerror(errno));
         return nullptr;
     }
     // Display and config need to be initialized only once

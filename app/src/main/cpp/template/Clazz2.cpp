@@ -8,7 +8,7 @@
 #define LOG_TAG "Clazz2"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 
 int Clazz2::Get()
 {

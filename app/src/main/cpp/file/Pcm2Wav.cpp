@@ -8,17 +8,15 @@
 #define LOG_TAG "Pcm2Wav"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};
 const char fileID[] = {'R', 'I', 'F', 'F'};
 const char fmtHdrID[] = {'f', 'm', 't', ' '};
 const char dataHdrID[] = {'d', 'a', 't', 'a'};
 
-int makeDirs(const char *fullPath)
+int mkdirs(const char *fullPath)
 {
-    int i = 0;
-    int iRet;
     size_t len = strlen(fullPath) + 1;
     char *pszDir = new char(len);
     memcpy(pszDir, fullPath, len);
@@ -31,10 +29,10 @@ int makeDirs(const char *fullPath)
         pszDir[iLen] = '/';
         pszDir[iLen + 1] = '\0';
     }
-    for (i = 0; i <= iLen; i++) {
+    for (int i = 0; i <= iLen; i++) {
         if (pszDir[i] == '\\' || pszDir[i] == '/') {
             pszDir[i] = '\0';
-            iRet = access(pszDir, 0);
+            int iRet = access(pszDir, 0);
             if (iRet != 0) {
                 iRet = mkdir(pszDir, 0755);
                 if (iRet != 0) {
@@ -151,7 +149,7 @@ int convertAudioFiles(const char *from, const char *target)
         LOGE("can not load '%s' file!", from);
         return -2;
     }
-    int c = 0;
+    int c;
     while (EOF != (c = getc(fp))) {
         memset(buf + size, c, 1);
         size++;
@@ -159,10 +157,10 @@ int convertAudioFiles(const char *from, const char *target)
     fclose(fp);
 
     //write data stream
-    if (makeDirs(target) < 0) {
+    if (mkdirs(target) < 0) {
         LOGE("write target file '%s' failed.", target);
         return -3;
-    };
+    }
     fp = fopen(target, "w");
     if (fp == nullptr) {
         LOGE("can not load '%s' file!", target);

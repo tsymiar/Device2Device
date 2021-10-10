@@ -9,10 +9,8 @@
 #define LOG_TAG "Base"
 #endif
 
-#include <utils/logger.h>
+#include <utils/logging.h>
 #include <vector>
-
-using namespace std;
 
 class Base;
 

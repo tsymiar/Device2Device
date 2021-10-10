@@ -2,8 +2,8 @@
 // Created by dell-pc on 2019/11/9.
 //
 
-#ifndef DEVIDROID_LOGGER_H
-#define DEVIDROID_LOGGER_H
+#ifndef DEVIDROID_LOGGING_H
+#define DEVIDROID_LOGGING_H
 
 #ifndef LOG_TAG
 #error Please define 'LOG_TAG' constant at first.
@@ -42,8 +42,8 @@
     } while(false)
 #endif
 #endif
-#define LOGI(fmt, ...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG,"[%s:%d][%s]: " fmt,basename(__FILE__),__LINE__,__FUNCTION__,##__VA_ARGS__)
-#define LOGD(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,"[%s:%d][%s]: " fmt,basename(__FILE__),__LINE__,__FUNCTION__,##__VA_ARGS__)
-#define LOGE(fmt, ...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,"[%s:%d][%s]: " fmt,basename(__FILE__),__LINE__,__FUNCTION__,##__VA_ARGS__)
+#define LOGI(fmt, ...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG,"[%s:%d][%s]: " fmt, basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define LOGD(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,"[%s:%d][%s]: " fmt, basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define LOGE(fmt, ...) __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,"[%s:%d][%s]: " fmt, basename(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #endif
-#endif //DEVIDROID_LOGGER_H
+#endif //DEVIDROID_LOGGING_H
