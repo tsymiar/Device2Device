@@ -36,9 +36,14 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         jniComm.cpp
-        texture/TextureView.cpp
-        callback/CallJavaMethod.cpp)
+        texture/TextureView.cpp)
 
+set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
+add_custom_command(TARGET jniComm
+        PRE_BUILD
+        COMMAND mkdir -p ${LIBS_DIR}
+        COMMAND cp -r ${CMAKE_SOURCE_DIR}/kaics/*[^.h] ${LIBS_DIR}
+        COMMENT "copy kaics so files...")
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
 # default, you only need to specify the name of the public NDK library
@@ -63,6 +68,7 @@ find_library(GLESv2 GLESv2)
 target_link_libraries( # Specifies the target library.
         jniComm
         # template
+        ${PROJECT_SOURCE_DIR}/kaics/${ANDROID_ABI}/libkaics.so
         Network callback timestamp fileIO
         # Links the target library to the log library
         # included in the NDK.

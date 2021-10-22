@@ -20,4 +20,5 @@
     <string name="client">client</string>
     <string name="event">event</string>
     <string name="time">time</string>
+    <string name="subscribe">Subscribe</string>
 </resources>

@@ -9,6 +9,7 @@
 #include <thread>
 #include <android/native_window.h>
 #include <runtime/TimeStamp.h>
+#include <kaics/KaiSocket.h>
 
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
@@ -157,6 +158,31 @@ JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time,
     return val;
 }
 
+void RecvHook(const KaiSocket::Message& msg)
+{
+    LOGI("topic '%s' of %s, payload: [%s]-[%s].",
+         msg.head.topic,
+         KaiSocket::G_KaiRole[msg.head.etag],
+         msg.data.stat,
+         msg.data.body);
+}
+
+JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass , jstring ip, jint port, jstring topic) {
+    jint status = -1;
+    std::string ipv4 = Jstring2Cstring(env, ip);
+    const std::string msg = Jstring2Cstring(env, topic);
+    std::thread th(
+            [&status](const std::string &ip, int port, const std::string &topic, KaiSocket::RECVCALLBACK hook) -> void {
+                KaiSocket kaiSocket(ip.c_str(), port);
+                status = kaiSocket.Subscriber(topic, hook);
+                // TODO call View.setText()
+                LOGI("message from %s:%d, topic = '%s' hook = %p, status = %d.", ip.c_str(), port, topic.c_str(), hook, status);
+            }, ipv4, port, msg, RecvHook);
+    if (th.joinable())
+        th.detach();
+    return status;
+}
+
 int callback(const char *c, int i)
 {
     LOGE("param1 = %s, param2 = %d.", c, i);
@@ -226,12 +252,13 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
             LOGD("CPU rendering initialized");
             static int iteration = 0;
             static constexpr uint32_t colors[] = {
-                    0x88bf360c,
-                    0xcc3e2723,
-                    0xaaffdd60,
-                    0x6664dd17,
-                    0x880277ac,
-                    0xff880e4f
+                    0x00000000,
+                    0x0055aaff,
+                    0x5500aaff,
+                    0xaaff0055,
+                    0xff55aa00,
+                    0xaa0055ff,
+                    0xffffffff
             };
             drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
             break;
@@ -271,7 +298,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
     LOGI("text = %s, %d", tx, len);
-    auto *sock = new UdpSocket("127.0.0.1", 9999);
+    auto *sock = new UdpSocket("127.0.0.1", 8899);
     sock->Sender(tx, (unsigned int) len);
 /*
     auto *clz1 = new Clazz1();

@@ -1,5 +1,6 @@
 package com.tsymiar.devidroid.activity;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
@@ -58,13 +59,14 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
+    @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         // a call to a native method
-        TextView tv = findViewById(R.id.sample_text);
-        tv.setText((new CallbackWrapper()).stringGetJNI());
+        TextView textView = findViewById(R.id.sample_text);
+        textView.setText((new CallbackWrapper()).stringGetJNI());
         Time time = new Time();
 
         CallbackWrapper.initJvmEnv(MethodUtil.TAG);
@@ -84,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_time).setOnClickListener(
                 v -> {
+                    TextView tv = findViewById(R.id.txt_time);
                     time.x = (int) tv.getX();
                     time.t = System.currentTimeMillis();
                     Log.i(TAG, time.t + "----" + Arrays.toString(time.toByte()));
@@ -98,6 +101,8 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     event.setEvent("event: " + gValue);
                     notify.notifyListeners(event);
                     gValue++;
+                    TextView tv = findViewById(R.id.txt_event);
+                    tv.setText(event.getEvent().toString() + ", value = " + gValue);
                 }
         );
         WifiManager manager = (WifiManager) this.getApplicationContext()
@@ -116,6 +121,17 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     gValue++;
                     if (wifiLock.isHeld()) {
                         wifiLock.release();
+                    }
+                }
+        );
+        findViewById(R.id.btn_sub).setOnClickListener(
+                v -> {
+                    int ret = CallbackWrapper.KaiSubscribe("81.68.170.12", 9999, "topic");
+                    TextView tv = findViewById(R.id.txt_status);
+                    if (ret < 0) {
+                        tv.setText("fail");
+                    } else {
+                        tv.setText("success");
                     }
                 }
         );

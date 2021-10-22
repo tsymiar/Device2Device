@@ -14,7 +14,7 @@
 
 #include "UdpSocket.h"
 
-constexpr const int LOCAL_PORT = 9999;
+constexpr const int LOCAL_PORT = 8899;
 
 UdpSocket::UdpSocket() = default;
 

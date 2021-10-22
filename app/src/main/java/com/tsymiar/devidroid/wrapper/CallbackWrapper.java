@@ -12,4 +12,6 @@ public class CallbackWrapper {
     public native long timeSetJNI(byte[] time, int len);
 
     public static native void callJavaMethod(String method, int action, String content, boolean statics);
+
+    public static native int KaiSubscribe(String ip, int port, String topic);
 }
