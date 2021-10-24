@@ -173,7 +173,8 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass , jstring ip, jin
     const std::string msg = Jstring2Cstring(env, topic);
     std::thread th(
             [&status](const std::string &ip, int port, const std::string &topic, KaiSocket::RECVCALLBACK hook) -> void {
-                KaiSocket kaiSocket(ip.c_str(), port);
+                KaiSocket kaiSocket;
+                kaiSocket.Initialize(ip.c_str(), port);
                 status = kaiSocket.Subscriber(topic, hook);
                 // TODO call View.setText()
                 LOGI("message from %s:%d, topic = '%s' hook = %p, status = %d.", ip.c_str(), port, topic.c_str(), hook, status);

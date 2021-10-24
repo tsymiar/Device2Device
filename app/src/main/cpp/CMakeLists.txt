@@ -18,6 +18,7 @@ include_directories(
 )
 
 add_subdirectory(file)
+#add_subdirectory(kaics)
 add_subdirectory(runtime)
 add_subdirectory(network)
 add_subdirectory(callback)
