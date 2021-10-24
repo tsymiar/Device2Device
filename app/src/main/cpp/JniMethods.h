@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_JNICOMM_H
-#define DEVIDROID_JNICOMM_H
+#ifndef DEVIDROID_JNIMETHODS_H
+#define DEVIDROID_JNIMETHODS_H
 
 #define Callback_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_CallbackWrapper_##func
 #define CPP_FUNC_CALL(func) JNICALL Callback_WRAPPER(func)
@@ -26,7 +26,7 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass clazz, jstring clas
 
 JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(JNIEnv *env, jobject clazz);
 JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len);
-JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clazz, jstring ip, jint port, jstring topic);
+JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clazz, jstring addr, jint port, jstring topic, jint viewId);
 
 JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass clazz, jstring method, jint action,
@@ -47,4 +47,4 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *env, jclass);
 }
 #endif
 
-#endif //DEVIDROID_JNICOMM_H
+#endif //DEVIDROID_JNIMETHODS_H

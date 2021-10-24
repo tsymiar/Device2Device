@@ -36,7 +36,8 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        jniComm.cpp
+        JniMethods.cpp
+        JniFuncImpl.cpp
         texture/TextureView.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)

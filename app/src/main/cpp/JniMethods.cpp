@@ -1,116 +1,20 @@
-#ifndef LOG_TAG
-#define LOG_TAG "jniComm"
-#endif
-
-#include <utils/logging.h>
-
 #include <mutex>
 #include <string>
 #include <thread>
-#include <android/native_window.h>
+#ifndef LOG_TAG
+#define LOG_TAG "jniComm"
+#endif
+#include <utils/logging.h>
 #include <runtime/TimeStamp.h>
 #include <kaics/KaiSocket.h>
-
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
 #include "callback/CallJavaMethod.h"
 
-static jint JNI_RESULT = -1;
-
-JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
-{
-    typedef union {
-        JNIEnv *env;
-        void *rsv;
-    } UnionJNIEnvToVoid;
-    UnionJNIEnvToVoid envToVoid;
-    LOGI("Media Tag: JNI OnLoad\n");
-
-#ifdef JNI_VERSION_1_6
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_6\n");
-        JNI_RESULT = JNI_VERSION_1_6;
-    }
-#endif
-#ifdef JNI_VERSION_1_4
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_4\n");
-        JNI_RESULT = JNI_VERSION_1_4;
-    }
-#endif
-#ifdef JNI_VERSION_1_2
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_2\n");
-        JNI_RESULT = JNI_VERSION_1_2;
-    }
-#endif
-    return JNI_RESULT;
-}
-
-jstring Cstring2Jstring(JNIEnv *env, const char *pat)
-{
-    jclass clz = (env)->FindClass("java/lang/String");
-    jmethodID jmId = (env)->GetMethodID(clz, "<init>", "([BLjava/lang/String;)V");
-    jbyteArray bytes = (env)->NewByteArray(strlen(pat));
-    (env)->SetByteArrayRegion(bytes, 0, strlen(pat), (jbyte *) pat);
-    jstring encoding = (env)->NewStringUTF("utf-8");
-    return (jstring) (env)->NewObject(clz, jmId, bytes, encoding);
-}
-
-std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
-{
-    char *rtn = nullptr;
-    jclass clz = env->FindClass("java/lang/String");
-    jstring encode = env->NewStringUTF("utf-8");
-    jmethodID mid = env->GetMethodID(clz, "getBytes", "(Ljava/lang/String;)[B");
-    auto barr = (jbyteArray) env->CallObjectMethod(jstr, mid, encode);
-    auto len = static_cast<size_t>(env->GetArrayLength(barr));
-    jbyte *ba = env->GetByteArrayElements(barr, JNI_FALSE);
-    if (len > 0) {
-        rtn = (char *) malloc(len + 1);
-        memcpy(rtn, ba, len);
-        rtn[len] = 0;
-    }
-    env->ReleaseByteArrayElements(barr, ba, 0);
-    std::string temp(rtn);
-    free(rtn);
-    return temp;
-}
-
-jstring GetPackageName(JNIEnv *env)
-{
-    jobject context = nullptr;
-    jclass activity_thread_clz = env->FindClass("android/app/ActivityThread");
-    if (activity_thread_clz != nullptr) {
-        jmethodID get_Application = env->GetStaticMethodID(
-                activity_thread_clz,
-                "currentActivityThread",
-                "()Landroid/app/ActivityThread;");
-        if (get_Application != nullptr) {
-            jobject currentActivityThread = env->CallStaticObjectMethod(
-                    activity_thread_clz,
-                    get_Application);
-            jmethodID getal = env->GetMethodID(
-                    activity_thread_clz,
-                    "getApplication",
-                    "()Landroid/app/Application;");
-            context = env->CallObjectMethod(currentActivityThread, getal);
-        }
-    }
-    if (context == nullptr) {
-        LOGE("context is null!");
-        return nullptr;
-    }
-    jclass activity = env->GetObjectClass(context);
-    jmethodID methodId_pack = env->GetMethodID(activity, "getPackageName", "()Ljava/lang/String;");
-    auto package = reinterpret_cast<jstring >( env->CallObjectMethod(context, methodId_pack));
-    return package;
-}
-
-extern jclass g_jniCls;
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
-extern std::mutex g_lock;
+extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
+extern void ViewSetText(JNIEnv *env, jclass clz, int viewId = 0, const char* text = nullptr);
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -167,18 +71,29 @@ void RecvHook(const KaiSocket::Message& msg)
          msg.data.body);
 }
 
-JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass , jstring ip, jint port, jstring topic) {
+struct PubSubParam {
+    std::string addr;
+    int port;
+    std::string topic;
+    KaiSocket::RECVCALLBACK hook;
+};
+
+JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jint viewId) {
     jint status = -1;
-    std::string ipv4 = Jstring2Cstring(env, ip);
+    std::string address = Jstring2Cstring(env, addr);
     const std::string msg = Jstring2Cstring(env, topic);
+    PubSubParam param = {address, port, msg, RecvHook};
     std::thread th(
-            [&status](const std::string &ip, int port, const std::string &topic, KaiSocket::RECVCALLBACK hook) -> void {
+            [&status](JNIEnv *env, jclass clz, int id, const PubSubParam &param) -> void {
                 KaiSocket kaiSocket;
-                kaiSocket.Initialize(ip.c_str(), port);
-                status = kaiSocket.Subscriber(topic, hook);
-                // TODO call View.setText()
-                LOGI("message from %s:%d, topic = '%s' hook = %p, status = %d.", ip.c_str(), port, topic.c_str(), hook, status);
-            }, ipv4, port, msg, RecvHook);
+                kaiSocket.Initialize(param.addr.c_str(), param.port);
+                status = kaiSocket.Subscriber(param.topic, param.hook);
+                char msg[256];
+                memset(msg, 0, 256);
+                sprintf(msg, "message from %s:%d, topic = '%s', hook = %p, status = %d",
+                        param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
+                ViewSetText(env, clz, id, msg);
+            }, env, clz, viewId, param);
     if (th.joinable())
         th.detach();
     return status;

@@ -13,5 +13,5 @@ public class CallbackWrapper {
 
     public static native void callJavaMethod(String method, int action, String content, boolean statics);
 
-    public static native int KaiSubscribe(String ip, int port, String topic);
+    public static native int KaiSubscribe(String address, int port, String topic, int viewId);
 }

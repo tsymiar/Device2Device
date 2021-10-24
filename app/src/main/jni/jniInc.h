@@ -1,3 +1,3 @@
 #pragma once
 
-#include "../cpp/jniComm.h"
+#include "../cpp/JniMethods.h"

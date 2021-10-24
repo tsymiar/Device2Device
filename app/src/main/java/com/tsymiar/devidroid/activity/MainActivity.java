@@ -11,6 +11,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
+import com.tsymiar.devidroid.data.PubSubSetting;
 import com.tsymiar.devidroid.event.EventEntity;
 import com.tsymiar.devidroid.event.EventHandle;
 import com.tsymiar.devidroid.event.EventNotify;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
+    public static final int RequestCode = 10001;
     private int gValue = 1;
 
     public static class Time {
@@ -126,16 +128,32 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_sub).setOnClickListener(
                 v -> {
-                    int ret = CallbackWrapper.KaiSubscribe("81.68.170.12", 9999, "topic");
-                    TextView tv = findViewById(R.id.txt_status);
-                    if (ret < 0) {
-                        tv.setText("fail");
-                    } else {
-                        tv.setText("success");
-                    }
+                    Intent intent = new Intent(MainActivity.this, ConnectDialog.class);
+                    startActivityForResult(intent, RequestCode);
                 }
         );
     }
+
+    @SuppressLint("SetTextI18n")
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RequestCode && resultCode == RESULT_OK) {
+            TextView tv = findViewById(R.id.txt_status);
+            String string = data.getStringExtra("ConnectDialog");
+            if (string != null && string.equals("SUCCESS")) {
+                int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
+                        PubSubSetting.getPort(), PubSubSetting.getTopic(), R.id.txt_status);
+                if (ret < 0) {
+                    tv.setText("status fail!");
+                } else {
+                    tv.setText("success");
+                }
+            } else {
+                Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
+            }
+        }
+    };
 
     @Override
     public void handle(EventEntity... event) {

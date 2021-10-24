@@ -31,6 +31,7 @@
         <activity android:name=".activity.TextureActivity" />
         <activity android:name=".activity.WaveActivity" />
         <activity android:name=".activity.ChartActivity" />
+        <activity android:name=".activity.ConnectDialog" />
     </application>
 
 </manifest>
