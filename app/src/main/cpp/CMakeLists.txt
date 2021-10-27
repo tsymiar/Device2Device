@@ -18,7 +18,9 @@ include_directories(
 )
 
 add_subdirectory(file)
-#add_subdirectory(kaics)
+if(${BUILD_KAICS_LIB} AND ${BUILD_KAICS_LIB} EQUAL 1)
+    add_subdirectory(kaics)
+endif()
 add_subdirectory(runtime)
 add_subdirectory(network)
 add_subdirectory(callback)
@@ -40,12 +42,14 @@ add_library( # Sets the name of the library.
         JniFuncImpl.cpp
         texture/TextureView.cpp)
 
-set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
-add_custom_command(TARGET jniComm
-        PRE_BUILD
-        COMMAND mkdir -p ${LIBS_DIR}
-        COMMAND cp -r ${CMAKE_SOURCE_DIR}/kaics/*[^.h] ${LIBS_DIR}
-        COMMENT "copy kaics so files...")
+if (${BUILD_KAICS_LIB} AND NOT ${BUILD_KAICS_LIB} EQUAL 1)
+    set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
+    add_custom_command(TARGET jniComm
+            PRE_BUILD
+            COMMAND mkdir -p ${LIBS_DIR}
+            COMMAND cp -r ${CMAKE_SOURCE_DIR}/kaics/*[^.h] ${LIBS_DIR}
+            COMMENT "copy kaics so files...")
+endif()
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
 # default, you only need to specify the name of the public NDK library

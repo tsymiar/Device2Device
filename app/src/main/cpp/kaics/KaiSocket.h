@@ -48,7 +48,6 @@ public:
 public:
     int Initialize(unsigned short lstnprt);
     int Initialize(const char* srvip, unsigned short srvport);
-    static KaiSocket& GetInstance();
     // workflow
     int start();
     int connect();
@@ -56,12 +55,5 @@ public:
     int Broker();
     ssize_t Publisher(const std::string& topic, const std::string& payload, ...);
     ssize_t Subscriber(const std::string& message, RECVCALLBACK callback = nullptr);
-    // packaged
     static void wait(unsigned int tms);
-    ssize_t send(const uint8_t* data, size_t len);
-    ssize_t recv(uint8_t* buff, size_t size);
-    ssize_t broadcast(const uint8_t* data, size_t len);
-    // callback
-    void registerCallback(KAISOCKHOOK func);
-    void appendCallback(KAISOCKHOOK func);
 };
