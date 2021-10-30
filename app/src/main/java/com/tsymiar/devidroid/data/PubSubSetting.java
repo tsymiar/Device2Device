@@ -6,6 +6,7 @@ public class PubSubSetting {
     private String addr = "";
     private int port = 0;
     private String topic = "";
+    private String payload = "";
 
     public static int getPort() {
         return setting.port;
@@ -17,6 +18,10 @@ public class PubSubSetting {
 
     public static String getTopic() {
         return setting.topic;
+    }
+
+    public static String getPayload() {
+        return setting.payload;
     }
 
     public static void setAddr(String ip) {
@@ -31,6 +36,10 @@ public class PubSubSetting {
         setting.topic = topic;
     }
 
+    public static void setPayload(String payload) {
+        setting.payload = payload;
+    }
+
     public static PubSubSetting getSetting() {
         return setting;
     }
@@ -38,9 +47,10 @@ public class PubSubSetting {
     @Override
     public String toString() {
         return "PubSubSetting {" +
-                "ip='" + setting.addr + '\'' +
-                ", port=" + setting.port +
-                ", topic='" + setting.topic + '\'' +
+                "addr='" + addr + '\'' +
+                ", port=" + port +
+                ", topic='" + topic + '\'' +
+                ", payload='" + payload + '\'' +
                 '}';
     }
 }

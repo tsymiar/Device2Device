@@ -15,6 +15,7 @@ set(TOOLCHAIN ${NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot)
 include_directories(
         ${PROJECT_SOURCE_DIR}
         ${TOOLCHAIN}/usr/include
+        ${PROJECT_SOURCE_DIR}/kaics
 )
 
 add_subdirectory(file)
@@ -42,13 +43,21 @@ add_library( # Sets the name of the library.
         JniFuncImpl.cpp
         texture/TextureView.cpp)
 
-if (${BUILD_KAICS_LIB} AND NOT ${BUILD_KAICS_LIB} EQUAL 1)
-    set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
+set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
+if (NOT ${BUILD_KAICS_LIB} EQUAL 1)
+    file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/kaics/*[^kaics][^utils][^.txt][^.DS_Store]")
+    foreach(SOLIB IN LISTS LIB_FILE_LIST)
+        add_custom_command(TARGET jniComm
+                PRE_BUILD
+                COMMAND mkdir -p ${LIBS_DIR}
+                COMMAND cp -r ${SOLIB} ${LIBS_DIR}
+                COMMENT "setup kaics so files...")
+    endforeach()
+else()
     add_custom_command(TARGET jniComm
             PRE_BUILD
-            COMMAND mkdir -p ${LIBS_DIR}
-            COMMAND cp -r ${CMAKE_SOURCE_DIR}/kaics/*[^.h] ${LIBS_DIR}
-            COMMENT "copy kaics so files...")
+            COMMAND rm -rf ${LIBS_DIR}
+            COMMENT "clean kaics so files...")
 endif()
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -75,7 +84,7 @@ target_link_libraries( # Specifies the target library.
         jniComm
         # template
         ${PROJECT_SOURCE_DIR}/kaics/${ANDROID_ABI}/libkaics.so
-        Network callback timestamp fileIO
+        Network callback timestamp fileutil
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

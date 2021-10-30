@@ -18,7 +18,7 @@ import com.tsymiar.devidroid.R;
 
 import java.util.ArrayList;
 
-public class ChartActivity extends AppCompatActivity {
+public class GraphActivity extends AppCompatActivity {
 
     private final LineChart[] charts = new LineChart[4];
 

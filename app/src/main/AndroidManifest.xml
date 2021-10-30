@@ -30,8 +30,9 @@
         </activity>
         <activity android:name=".activity.TextureActivity" />
         <activity android:name=".activity.WaveActivity" />
-        <activity android:name=".activity.ChartActivity" />
-        <activity android:name=".activity.ConnectDialog" />
+        <activity android:name=".activity.GraphActivity" />
+        <activity android:name=".activity.SubscribeDialog" />
+        <activity android:name=".activity.PublishDialog" />
     </application>
 
 </manifest>

@@ -42,19 +42,21 @@ int UdpSocket::Sender(const char *sendBuff, size_t length)
     int opt = 1;
     setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (const void *) &opt, sizeof(opt));
 
-    auto *message = (uint8_t *) malloc(length + m_proSize);
-    memset(message, 0, length + m_proSize);
+    size_t total = length + m_proSize;
+    auto *message = (uint8_t *) malloc(total);
+    memset(message, 0, total);
     memcpy(message, &protocol, m_proSize);
     memcpy(message + m_proSize, sendBuff, length);
 
-    int iRet = sendto(m_socket, (char *) message, length, 0, (struct sockaddr *) &peer, m_addLen);
+    int iRet = sendto(m_socket, (char *) message, total, 0, (struct sockaddr *) &peer, m_addLen);
     if (iRet > 0)
-        LOGI("Udp send: %s", message + m_proSize);
+        LOGI("Udp send(%d):[%s]", iRet, message + m_proSize);
     else {
-        if (SendBySlice(sendBuff, length) < 0)
-            LOGE("Udp send error![%d]", iRet);
+        if ((iRet = SendBySlice(sendBuff, length)) < 0)
+            LOGE("Udp send(%d) error!", iRet);
     }
     close(m_socket);
+    free(message);
     return 0;
 }
 
@@ -94,8 +96,8 @@ int UdpSocket::Receiver(char *rcvBuff, int len)
                           (struct sockaddr *) &remote, &size);
         if (_s > 0) {
             rcvBuff[_s] = '\0';
-            LOGI("client:[%s:%d]  %s, len = %d.", inet_ntoa(remote.sin_addr),
-                 ntohs(remote.sin_port), rcvBuff + m_proSize, _s);
+            LOGI("client:[%s:%d]len = %d:[%s].", inet_ntoa(remote.sin_addr),
+                 ntohs(remote.sin_port), _s, rcvBuff + m_proSize);
         } else if (_s == 0) {
             LOGI("client close");
         } else

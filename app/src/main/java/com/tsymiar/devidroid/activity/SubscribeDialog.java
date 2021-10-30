@@ -15,8 +15,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.data.PubSubSetting;
 
-public class ConnectDialog extends AppCompatActivity {
-    private static final String TAG = MainActivity.class.getCanonicalName();
+public class SubscribeDialog extends AppCompatActivity {
+    private static final String TAG = SubscribeDialog.class.getCanonicalName();
 
     EditText g_editAddr = null;
     EditText g_editPort = null;
@@ -30,7 +30,7 @@ public class ConnectDialog extends AppCompatActivity {
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-        setContentView(R.layout.activity_connect);
+        setContentView(R.layout.activity_subscribe);
 
         WindowManager windowManager=getWindowManager();
         Display display=windowManager.getDefaultDisplay();
@@ -50,9 +50,8 @@ public class ConnectDialog extends AppCompatActivity {
                     if (g_editTopic != null)
                         PubSubSetting.setTopic(g_editTopic.getText().toString());
                     Intent data = new Intent();
-                    data.putExtra("ConnectDialog", "SUCCESS");
+                    data.putExtra("Subscribe", "SUCCESS");
                     setResult(Activity.RESULT_OK, data);
-                    Log.i(TAG, PubSubSetting.getSetting().toString());
                     finish();
                 }
         );

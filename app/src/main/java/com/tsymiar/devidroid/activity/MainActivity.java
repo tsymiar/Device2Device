@@ -24,7 +24,8 @@ import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
-    public static final int RequestCode = 10001;
+    public static final int RequestSubscribe = 10001;
+    public static final int RequestPublish = 10002;
     private int gValue = 1;
 
     public static class Time {
@@ -84,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 v -> startActivity(new Intent(MainActivity.this, WaveActivity.class))
         );
         findViewById(R.id.btn_chart).setOnClickListener(
-                v -> startActivity(new Intent(MainActivity.this, ChartActivity.class))
+                v -> startActivity(new Intent(MainActivity.this, GraphActivity.class))
         );
         findViewById(R.id.btn_time).setOnClickListener(
                 v -> {
@@ -128,8 +129,14 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_sub).setOnClickListener(
                 v -> {
-                    Intent intent = new Intent(MainActivity.this, ConnectDialog.class);
-                    startActivityForResult(intent, RequestCode);
+                    Intent intent = new Intent(MainActivity.this, SubscribeDialog.class);
+                    startActivityForResult(intent, RequestSubscribe);
+                }
+        );
+        findViewById(R.id.btn_pub).setOnClickListener(
+                v -> {
+                    Intent intent = new Intent(MainActivity.this, PublishDialog.class);
+                    startActivityForResult(intent, RequestPublish);
                 }
         );
     }
@@ -138,14 +145,15 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RequestCode && resultCode == RESULT_OK) {
+        if (requestCode == RequestSubscribe && resultCode == RESULT_OK) {
             TextView tv = findViewById(R.id.txt_status);
-            String string = data.getStringExtra("ConnectDialog");
+            String string = data.getStringExtra("Subscribe");
             if (string != null && string.equals("SUCCESS")) {
+                Log.i(TAG, "Subscribe " + string + ":\n" + PubSubSetting.getSetting().toString());
                 int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
                         PubSubSetting.getPort(), PubSubSetting.getTopic(), R.id.txt_status);
                 if (ret < 0) {
-                    tv.setText("status fail!");
+                    tv.setText("subscribe ready!");
                 } else {
                     tv.setText("success");
                 }
@@ -153,7 +161,16 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
             }
         }
-    };
+        if (requestCode == RequestPublish && resultCode == RESULT_OK) {
+            String string = data.getStringExtra("Publish");
+            if (string != null && string.equals("SUCCESS")) {
+                Log.i(TAG, "Publish " + string + ":\n" + PubSubSetting.getSetting().toString());
+                CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+            } else {
+                Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
+            }
+        }
+    }
 
     @Override
     public void handle(EventEntity... event) {

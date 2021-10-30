@@ -73,16 +73,19 @@ void RecvHook(const KaiSocket::Message& msg)
 
 struct PubSubParam {
     std::string addr;
-    int port;
+    int port{};
     std::string topic;
-    KaiSocket::RECVCALLBACK hook;
-};
+    KaiSocket::RECVCALLBACK hook{};
+} g_pubSubParam;
 
 JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jint viewId) {
     jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
     const std::string msg = Jstring2Cstring(env, topic);
-    PubSubParam param = {address, port, msg, RecvHook};
+    g_pubSubParam.addr = address;
+    g_pubSubParam.port = port;
+    g_pubSubParam.topic = msg;
+    g_pubSubParam.hook = RecvHook;
     std::thread th(
             [&status](JNIEnv *env, jclass clz, int id, const PubSubParam &param) -> void {
                 KaiSocket kaiSocket;
@@ -93,10 +96,27 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring add
                 sprintf(msg, "message from %s:%d, topic = '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
                 ViewSetText(env, clz, id, msg);
-            }, env, clz, viewId, param);
+            }, env, clz, viewId, g_pubSubParam);
     if (th.joinable())
         th.detach();
     return status;
+}
+
+JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass , jstring topic, jstring payload)
+{
+    if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
+        LOGI("g_pubSubParam: addr is null or port == 0.");
+        return;
+    }
+    std::thread th([](const std::string& topic, const std::string& payload) {
+        KaiSocket kaiSocket;
+        kaiSocket.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
+        LOGI("KaiPublishing to: [%s:%d].", g_pubSubParam.addr.c_str(), g_pubSubParam.port);
+        ssize_t stat = kaiSocket.Publisher(topic, payload);
+        LOGI("Published(%zu): payload = [%s][%s].", stat, topic.c_str(), payload.c_str());
+    }, Jstring2Cstring(env, topic), Jstring2Cstring(env, payload));
+    if (th.joinable())
+        th.detach();
 }
 
 int callback(const char *c, int i)
@@ -198,8 +218,11 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 #include <unistd.h>
 #include <file/Pcm2Wav.h>
 #include <network/UdpSocket.h>
+#include <iostream>
+
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>
+static int g_msgLen;
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
@@ -213,9 +236,11 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
 {
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
-    LOGI("text = %s, %d", tx, len);
+    LOGI("text = [%s](%d)", tx, len);
+    g_msgLen = len;
     auto *sock = new UdpSocket("127.0.0.1", 8899);
-    sock->Sender(tx, (unsigned int) len);
+    sock->Sender(tx, (unsigned int) len + 1);
+    delete sock;
 /*
     auto *clz1 = new Clazz1();
     clz1->setBase<Clazz1>("AAA", 3);
@@ -229,11 +254,15 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
 {
     std::thread th(
             []() -> void {
+                int total = g_msgLen + (int)sizeof(NetProtocol);
+                char msg[total];
                 auto *sock = new UdpSocket();
-                char buff[36];
-                while (sock->Receiver(buff, 36) != 0) {
+                int size;
+                do {
+                    size = sock->Receiver(msg, total);
                     usleep(10000);
-                }
+                } while (size != 0);
+                delete sock;
             }
     );
     if (th.joinable())

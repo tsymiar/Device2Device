@@ -1,2 +1,2 @@
-add_library(fileIO STATIC Pcm2Wav.cpp)
-target_link_libraries(fileIO log)
+add_library(fileutil STATIC Pcm2Wav.cpp)
+target_link_libraries(fileutil log)

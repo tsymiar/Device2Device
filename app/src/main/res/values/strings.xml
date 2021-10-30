@@ -21,4 +21,5 @@
     <string name="event">event</string>
     <string name="time">time</string>
     <string name="subscribe">Subscribe</string>
+    <string name="publish">publish</string>
 </resources>
