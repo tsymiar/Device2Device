@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/scadop"]
+	path = app/src/main/cpp/scadop
+	url = https://github.com/tsymiar/scadop.git

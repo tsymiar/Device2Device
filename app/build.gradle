@@ -14,7 +14,7 @@ android {
             cmake {
                 arguments "-DANDROID_ARM_NEON=TRUE"
                 cppFlags "-std=c++11"
-                arguments "-DBUILD_KAICS_LIB=0" // "1" to compile libkaics.so
+                arguments "-DBUILD_KAICS_LIB=1" // "0" to compile with libkaics.so file
             }
         }
         splits {
