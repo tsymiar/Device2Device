@@ -9,7 +9,7 @@
 #include <kaics/KaiSocket.h>
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
-#include "callback/CallJavaMethod.h"
+#include "callback/JavaFuncCalls.h"
 
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
@@ -129,12 +129,12 @@ JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, jstring content,
                               jboolean statics)
 {
-    CallJavaMethod::GetInstance().callMethodBack(Jstring2Cstring(env, method),
+    JavaFuncCalls::GetInstance().CallBack(Jstring2Cstring(env, method),
                                                   static_cast<int>(action),
                                                  Jstring2Cstring(env, content).c_str(),
                                                   statics);
-    CallJavaMethod::CALLBACK call = callback;
-    int val = CallJavaMethod::GetInstance().registerCallBack(const_cast<char *>("aaa"), call);
+    JavaFuncCalls::CALLBACK call = callback;
+    int val = JavaFuncCalls::GetInstance().Register(const_cast<char *>("aaa"), call);
     LOGI("callback = %p, val = %d.", call, val);
 }
 
@@ -216,9 +216,9 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 }
 
 #include <unistd.h>
-#include <file/Pcm2Wav.h>
-#include <network/UdpSocket.h>
 #include <iostream>
+#include <filetools/Pcm2Wav.h>
+#include <network/UdpSocket.h>
 
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>

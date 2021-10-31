@@ -11,9 +11,9 @@ private:
 public:
     static TimeStamp *get();
 
-    static unsigned long long BootTime();
+    unsigned long long BootTime();
 
-    static unsigned long long AbsoluteTime();
+    unsigned long long AbsoluteTime();
 };
 
 #endif //DEVIDROID_TIMESTAMP_H

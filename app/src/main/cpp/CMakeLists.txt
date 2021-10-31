@@ -15,12 +15,12 @@ set(TOOLCHAIN ${NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot)
 include_directories(
         ${PROJECT_SOURCE_DIR}
         ${TOOLCHAIN}/usr/include
-        ${PROJECT_SOURCE_DIR}/kaics
+        ${CMAKE_SOURCE_DIR}/scadop/src
 )
 
-add_subdirectory(file)
+add_subdirectory(filetools)
 if(${BUILD_KAICS_LIB} AND ${BUILD_KAICS_LIB} EQUAL 1)
-    add_subdirectory(kaics)
+    add_subdirectory(scadop)
 endif()
 add_subdirectory(runtime)
 add_subdirectory(network)
@@ -40,12 +40,11 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         JniMethods.cpp
-        JniFuncImpl.cpp
         texture/TextureView.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
 if (NOT ${BUILD_KAICS_LIB} EQUAL 1)
-    file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/kaics/*[^kaics][^utils][^.txt][^.DS_Store]")
+    file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/scadop/jniLibs/*")
     foreach(SOLIB IN LISTS LIB_FILE_LIST)
         add_custom_command(TARGET jniComm
                 PRE_BUILD
@@ -83,8 +82,8 @@ find_library(GLESv2 GLESv2)
 target_link_libraries( # Specifies the target library.
         jniComm
         # template
-        ${PROJECT_SOURCE_DIR}/kaics/${ANDROID_ABI}/libkaics.so
-        Network callback timestamp fileutil
+        ${PROJECT_SOURCE_DIR}/scadop/jniLibs/${ANDROID_ABI}/libkaics.so
+        Network callback timestamp filetools
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

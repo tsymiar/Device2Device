@@ -1,43 +1,75 @@
-#include <jni.h>
-#include <string>
-#include <android/native_window.h>
 #ifndef LOG_TAG
-#define LOG_TAG "jniFunc"
+#define LOG_TAG "JniFuncImpl"
 #endif
+
+#include <jni.h>
+#include <mutex>
+#include <algorithm>
+#include <thread>
 #include <utils/logging.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+jclass g_jniCls = {};
+JavaVM *g_jniJVM = nullptr;
+std::string g_className = {};
+#ifdef __cplusplus
+}
+#endif
+
 static jint JNI_RESULT = -1;
-extern JavaVM *g_jniJVM;
-extern jclass g_jniCls;
+
+int JVM_Attach()
+{
+    JNIEnv *myNewEnv;
+    if (nullptr == g_jniJVM) {
+        LOGE("g_jniJVM == NULL");
+        return -1;
+    }
+    int attack = 0;
+    JavaVMAttachArgs jvmArgs = {JNI_VERSION_1_6, __FUNCTION__, nullptr};
+    int env = g_jniJVM->GetEnv((void **) &myNewEnv, JNI_VERSION_1_6);
+    if (JNI_EDETACHED == env) {
+        LOGD("callback_handler:failed to get JNI environment assuming native thread");
+        env = g_jniJVM->AttachCurrentThread(&myNewEnv, &jvmArgs);
+        if (env < 0) {
+            LOGE("callback_handler: failed to attach current thread");
+            return -2;
+        }
+        attack = 1;
+    }
+    return attack;
+}
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
 {
-typedef union {
-    JNIEnv *env;
-    void *rsv;
-} UnionJNIEnvToVoid;
-UnionJNIEnvToVoid envToVoid;
-LOGI("Media Tag: JNI OnLoad\n");
+    typedef union {
+        JNIEnv *env;
+        void *rsv;
+    } UnionJNIEnvToVoid;
+    UnionJNIEnvToVoid envToVoid;
+    LOGI("Media Tag: JNI OnLoad\n");
 
 #ifdef JNI_VERSION_1_6
-if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
         LOGI("JNI_OnLoad: JNI_VERSION_1_6\n");
         JNI_RESULT = JNI_VERSION_1_6;
     }
 #endif
 #ifdef JNI_VERSION_1_4
-if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
         LOGI("JNI_OnLoad: JNI_VERSION_1_4\n");
         JNI_RESULT = JNI_VERSION_1_4;
     }
 #endif
 #ifdef JNI_VERSION_1_2
-if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
+    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
         LOGI("JNI_OnLoad: JNI_VERSION_1_2\n");
         JNI_RESULT = JNI_VERSION_1_2;
     }
 #endif
-return JNI_RESULT;
+    return JNI_RESULT;
 }
 
 jstring Cstring2Jstring(JNIEnv *env, const char *pat)
@@ -98,6 +130,45 @@ jstring GetPackageName(JNIEnv *env)
     jmethodID methodId_pack = env->GetMethodID(activity, "getPackageName", "()Ljava/lang/String;");
     auto package = reinterpret_cast<jstring >( env->CallObjectMethod(context, methodId_pack));
     return package;
+}
+
+void CallBackJavaMethod(const std::string &method, int action, const char *content, bool statics)
+{
+    int attack = JVM_Attach();
+    if (attack < 0) {
+        LOGE("failed to attach to java vm.");
+        return;
+    }
+    const char *clzz = g_className.c_str();
+    std::string cname = g_className;
+    replace(cname.begin(), cname.end(), '.', '/');
+    JNIEnv *env;
+    if (0 != g_jniJVM->GetEnv((void **) &env, JNI_VERSION_1_6)) {
+        LOGE("GetEnv fail with JNI_VERSION_1_6, '%s'.", clzz);
+        return;
+    }
+    if (env == nullptr) {
+        LOGE("env of class '%s' is NULL.", clzz);
+        return;
+    }
+    LOGI("calling java class %s(%s), method: %s, action = %d, content = %s.",
+         clzz, cname.c_str(), method.c_str(), action, content);
+    jclass cls = env->FindClass(cname.c_str());
+    g_jniCls = (jclass) env->NewGlobalRef(cls);
+    jstring msg = env->NewStringUTF(content);
+    constexpr const char *mthTag = "(ILjava/lang/String;)V";
+    if (statics) {
+        jmethodID jmID = env->GetStaticMethodID(g_jniCls, method.c_str(), mthTag);
+        env->CallStaticVoidMethod(g_jniCls, jmID, action, msg);
+    } else {
+        jmethodID jmID = env->GetMethodID(g_jniCls, method.c_str(), mthTag);
+        jobject obj = env->AllocObject(g_jniCls);
+        env->CallVoidMethod(obj, jmID, action, msg);
+        env->DeleteLocalRef(obj);
+    }
+    env->DeleteLocalRef(msg);
+    if (attack == 1)
+        g_jniJVM->DetachCurrentThread();
 }
 
 void ViewSetText(JNIEnv *env, jclass clz, int viewId, const char* text)
