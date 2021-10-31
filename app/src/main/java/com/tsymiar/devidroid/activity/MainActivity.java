@@ -141,6 +141,12 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
     }
 
+    public void showText(String string)
+    {
+        TextView text = findViewById(R.id.txt_status);
+        text.setText(string);
+    }
+
     @SuppressLint("SetTextI18n")
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {

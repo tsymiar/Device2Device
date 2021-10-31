@@ -178,13 +178,26 @@ void ViewSetText(JNIEnv *env, jclass clz, int viewId, const char* text)
         return;
     }
     g_jniJVM->AttachCurrentThread(&env, nullptr);
-    jobject activity = env->NewGlobalRef(clz);
-    jclass actClz = env->GetObjectClass(activity);
-    jmethodID actJmId = (env)->GetMethodID(actClz, "findViewById", "(I)Landroid/view/View;");
-    jobject view = env->CallObjectMethod(actClz, actJmId, viewId);
-    jclass textView = env->FindClass("android/widget/TextView");
-    jmethodID jmId = (env)->GetMethodID(textView, "setText", "(Ljava/lang/CharSequence;)V");
-    env->CallVoidMethod(view, jmId, Cstring2Jstring(env, text));
+    jstring msg = env->NewStringUTF(text);
+    std::string main_activity = "com/tsymiar/devidroid/activity/MainActivity";
+    jclass activity = env->FindClass(main_activity.c_str());
+    if (activity != nullptr) {
+        g_jniCls = (jclass) env->NewGlobalRef(activity);
+        jmethodID showText = env->GetMethodID(
+                g_jniCls,
+                "showText",
+                "(Ljava/lang/String;)V");
+        jobject alloc = env->AllocObject(g_jniCls);
+        env->CallVoidMethod(alloc, showText, msg);
+    } else {
+        jmethodID actJmId = (env)->GetMethodID(g_jniCls, "findViewById", "(I)Landroid/view/View;");
+        jobject widget = env->CallStaticObjectMethod(g_jniCls, actJmId, actJmId, viewId);
+        jclass textClz = env->GetObjectClass(widget);
+        jmethodID jmId = (env)->GetMethodID(textClz, "setText", "(Ljava/lang/CharSequence;)V");
+        jobject textView = env->AllocObject(textClz);
+        env->CallVoidMethod(textView, jmId, msg);
+    }
+    env->DeleteLocalRef(msg);
     g_jniJVM->DetachCurrentThread();
     LOGI("View.setText: %d, %s", viewId, text);
 }

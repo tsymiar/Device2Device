@@ -33,9 +33,10 @@
         android:id="@+id/btn_confirm1"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="16dp"
+        android:layout_marginLeft="8dp"
         android:layout_marginTop="32dp"
         android:text="Confirm"
+        android:textSize="1mm"
         app:layout_constraintLeft_toRightOf="@id/edit_topic1"
         app:layout_constraintTop_toBottomOf="@id/edit_payload"
         tools:ignore="MissingConstraints" />

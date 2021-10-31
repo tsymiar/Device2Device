@@ -62,6 +62,16 @@ JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time,
     return val;
 }
 
+struct PubSubParam {
+    std::string addr;
+    int port{};
+    std::string topic;
+    KaiSocket::RECVCALLBACK hook{};
+    JNIEnv env;
+    jclass clz;
+    jint vid;
+} g_pubSubParam;
+
 void RecvHook(const KaiSocket::Message& msg)
 {
     LOGI("topic '%s' of %s, payload: [%s]-[%s].",
@@ -69,25 +79,22 @@ void RecvHook(const KaiSocket::Message& msg)
          KaiSocket::G_KaiRole[msg.head.etag],
          msg.data.stat,
          msg.data.body);
+    // ViewSetText(&g_pubSubParam.env, g_pubSubParam.clz, g_pubSubParam.vid, msg.data.body);
 }
-
-struct PubSubParam {
-    std::string addr;
-    int port{};
-    std::string topic;
-    KaiSocket::RECVCALLBACK hook{};
-} g_pubSubParam;
 
 JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jint viewId) {
     jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
     const std::string msg = Jstring2Cstring(env, topic);
     g_pubSubParam.addr = address;
-    g_pubSubParam.port = port;
     g_pubSubParam.topic = msg;
+    g_pubSubParam.port = port;
     g_pubSubParam.hook = RecvHook;
+    g_pubSubParam.env = *env;
+    g_pubSubParam.clz = clz;
+    g_pubSubParam.vid = viewId;
     std::thread th(
-            [&status](JNIEnv *env, jclass clz, int id, const PubSubParam &param) -> void {
+            [&status](PubSubParam param) -> void {
                 KaiSocket kaiSocket;
                 kaiSocket.Initialize(param.addr.c_str(), param.port);
                 status = kaiSocket.Subscriber(param.topic, param.hook);
@@ -95,8 +102,8 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring add
                 memset(msg, 0, 256);
                 sprintf(msg, "message from %s:%d, topic = '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
-                ViewSetText(env, clz, id, msg);
-            }, env, clz, viewId, g_pubSubParam);
+                ViewSetText(&param.env, param.clz, param.vid, msg);
+            }, g_pubSubParam);
     if (th.joinable())
         th.detach();
     return status;
