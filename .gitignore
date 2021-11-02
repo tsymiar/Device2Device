@@ -12,3 +12,4 @@ app/src/main/jniLibs
 gradle/wrapper/gradle-wrapper.properties
 jniLibs
 libs
+file
