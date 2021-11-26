@@ -15,7 +15,7 @@ import com.tsymiar.devidroid.data.PubSubSetting;
 import com.tsymiar.devidroid.event.EventEntity;
 import com.tsymiar.devidroid.event.EventHandle;
 import com.tsymiar.devidroid.event.EventNotify;
-import com.tsymiar.devidroid.utils.MethodUtil;
+import com.tsymiar.devidroid.utils.JvmMethods;
 import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 import com.tsymiar.devidroid.wrapper.NetWrapper;
 import com.tsymiar.devidroid.wrapper.TimeWrapper;
@@ -26,7 +26,13 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
     public static final int RequestSubscribe = 10001;
     public static final int RequestPublish = 10002;
+    static MainActivity mainActivity;
     private int gValue = 1;
+
+    public static MainActivity getInstance()
+    {
+        return mainActivity;
+    }
 
     public static class Time {
         int x;
@@ -72,7 +78,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         textView.setText((new CallbackWrapper()).stringGetJNI());
         Time time = new Time();
 
-        CallbackWrapper.initJvmEnv(MethodUtil.TAG);
+        CallbackWrapper.initJvmEnv(JvmMethods.TAG);
         CallbackWrapper.callJavaMethod("hello", 0, "non-static call", false);
         CallbackWrapper.callJavaMethod("welcome", 2, "callJavaStaticMethod!", true);
 
@@ -141,12 +147,6 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
     }
 
-    public void showText(String string)
-    {
-        TextView text = findViewById(R.id.txt_status);
-        text.setText(string);
-    }
-
     @SuppressLint("SetTextI18n")
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -157,7 +157,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
             if (string != null && string.equals("SUCCESS")) {
                 Log.i(TAG, "Subscribe " + string + ":\n" + PubSubSetting.getSetting().toString());
                 int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
-                        PubSubSetting.getPort(), PubSubSetting.getTopic(), R.id.txt_status);
+                        PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                 if (ret < 0) {
                     tv.setText("subscribe ready!");
                 } else {

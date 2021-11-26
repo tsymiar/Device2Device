@@ -17,7 +17,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
-import com.tsymiar.devidroid.utils.FileUtil;
+import com.tsymiar.devidroid.utils.LocalFile;
 import com.tsymiar.devidroid.utils.SamplePlayer;
 import com.tsymiar.devidroid.utils.SoundFile;
 import com.tsymiar.devidroid.utils.WaveCanvas;
@@ -196,7 +196,7 @@ public class WaveActivity extends AppCompatActivity {
                 CHANNELCONGIFIGURATION,// 录制通道
                 AUDIO_SOURCE,// 录制编码格式
                 recvBufSize);// 录制缓冲区大小
-        FileUtil.createDirectory(DATA_DIRECTORY);
+        LocalFile.createDirectory(DATA_DIRECTORY);
         waveCanvas = new WaveCanvas();
         waveCanvas.setBaseLine(waveView);
         Handler.Callback msgCallback = new Handler.Callback() {

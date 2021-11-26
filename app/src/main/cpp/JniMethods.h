@@ -25,7 +25,7 @@ extern "C" {
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass clazz, jstring class_name);
 JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(JNIEnv *env, jobject clazz);
 JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len);
-JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clazz, jstring addr, jint port, jstring topic, jint viewId);
+JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clazz, jstring addr, jint port, jstring topic, jstring viewId, jint id);
 JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass clazz, jstring topic, jstring payload);
 
 JNIEXPORT void

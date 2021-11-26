@@ -22,5 +22,5 @@
     <string name="time">time</string>
     <string name="subscribe">Subscribe</string>
     <string name="publish">Publish</string>
-    <string name="address">192.168.0.1</string>
+    <string name="address">81.68.170.12</string>
 </resources>

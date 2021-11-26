@@ -18,7 +18,7 @@ include_directories(
         ${CMAKE_SOURCE_DIR}/scadop/src
 )
 
-add_subdirectory(filetools)
+add_subdirectory(files)
 if(${BUILD_KAICS_LIB} AND ${BUILD_KAICS_LIB} EQUAL 1)
     add_subdirectory(scadop)
 endif()
@@ -83,7 +83,7 @@ target_link_libraries( # Specifies the target library.
         jniComm
         # template
         ${PROJECT_SOURCE_DIR}/scadop/jniLibs/${ANDROID_ABI}/libkaics.so
-        Network callback timestamp filetools
+        Network callback timestamp files
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

@@ -18,7 +18,36 @@ std::string g_className = {};
 }
 #endif
 
-static jint JNI_RESULT = -1;
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
+{
+    typedef union {
+        JNIEnv *env;
+        void *rsv;
+    } UnionJNIEnvToVoid;
+    UnionJNIEnvToVoid envToVoid;
+    LOGI("Media Tag: JNI OnLoad\n");
+
+    static jint JNI_VERSION = -1;
+#ifdef JNI_VERSION_1_6
+    if (JNI_VERSION == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_6");
+        JNI_VERSION = JNI_VERSION_1_6;
+    }
+#endif
+#ifdef JNI_VERSION_1_4
+    if (JNI_VERSION == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_4");
+        JNI_VERSION = JNI_VERSION_1_4;
+    }
+#endif
+#ifdef JNI_VERSION_1_2
+    if (JNI_VERSION == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
+        LOGI("JNI_OnLoad: JNI_VERSION_1_2");
+        JNI_VERSION = JNI_VERSION_1_2;
+    }
+#endif
+    return JNI_VERSION;
+}
 
 int JVM_Attach()
 {
@@ -28,8 +57,13 @@ int JVM_Attach()
         return -1;
     }
     int attack = 0;
-    JavaVMAttachArgs jvmArgs = {JNI_VERSION_1_6, __FUNCTION__, nullptr};
-    int env = g_jniJVM->GetEnv((void **) &myNewEnv, JNI_VERSION_1_6);
+    jint version = JNI_OnLoad(g_jniJVM, nullptr);
+    if (version == -1) {
+        LOGE("version cant load!");
+        return -1;
+    }
+    JavaVMAttachArgs jvmArgs = {version, __FUNCTION__, nullptr};
+    int env = g_jniJVM->GetEnv((void **) &myNewEnv, version);
     if (JNI_EDETACHED == env) {
         LOGD("callback_handler:failed to get JNI environment assuming native thread");
         env = g_jniJVM->AttachCurrentThread(&myNewEnv, &jvmArgs);
@@ -42,44 +76,14 @@ int JVM_Attach()
     return attack;
 }
 
-JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void * /*reserved*/)
-{
-    typedef union {
-        JNIEnv *env;
-        void *rsv;
-    } UnionJNIEnvToVoid;
-    UnionJNIEnvToVoid envToVoid;
-    LOGI("Media Tag: JNI OnLoad\n");
-
-#ifdef JNI_VERSION_1_6
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_6) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_6\n");
-        JNI_RESULT = JNI_VERSION_1_6;
-    }
-#endif
-#ifdef JNI_VERSION_1_4
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_4) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_4\n");
-        JNI_RESULT = JNI_VERSION_1_4;
-    }
-#endif
-#ifdef JNI_VERSION_1_2
-    if (JNI_RESULT == -1 && vm->GetEnv(&envToVoid.rsv, JNI_VERSION_1_2) == JNI_OK) {
-        LOGI("JNI_OnLoad: JNI_VERSION_1_2\n");
-        JNI_RESULT = JNI_VERSION_1_2;
-    }
-#endif
-    return JNI_RESULT;
-}
-
 jstring Cstring2Jstring(JNIEnv *env, const char *pat)
 {
-    jclass clz = (env)->FindClass("java/lang/String");
-    jmethodID jmId = (env)->GetMethodID(clz, "<init>", "([BLjava/lang/String;)V");
-    jbyteArray bytes = (env)->NewByteArray(strlen(pat));
-    (env)->SetByteArrayRegion(bytes, 0, strlen(pat), (jbyte *) pat);
-    jstring encoding = (env)->NewStringUTF("utf-8");
-    return (jstring) (env)->NewObject(clz, jmId, bytes, encoding);
+    jclass clz = env->FindClass("java/lang/String");
+    jmethodID jmId = env->GetMethodID(clz, "<init>", "([BLjava/lang/String;)V");
+    jbyteArray bytes = env->NewByteArray(strlen(pat));
+    env->SetByteArrayRegion(bytes, 0, strlen(pat), (jbyte *) pat);
+    jstring encoding = env->NewStringUTF("utf-8");
+    return (jstring) env->NewObject(clz, jmId, bytes, encoding);
 }
 
 std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
@@ -167,35 +171,102 @@ void CallBackJavaMethod(const std::string &method, int action, const char *conte
         env->DeleteLocalRef(obj);
     }
     env->DeleteLocalRef(msg);
-    if (attack == 1)
-        g_jniJVM->DetachCurrentThread();
+    if (attack == 1) g_jniJVM->DetachCurrentThread();
 }
 
-void ViewSetText(JNIEnv *env, jclass clz, int viewId, const char* text)
+void SetContentView(JNIEnv *env, jclass cls)
 {
-    if (viewId == 0 || g_jniJVM == nullptr) {
-        LOGE("one of these invalid: viewId = %d, jniVm = %p", viewId, g_jniJVM);
+    if (g_jniJVM == nullptr) {
+        LOGE("failed to attach to java vm.");
+        return;
+    }
+    g_jniJVM->AttachCurrentThread(&env, nullptr);
+    jclass layout_res = env->FindClass("com/tsymiar/devidroid/R$layout");
+    jfieldID fieldID_main = env->GetStaticFieldID(layout_res, "main", "I");
+    jint main = env->GetStaticIntField(layout_res, fieldID_main);
+
+    jclass activity_clazz = env->FindClass("android/app/Activity");
+    if (activity_clazz == nullptr) {
+        LOGE("FindClass activity_clazz error");
+        return;
+    }
+    jmethodID methodID_func = env->GetMethodID(activity_clazz, "setContentView",
+                                               "(I)V");
+    if (methodID_func == nullptr) {
+        LOGE("GetMethodID methodID_func error");
+        return;
+    }
+    env->CallVoidMethod(cls, methodID_func, main);
+    g_jniJVM->DetachCurrentThread();
+}
+
+void SetTextView(JNIEnv *env, jclass cls, const std::string& viewId, const std::string& text)
+{
+    if (g_jniJVM == nullptr) {
+        LOGE("failed to attach to java vm.");
+        return;
+    }
+    g_jniJVM->AttachCurrentThread(&env, nullptr);
+    jclass activity_clazz = env->FindClass("android/app/Activity");
+    if (activity_clazz == nullptr) {
+        LOGE("FindClass activity_clazz error");
+        return;
+    }
+    jclass id_res = env->FindClass("com/tsymiar/devidroid/R$id");
+    jfieldID field_id = env->GetStaticFieldID(id_res, viewId.c_str(), "I");
+    jint field_val = env->GetStaticIntField(id_res, field_id);
+    jmethodID findViewById = env->GetMethodID(activity_clazz, "findViewById",
+                                               "(I)Landroid/view/View;");
+    if (findViewById == nullptr) {
+        LOGE("GetMethodID methodID_func error");
+        return;
+    }
+    jobject method_findView = env->CallObjectMethod(cls, findViewById, field_val);
+
+    jclass native_TextView = env->FindClass("android/widget/TextView");
+    if (native_TextView == nullptr) {
+        LOGE("FindClass native_TextView error");
+        return;
+    }
+    jmethodID methodID_TextView = env->GetMethodID(native_TextView, "setText",
+                                                   "(Ljava/lang/CharSequence;)V");
+    if (methodID_TextView == nullptr) {
+        LOGE("GetMethodID methodID_func error");
+        return;
+    }
+    jstring text_ref = env->NewStringUTF(text.c_str());
+    env->CallVoidMethod(method_findView, methodID_TextView, text_ref);
+    env->DeleteLocalRef(text_ref);
+    g_jniJVM->DetachCurrentThread();
+    LOGI("View.setText: %s = [%s]", viewId.c_str(), text.c_str());
+}
+
+void SetActivityViewText(JNIEnv *env, int viewId, const char* text)
+{
+    if (g_jniJVM == nullptr) {
+        LOGE("failed to attach to java vm.");
         return;
     }
     g_jniJVM->AttachCurrentThread(&env, nullptr);
     jstring msg = env->NewStringUTF(text);
-    std::string main_activity = "com/tsymiar/devidroid/activity/MainActivity";
-    jclass activity = env->FindClass(main_activity.c_str());
-    if (activity != nullptr) {
-        g_jniCls = (jclass) env->NewGlobalRef(activity);
+    if (viewId <= 0) {
+        LOGE("invalid viewId = %d", viewId);
+        std::string main_activity = "com/tsymiar/devidroid/activity/MainActivity";
+        jclass activity = env->FindClass(main_activity.c_str());
+        auto cls = (jclass) env->NewGlobalRef(activity);
         jmethodID showText = env->GetMethodID(
-                g_jniCls,
+                cls,
                 "showText",
                 "(Ljava/lang/String;)V");
-        jobject alloc = env->AllocObject(g_jniCls);
+        jobject alloc = env->AllocObject(cls);
         env->CallVoidMethod(alloc, showText, msg);
     } else {
-        jmethodID actJmId = (env)->GetMethodID(g_jniCls, "findViewById", "(I)Landroid/view/View;");
-        jobject widget = env->CallStaticObjectMethod(g_jniCls, actJmId, actJmId, viewId);
-        jclass textClz = env->GetObjectClass(widget);
-        jmethodID jmId = (env)->GetMethodID(textClz, "setText", "(Ljava/lang/CharSequence;)V");
-        jobject textView = env->AllocObject(textClz);
-        env->CallVoidMethod(textView, jmId, msg);
+        jmethodID setText = env->GetMethodID(g_jniCls, "SetTextView", "(Ljava/lang/String;)V");
+        if (setText == nullptr) {
+            LOGE("GetMethodID 'SetTextView' error");
+            return;
+        }
+        env->CallStaticVoidMethod(g_jniCls, setText, msg);
     }
     env->DeleteLocalRef(msg);
     g_jniJVM->DetachCurrentThread();

@@ -5,8 +5,8 @@ import android.util.Log;
 
 import java.io.File;
 
-public class FileUtil {
-    private static final String TAG = FileUtil.class.getSimpleName();
+public class LocalFile {
+    private static final String TAG = LocalFile.class.getSimpleName();
 
     public static void createDirectory(String fullPath) {
         if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {

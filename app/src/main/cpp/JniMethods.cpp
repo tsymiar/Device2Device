@@ -14,7 +14,8 @@
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
-extern void ViewSetText(JNIEnv *env, jclass clz, int viewId = 0, const char* text = nullptr);
+extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
+extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -67,9 +68,10 @@ struct PubSubParam {
     int port{};
     std::string topic;
     KaiSocket::RECVCALLBACK hook{};
-    JNIEnv env;
-    jclass clz;
-    jint vid;
+    JNIEnv env{};
+    jclass clz{};
+    std::string view;
+    int id{};
 } g_pubSubParam;
 
 void RecvHook(const KaiSocket::Message& msg)
@@ -79,30 +81,32 @@ void RecvHook(const KaiSocket::Message& msg)
          KaiSocket::G_KaiRole[msg.head.etag],
          msg.data.stat,
          msg.data.body);
-    // ViewSetText(&g_pubSubParam.env, g_pubSubParam.clz, g_pubSubParam.vid, msg.data.body);
+    // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
 }
 
-JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jint viewId) {
+JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jstring viewId, jint id) {
     jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
-    const std::string msg = Jstring2Cstring(env, topic);
     g_pubSubParam.addr = address;
+    const std::string msg = Jstring2Cstring(env, topic);
     g_pubSubParam.topic = msg;
     g_pubSubParam.port = port;
     g_pubSubParam.hook = RecvHook;
     g_pubSubParam.env = *env;
     g_pubSubParam.clz = clz;
-    g_pubSubParam.vid = viewId;
+    const std::string view = Jstring2Cstring(env, viewId);
+    g_pubSubParam.view = view;
+    g_pubSubParam.id = id;
     std::thread th(
-            [&status](PubSubParam param) -> void {
+            [&status](const PubSubParam& param) -> void {
                 KaiSocket kaiSocket;
                 kaiSocket.Initialize(param.addr.c_str(), param.port);
                 status = kaiSocket.Subscriber(param.topic, param.hook);
-                char msg[256];
-                memset(msg, 0, 256);
-                sprintf(msg, "message from %s:%d, topic = '%s', hook = %p, status = %d",
+                char content[256];
+                memset(content, 0, 256);
+                sprintf(content, "message from %s:%d, topic = '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
-                ViewSetText(&param.env, param.clz, param.vid, msg);
+                // SetTextView(&param.env, param.clz, param.view, content);
             }, g_pubSubParam);
     if (th.joinable())
         th.detach();
@@ -224,7 +228,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <unistd.h>
 #include <iostream>
-#include <filetools/Pcm2Wav.h>
+#include <files/Pcm2Wav.h>
 #include <network/UdpSocket.h>
 
 // #include <template/Clazz1.h>

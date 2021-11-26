@@ -13,7 +13,7 @@ public class CallbackWrapper {
 
     public static native void callJavaMethod(String method, int action, String content, boolean statics);
 
-    public static native int KaiSubscribe(String address, int port, String topic, int viewId);
+    public static native int KaiSubscribe(String address, int port, String topic, String viewId, int id);
 
     public static native void KaiPublish(String topic, String payload);
 }
