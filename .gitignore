@@ -13,3 +13,4 @@ gradle/wrapper/gradle-wrapper.properties
 jniLibs
 libs
 file
+.vs*
