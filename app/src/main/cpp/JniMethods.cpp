@@ -6,7 +6,7 @@
 #endif
 #include <utils/logging.h>
 #include <runtime/TimeStamp.h>
-#include <kaics/KaiSocket.h>
+#include <kaics/scadop.h>
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
