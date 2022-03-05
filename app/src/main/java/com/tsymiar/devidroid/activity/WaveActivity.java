@@ -1,6 +1,8 @@
 package com.tsymiar.devidroid.activity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -10,11 +12,13 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.utils.LocalFile;
@@ -28,11 +32,12 @@ import java.io.File;
 
 public class WaveActivity extends AppCompatActivity {
 
+    public final String TAG = WaveActivity.class.getSimpleName();
     public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
             + "/Android/data/" + "com.tsymiar.devidroid" + "/record/";
     private static final int FREQUENCY = 16000;// 设置音频采样率,44100是目前的标准,某些设备仍然支持22050，16000，11025
-    private static final int CHANNELCONGIFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
-    private static final int AUDIOENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
+    private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
+    private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
     public final static int AUDIO_SOURCE = MediaRecorder.AudioSource.MIC;// 音频获取源
     private static final String mFileName = "test";
     WaveSurfaceView waveView;
@@ -60,7 +65,8 @@ public class WaveActivity extends AppCompatActivity {
             waveform.setVisibility(View.INVISIBLE);
             statusHandle.sendMessage(statusHandle.obtainMessage(0, ""));
             loadWaveFile();
-            playWaveAudio(0);
+            int start = 0;
+            playWaveAudio(start);
         });
         Button recdBtn = findViewById(R.id.wave_record);
         recdBtn.setOnClickListener(view -> {
@@ -124,7 +130,7 @@ public class WaveActivity extends AppCompatActivity {
         mLoadSoundFileThread.start();
     }
 
-    private int mPlayEndMsec;
+    private int mPlayFullMisc;
     private final int UPDATE_WAV = 100;
 
     /**
@@ -139,14 +145,14 @@ public class WaveActivity extends AppCompatActivity {
             mPlayer.pause();
             updateWaveTime.removeMessages(UPDATE_WAV);
         }
-        int mPlayStartMsec = waveform.pixelsToMillisecs(startPosition);
-        mPlayEndMsec = waveform.pixelsToMillisecsTotal();
+        int mPlayStartMisc = waveform.pixelsToMillisecs(startPosition);
+        mPlayFullMisc = waveform.pixelsToMillisecsTotal();
         mPlayer.setOnCompletionListener(() -> {
             waveform.setPlayback(-1);
             setDisplaySpeed();
             updateWaveTime.removeMessages(UPDATE_WAV);
         });
-        mPlayer.seekTo(mPlayStartMsec);
+        mPlayer.seekTo(mPlayStartMisc);
         mPlayer.start();
         Message msg = new Message();
         msg.what = UPDATE_WAV;
@@ -154,7 +160,7 @@ public class WaveActivity extends AppCompatActivity {
     }
 
     @SuppressLint("HandlerLeak")
-    Handler updateWaveTime = new Handler() {
+    final Handler updateWaveTime = new Handler() {
         public void handleMessage(Message msg) {
             setDisplaySpeed();
             updateWaveTime.sendMessageDelayed(new Message(), 10);
@@ -174,7 +180,7 @@ public class WaveActivity extends AppCompatActivity {
         int current = mPlayer.getCurrentPosition();
         int frames = waveform.millisecsToPixels(current);
         waveform.setPlayback(frames);
-        if (current >= mPlayEndMsec) {
+        if (current >= mPlayFullMisc) {
             waveform.setPlayFinish(1);
             if (mPlayer != null && mPlayer.isPlaying()) {
                 mPlayer.pause();
@@ -187,25 +193,32 @@ public class WaveActivity extends AppCompatActivity {
     }
 
     public void startDrawWave() {
-        int recvBufSize = AudioRecord.getMinBufferSize(
+        int bufSize = AudioRecord.getMinBufferSize(
                 FREQUENCY,
-                CHANNELCONGIFIGURATION,
-                AUDIOENCODING);// 录音组件
+                CHANNEL_CONFIGURATION,
+                AUDIO_ENCODING);// 录音组件
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
         AudioRecord audioRecord = new AudioRecord(AUDIO_SOURCE,// 指定音频来源，麦克风
                 FREQUENCY, // 16000HZ采样频率
-                CHANNELCONGIFIGURATION,// 录制通道
+                CHANNEL_CONFIGURATION,// 录制通道
                 AUDIO_SOURCE,// 录制编码格式
-                recvBufSize);// 录制缓冲区大小
+                bufSize);// 录制缓冲区大小
         LocalFile.createDirectory(DATA_DIRECTORY);
         waveCanvas = new WaveCanvas();
         waveCanvas.setBaseLine(waveView);
-        Handler.Callback msgCallback = new Handler.Callback() {
-            @Override
-            public boolean handleMessage(Message msg) {
-                return true;
-            }
-        };
-        waveCanvas.Start(audioRecord, recvBufSize, waveView, mFileName, DATA_DIRECTORY, msgCallback);
+        Handler.Callback msgCallback = msg -> true;
+        waveCanvas.Start(audioRecord, bufSize, waveView, mFileName, DATA_DIRECTORY, msgCallback);
+        int baseLine = waveCanvas.getBaseLine();
+        Log.i(TAG, "waveCanvas baseline = " + baseLine);
     }
 
     @Override

@@ -1,5 +1,7 @@
 package com.tsymiar.devidroid.utils;
 
+import static android.media.AudioRecord.STATE_INITIALIZED;
+
 import android.annotation.SuppressLint;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -26,8 +28,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 
-import static android.media.AudioRecord.STATE_INITIALIZED;
-
 /**
  * 波形和写入文件使用了两个不同的线程，以免造成卡机现象
  * 实时波形绘制
@@ -37,8 +37,8 @@ import static android.media.AudioRecord.STATE_INITIALIZED;
 public class WaveCanvas {
 
     private static final String TAG = WaveCanvas.class.getSimpleName();
-    private final ArrayList<Short> inBuf = new ArrayList<Short>();//缓冲区数据
-    private final ArrayList<byte[]> write_data = new ArrayList<byte[]>();//写入文件数据
+    private final ArrayList<Short> inBuf = new ArrayList<>();//缓冲区数据
+    private final ArrayList<byte[]> write_data = new ArrayList<>();//写入文件数据
     private boolean isWriting = false;// 录音线程控制标记
     private boolean isRecording = false;// 录音线程控制标记
     private int line_off;//上下边距的距离
@@ -113,14 +113,14 @@ public class WaveCanvas {
         if (audioTask != null) {
             audioTask.StopRecord();
         }
-        //inBuf.clear();// 清除
+        Clear(); // 清除
     }
 
     /**
      * 清除数据
      */
     public void Clear() {
-        inBuf.clear();// 清除
+        inBuf.clear();
     }
 
     /**
@@ -156,19 +156,19 @@ public class WaveCanvas {
                 audioRecord.startRecording();// 开始录制
                 while (isRecording) {
                     // 从MIC保存数据到缓冲区
-                    int readsize = audioRecord.read(buffer, 0,
+                    int readSize = audioRecord.read(buffer, 0,
                             recBufSize);
                     synchronized (inBuf) {
-                        for (int i = 0; i < readsize; i += rateX) {
+                        for (int i = 0; i < readSize; i += rateX) {
                             inBuf.add(buffer[i]);
                         }
                     }
                     publishProgress();
-                    if (AudioRecord.ERROR_INVALID_OPERATION != readsize) {
+                    if (AudioRecord.ERROR_INVALID_OPERATION != readSize) {
                         synchronized (write_data) {
-                            byte[] bys = new byte[readsize * 2];
+                            byte[] bys = new byte[readSize * 2];
                             //因为arm字节序问题，所以需要高低位交换
-                            for (int i = 0; i < readsize; i++) {
+                            for (int i = 0; i < readSize; i++) {
                                 byte[] ss = getBytes(buffer[i]);
                                 bys[i * 2] = ss[0];
                                 bys[i * 2 + 1] = ss[1];
@@ -188,21 +188,25 @@ public class WaveCanvas {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         protected void onProgressUpdate(Object... values) {
             long time = new Date().getTime();
             //两次绘图间隔的时间
             int draw_time = 1000 / 200;
             if (time - c_time >= draw_time) {
-                ArrayList<Short> buf = new ArrayList<Short>();
+                ArrayList<Short> arrBuf = null;
                 synchronized (inBuf) {
                     if (inBuf.size() == 0)
                         return;
                     while (inBuf.size() > (sfv.getWidth() - marginRight) / divider) {
                         inBuf.remove(0);
                     }
-                    buf = (ArrayList<Short>) inBuf.clone();// 缓存
+                    Object object = inBuf.clone();
+                    if (object instanceof ArrayList<?>) {
+                        arrBuf = (ArrayList<Short>) object;// 缓存
+                    }
                 }
-                SimpleDraw(buf, sfv.getHeight() / 2);// 把缓冲区数据画出来
+                SimpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
                 c_time = new Date().getTime();
             }
             super.onProgressUpdate(values);
@@ -243,8 +247,6 @@ public class WaveCanvas {
                 return;
             canvas.drawARGB(255, 239, 239, 239);
             int start = (int) ((buf.size()) * divider);
-            float py = baseLine;
-            float y;
 
             if (sfv.getWidth() - start <= marginRight) {//如果超过预留的右边距距离
                 start = sfv.getWidth() - marginRight;//画的位置x坐标
@@ -257,8 +259,9 @@ public class WaveCanvas {
             int height = sfv.getHeight() - line_off;
             canvas.drawLine(0, height * 0.5f + (line_off >> 1), sfv.getWidth(), height * 0.5f + (line_off >> 1), center);//中心线
 
-//	         canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, paintLine);//第二根线
-//	         canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, paintLine);//第3根线
+	         canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, paintLine);//第二根线
+	         canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, paintLine);//第3根线
+            float y;
             for (int i = 0; i < buf.size(); i++) {
                 y = 1.f * buf.get(i) / rateY + baseLine;// 调节缩小比例，调节基准线
                 float x = (i) * divider;
@@ -304,9 +307,6 @@ public class WaveCanvas {
                 File file2wav;
                 try {
                     file2wav = new File(savePcmPath);
-                    if (file2wav.exists()) {
-                        file2wav.delete();
-                    }
                     fos2wav = new FileOutputStream(file2wav);// 建立一个可存取字节的文件
                 } catch (Exception e) {
                     e.printStackTrace();

@@ -76,9 +76,9 @@ struct PubSubParam {
 
 void RecvHook(const KaiSocket::Message& msg)
 {
-    LOGI("topic '%s' of %s, payload: [%s]-[%s].",
+    LOGI("topic '%s' of %%s, payload: [%s]-[%s].",
          msg.head.topic,
-         KaiSocket::G_KaiRole[msg.head.etag],
+         // KaiSocket::G_KaiMethod[msg.head.etag],
          msg.data.stat,
          msg.data.body);
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
@@ -218,12 +218,12 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass)
 {
-    return TimeStamp::get()->AbsoluteTime();
+    return TimeStamp::AbsoluteTime();
 }
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 {
-    return TimeStamp::get()->BootTime();
+    return TimeStamp::BootTime();
 }
 
 #include <unistd.h>
