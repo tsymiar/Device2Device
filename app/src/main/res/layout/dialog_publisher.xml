@@ -4,13 +4,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="@android:color/system_accent1_50">
 
     <EditText
         android:id="@+id/edit_payload"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="48dp"
         android:ems="10"
         android:inputType="textPersonName"
         android:text="xxxxx"
@@ -19,7 +19,7 @@
         tools:ignore="MissingConstraints" />
 
     <EditText
-        android:id="@+id/edit_topic1"
+        android:id="@+id/edit_pub_topic"
         android:layout_width="96dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
@@ -30,15 +30,24 @@
         tools:ignore="MissingConstraints" />
 
     <Button
-        android:id="@+id/btn_confirm1"
+        android:id="@+id/btn_pub_confirm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="32dp"
         android:text="Confirm"
-        android:textSize="1mm"
-        app:layout_constraintLeft_toRightOf="@id/edit_topic1"
+        android:textSize="14sp"
+        app:layout_constraintLeft_toRightOf="@id/edit_pub_topic"
         app:layout_constraintTop_toBottomOf="@id/edit_payload"
         tools:ignore="MissingConstraints" />
+
+    <Button
+        android:id="@+id/btn_pub_finish"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="120dp"
+        android:layout_marginLeft="120dp"
+        android:text="❌"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_editor_absoluteY="0dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

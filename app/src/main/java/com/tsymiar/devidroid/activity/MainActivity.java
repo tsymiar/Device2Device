@@ -1,13 +1,25 @@
 package com.tsymiar.devidroid.activity;
 
 import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Message;
+import android.provider.Settings;
 import android.util.Log;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
@@ -15,6 +27,8 @@ import com.tsymiar.devidroid.data.PubSubSetting;
 import com.tsymiar.devidroid.event.EventEntity;
 import com.tsymiar.devidroid.event.EventHandle;
 import com.tsymiar.devidroid.event.EventNotify;
+import com.tsymiar.devidroid.service.FloatingService;
+import com.tsymiar.devidroid.service.PublishDialog;
 import com.tsymiar.devidroid.utils.JvmMethods;
 import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 import com.tsymiar.devidroid.wrapper.NetWrapper;
@@ -24,14 +38,27 @@ import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
-    public static final int RequestSubscribe = 10001;
     public static final int RequestPublish = 10002;
+    public static final int RequestFloat = 10003;
     static MainActivity mainActivity;
+    BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
+    private ServiceConnection mServiceConnection = null;
+    FloatingService mFloatService;
     private int gValue = 1;
+    Intent publisherIntent;
+    Intent subscribeIntent;
 
     public static MainActivity getInstance()
     {
         return mainActivity;
+    }
+
+    public ServiceConnection getServiceConnection() {
+        return mServiceConnection;
+    }
+
+    public void setServiceConnection(ServiceConnection mServiceConnection) {
+        this.mServiceConnection = mServiceConnection;
     }
 
     public static class Time {
@@ -68,6 +95,21 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
+    @Override
+    public void handle(EventEntity... event) {
+        Log.i(TAG, Arrays.toString(event));
+    }
+
+    @SuppressLint("HandlerLeak")
+    private final Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            Log.i(TAG, msg.obj.toString());
+        }
+    };
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,7 +126,31 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
 
         TimeWrapper.getBootTimestamp();
 
-        findViewById(R.id.button).setOnClickListener(
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(FloatingService.BROADCAST_ACTION);
+        this.registerReceiver(mBroadcastReceiverClass, intentFilter);
+
+        setServiceConnection(new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                FloatingService.Binder binder = (FloatingService.Binder) service;
+                mFloatService = binder.getService();
+                mFloatService.setCallback(data -> {
+                    Message msg = new Message();
+                    msg.obj = data;
+                    handler.sendMessage(msg);
+                });
+            }
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                Log.d(TAG, name.toString() + " is disconnected");
+            }
+        });
+
+        subscribeIntent = new Intent(MainActivity.this, FloatingService.class);
+        publisherIntent = new Intent(MainActivity.this, PublishDialog.class);
+
+        findViewById(R.id.btn_texture).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, TextureActivity.class))
         );
         findViewById(R.id.btn_audio).setOnClickListener(
@@ -118,13 +184,13 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 .getSystemService(Context.WIFI_SERVICE);
         assert manager != null;
         WifiManager.MulticastLock wifiLock = manager.createMulticastLock("localWifi");
-        findViewById(R.id.server).setOnClickListener(
+        findViewById(R.id.btn_server).setOnClickListener(
                 v -> {
                     wifiLock.acquire();
                     NetWrapper.startServer();
                 }
         );
-        findViewById(R.id.client).setOnClickListener(
+        findViewById(R.id.btn_client).setOnClickListener(
                 v -> {
                     NetWrapper.sendUdpData(gValue + " - aaa", 8);
                     gValue++;
@@ -133,40 +199,76 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     }
                 }
         );
-        findViewById(R.id.btn_sub).setOnClickListener(
+        findViewById(R.id.btn_subscribe).setOnClickListener(
                 v -> {
-                    Intent intent = new Intent(MainActivity.this, SubscribeDialog.class);
-                    startActivityForResult(intent, RequestSubscribe);
+                    if (!Settings.canDrawOverlays(this)) {
+                        Toast.makeText(this, "Please enable the PERMISSION", Toast.LENGTH_SHORT).show();
+                        startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())), RequestFloat);
+                    } else {
+                        startService(subscribeIntent);
+                    }
                 }
         );
-        findViewById(R.id.btn_pub).setOnClickListener(
+        findViewById(R.id.btn_publisher).setOnClickListener(
                 v -> {
-                    Intent intent = new Intent(MainActivity.this, PublishDialog.class);
-                    startActivityForResult(intent, RequestPublish);
+                    if (!Settings.canDrawOverlays(this)) {
+                        Toast.makeText(this, "Please enable the PERMISSION", Toast.LENGTH_SHORT).show();
+                        startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())), RequestFloat);
+                    } else {
+                        startService(publisherIntent);
+                    }
                 }
         );
     }
+    private class BroadcastReceiverClass extends BroadcastReceiver {
+        @SuppressLint("SetTextI18n")
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(FloatingService.BROADCAST_ACTION)) {
+                String subscribe = intent.getStringExtra("Subscribe");
+                System.out.println("Subscribe status ==> " + subscribe);
+                TextView tv = findViewById(R.id.txt_status);
+                if (subscribe != null && subscribe.equals("SUCCESS")) {
+                    Log.i(TAG, PubSubSetting.getSetting().toString());
+                    int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
+                            PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
+                    if (ret < 0) {
+                        tv.setText("subscribe has ready!");
+                    } else {
+                        tv.setText("success");
+                    }
+                } else {
+                    Log.i(TAG, "Subscribe with " + subscribe);
+                }
+                String publish = intent.getStringExtra("Publish");
+                if (publish != null) {
+                    if (publish.equals("SUCCESS")) {
+                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + PubSubSetting.getSetting().toString());
+                        CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                    }
+                } else {
+                    Log.i(TAG, "Publish status is null");
+                }
+            }
+        }
+    }
 
-    @SuppressLint("SetTextI18n")
+    @Override
+    public void onDestroy() {
+        MainActivity.this.unregisterReceiver(mBroadcastReceiverClass);
+        stopService(subscribeIntent);
+        stopService(publisherIntent);
+        if(mFloatService != null) {
+            mFloatService.closeWindow();
+        }
+        super.onDestroy();
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RequestSubscribe && resultCode == RESULT_OK) {
-            TextView tv = findViewById(R.id.txt_status);
-            String string = data.getStringExtra("Subscribe");
-            if (string != null && string.equals("SUCCESS")) {
-                Log.i(TAG, "Subscribe " + string + ":\n" + PubSubSetting.getSetting().toString());
-                int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
-                        PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
-                if (ret < 0) {
-                    tv.setText("subscribe ready!");
-                } else {
-                    tv.setText("success");
-                }
-            } else {
-                Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
-            }
-        }
         if (requestCode == RequestPublish && resultCode == RESULT_OK) {
             String string = data.getStringExtra("Publish");
             if (string != null && string.equals("SUCCESS")) {
@@ -176,10 +278,12 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
             }
         }
-    }
-
-    @Override
-    public void handle(EventEntity... event) {
-        Log.i(TAG, Arrays.toString(event));
+        if (requestCode == RequestFloat) {
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show();
+            } else {
+                startService(new Intent(MainActivity.this, FloatingService.class));
+            }
+        }
     }
 }

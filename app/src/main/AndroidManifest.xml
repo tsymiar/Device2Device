@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -31,8 +32,9 @@
         <activity android:name=".activity.TextureActivity" />
         <activity android:name=".activity.WaveActivity" />
         <activity android:name=".activity.GraphActivity" />
-        <activity android:name=".activity.SubscribeDialog" />
-        <activity android:name=".activity.PublishDialog" />
+
+        <service android:name=".service.PublishDialog" />
+        <service android:name=".service.FloatingService" />
     </application>
 
 </manifest>

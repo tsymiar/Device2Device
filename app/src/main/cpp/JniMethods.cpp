@@ -132,7 +132,7 @@ JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass , jstring topic, js
 
 int callback(const char *c, int i)
 {
-    LOGE("param1 = %s, param2 = %d.", c, i);
+    LOGD("JavaFuncCalls::Register c = %s, a = %d.", c, i);
     return i;
 }
 

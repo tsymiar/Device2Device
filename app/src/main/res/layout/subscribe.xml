@@ -4,13 +4,15 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="@android:color/white"
+    android:visibility="visible"
+    tools:visibility="visible">
 
     <EditText
         android:id="@+id/edit_addr"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="40dp"
         android:ems="10"
         android:inputType="textPersonName"
         android:text="@string/address"
@@ -51,5 +53,32 @@
         android:text="Confirm"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/edit_topic"
+        tools:ignore="MissingConstraints" />
+
+    <ImageView
+        android:id="@+id/img_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:baselineAlignBottom="true"
+        android:clickable="true"
+        android:cropToPadding="true"
+        android:visibility="visible"
+        app:layout_constraintBottom_toTopOf="@id/edit_addr"
+        app:layout_constraintEnd_toEndOf="@id/edit_addr"
+        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@android:drawable/ic_menu_close_clear_cancel"
+        tools:ignore="MissingConstraints,ImageContrastCheck"
+        tools:visibility="visible" />
+
+    <Button
+        android:id="@+id/btn_close"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:text="❌"
+        tools:layout_editor_absoluteX="170dp"
+        tools:layout_editor_absoluteY="-8dp"
         tools:ignore="MissingConstraints" />
 </androidx.constraintlayout.widget.ConstraintLayout>
