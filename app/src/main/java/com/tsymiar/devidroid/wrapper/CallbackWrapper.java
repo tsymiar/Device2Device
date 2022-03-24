@@ -1,5 +1,7 @@
 package com.tsymiar.devidroid.wrapper;
 
+import com.tsymiar.devidroid.data.Receiver;
+
 public class CallbackWrapper {
     static {
         System.loadLibrary("jniComm");
@@ -8,6 +10,8 @@ public class CallbackWrapper {
     public static native void initJvmEnv(String className);
 
     public native String stringGetJNI();
+
+    public native Receiver getMessage(Receiver receiver);
 
     public native long timeSetJNI(byte[] time, int len);
 

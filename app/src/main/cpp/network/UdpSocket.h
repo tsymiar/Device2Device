@@ -32,7 +32,7 @@ public:
 
     int Sender(const char *, size_t);
 
-    int Receiver(char *, int);
+    int Receiver(char *, int, void(*)(char*) = nullptr);
 
 private:
     int SendBySlice(const char *, size_t);

@@ -60,7 +60,7 @@ int UdpSocket::Sender(const char *sendBuff, size_t length)
     return 0;
 }
 
-int UdpSocket::Receiver(char *rcvBuff, int len)
+int UdpSocket::Receiver(char *rcvBuff, int len, void(*callback)(char*))
 {
     if (m_socket != -1 && m_flag) {
         LOGE("socket %d already in receiving.", m_socket);
@@ -98,6 +98,12 @@ int UdpSocket::Receiver(char *rcvBuff, int len)
             rcvBuff[_s] = '\0';
             LOGI("client:[%s:%d]len = %d:[%s].", inet_ntoa(remote.sin_addr),
                  ntohs(remote.sin_port), _s, rcvBuff + m_proSize);
+            if (callback != nullptr) {
+                size_t msg = strlen(rcvBuff + m_proSize) + 1;
+                if (msg > _s)
+                    rcvBuff[m_proSize + _s] = '\0';
+                callback(rcvBuff + m_proSize);
+            }
         } else if (_s == 0) {
             LOGI("client close");
         } else

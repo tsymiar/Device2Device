@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.data.PubSubSetting;
+import com.tsymiar.devidroid.data.Receiver;
 import com.tsymiar.devidroid.event.EventEntity;
 import com.tsymiar.devidroid.event.EventHandle;
 import com.tsymiar.devidroid.event.EventNotify;
@@ -105,7 +106,25 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
-            Log.i(TAG, msg.obj.toString());
+            TextView tv;
+            switch (msg.what)
+            {
+                case Receiver.UDP_SERVER:
+                    tv = findViewById(R.id.txt_server);
+                    tv.setText(msg.obj.toString());
+                    break;
+                case Receiver.UDP_CLIENT:
+                    tv = findViewById(R.id.txt_client);
+                    tv.setText(msg.obj.toString());
+                    break;
+                case Receiver.KAI_SUBSCRIBE:
+                case Receiver.KAI_PUBLISHER:
+                    tv = findViewById(R.id.txt_status);
+                    tv.setText(msg.obj.toString());
+                    break;
+                default:
+                    break;
+            }
         }
     };
 
@@ -149,6 +168,25 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
 
         subscribeIntent = new Intent(MainActivity.this, FloatingService.class);
         publisherIntent = new Intent(MainActivity.this, PublishDialog.class);
+
+        new Thread(() -> {
+            do {
+                Receiver receiver = new Receiver();
+                CallbackWrapper wrapper = new CallbackWrapper();
+                receiver = wrapper.getMessage(receiver);
+                if (receiver != null && receiver.message != null) {
+                    Message msg = new Message();
+                    msg.what = receiver.receiver;
+                    msg.obj = receiver.message;
+                    handler.sendMessage(msg);
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } while(true);
+        }).start();
 
         findViewById(R.id.btn_texture).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, TextureActivity.class))
