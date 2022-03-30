@@ -28,6 +28,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject , jobject clazz
 JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len);
 JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clazz, jstring addr, jint port, jstring topic, jstring viewId, jint id);
 JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass clazz, jstring topic, jstring payload);
+JNIEXPORT void CPP_FUNC_CALL(quitSubscribe)(JNIEnv *, jclass clazz);
 
 JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass clazz, jstring method, jint action,

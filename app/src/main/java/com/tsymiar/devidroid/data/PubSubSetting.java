@@ -1,5 +1,7 @@
 package com.tsymiar.devidroid.data;
 
+import androidx.annotation.NonNull;
+
 public class PubSubSetting {
     static private final PubSubSetting setting = new PubSubSetting();
 
@@ -44,6 +46,7 @@ public class PubSubSetting {
         return setting;
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "PubSubSetting {" +

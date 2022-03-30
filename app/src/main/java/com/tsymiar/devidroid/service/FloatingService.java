@@ -21,6 +21,7 @@ import androidx.annotation.RequiresApi;
 
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.data.PubSubSetting;
+import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 
 public class FloatingService extends Service {
 
@@ -145,12 +146,12 @@ public class FloatingService extends Service {
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;
+        floatView.setFocusableInTouchMode(true);
+        floatView.setOnTouchListener(new FloatingOnTouchListener(windowManager, layoutParams, true));
         if (Settings.canDrawOverlays(this)) {
             windowManager.addView(floatView, layoutParams);
             windowManager.getDefaultDisplay();
         }
-
-        floatView.setOnTouchListener(new FloatingOnTouchListener(windowManager, layoutParams, true));
 
         EditText editAddr = floatView.findViewById(R.id.edit_addr);
         EditText editPort = floatView.findViewById(R.id.edit_port);
@@ -184,6 +185,9 @@ public class FloatingService extends Service {
     }
 
     public void closeWindow() {
-        windowManager.removeView(floatView);
+        CallbackWrapper.quitSubscribe();
+        if (windowManager != null) {
+            windowManager.removeView(floatView);
+        }
     }
 }

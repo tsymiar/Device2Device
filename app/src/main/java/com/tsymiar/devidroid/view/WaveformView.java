@@ -29,16 +29,12 @@ import com.tsymiar.devidroid.utils.SoundFile;
 
 public class WaveformView extends View {
     // Colors
-    private int line_offset;
-    private Paint mGridPaint;
-    private Paint mSelectedLinePaint;
-    private Paint mUnselectedLinePaint;
-    private Paint mUnselectedBkgndLinePaint;
-    private Paint mBorderLinePaint;
-    private Paint mPlaybackLinePaint;
-    private Paint mTimeValuePaint;
-    private Paint circlePaint;
+    private final Paint mSelectedLinePaint;
+    private final Paint mUnselectedLinePaint;
+    private final Paint mTimeValuePaint;
+    private final Paint circlePaint;
     Paint paintLine;
+    private int line_offset;
     private int playFinish;
 
     private SoundFile mSoundFile;
@@ -92,9 +88,9 @@ public class WaveformView extends View {
         circlePaint.setColor(Color.rgb(246, 131, 126));
         circlePaint.setAntiAlias(true);
 
-        mGridPaint = new Paint();
-        mGridPaint.setAntiAlias(false);
-        mGridPaint.setColor(
+        Paint gridPaint = new Paint();
+        gridPaint.setAntiAlias(false);
+        gridPaint.setColor(
                 getResources().getColor(R.color.grid_line));
         mSelectedLinePaint = new Paint();
         mSelectedLinePaint.setAntiAlias(false);
@@ -104,21 +100,21 @@ public class WaveformView extends View {
         mUnselectedLinePaint.setAntiAlias(false);
         mUnselectedLinePaint.setColor(
                 getResources().getColor(R.color.waveform_unselected));
-        mUnselectedBkgndLinePaint = new Paint();
-        mUnselectedBkgndLinePaint.setAntiAlias(false);
-        mUnselectedBkgndLinePaint.setColor(
+        Paint unselectedBkgndLinePaint = new Paint();
+        unselectedBkgndLinePaint.setAntiAlias(false);
+        unselectedBkgndLinePaint.setColor(
                 getResources().getColor(
                         R.color.waveform_unselected_overlay));
-        mBorderLinePaint = new Paint();
-        mBorderLinePaint.setAntiAlias(true);
-        mBorderLinePaint.setStrokeWidth(1.5f);
-        mBorderLinePaint.setPathEffect(
+        Paint borderLinePaint = new Paint();
+        borderLinePaint.setAntiAlias(true);
+        borderLinePaint.setStrokeWidth(1.5f);
+        borderLinePaint.setPathEffect(
                 new DashPathEffect(new float[]{3.0f, 2.0f}, 0.0f));
-        mBorderLinePaint.setColor(
+        borderLinePaint.setColor(
                 getResources().getColor(R.color.selection_border));
-        mPlaybackLinePaint = new Paint();
-        mPlaybackLinePaint.setAntiAlias(false);
-        mPlaybackLinePaint.setColor(
+        Paint playbackLinePaint = new Paint();
+        playbackLinePaint.setAntiAlias(false);
+        playbackLinePaint.setColor(
                 getResources().getColor(R.color.playback_indicator));
         mTimeValuePaint = new Paint();
         mTimeValuePaint.setTextSize(12);

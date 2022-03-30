@@ -54,18 +54,19 @@ public class PublishDialog extends Service {
         }
         layoutParams.format = PixelFormat.RGBA_8888;
         layoutParams.gravity = Gravity.RIGHT | Gravity.CENTER;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
         Display display = windowManager.getDefaultDisplay();
         layoutParams.width = (int)(display.getWidth() * 0.5);
         layoutParams.height = (int)(display.getHeight() * 0.3);
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;
+        floatView.setFocusableInTouchMode(true);
+        floatView.setOnTouchListener(new FloatingService.FloatingOnTouchListener(windowManager, layoutParams, false));
         if (Settings.canDrawOverlays(this)) {
             windowManager.addView(floatView, layoutParams);
             windowManager.getDefaultDisplay();
         }
-        floatView.setOnTouchListener(new FloatingService.FloatingOnTouchListener(windowManager, layoutParams, false));
 
         editTopic = floatView.findViewById(R.id.edit_pub_topic);
         editPayload = floatView.findViewById(R.id.edit_payload);

@@ -35,6 +35,9 @@ import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 import com.tsymiar.devidroid.wrapper.NetWrapper;
 import com.tsymiar.devidroid.wrapper.TimeWrapper;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
@@ -94,6 +97,22 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
             b[15] = (byte) (t >>> 56);
             return b;
         }
+    }
+
+    public static String MD5(String plainText)
+    {
+        byte[] secretBytes;
+        try {
+            secretBytes = MessageDigest.getInstance("md5").digest(
+                    plainText.getBytes());
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("no such md5!");
+        }
+        StringBuilder md5code = new StringBuilder(new BigInteger(1, secretBytes).toString(16));
+        for (int i = 0; i < 32 - md5code.length(); i++) {
+            md5code.insert(0, "0");
+        }
+        return md5code.toString();
     }
 
     @Override
@@ -181,7 +200,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     handler.sendMessage(msg);
                 }
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -202,7 +221,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     TextView tv = findViewById(R.id.txt_time);
                     time.x = (int) tv.getX();
                     time.t = System.currentTimeMillis();
-                    Log.i(TAG, time.t + "----" + Arrays.toString(time.toByte()));
+                    Log.i(TAG, time.t + "\n---- " + Arrays.toString(time.toByte()));
                     tv.setText(String.valueOf(new CallbackWrapper().timeSetJNI(time.toByte(), Time.length)));
                 }
         );
@@ -230,7 +249,8 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_client).setOnClickListener(
                 v -> {
-                    NetWrapper.sendUdpData(gValue + " - aaa", 8);
+                    String text = MD5(gValue + "").substring(0, 6);
+                    NetWrapper.sendUdpData(text, text.length());
                     gValue++;
                     if (wifiLock.isHeld()) {
                         wifiLock.release();
@@ -272,7 +292,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
                             PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                     if (ret < 0) {
-                        tv.setText("subscribe has ready!");
+                        tv.setText("subscribe is beginning!");
                     } else {
                         tv.setText("success");
                     }
@@ -280,13 +300,12 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     Log.i(TAG, "Subscribe with " + subscribe);
                 }
                 String publish = intent.getStringExtra("Publish");
-                if (publish != null) {
-                    if (publish.equals("SUCCESS")) {
-                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + PubSubSetting.getSetting().toString());
-                        CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                if (publish != null && publish.equals("SUCCESS")) {
+                    PubSubSetting status = PubSubSetting.getSetting();
+                    if (status != null) {
+                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + status.toString());
                     }
-                } else {
-                    Log.i(TAG, "Publish status is null");
+                    CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
                 }
             }
         }

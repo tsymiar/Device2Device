@@ -148,6 +148,11 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring add
     return status;
 }
 
+JNIEXPORT void CPP_FUNC_CALL(quitSubscribe)(JNIEnv *, jclass)
+{
+    KaiSocket::GetInstance().exit();
+}
+
 JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass , jstring topic, jstring payload) {
     if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
         LOGI("g_pubSubParam: addr is null or port == 0.");
@@ -275,12 +280,11 @@ CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
-                                                     jstring text, jint len)
-{
+                                                     jstring text, jint len) {
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
-    LOGI("text = [%s](%d)", tx, len);
-    g_receiving.message = txt;
+    g_receiving.message = "text = [" + txt + "](" + std::to_string(len) + ")";
+    LOGI("%s", g_receiving.message.c_str());
     g_receiving.receiver = UDP_CLIENT;
     g_msgQue.emplace(g_receiving);
     g_msgLen = len;
