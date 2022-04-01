@@ -22,5 +22,13 @@
     <string name="time">time</string>
     <string name="subscribe">Subscribe</string>
     <string name="publish">Publish</string>
+    <string name="exit">❌</string>
+    <string name="confirm">Confirm</string>
     <string name="address">81.68.170.12</string>
+    <string name="minimum">－</string>
+    <string name="topic">topic</string>
+    <string name="sub_port">9999</string>
+    <string name="pub_payload">payload</string>
+    <string name="hint_address">address</string>
+    <string name="hint_port">port</string>
 </resources>

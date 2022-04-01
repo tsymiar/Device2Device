@@ -115,12 +115,12 @@
         android:id="@+id/txt_client"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
         android:layout_marginLeft="16dp"
         android:layout_marginTop="48dp"
         android:text="Hello World!"
         app:layout_constraintLeft_toRightOf="@id/btn_client"
-        app:layout_constraintTop_toBottomOf="@id/txt_server" />
+        app:layout_constraintTop_toBottomOf="@id/txt_server"
+        android:layout_marginStart="16dp" />
 
     <Button
         android:id="@+id/btn_event"
@@ -131,18 +131,18 @@
         android:layout_marginTop="32dp"
         android:text="@string/event"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/txt_status" />
+        app:layout_constraintTop_toBottomOf="@id/btn_client" />
 
     <TextView
         android:id="@+id/txt_event"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="0dp"
         android:layout_marginLeft="16dp"
-        android:layout_marginTop="48dp"
+        android:layout_marginTop="64dp"
         android:text="Hello World!"
         app:layout_constraintLeft_toRightOf="@id/btn_event"
-        app:layout_constraintTop_toBottomOf="@id/txt_status" />
+        app:layout_constraintTop_toBottomOf="@id/txt_client"
+        android:layout_marginStart="16dp" />
 
     <Button
         android:id="@+id/btn_time"
@@ -170,14 +170,15 @@
         android:id="@+id/txt_status"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="64dp"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginLeft="8dp"
+        android:layout_marginTop="32dp"
         android:foregroundGravity="center_horizontal"
-        android:gravity="center_horizontal"
+        android:gravity="center_horizontal|left"
         android:text="Hello World!"
         android:textStyle="normal"
-        app:layout_constraintTop_toBottomOf="@id/txt_client"
-        tools:ignore="MissingConstraints" />
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btn_time"
+        tools:ignore="MissingConstraints,RtlHardcoded" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

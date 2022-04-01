@@ -287,6 +287,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 String subscribe = intent.getStringExtra("Subscribe");
                 System.out.println("Subscribe status ==> " + subscribe);
                 TextView tv = findViewById(R.id.txt_status);
+                tv.setText("");
                 if (subscribe != null && subscribe.equals("SUCCESS")) {
                     Log.i(TAG, PubSubSetting.getSetting().toString());
                     int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
@@ -301,11 +302,15 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 }
                 String publish = intent.getStringExtra("Publish");
                 if (publish != null && publish.equals("SUCCESS")) {
-                    PubSubSetting status = PubSubSetting.getSetting();
-                    if (status != null) {
-                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + status.toString());
+                    PubSubSetting setting = PubSubSetting.getSetting();
+                    if (setting != null) {
+                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting.toString());
                     }
-                    CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                    if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
+                        Toast.makeText(MainActivity.this, "please Subscribe at first", Toast.LENGTH_SHORT).show();
+                    } else {
+                        CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                    }
                 }
             }
         }

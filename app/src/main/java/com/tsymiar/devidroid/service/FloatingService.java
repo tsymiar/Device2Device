@@ -125,7 +125,7 @@ public class FloatingService extends Service {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
-    @SuppressLint({"InflateParams", "RtlHardcoded"})
+    @SuppressLint({"InflateParams", "RtlHardcoded", "WrongConstant"})
     @Override
     public void onStart(Intent intent, int startId) {
         super.onStart(intent, startId);
@@ -139,7 +139,7 @@ public class FloatingService extends Service {
         }
         layoutParams.format = PixelFormat.RGBA_8888;
         layoutParams.gravity = Gravity.LEFT | Gravity.TOP;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON; // | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         Display display = windowManager.getDefaultDisplay();
         layoutParams.width = (int)(display.getWidth() * 0.5);
         layoutParams.height = (int)(display.getHeight() * 0.44);
@@ -171,6 +171,13 @@ public class FloatingService extends Service {
                     data.setAction(BROADCAST_ACTION);
                     data.putExtra("Subscribe", "SUCCESS");
                     getApplicationContext().sendBroadcast(data);
+                }
+        );
+        floatView.findViewById(R.id.btn_minium).setOnClickListener(
+                v -> {
+                    if (windowManager != null) {
+                        windowManager.removeView(floatView);
+                    }
                 }
         );
         floatView.findViewById(R.id.btn_close).setOnClickListener(

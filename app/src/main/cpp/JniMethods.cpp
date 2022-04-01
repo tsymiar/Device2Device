@@ -109,9 +109,9 @@ struct PubSubParam {
 } g_pubSubParam;
 
 void RecvHook(const KaiSocket::Message& msg) {
-    std::string message = "topic '" + std::string(msg.head.topic)
-                          + "' of %%s, payload: [" + msg.data.stat
-                          + "]-[" + msg.data.body + "].";
+    std::string message = "topic: '" + std::string(msg.head.topic)
+                          + "'\npayload: [" + msg.data.stat
+                          + "][" + msg.data.body + "].";
     // KaiSocket::G_KaiMethod[msg.head.etag]
     g_receiving.receiver = KAI_SUBSCRIBE;
     g_receiving.message = message;
@@ -162,9 +162,10 @@ JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass , jstring topic, js
     std::string payloadParam = Jstring2Cstring(env, payload);
     KaiSocket kaiSocket;
     kaiSocket.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
-    LOGI("KaiPublishing to: [%s:%d].", g_pubSubParam.addr.c_str(), g_pubSubParam.port);
     ssize_t stat = kaiSocket.Publisher(topicParam, payloadParam);
-    LOGI("Published(%zu): payload = [%s][%s].", stat, topicParam.c_str(), payloadParam.c_str());
+    LOGI("Publish(%zu) to [%s:%d]: message: [%s][%s].", stat,
+         g_pubSubParam.addr.c_str(), g_pubSubParam.port,
+         topicParam.c_str(), payloadParam.c_str());
 }
 
 int callback(const char *c, int i)

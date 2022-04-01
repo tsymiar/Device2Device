@@ -4,7 +4,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/system_accent1_50">
+    android:background="@drawable/border"
+    tools:targetApi="s">
+
+    <Button
+        android:background="#00000000"
+        android:id="@+id/btn_pub_finish"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/exit"
+        android:textColor="#B71C1C"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_editor_absoluteY="0dp"
+        tools:ignore="MissingConstraints" />
 
     <EditText
         android:id="@+id/edit_payload"
@@ -13,42 +27,41 @@
         android:layout_marginTop="48dp"
         android:ems="10"
         android:inputType="textPersonName"
+        android:minHeight="48dp"
         android:selectAllOnFocus="true"
-        android:text="xxxxx"
+        android:text="@string/pub_payload"
+        android:hint="@string/pub_payload"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints" />
+        tools:ignore="LabelFor,MissingConstraints"
+        android:autofillHints="" />
 
     <EditText
         android:id="@+id/edit_pub_topic"
-        android:layout_width="96dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:ems="10"
-        android:inputType="textPersonName"
-        android:text="topic"
-        app:layout_constraintTop_toBottomOf="@id/edit_payload"
-        tools:ignore="MissingConstraints" />
-
-    <Button
-        android:id="@+id/btn_pub_confirm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:text="Confirm"
-        android:textSize="14sp"
-        app:layout_constraintLeft_toRightOf="@id/edit_pub_topic"
+        android:layout_marginTop="16dp"
+        android:ems="10"
+        android:inputType="textPersonName"
+        android:minHeight="48dp"
+        android:text="@string/topic"
+        android:hint="@string/topic"
         app:layout_constraintTop_toBottomOf="@id/edit_payload"
-        tools:ignore="MissingConstraints" />
+        tools:ignore="LabelFor,MissingConstraints"
+        android:importantForAutofill="no" />
 
     <Button
-        android:id="@+id/btn_pub_finish"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginStart="120dp"
-        android:layout_marginLeft="120dp"
-        android:text="❌"
-        app:layout_constraintStart_toStartOf="parent"
-        tools:layout_editor_absoluteY="0dp" />
+        android:background="@drawable/border"
+        android:id="@+id/btn_pub_confirm"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginRight="-8dp"
+        android:layout_marginEnd="-8dp"
+        android:text="@string/confirm"
+        android:textSize="14sp"
+        style="?android:attr/buttonStyleSmall"
+        app:layout_constraintTop_toBottomOf="@id/edit_pub_topic"
+        tools:ignore="MissingConstraints" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

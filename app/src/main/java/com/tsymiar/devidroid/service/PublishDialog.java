@@ -39,7 +39,7 @@ public class PublishDialog extends Service {
         layoutInflater = LayoutInflater.from(this);
     }
 
-    @SuppressLint("InflateParams")
+    @SuppressLint({"InflateParams", "RtlHardcoded"})
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     public void onStart(Intent intent, int startId) {
@@ -54,10 +54,10 @@ public class PublishDialog extends Service {
         }
         layoutParams.format = PixelFormat.RGBA_8888;
         layoutParams.gravity = Gravity.RIGHT | Gravity.CENTER;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON;
         Display display = windowManager.getDefaultDisplay();
         layoutParams.width = (int)(display.getWidth() * 0.5);
-        layoutParams.height = (int)(display.getHeight() * 0.3);
+        layoutParams.height = (int)(display.getHeight() * 0.33);
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;

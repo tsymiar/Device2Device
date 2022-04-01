@@ -16,6 +16,7 @@
         android:ems="10"
         android:inputType="textPersonName"
         android:text="@string/address"
+        android:hint="@string/hint_address"
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints" />
 
@@ -26,7 +27,8 @@
         android:layout_marginTop="64dp"
         android:ems="10"
         android:inputType="textPersonName"
-        android:text="9999"
+        android:text="@string/sub_port"
+        android:hint="@string/hint_port"
         app:layout_constraintTop_toTopOf="@id/edit_addr"
         tools:ignore="MissingConstraints"
         tools:layout_editor_absoluteX="0dp" />
@@ -38,7 +40,8 @@
         android:layout_marginTop="64dp"
         android:ems="10"
         android:inputType="textPersonName"
-        android:text="topic"
+        android:text="@string/topic"
+        android:hint="@string/topic"
         app:layout_constraintTop_toTopOf="@id/edit_port"
         tools:ignore="MissingConstraints"
         tools:layout_editor_absoluteX="0dp" />
@@ -47,10 +50,10 @@
         android:id="@+id/btn_confirm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="64dp"
-        android:layout_marginLeft="64dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginLeft="32dp"
         android:layout_marginTop="64dp"
-        android:text="Confirm"
+        android:text="@string/confirm"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/edit_topic"
         tools:ignore="MissingConstraints" />
@@ -71,14 +74,29 @@
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@android:drawable/ic_menu_close_clear_cancel"
         tools:ignore="MissingConstraints,ImageContrastCheck"
-        tools:visibility="visible" />
+        tools:visibility="visible"
+        android:focusable="true" />
 
     <Button
+        android:background="#00000000"
         android:id="@+id/btn_close"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:text="❌"
+        android:text="@string/exit"
+        tools:ignore="MissingConstraints"
         tools:layout_editor_absoluteX="170dp"
-        tools:layout_editor_absoluteY="-8dp"
+        tools:layout_editor_absoluteY="-8dp" />
+
+    <Button
+        android:id="@+id/btn_minium"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginLeft="32dp"
+        android:layout_marginTop="24dp"
+        android:text="@string/minimum"
+        app:layout_constraintStart_toEndOf="@+id/btn_confirm"
+        app:layout_constraintTop_toBottomOf="@+id/edit_topic"
         tools:ignore="MissingConstraints" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
