@@ -19,7 +19,7 @@ include_directories(
 )
 
 add_subdirectory(files)
-if(${BUILD_KAICS_LIB} AND ${BUILD_KAICS_LIB} EQUAL 1)
+if(${BUILD_SCADOP_LIB} AND ${BUILD_SCADOP_LIB} EQUAL 1)
     add_subdirectory(scadop)
 endif()
 add_subdirectory(runtime)
@@ -43,20 +43,20 @@ add_library( # Sets the name of the library.
         texture/TextureView.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
-if (NOT ${BUILD_KAICS_LIB} EQUAL 1)
+if (NOT ${BUILD_SCADOP_LIB} EQUAL 1)
     file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/scadop/jniLibs/*")
     foreach(SOLIB IN LISTS LIB_FILE_LIST)
         add_custom_command(TARGET jniComm
                 PRE_BUILD
                 COMMAND mkdir -p ${LIBS_DIR}
                 COMMAND cp -r ${SOLIB} ${LIBS_DIR}
-                COMMENT "setup kaics so files...")
+                COMMENT "setup scadop so files...")
     endforeach()
 else()
     add_custom_command(TARGET jniComm
             PRE_BUILD
             COMMAND rm -rf ${LIBS_DIR}
-            COMMENT "clean kaics so files...")
+            COMMENT "clean scadop so files...")
 endif()
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -82,7 +82,7 @@ find_library(GLESv2 GLESv2)
 target_link_libraries( # Specifies the target library.
         jniComm
         # template
-        ${PROJECT_SOURCE_DIR}/scadop/jniLibs/${ANDROID_ABI}/libkaics.so
+        ${PROJECT_SOURCE_DIR}/scadop/jniLibs/${ANDROID_ABI}/libscadop.so
         Network callback timestamp files
         # Links the target library to the log library
         # included in the NDK.

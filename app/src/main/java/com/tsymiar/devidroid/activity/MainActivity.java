@@ -290,10 +290,10 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 tv.setText("");
                 if (subscribe != null && subscribe.equals("SUCCESS")) {
                     Log.i(TAG, PubSubSetting.getSetting().toString());
-                    int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
+                    int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(),
                             PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                     if (ret < 0) {
-                        tv.setText("subscribe is beginning!");
+                        tv.setText("Subscribe beginning!");
                     } else {
                         tv.setText("success");
                     }
@@ -307,9 +307,9 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                         Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting.toString());
                     }
                     if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
-                        Toast.makeText(MainActivity.this, "please Subscribe at first", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Subscribe at first", Toast.LENGTH_SHORT).show();
                     } else {
-                        CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                        CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
                     }
                 }
             }
@@ -335,7 +335,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
             String string = data.getStringExtra("Publish");
             if (string != null && string.equals("SUCCESS")) {
                 Log.i(TAG, "Publish " + string + ":\n" + PubSubSetting.getSetting().toString());
-                CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
             } else {
                 Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
             }

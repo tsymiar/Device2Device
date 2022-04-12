@@ -192,7 +192,7 @@ public class FloatingService extends Service {
     }
 
     public void closeWindow() {
-        CallbackWrapper.quitSubscribe();
+        CallbackWrapper.QuitSubscribe();
         if (windowManager != null) {
             windowManager.removeView(floatView);
         }
