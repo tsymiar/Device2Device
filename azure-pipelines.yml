@@ -2,62 +2,6 @@
 # Build your Android project with Gradle.
 # Add steps that test, sign, and distribute the APK, save build artifacts, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/android
-
-language: android
-
-jdk:
-  - oraclejdk8
-  
-sudo: required
-  
-android:
-  components:
-    - tools
-    - platform-tools
-    - tools
-    - build-tools-30.0.3
-    - android-31
-    - extra-android-m2repository
-    - extra-android-support
-    - add-on
-    - extra
-
-licenses:
-  - 'android-sdk-preview-license-.+'
-  - 'android-sdk-license-.+'
-  
-before_install:  
-# Skip build if the commit message contains [skip travis] or [travis skip]
-  - >
-       echo "$TRAVIS_COMMIT_MESSAGE"
-       | grep -E  '\[(skip travis|travis skip)\]'
-       && echo "[skip travis] has been found, exiting."
-       && exit 0 || true
-  - chmod +x gradlew
-  - touch ~/.android/repositories.cfg
-  
-install:
-  - echo y | sdkmanager "ndk-bundle"
-  - echo y | sdkmanager --channel=3 --channel=1 "cmake;3.18.1"
-  - echo y | sdkmanager 'ndk;23.0.7599858'
-  - echo y | sdkmanager "cmake;3.18.1"
-  
-before_script:
-  - export ANDROID_NDK_HOME=$ANDROID_HOME/ndk-bundle
-  
-script:  
-  - ./gradlew clean assembleDebug --no-daemon --stacktrace
-  
-before_cache:
-  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
-  - rm -rf $HOME/.gradle/caches/*/plugin-resolution/
-
-notifications:
-  email: false
-  
-cache:
-  directories:
-    - "$HOME/.gradle/caches/"
-    - "$HOME/.gradle/wrapper/"
-    - "$HOME/.m2"
-    - "$HOME/.cache"
+- task: Bash@3
+  inputs:
+    filePath: './build.sh'
