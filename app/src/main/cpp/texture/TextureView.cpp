@@ -14,7 +14,7 @@
 #define LOG_TAG "SurfaceTexture"
 #endif
 
-#include <utils/logging.h>
+#include <Utils/logging.h>
 
 /** Classes and methods from JNI. */
 namespace JNI {

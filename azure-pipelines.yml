@@ -1,0 +1,50 @@
+# Android
+# Build your Android project with Gradle.
+# Add steps that test, sign, and distribute the APK, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/android
+resources:
+  repositories:
+  - repository: Scadup # The name used to reference this repository in the checkout step
+    type: github
+    endpoint: tsymiar
+    name: tsymiar/scadup
+
+trigger:
+- master
+
+pool:
+  vmImage: 'macos-latest'
+
+steps:
+- checkout: Scadup
+- checkout: self
+- task: CopyFiles@1
+  inputs:
+    SourceFolder: 'scadup'
+    Contents: '**'
+    TargetFolder: 'Device2Device/app/src/main/cpp/scadup'
+    OverWrite: true
+- task: DeleteFiles@1
+  inputs:
+    SourceFolder: 'scadup'
+    Contents: '**'
+    RemoveSourceFolder: true
+    RemoveDotFiles: true
+- script: cd Device2Device && ls -al
+  workingDirectory: 'Device2Device'
+  displayName: List contents
+
+- task: Gradle@1
+  inputs:
+    workingDirectory: 'Device2Device'
+    gradleWrapperFile: 'gradlew'
+    gradleOptions: '-Xmx3072m'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.8'
+    publishJUnitResults: false
+    testResultsFiles: '**/TEST-*.xml'
+    tasks: 'assembleDebug'
+    sonarQubeRunAnalysis: false
+    findBugsRunAnalysis: false
+    jdkArchitectureOption: 'x64'
+  displayName: gradlew assembleDebug test

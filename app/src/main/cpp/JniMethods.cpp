@@ -6,22 +6,23 @@
 #ifndef LOG_TAG
 #define LOG_TAG "jniComm"
 #endif
-#include <utils/logging.h>
+#include <Utils/logging.h>
 #include <runtime/TimeStamp.h>
-#include <kaics/scadop.h>
+#include <Scadup/Scadup.h>
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
 
 enum RECEIVER {
+    MESSAGE,
     UDP_SERVER,
     UDP_CLIENT,
-    KAI_SUBSCRIBE,
-    KAI_PUBLISHER
+    SUBSCRIBER,
+    PUBLISHER
 };
 
 struct Receiving {
-    RECEIVER receiver;
+    RECEIVER receiver = MESSAGE;
     std::string message;
 };
 
@@ -31,7 +32,6 @@ extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
 extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
 static std::queue<Receiving> g_msgQue;
-static Receiving g_receiving;
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -71,6 +71,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         env->SetObjectField(clazz, value, env->NewStringUTF(receiving.message.c_str()));
         env->SetIntField(clazz, key, (int) receiving.receiver);
+        LOGI("message pop %d: [%s].", receiving.receiver, receiving.message.c_str());
         return clazz;
     } else {
         return nullptr;
@@ -101,25 +102,26 @@ struct PubSubParam {
     std::string addr;
     int port{};
     std::string topic;
-    KaiSocket::RECVCALLBACK hook{};
+    Scadup::RECVCALLBACK hook{};
     JNIEnv env{};
     jclass clz{};
     std::string view;
     int id{};
 } g_pubSubParam;
 
-void RecvHook(const KaiSocket::Message& msg) {
-    std::string message = "topic: '" + std::string(msg.head.topic)
-                          + "'\npayload: [" + msg.data.stat
-                          + "][" + msg.data.body + "].";
-    // KaiSocket::G_KaiMethod[msg.head.etag]
-    g_receiving.receiver = KAI_SUBSCRIBE;
-    g_receiving.message = message;
-    g_msgQue.emplace(g_receiving);
+void RecvHook(const Scadup::Message& msg) {
+    std::string message = "header:\t[" + std::string(msg.header.topic)
+                          + "]\npayload:\t[" + msg.payload.status
+                          + "]\t[" + msg.payload.content + "].";
+    // Scadup::G_MethodValue[msg.header.tag]
+    Receiving receiving;
+    receiving.receiver = MESSAGE;
+    receiving.message = message;
+    g_msgQue.emplace(receiving);
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
 }
 
-JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jstring viewId, jint id) {
+JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jstring viewId, jint id) {
     jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
     g_pubSubParam.addr = address;
@@ -134,13 +136,17 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring add
     g_pubSubParam.id = id;
     std::thread th(
             [&status](const PubSubParam& param) -> void {
-                KaiSocket kaiSocket;
-                kaiSocket.Initialize(param.addr.c_str(), param.port);
-                status = kaiSocket.Subscriber(param.topic, param.hook);
+                Scadup Scadup;
+                Scadup.Initialize(param.addr.c_str(), param.port);
+                status = Scadup.Subscriber(param.topic, param.hook);
                 char content[256];
                 memset(content, 0, 256);
                 sprintf(content, "message from %s:%d, topic = '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
+                Receiving receiving;
+                receiving.message = content;
+                receiving.receiver = SUBSCRIBER;
+                g_msgQue.emplace(receiving);
                 // SetTextView(&param.env, param.clz, param.view, content);
             }, g_pubSubParam);
     if (th.joinable())
@@ -148,22 +154,28 @@ JNIEXPORT jint CPP_FUNC_CALL(KaiSubscribe)(JNIEnv *env, jclass clz , jstring add
     return status;
 }
 
-JNIEXPORT void CPP_FUNC_CALL(quitSubscribe)(JNIEnv *, jclass)
+JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv *, jclass)
 {
-    KaiSocket::GetInstance().exit();
+    Scadup::GetInstance().exit();
 }
 
-JNIEXPORT void CPP_FUNC_CALL(KaiPublish)(JNIEnv *env, jclass , jstring topic, jstring payload) {
+JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstring payload) {
     if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
         LOGI("g_pubSubParam: addr is null or port == 0.");
         return;
     }
     std::string topicParam = Jstring2Cstring(env, topic);
     std::string payloadParam = Jstring2Cstring(env, payload);
-    KaiSocket kaiSocket;
-    kaiSocket.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
-    ssize_t stat = kaiSocket.Publisher(topicParam, payloadParam);
-    LOGI("Publish(%zu) to [%s:%d]: message: [%s][%s].", stat,
+    Scadup Scadup;
+    Scadup.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
+    ssize_t stat = Scadup.Publisher(topicParam, payloadParam);
+    Receiving receiving;
+    if (stat < 0) {
+        receiving.message = "Message Publisher failed!";
+        receiving.receiver = PUBLISHER;
+        g_msgQue.emplace(receiving);
+    }
+    LOGI("Publish(%ld) to [%s:%d]: message: [%s][%s].", stat,
          g_pubSubParam.addr.c_str(), g_pubSubParam.port,
          topicParam.c_str(), payloadParam.c_str());
 }
@@ -284,10 +296,11 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
                                                      jstring text, jint len) {
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
-    g_receiving.message = "text = [" + txt + "](" + std::to_string(len) + ")";
-    LOGI("%s", g_receiving.message.c_str());
-    g_receiving.receiver = UDP_CLIENT;
-    g_msgQue.emplace(g_receiving);
+    Receiving receiving;
+    receiving.message = "text = [" + txt + "](" + std::to_string(len) + ")";
+    LOGI("%s", receiving.message.c_str());
+    receiving.receiver = UDP_CLIENT;
+    g_msgQue.emplace(receiving);
     g_msgLen = len;
     auto *sock = new UdpSocket("127.0.0.1", 8899);
     sock->Sender(tx, (unsigned int) len + 1);
@@ -304,9 +317,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
 void callback(char* data)
 {
     if (data[0] != '\0') {
-        g_receiving.message = data;
-        g_receiving.receiver = UDP_SERVER;
-        g_msgQue.emplace(g_receiving);
+        Receiving receiving;
+        receiving.message = data;
+        receiving.receiver = UDP_SERVER;
+        g_msgQue.emplace(receiving);
     }
 }
 

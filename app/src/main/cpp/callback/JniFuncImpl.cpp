@@ -6,7 +6,7 @@
 #include <mutex>
 #include <algorithm>
 #include <thread>
-#include <utils/logging.h>
+#include <Utils/logging.h>
 
 #ifdef __cplusplus
 extern "C" {

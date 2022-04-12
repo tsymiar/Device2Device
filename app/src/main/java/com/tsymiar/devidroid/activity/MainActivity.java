@@ -126,8 +126,11 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             TextView tv;
-            switch (msg.what)
-            {
+            switch (msg.what) {
+                case Receiver.MESSAGE:
+                    tv = findViewById(R.id.txt_status);
+                    tv.setText(msg.obj.toString());
+                    break;
                 case Receiver.UDP_SERVER:
                     tv = findViewById(R.id.txt_server);
                     tv.setText(msg.obj.toString());
@@ -138,8 +141,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     break;
                 case Receiver.KAI_SUBSCRIBE:
                 case Receiver.KAI_PUBLISHER:
-                    tv = findViewById(R.id.txt_status);
-                    tv.setText(msg.obj.toString());
+                    Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
                     break;
                 default:
                     break;
@@ -290,12 +292,12 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 tv.setText("");
                 if (subscribe != null && subscribe.equals("SUCCESS")) {
                     Log.i(TAG, PubSubSetting.getSetting().toString());
-                    int ret = CallbackWrapper.KaiSubscribe(PubSubSetting.getAddr(),
+                    int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(),
                             PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                     if (ret < 0) {
-                        tv.setText("subscribe is beginning!");
+                        Toast.makeText(MainActivity.this, "Subscribe beginning!", Toast.LENGTH_SHORT).show();
                     } else {
-                        tv.setText("success");
+                        Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
                     }
                 } else {
                     Log.i(TAG, "Subscribe with " + subscribe);
@@ -307,9 +309,9 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                         Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting.toString());
                     }
                     if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
-                        Toast.makeText(MainActivity.this, "please Subscribe at first", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
                     } else {
-                        CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                        CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
                     }
                 }
             }
@@ -335,7 +337,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
             String string = data.getStringExtra("Publish");
             if (string != null && string.equals("SUCCESS")) {
                 Log.i(TAG, "Publish " + string + ":\n" + PubSubSetting.getSetting().toString());
-                CallbackWrapper.KaiPublish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
             } else {
                 Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
             }

@@ -15,12 +15,12 @@ set(TOOLCHAIN ${NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot)
 include_directories(
         ${PROJECT_SOURCE_DIR}
         ${TOOLCHAIN}/usr/include
-        ${CMAKE_SOURCE_DIR}/scadop/src
+        ${CMAKE_SOURCE_DIR}/scadup/src
 )
 
 add_subdirectory(files)
-if(${BUILD_KAICS_LIB} AND ${BUILD_KAICS_LIB} EQUAL 1)
-    add_subdirectory(scadop)
+if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
+    add_subdirectory(scadup)
 endif()
 add_subdirectory(runtime)
 add_subdirectory(network)
@@ -43,20 +43,20 @@ add_library( # Sets the name of the library.
         texture/TextureView.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
-if (NOT ${BUILD_KAICS_LIB} EQUAL 1)
-    file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/scadop/jniLibs/*")
+if (NOT ${BUILD_SCADUP_LIB} EQUAL 1)
+    file(GLOB LIB_FILE_LIST "${CMAKE_SOURCE_DIR}/scadup/jniLibs/*")
     foreach(SOLIB IN LISTS LIB_FILE_LIST)
         add_custom_command(TARGET jniComm
                 PRE_BUILD
                 COMMAND mkdir -p ${LIBS_DIR}
                 COMMAND cp -r ${SOLIB} ${LIBS_DIR}
-                COMMENT "setup kaics so files...")
+                COMMENT "setup scadup so files...")
     endforeach()
 else()
     add_custom_command(TARGET jniComm
             PRE_BUILD
             COMMAND rm -rf ${LIBS_DIR}
-            COMMENT "clean kaics so files...")
+            COMMENT "clean scadup so files...")
 endif()
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -82,7 +82,7 @@ find_library(GLESv2 GLESv2)
 target_link_libraries( # Specifies the target library.
         jniComm
         # template
-        ${PROJECT_SOURCE_DIR}/scadop/jniLibs/${ANDROID_ABI}/libkaics.so
+        ${PROJECT_SOURCE_DIR}/scadup/jniLibs/${ANDROID_ABI}/libscadup.so
         Network callback timestamp files
         # Links the target library to the log library
         # included in the NDK.

@@ -35,7 +35,7 @@ else
 fi
 export PATH=${PATH}:${toolPath}/gradle-7.0.2/bin
 cd - || exit
-cd app/src/main/cpp/scadop || exit
+cd app/src/main/cpp/scadup || exit
 git submodule update --init --recursive
 cd - || exit
 gradle clean assembleDebug --no-daemon --stacktrace
