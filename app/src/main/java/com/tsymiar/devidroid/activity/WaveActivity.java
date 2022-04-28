@@ -25,8 +25,8 @@ import com.tsymiar.devidroid.utils.LocalFile;
 import com.tsymiar.devidroid.utils.SamplePlayer;
 import com.tsymiar.devidroid.utils.SoundFile;
 import com.tsymiar.devidroid.utils.WaveCanvas;
-import com.tsymiar.devidroid.view.WaveSurfaceView;
-import com.tsymiar.devidroid.view.WaveformView;
+import com.tsymiar.devidroid.view.WaveSurface;
+import com.tsymiar.devidroid.view.WaveformsView;
 
 import java.io.File;
 
@@ -40,8 +40,8 @@ public class WaveActivity extends AppCompatActivity {
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
     public final static int AUDIO_SOURCE = MediaRecorder.AudioSource.MIC;// 音频获取源
     private static final String mFileName = "test";
-    WaveSurfaceView waveView;
-    WaveformView waveform;
+    WaveSurface waveView;
+    WaveformsView waveform;
     WaveCanvas waveCanvas = null;
     TextView status;
 

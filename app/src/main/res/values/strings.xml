@@ -2,9 +2,9 @@
     <string name="app_name">Devidroid</string>
     <string-array name="types">
         <item>None</item>
-        <item>CPU rendering</item>
+        <item>CPU-Rendering</item>
         <item>OpenGL-file</item>
-        <item> </item>
+        <item>Disconnect</item>
     </string-array>
 
     <string name="reload">Re-init</string>

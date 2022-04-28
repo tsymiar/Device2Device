@@ -15,6 +15,7 @@
 #endif
 
 #include <Utils/logging.h>
+#include <message/Message.h>
 
 /** Classes and methods from JNI. */
 namespace JNI {
@@ -533,7 +534,11 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
 {
     g_fpUrl = fopen(filename, "rbe");
     if (!g_fpUrl) {
-        LOGE("open file '%s' failed: %s!", filename, strerror(errno));
+        char msg[128];
+        char text[] = "'%s' open failed:\n%s!";
+        sprintf(msg, text, filename, strerror(errno));
+        LOGE("%s", msg);
+        Message::instance().setMessage(msg, ERROR);
         return nullptr;
     }
     // Display and config need to be initialized only once

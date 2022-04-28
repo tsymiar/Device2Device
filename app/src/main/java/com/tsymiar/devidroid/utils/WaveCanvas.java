@@ -19,7 +19,7 @@ import android.view.View;
 
 import androidx.annotation.RequiresApi;
 
-import com.tsymiar.devidroid.view.WaveSurfaceView;
+import com.tsymiar.devidroid.view.WaveSurface;
 import com.tsymiar.devidroid.wrapper.FileWrapper;
 
 import java.io.File;
@@ -142,7 +142,7 @@ public class WaveCanvas {
             this.audioRecord = audioRecord;
             this.recBufSize = recBufSize;
             this.sfv = sfv;
-            line_off = ((WaveSurfaceView) sfv).getLine_off();
+            line_off = ((WaveSurface) sfv).getLine_off();
             this.mPaint = mPaint;
             this.callback = callback;
             inBuf.clear();// 清除 换缓冲区的数据

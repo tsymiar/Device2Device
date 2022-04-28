@@ -9,29 +9,16 @@
 #include <Utils/logging.h>
 #include <runtime/TimeStamp.h>
 #include <Scadup/Scadup.h>
+#include <message/Message.h>
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
-
-enum RECEIVER {
-    MESSAGE,
-    UDP_SERVER,
-    UDP_CLIENT,
-    SUBSCRIBER,
-    PUBLISHER
-};
-
-struct Receiving {
-    RECEIVER receiver = MESSAGE;
-    std::string message;
-};
 
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
 extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
-static std::queue<Receiving> g_msgQue;
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -61,17 +48,14 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
 
 JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
 {
-    if (g_msgQue.empty())
-        return nullptr;
-    Receiving receiving = g_msgQue.front();
+    Messaging receiving = Message::instance().getMessage();
     if (!receiving.message.empty()) {
-        g_msgQue.pop();
         jclass objectClass = env->FindClass("com/tsymiar/devidroid/data/Receiver");
         jfieldID value = (env)->GetFieldID(objectClass, "message", "Ljava/lang/String;");
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         env->SetObjectField(clazz, value, env->NewStringUTF(receiving.message.c_str()));
-        env->SetIntField(clazz, key, (int) receiving.receiver);
-        LOGI("message pop %d: [%s].", receiving.receiver, receiving.message.c_str());
+        env->SetIntField(clazz, key, (int) receiving.massager);
+        LOGI("message pop %d: [%s].", receiving.massager, receiving.message.c_str());
         return clazz;
     } else {
         return nullptr;
@@ -114,10 +98,7 @@ void RecvHook(const Scadup::Message& msg) {
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
     // Scadup::G_MethodValue[msg.header.tag]
-    Receiving receiving;
-    receiving.receiver = MESSAGE;
-    receiving.message = message;
-    g_msgQue.emplace(receiving);
+    Message::instance().setMessage(message, MESSAGE);
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
 }
 
@@ -143,10 +124,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
                 memset(content, 0, 256);
                 sprintf(content, "message from %s:%d, topic = '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
-                Receiving receiving;
-                receiving.message = content;
-                receiving.receiver = SUBSCRIBER;
-                g_msgQue.emplace(receiving);
+                Message::instance().setMessage(content, SUBSCRIBER);
                 // SetTextView(&param.env, param.clz, param.view, content);
             }, g_pubSubParam);
     if (th.joinable())
@@ -169,11 +147,8 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstri
     Scadup Scadup;
     Scadup.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
     ssize_t stat = Scadup.Publisher(topicParam, payloadParam);
-    Receiving receiving;
     if (stat < 0) {
-        receiving.message = "Message Publisher failed!";
-        receiving.receiver = PUBLISHER;
-        g_msgQue.emplace(receiving);
+        Message::instance().setMessage("Message Publisher failed!", ERROR);
     }
     LOGI("Publish(%ld) to [%s:%d]: message: [%s][%s].", stat,
          g_pubSubParam.addr.c_str(), g_pubSubParam.port,
@@ -261,7 +236,7 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
             break;
         }
         default:
-            LOGE("Rendering initialize fail");
+            Message::instance().setMessage("Rendering initialize fail", ERROR);
             return;
     }
 }
@@ -296,11 +271,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
                                                      jstring text, jint len) {
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
-    Receiving receiving;
-    receiving.message = "text = [" + txt + "](" + std::to_string(len) + ")";
-    LOGI("%s", receiving.message.c_str());
-    receiving.receiver = UDP_CLIENT;
-    g_msgQue.emplace(receiving);
+    std::string message;
+    message = "text = [" + txt + "](" + std::to_string(len) + ")";
+    Message::instance().setMessage(message, UDP_CLIENT);
+    LOGI("%s", message.c_str());
     g_msgLen = len;
     auto *sock = new UdpSocket("127.0.0.1", 8899);
     sock->Sender(tx, (unsigned int) len + 1);
@@ -317,10 +291,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
 void callback(char* data)
 {
     if (data[0] != '\0') {
-        Receiving receiving;
-        receiving.message = data;
-        receiving.receiver = UDP_SERVER;
-        g_msgQue.emplace(receiving);
+        Message::instance().setMessage(data, UDP_SERVER);
     }
 }
 

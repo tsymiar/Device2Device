@@ -141,6 +141,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     break;
                 case Receiver.KAI_SUBSCRIBE:
                 case Receiver.KAI_PUBLISHER:
+                case Receiver.ERROR:
                     Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
                     break;
                 default:

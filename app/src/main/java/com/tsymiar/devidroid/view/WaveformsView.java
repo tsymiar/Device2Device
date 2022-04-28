@@ -27,7 +27,7 @@ import android.view.View;
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.utils.SoundFile;
 
-public class WaveformView extends View {
+public class WaveformsView extends View {
     // Colors
     private final Paint mSelectedLinePaint;
     private final Paint mUnselectedLinePaint;
@@ -79,7 +79,7 @@ public class WaveformView extends View {
         this.line_offset = line_offset;
     }
 
-    public WaveformView(Context context, AttributeSet attrs) {
+    public WaveformsView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         // We don't want keys, the markers get these

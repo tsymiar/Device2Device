@@ -1,5 +1,6 @@
 package com.tsymiar.devidroid.activity;
 
+import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Environment;
@@ -118,8 +119,10 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         // Each draw updates the texture and logs on its own
     }
 
+    @SuppressLint("SdCardPath")
     public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/Android/data/" + "com.tsymiar.devidroid" + "/cache/";
+            + "/Android/data/" + "com.tsymiar.devidroid" + "/cache"
+            + "/test.h264";
 
     public void updateSurfaceView(@IntRange(from = 0) int item) {
         final SurfaceTexture texture = mTextureView.getSurfaceTexture();
@@ -129,7 +132,7 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
             ViewWrapper.updateSurfaceView(texture, item);
         }
         if (item == 2) {
-            ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY + "test.h264");
+            ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY);
         }
     }
 
@@ -143,6 +146,6 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         }
         mLog[2].setText(mLog[1].getText());
         mLog[1].setText(mLog[0].getText());
-        mLog[0].setText(String.format(Locale.ROOT, "%s [%d]", message, TimeWrapper.getAbsoluteTimestamp()));
+        mLog[0].setText(String.format(Locale.ROOT, "%s [%d]", message, TimeWrapper.getBootTimestamp()));
     }
 }

@@ -14,7 +14,7 @@ import android.view.SurfaceView;
  *
  * @author cokus
  */
-public class WaveSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
+public class WaveSurface extends SurfaceView implements SurfaceHolder.Callback {
     private int line_off;//上下边距距离
 
     public int getLine_off() {
@@ -25,7 +25,7 @@ public class WaveSurfaceView extends SurfaceView implements SurfaceHolder.Callba
         this.line_off = line_off;
     }
 
-    public WaveSurfaceView(Context context, AttributeSet attrs) {
+    public WaveSurface(Context context, AttributeSet attrs) {
         super(context, attrs);
         this.getHolder().addCallback(this);
     }
