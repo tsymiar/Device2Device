@@ -7,9 +7,10 @@
 #define LOG_TAG "jniComm"
 #endif
 #include <Utils/logging.h>
-#include <runtime/TimeStamp.h>
+#include <time/TimeStamp.h>
 #include <Scadup/Scadup.h>
 #include <message/Message.h>
+#include <network/KcpEmulator.h>
 #include "../jni/jniInc.h"
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
@@ -148,7 +149,7 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstri
     Scadup.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
     ssize_t stat = Scadup.Publisher(topicParam, payloadParam);
     if (stat < 0) {
-        Message::instance().setMessage("Message Publisher failed!", ERROR);
+        Message::instance().setMessage("Message Publisher failed!", TOAST);
     }
     LOGI("Publish(%ld) to [%s:%d]: message: [%s][%s].", stat,
          g_pubSubParam.addr.c_str(), g_pubSubParam.port,
@@ -236,7 +237,7 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
             break;
         }
         default:
-            Message::instance().setMessage("Rendering initialize fail", ERROR);
+            Message::instance().setMessage("Rendering initialize fail", TOAST);
             return;
     }
 }
@@ -305,6 +306,8 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
                 int size;
                 do {
                     size = sock->Receiver(msg, total, callback);
+                    std::string message = "UdpSocket Receiver bind success";
+                    Message::instance().setMessage(message, TOAST);
                     usleep(10000);
                 } while (size != 0);
                 delete sock;
@@ -313,4 +316,19 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
     if (th.joinable())
         th.detach();
     return 0;
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv *, jclass)
+{
+    std::thread th([&]()-> void {
+        static int index = 0;
+        KcpEmulator emulator;
+        emulator.KcpRun(index);
+        LOGI("kcp emulator run in mode: %d.", index);
+        if (index > 2)
+            index = 0;
+        index++;
+    });
+    if (th.joinable())
+        th.detach();
 }

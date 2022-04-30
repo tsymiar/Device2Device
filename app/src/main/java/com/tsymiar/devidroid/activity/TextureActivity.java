@@ -20,6 +20,7 @@ import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.wrapper.TimeWrapper;
 import com.tsymiar.devidroid.wrapper.ViewWrapper;
 
+import java.io.File;
 import java.util.Locale;
 
 public class TextureActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener,
@@ -39,11 +40,23 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
      */
     private final TextView[] mLog = new TextView[3];
 
+    @SuppressLint("SdCardPath")
+    public String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
+            + "/Android/data/" + "com.tsymiar.devidroid" + "/files/cache/";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_texture);
         InitViews();
+        File file = getExternalFilesDir("cache");
+        DATA_DIRECTORY = file.getAbsolutePath() + "/";
+        if (!file.exists()) {
+            boolean status = file.mkdirs();
+            if (!status) {
+                System.out.println("make dirs fail");
+            }
+        }
     }
 
     protected void InitViews() {
@@ -119,11 +132,6 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         // Each draw updates the texture and logs on its own
     }
 
-    @SuppressLint("SdCardPath")
-    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/Android/data/" + "com.tsymiar.devidroid" + "/cache"
-            + "/test.h264";
-
     public void updateSurfaceView(@IntRange(from = 0) int item) {
         final SurfaceTexture texture = mTextureView.getSurfaceTexture();
         String[] selValue = getResources().getStringArray(R.array.types);
@@ -132,7 +140,7 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
             ViewWrapper.updateSurfaceView(texture, item);
         }
         if (item == 2) {
-            ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY);
+            ViewWrapper.updateEglSurface(texture, DATA_DIRECTORY + "test.h264");
         }
     }
 

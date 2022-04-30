@@ -4,7 +4,7 @@
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
-PROJECT(Devidroid CXX)
+PROJECT(Devidroid CXX C)
 
 set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -std=c++11")
@@ -22,7 +22,7 @@ add_subdirectory(files)
 if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
-add_subdirectory(runtime)
+add_subdirectory(time)
 add_subdirectory(network)
 add_subdirectory(callback)
 # add_subdirectory(template)

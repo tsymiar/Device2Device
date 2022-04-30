@@ -16,6 +16,7 @@
     <string name="chart">chart</string>
     <string name="viewGithub">View on GitHub</string>
     <string name="close">Close</string>
+    <string name="dftHint">" "</string>
     <string name="server">server</string>
     <string name="client">client</string>
     <string name="event">event</string>
@@ -31,4 +32,5 @@
     <string name="pub_payload">payload</string>
     <string name="hint_address">address</string>
     <string name="hint_port">port</string>
+    <string name="kcprun">KcpRun</string>
 </resources>

@@ -45,6 +45,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *, jclass, jstring, jstring);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *, jclass, jstring text, jint len);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *env, jclass);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv* , jclass);
 #ifdef __cplusplus
 }
 #endif

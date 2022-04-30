@@ -10,7 +10,7 @@
 
 enum MASSAGER {
     MESSAGE,
-    ERROR,
+    TOAST,
     UDP_SERVER,
     UDP_CLIENT,
     SUBSCRIBER,

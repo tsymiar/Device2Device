@@ -6,4 +6,5 @@ public class NetWrapper {
     }
     public static native int sendUdpData(String text, int len);
     public static native int startServer();
+    public static native void KcpRun();
 }

@@ -538,30 +538,32 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
         char text[] = "'%s' open failed:\n%s!";
         sprintf(msg, text, filename, strerror(errno));
         LOGE("%s", msg);
-        Message::instance().setMessage(msg, ERROR);
+        Message::instance().setMessage(msg, TOAST);
         return nullptr;
     }
     // Display and config need to be initialized only once
     if (EGL2::display == nullptr) {
         EGL2::display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-        eglInitialize(EGL2::display, nullptr, nullptr);
-        if (EGL2::display == nullptr) {
+        EGLBoolean status = eglInitialize(EGL2::display, nullptr, nullptr);
+        if (EGL2::display == nullptr || !status) {
             LOGE("Failed to initialize OpenGL display");
             return nullptr;
         }
         {
             // We want to use OpenGL ES2 with RGBA
-            EGLint attrs[] = {
-                    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-                    EGL_RED_SIZE, 8,
-                    EGL_GREEN_SIZE, 8,
-                    EGL_BLUE_SIZE, 8,
+            EGLint attrib[] = {
+                    EGL_BUFFER_SIZE, 32,
                     EGL_ALPHA_SIZE, 8,
+                    EGL_BLUE_SIZE, 8,
+                    EGL_GREEN_SIZE, 8,
+                    EGL_RED_SIZE, 8,
+                    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
                     EGL_NONE
             };
-            int num;
-            if (!eglChooseConfig(EGL2::display, attrs, &EGL2::config, 1, &num) ||
-                num != 1) {
+            int number;
+            if (!eglChooseConfig(EGL2::display, attrib, &EGL2::config, 1, &number) ||
+                    number != 1) {
                 LOGE("No OpenGL display config chosen");
                 return nullptr;
             }
@@ -579,11 +581,18 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
             return nullptr;
         }
     }
+    EGLSurface surface = nullptr;
+    EGLint format;
+    if (!eglGetConfigAttrib(EGL2::display, EGL2::config, EGL_NATIVE_VISUAL_ID, &format)) {
+        LOGE("eglGetConfigAttrib returned error %d.", eglGetError());
+        return nullptr;
+    }
+    ANativeWindow_setBuffersGeometry(::g_nativeWindow, 0, 0, format);
     EGL2::surface = eglCreateWindowSurface(EGL2::display, EGL2::config,
                                            ::g_nativeWindow,
                                            nullptr);
     if (EGL2::surface == nullptr) {
-        LOGE("Failed to create OpenGL surface.");
+        LOGE("Failed to create OpenGL Window surface.");
         return nullptr;
     } else {
         return g_nativeWindow;

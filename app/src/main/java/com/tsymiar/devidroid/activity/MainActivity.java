@@ -141,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     break;
                 case Receiver.KAI_SUBSCRIBE:
                 case Receiver.KAI_PUBLISHER:
-                case Receiver.ERROR:
+                case Receiver.TOAST:
                     Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
                     break;
                 default:
@@ -279,6 +279,9 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                         startService(publisherIntent);
                     }
                 }
+        );
+        findViewById(R.id.btn_ikcp).setOnClickListener(
+                v-> NetWrapper.KcpRun()
         );
     }
     private class BroadcastReceiverClass extends BroadcastReceiver {
