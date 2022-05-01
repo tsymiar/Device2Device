@@ -15,7 +15,9 @@
 #endif
 
 #include <Utils/logging.h>
-#include <message/Message.h>
+
+FILE *g_filePtr = nullptr;
+unsigned char *g_fileData = nullptr;
 
 /** Classes and methods from JNI. */
 namespace JNI {
@@ -39,8 +41,34 @@ namespace EGL2 {
     static EGLSurface surface = nullptr;
 }
 
+GLbyte vShaderStr[] =
+        "attribute vec4 vPosition;    \n"
+        "attribute vec2 a_texCoord;   \n"
+        "varying vec2 tc;             \n"
+        "void main()                  \n"
+        "{                            \n"
+        "   gl_Position = vPosition;  \n"
+        "   tc = a_texCoord;          \n"
+        "}                            \n";
+
+GLbyte fShaderStr[] =
+        "precision mediump float;     \n"
+        "uniform sampler2D tex_y;     \n"
+        "uniform sampler2D tex_u;     \n"
+        "uniform sampler2D tex_v;     \n"
+        "varying vec2 tc;             \n"
+        "void main()                  \n"
+        "{                            \n"
+        "  vec4 c = vec4((texture2D(tex_y, tc).r - 16./255.) * 1.164);\n"
+        "  vec4 U = vec4(texture2D(tex_u, tc).r - 128./255.);\n"
+        "  vec4 V = vec4(texture2D(tex_v, tc).r - 128./255.);\n"
+        "  c += V * vec4(1.596, -0.813, 0, 0);\n"
+        "  c += U * vec4(0, -0.392, 2.017, 0);\n"
+        "  c.a = 1.0;\n"
+        "  gl_FragColor = c;\n"
+        "}                  \n";
+
 /** The surface and its native window. */
-FILE *g_fpUrl = nullptr;
 jobject g_surfaceView = {};
 static ANativeWindow *g_nativeWindow = nullptr;
 
@@ -69,14 +97,23 @@ void createSurface(JNIEnv *env, jobject texture)
  */
 void releaseSurface(JNIEnv *env)
 {
+    if (g_filePtr != nullptr) {
+        fclose(g_filePtr);
+        g_filePtr = nullptr;
+    }
+    if (g_fileData != nullptr) {
+        delete[] g_fileData;
+        g_fileData = nullptr;
+    }
+    eglDestroySurface(EGL2::display, EGL2::surface);
+    eglDestroyContext(EGL2::display, EGL2::context);
     env->CallVoidMethod(::g_surfaceView, JNI::surface_release);
     env->DeleteGlobalRef(::g_surfaceView);
     ::g_surfaceView = nullptr;
 }
 
-void initTexture(JNIEnv *env, jobject texture)
+void rebuildTexture(JNIEnv *env, jobject texture)
 {
-    // Tear down
     if (::g_nativeWindow != nullptr) {
         if (EGL2::surface != nullptr)
             eglDestroySurface(EGL2::display, EGL2::surface);
@@ -127,7 +164,7 @@ int TextureView::loadSurfaceView(JNIEnv *env, jobject texture)
         LOGE("Surface.release() method got fail");
         return 0;
     }
-    initTexture(env, texture);
+    rebuildTexture(env, texture);
     if (::g_surfaceView == nullptr) {
         LOGE("No surface");
         return -1;
@@ -186,7 +223,7 @@ static const char *fragYUV420P = GET_STR(
         }
 );
 
-GLint initShader(const char *code, GLenum type)
+GLint compileShader(const char *code, GLenum type)
 {
     GLint shader = glCreateShader(type);
     if (shader == 0) {
@@ -260,6 +297,10 @@ void TextureView::drawRGBColor(uint32_t argb)
     LOGD("Draws %08x using Native Window", argb);
 }
 
+void TextureView::Unlock()
+{
+    ANativeWindow_unlockAndPost(g_nativeWindow);
+}
 
 /**
  * Draw by OpenGL.
@@ -268,6 +309,10 @@ void TextureView::drawRGBColor(uint32_t argb)
  */
 int TextureView::drawRGBColor(size_t height, size_t width)
 {
+    if (g_filePtr == nullptr) {
+        LOGE("file describer is nullptr");
+        return -1;
+    }
     // -*-*-*-*-*-*- OpenGL rendering -*-*-*-*-*-*-
     if (EGL2::surface == nullptr) {
         LOGE("surface is nullptr");
@@ -296,9 +341,9 @@ int TextureView::drawRGBColor(size_t height, size_t width)
     // auto contextCurrentGuard = guard([=]{ eglMakeCurrent(EGL2::display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT); });
 
     //定点shader初始化
-    GLuint vuShader = static_cast<GLuint>(initShader(vertexShader, GL_VERTEX_SHADER));
+    GLuint vuShader = static_cast<GLuint>(compileShader(vertexShader, GL_VERTEX_SHADER));
     //片元yuv420 shader初始化
-    GLuint fuShader = static_cast<GLuint>(initShader(fragYUV420P, GL_FRAGMENT_SHADER));
+    GLuint fuShader = static_cast<GLuint>(compileShader(fragYUV420P, GL_FRAGMENT_SHADER));
     //创建渲染程序
     GLuint program = glCreateProgram();
     if (program == 0) {
@@ -372,12 +417,12 @@ int TextureView::drawRGBColor(size_t height, size_t width)
      * @param 3、第三个参数表示使用的滤镜
      *
      * 参数可选项如下：
-     * GL_NEAREST 	取最邻近像素
-     * GL_LINEAR 	线性内部插值
-     * GL_NEAREST_MIPMAP_NEAREST 	最近多贴图等级的最邻近像素
-     * GL_NEAREST_MIPMAP_LINEAR 	在最近多贴图等级的内部线性插值
-     * GL_LINEAR_MIPMAP_NEAREST 	在最近多贴图等级的外部线性插值
-     * GL_LINEAR_MIPMAP_LINEAR 	    在最近多贴图等级的外部和内部线性插值
+     * GL_NEAREST     取最邻近像素
+     * GL_LINEAR      线性内部插值
+     * GL_NEAREST_MIPMAP_NEAREST    最近多贴图等级的最邻近像素
+     * GL_NEAREST_MIPMAP_LINEAR     在最近多贴图等级的内部线性插值
+     * GL_LINEAR_MIPMAP_NEAREST     在最近多贴图等级的外部线性插值
+     * GL_LINEAR_MIPMAP_LINEAR      在最近多贴图等级的外部和内部线性插值
      *
      * 多贴图纹理(Mip Mapping)为一个纹理对象生成不同尺寸的图像。在需要时，根据绘制图形的大小来决定采用的纹理
      * 等级或者在不同的纹理等级之间进行线性内插。使用多贴图纹理的好处在于消除纹理躁动。这种情况在所绘制的景物
@@ -462,22 +507,22 @@ int TextureView::drawRGBColor(size_t height, size_t width)
     pixel[0] = new unsigned char[width * height];
     pixel[1] = new unsigned char[width * height / 4];
     pixel[2] = new unsigned char[width * height / 4];
-    if (g_fpUrl == nullptr) {
-        LOGE("Get file / url fail, g_fpUrl = nullptr");
+    if (g_filePtr == nullptr) {
+        LOGE("Get file / url fail, G_filePtr = nullptr");
         return -5;
     }
-    fseek(g_fpUrl, 0, SEEK_END); //定位到文件末
-    int fileSize = ftell(g_fpUrl);
-    fseek(g_fpUrl, 0, SEEK_SET);
+    fseek(g_filePtr, 0, SEEK_END); //定位到文件末
+    int fileSize = ftell(g_filePtr);
+    fseek(g_filePtr, 0, SEEK_SET);
     for (int i = 0; i < fileSize; i++) {
         // memset(pixel[0], rgba[i], width * height);
         // memset(pixel[1], rgba[i], width * height / 4);
         // memset(pixel[2], rgba[i], width * height / 4);
         //420 yy uu vv
-        if (feof(g_fpUrl) == 0) {
-            fread(pixel[0], 1, width * height, g_fpUrl);
-            fread(pixel[1], 1, width * height / 4, g_fpUrl);
-            fread(pixel[2], 1, width * height / 4, g_fpUrl);
+        if (feof(g_filePtr) == 0) {
+            fread(pixel[0], 1, width * height, g_filePtr);
+            fread(pixel[1], 1, width * height / 4, g_filePtr);
+            fread(pixel[2], 1, width * height / 4, g_filePtr);
         } else {
             break;
         }
@@ -530,17 +575,8 @@ int TextureView::drawRGBColor(size_t height, size_t width)
     return 0;
 }
 
-ANativeWindow *TextureView::initOpenGL(const char *filename)
+ANativeWindow *TextureView::initGLSurface()
 {
-    g_fpUrl = fopen(filename, "rbe");
-    if (!g_fpUrl) {
-        char msg[128];
-        char text[] = "'%s' open failed:\n%s!";
-        sprintf(msg, text, filename, strerror(errno));
-        LOGE("%s", msg);
-        Message::instance().setMessage(msg, TOAST);
-        return nullptr;
-    }
     // Display and config need to be initialized only once
     if (EGL2::display == nullptr) {
         EGL2::display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -581,7 +617,6 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
             return nullptr;
         }
     }
-    EGLSurface surface = nullptr;
     EGLint format;
     if (!eglGetConfigAttrib(EGL2::display, EGL2::config, EGL_NATIVE_VISUAL_ID, &format)) {
         LOGE("eglGetConfigAttrib returned error %d.", eglGetError());
@@ -597,4 +632,65 @@ ANativeWindow *TextureView::initOpenGL(const char *filename)
     } else {
         return g_nativeWindow;
     }
+}
+
+void TextureView::GLRenderLoop()
+{
+    eglMakeCurrent(EGL2::display, EGL2::surface, EGL2::surface, EGL2::context);
+}
+
+unsigned char *TextureView::readGLFile(const char *filename)
+{
+    FILE *fp = fopen(filename, "rbe");
+    if (fp != nullptr) {
+        g_filePtr = fp;
+        long size = 1280 * 720 * 3 / 2;
+        g_fileData = new unsigned char[size];
+        memset(g_fileData, '\0', size);
+        fread(g_fileData, size, 1, fp);
+    } else {
+        char msg[128];
+        char text[] = "'%s' open failed:\n%s!";
+        sprintf(msg, text, filename, strerror(errno));
+        LOGE("%s", msg);
+        return nullptr;
+    }
+    return g_fileData;
+}
+
+void TextureView::makeGLTexture(unsigned char *data)
+{
+    GLuint texYId;
+    GLuint texUId;
+    GLuint texVId;
+
+    int width = 640;
+    int height = 480;
+
+    glGenTextures(1, &texYId);
+    glBindTexture(GL_TEXTURE_2D, texYId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+                 data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenTextures(1, &texUId);
+    glBindTexture(GL_TEXTURE_2D, texUId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width / 2, height / 2, 0, GL_LUMINANCE,
+                 GL_UNSIGNED_BYTE, data + width * height);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenTextures(1, &texVId);
+    glBindTexture(GL_TEXTURE_2D, texVId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width / 2, height / 2, 0, GL_LUMINANCE,
+                 GL_UNSIGNED_BYTE, data + width * height * 5 / 4);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }

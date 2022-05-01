@@ -27,8 +27,8 @@ unsigned long long TimeStamp::BootTime()
     struct timespec time{};
     clock_gettime(CLOCK_MONOTONIC, &time);
     unsigned long long micro = MILLION * (unsigned long long) time.tv_sec + time.tv_nsec / KILO;
-    auto tm0 = static_cast<time_t>(micro / KILO);
-    struct tm *ttm = localtime(&tm0);
+    auto tmVal = static_cast<time_t>(micro / KILO);
+    struct tm *ttm = localtime(&tmVal);
     char szTime[TIME_LANG] = {0};
     snprintf(szTime, sizeof(szTime) - 1,
              "%d-%02d-%02d %02d:%02d:%02d",
@@ -38,7 +38,7 @@ unsigned long long TimeStamp::BootTime()
              ttm->tm_hour,
              ttm->tm_min,
              ttm->tm_sec);
-    LOGD("BootTime: micro = %lld, tm0 = %ld, szTime = %s", micro, tm0, szTime);
+    LOGD("BootTime: micro = %lld, value = %ld, szTime = %s", micro, tmVal, szTime);
     return micro;
 }
 

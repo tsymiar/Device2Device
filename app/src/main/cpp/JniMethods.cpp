@@ -15,6 +15,7 @@
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
 
+extern FILE *G_filePtr;
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
@@ -56,7 +57,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         env->SetObjectField(clazz, value, env->NewStringUTF(receiving.message.c_str()));
         env->SetIntField(clazz, key, (int) receiving.massager);
-        LOGI("message pop %d: [%s].", receiving.massager, receiving.message.c_str());
+        LOGI("message pop %d %s", receiving.massager, receiving.message.c_str());
         return clazz;
     } else {
         return nullptr;
@@ -196,7 +197,8 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring ur
         LOGI("loaded Surface class: %x", jvs);
     }
     const char *filename = env->GetStringUTFChars(url, JNI_FALSE);
-    ANativeWindow *window = initOpenGL(filename);
+    ANativeWindow *window = initGLSurface();
+    readGLFile(filename);
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
         drawRGBColor(1280, 720);
@@ -236,6 +238,9 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
             drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
             break;
         }
+        case 3:
+            Unlock();
+            break;
         default:
             Message::instance().setMessage("Rendering initialize fail", TOAST);
             return;
