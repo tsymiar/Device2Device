@@ -247,7 +247,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_server).setOnClickListener(
                 v -> {
                     wifiLock.acquire();
-                    NetWrapper.startServer();
+                    NetWrapper.startUdpServer();
                 }
         );
         findViewById(R.id.btn_client).setOnClickListener(
@@ -280,6 +280,9 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     }
                 }
         );
+        findViewById(R.id.btn_tcp).setOnClickListener(
+                v-> NetWrapper.startTcpServer(8700)
+        );
         findViewById(R.id.btn_ikcp).setOnClickListener(
                 v-> NetWrapper.KcpRun()
         );
@@ -299,7 +302,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(),
                             PubSubSetting.getPort(), PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                     if (ret < 0) {
-                        Toast.makeText(MainActivity.this, "Subscribe beginning!", Toast.LENGTH_SHORT).show();
+                        tv.setText("Subscribe beginning!");
                     } else {
                         Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
                     }

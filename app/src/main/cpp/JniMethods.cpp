@@ -15,7 +15,6 @@
 #include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
 
-extern FILE *G_filePtr;
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
@@ -261,6 +260,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 #include <iostream>
 #include <files/Pcm2Wav.h>
 #include <network/UdpSocket.h>
+#include <network/TcpSocket.h>
 
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>
@@ -301,7 +301,7 @@ void callback(char* data)
     }
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass)
 {
     std::thread th(
             []() -> void {
@@ -318,6 +318,25 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startServer)(JNIEnv *, jclass)
                 delete sock;
             }
     );
+    if (th.joinable())
+        th.detach();
+    return 0;
+}
+
+int tcp_callback(uint8_t *data, size_t size)
+{
+    Statics::printBuffer((char*)data, size);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint port)
+{
+    std::thread th(
+            [](int port) -> void {
+                TcpSocket tcp;
+                tcp.RegisterCallback(tcp_callback);
+                tcp.Start(port);
+            }, port);
     if (th.joinable())
         th.detach();
     return 0;
