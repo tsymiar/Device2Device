@@ -11,8 +11,9 @@
 #include <Scadup/Scadup.h>
 #include <message/Message.h>
 #include <network/KcpEmulator.h>
+#include <gles/EglSurface.h>
+#include <gles/TextureView.h>
 #include "../jni/jniInc.h"
-#include "texture/TextureView.h"
 #include "callback/JavaFuncCalls.h"
 
 extern JavaVM *g_jniJVM;
@@ -98,7 +99,6 @@ void RecvHook(const Scadup::Message& msg) {
     std::string message = "header:\t[" + std::string(msg.header.topic)
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
-    // Scadup::G_MethodValue[msg.header.tag]
     Message::instance().setMessage(message, MESSAGE);
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
 }
@@ -190,17 +190,16 @@ CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring url)
 {
-    using namespace TextureView;
-    int jvs = loadSurfaceView(env, texture);
+    int jvs = TextureView::loadSurfaceView(env, texture);
     if (jvs > 0) {
         LOGI("loaded Surface class: %x", jvs);
     }
     const char *filename = env->GetStringUTFChars(url, JNI_FALSE);
-    ANativeWindow *window = initGLSurface();
-    readGLFile(filename);
+    ANativeWindow *window = EglSurface::InitGLSurface();
+    EglSurface::ReadGLFile(filename);
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
-        drawRGBColor(1280, 720);
+        TextureView::drawRGBColor(1280, 720);
     } else {
         LOGE("native window = null while initOpenGL.");
     }
@@ -348,7 +347,9 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv *, jclass)
         static int index = 0;
         KcpEmulator emulator;
         emulator.KcpRun(index);
-        LOGI("kcp emulator run in mode: %d.", index);
+        char hint[64];
+        sprintf(hint, "Kcp emulator run in mode: %d.", index);
+        Message::instance().setMessage(hint, TOAST);
         if (index > 2)
             index = 0;
         index++;

@@ -23,6 +23,7 @@ if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
 add_subdirectory(time)
+add_subdirectory(gles)
 add_subdirectory(network)
 add_subdirectory(callback)
 # add_subdirectory(template)
@@ -39,7 +40,6 @@ add_library( # Sets the name of the library.
         SHARED
 
         # Provides a relative path to your source file(s).
-        texture/TextureView.cpp
         message/Message.cpp
         JniMethods.cpp)
 
@@ -84,7 +84,7 @@ target_link_libraries( # Specifies the target library.
         jniComm
         # template
         ${PROJECT_SOURCE_DIR}/scadup/jniLibs/${ANDROID_ABI}/libscadup.so
-        Network callback timestamp files
+        Network files callback timestamp texture
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})
