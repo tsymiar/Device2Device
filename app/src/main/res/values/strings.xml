@@ -2,12 +2,13 @@
     <string name="app_name">Devidroid</string>
     <string-array name="types">
         <item>None</item>
-        <item>CPU-Rendering</item>
-        <item>OpenGL-file</item>
+        <item>CPU-Render</item>
+        <item>OpenGL-texture</item>
+        <item>GPU-Render</item>
         <item>Disconnect</item>
     </string-array>
 
-    <string name="reload">Re-init</string>
+    <string name="reload">Re-do</string>
     <string name="texture">Texture</string>
     <string name="wave">Wave</string>
     <string name="status">status</string>

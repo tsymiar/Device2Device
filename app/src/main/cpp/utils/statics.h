@@ -5,6 +5,9 @@
 #ifndef DEVIDROID_STATICS_H
 #define DEVIDROID_STATICS_H
 
+#include <malloc.h>
+#include <mutex>
+
 namespace Statics {
     constexpr const int BYTES_PER_LINE = 513;
 

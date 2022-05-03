@@ -18,10 +18,10 @@ include_directories(
         ${CMAKE_SOURCE_DIR}/scadup/src
 )
 
-add_subdirectory(files)
 if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
+add_subdirectory(audio)
 add_subdirectory(time)
 add_subdirectory(gles)
 add_subdirectory(network)
@@ -41,6 +41,7 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         message/Message.cpp
+        files/FileUtils.cpp
         JniMethods.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
@@ -84,7 +85,7 @@ target_link_libraries( # Specifies the target library.
         jniComm
         # template
         ${PROJECT_SOURCE_DIR}/scadup/jniLibs/${ANDROID_ABI}/libscadup.so
-        Network files callback timestamp texture
+        Network audiotools callback timestamp texture
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

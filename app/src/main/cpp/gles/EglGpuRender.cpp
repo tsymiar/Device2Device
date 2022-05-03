@@ -1,142 +1,266 @@
-#include "TextureView.h"
+//
+// Created by Shenyrion on 2022/5/2.
+//
 
-#include <cerrno>
-#include <cstring>
-#include <cstdlib>
-
-#include <android/native_window.h>
-#include <android/native_window_jni.h>
-
-#include <GLES2/gl2.h>
+#include "EglGpuRender.h"
 
 #ifndef LOG_TAG
-#define LOG_TAG "SurfaceTexture"
+#define LOG_TAG "EglGpuRender"
 #endif
 #include <Utils/logging.h>
-
+#include <cerrno>
+#include <utils/statics.h>
 #include "EglShader.h"
-#include "EglSurface.h"
+#define BYTES_PER_FLOAT 4
+#define POSITION_COMPONENT_COUNT 2
+#define TEXTURE_COORDINATES_COMPONENT_COUNT 2
+#define STRIDE_SIZE ((POSITION_COMPONENT_COUNT + TEXTURE_COORDINATES_COMPONENT_COUNT)*BYTES_PER_FLOAT)
 
-extern EGL2 EGL2;
+namespace {
+    GLuint g_vertexShader;
+    GLuint g_fragmentShader;
+}
+
+EGL2 EGL2{};
+ANativeWindow *g_nativeWindow = nullptr;
 extern FILE *g_fileDesc;
-extern unsigned char *g_fileContent;
-extern ANativeWindow *g_nativeWindow;
+/*
+GLbyte vShaderStr[] =
+        "attribute vec4 vPosition;    \n"
+        "attribute vec2 a_texCoord;   \n"
+        "varying vec2 tc;             \n"
+        "void main()                  \n"
+        "{                            \n"
+        "   gl_Position = vPosition;  \n"
+        "   tc = a_texCoord;          \n"
+        "}                            \n";
 
-/** Classes and methods from JNI. */
-namespace JNI {
-    /** android.view.Surface class */
-    static jclass surface_class;
-    /** android.view.Surface constructor */
-    static jmethodID surface_init;
-    /** android.view.Surface.release() */
-    static jmethodID surface_release;
-    /** The surface and its native window. */
-    jobject surface_view = {};
-}
+GLbyte fShaderStr[] =
+        "precision mediump float;     \n"
+        "uniform sampler2D tex_y;     \n"
+        "uniform sampler2D tex_u;     \n"
+        "uniform sampler2D tex_v;     \n"
+        "varying vec2 tc;             \n"
+        "void main()                  \n"
+        "{                            \n"
+        "  vec4 c = vec4((texture2D(tex_y, tc).r - 16./255.) * 1.164);\n"
+        "  vec4 U = vec4(texture2D(tex_u, tc).r - 128./255.);\n"
+        "  vec4 V = vec4(texture2D(tex_v, tc).r - 128./255.);\n"
+        "  c += V * vec4(1.596, -0.813, 0, 0);\n"
+        "  c += U * vec4(0, -0.392, 2.017, 0);\n"
+        "  c.a = 1.0;\n"
+        "  gl_FragColor = c;\n"
+        "}                  \n";
+*/
+GLbyte vShaderStr[] = "attribute vec4 a_Position;                          \n"
+                      "attribute vec2 a_TextureCoordinates;                \n"
+                      "varying vec2 v_TextureCoordinates;                  \n"
+                      "void main()                                         \n"
+                      "{                                                   \n"
+                      "    v_TextureCoordinates = a_TextureCoordinates;    \n"
+                      "    gl_Position = a_Position;                       \n"
+                      "}                                                   \n";
 
-/**
- * Create surface for surface texture.
- *
- * @param env JNI environment.
- * @param texture Surface texture to create surface for.
- */
-void createSurface(JNIEnv *env, jobject texture)
+GLbyte fShaderStr[] =
+        "precision mediump float;                                          \n"
+        "uniform sampler2D u_TextureUnit;                                  \n"
+        "varying vec2 v_TextureCoordinates;                                \n"
+        "void main()                                                       \n"
+        "{                                                                 \n"
+        "    gl_FragColor = texture2D(u_TextureUnit, v_TextureCoordinates);\n"
+        "}                                                                 \n";
+
+ANativeWindow *EglGpuRender::OpenGLSurface()
 {
-    jvalue params[1];
-    params[0].l = texture;
-    auto surface = env->NewObjectA(JNI::surface_class, JNI::surface_init, params);
-    if (surface == nullptr) {
-        LOGE("Failed to construct surface");
-        return;
-    }
-    JNI::surface_view = env->NewGlobalRef(surface);
-}
-
-/**
- * Release surface.
- *
- * @param env JNI environment.
- */
-void releaseSurface(JNIEnv *env)
-{
-    if (g_fileDesc != nullptr) {
-        fclose(g_fileDesc);
-        g_fileDesc = nullptr;
-    }
-    if (g_fileContent != nullptr) {
-        delete[] g_fileContent;
-        g_fileContent = nullptr;
-    }
-    eglDestroySurface(EGL2.display, EGL2.surface);
-    eglDestroyContext(EGL2.display, EGL2.context);
-    env->CallVoidMethod(JNI::surface_view, JNI::surface_release);
-    env->DeleteGlobalRef(JNI::surface_view);
-    JNI::surface_view = nullptr;
-}
-
-void rebuildTexture(JNIEnv *env, jobject texture)
-{
-    if (::g_nativeWindow != nullptr) {
-        if (EGL2.surface != nullptr)
-            eglDestroySurface(EGL2.display, EGL2.surface);
-        EGL2.surface = nullptr;
-
-        if (EGL2.context != nullptr)
-            eglDestroyContext(EGL2.display, EGL2.context);
-        EGL2.context = nullptr;
-
-        ANativeWindow_release(::g_nativeWindow);
-        ::g_nativeWindow = nullptr;
-    }
-    /* Releasing the surface is extremely important. You can't initialize OpenGL on the same
-     * surface which was used for CPU rendering as there is no way how to de-initialize CPU
-     * rendering on a surface (OpenGL can be disconnected with eglMakeCurrent(EGL_NO_CONTEXT)).
-     * So each time you want to switch, you need to create a new surface for the surface
-     * texture, but to be able to do so, you need to release the original surface first. */
-    if (JNI::surface_view != nullptr) {
-        releaseSurface(env);
-    }
-    createSurface(env, texture);
-}
-
-int TextureView::loadSurfaceView(JNIEnv *env, jobject texture)
-{
-    jobject surface = env->FindClass("android/view/Surface");
-    if (surface == nullptr) {
-        LOGE("Surface class can not be found");
-        return 0;
-    } else {
-        jobject global = env->NewGlobalRef(surface);
-        JNI::surface_class = reinterpret_cast<jclass>(global);
-        if (JNI::surface_class == nullptr) {
-            LOGE("Surface reference cast with error");
-            return 0;
+    // Display and config need to be initialized only once
+    if (EGL2.eglDisplay == nullptr) {
+        EGL2.eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+        EGLBoolean status = eglInitialize(EGL2.eglDisplay, nullptr, nullptr);
+        if (EGL2.eglDisplay == nullptr || !status) {
+            LOGE("Failed to initialize OpenGL display");
+            return nullptr;
+        }
+        {
+            // We want to use OpenGL ES2 with RGBA
+            EGLint attrib[] = {
+                    EGL_BUFFER_SIZE, 32,
+                    EGL_ALPHA_SIZE, 8,
+                    EGL_BLUE_SIZE, 8,
+                    EGL_GREEN_SIZE, 8,
+                    EGL_RED_SIZE, 8,
+                    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                    EGL_NONE
+            };
+            int number;
+            if (!eglChooseConfig(EGL2.eglDisplay, attrib, &EGL2.eglConfig, 1, &number) ||
+                number != 1) {
+                LOGE("No OpenGL display config chosen");
+                return nullptr;
+            }
         }
     }
-
-    JNI::surface_init = env->GetMethodID(JNI::surface_class, "<init>",
-                                         "(Landroid/graphics/SurfaceTexture;)V");
-    if (JNI::surface_init == nullptr) {
-        LOGE("SurfaceTexture constructor got fail");
-        return 0;
+    if (EGL2.eglContext == nullptr) {
+        EGLint attrs[] =
+                {
+                        EGL_CONTEXT_CLIENT_VERSION, 2,
+                        EGL_NONE
+                };
+        EGL2.eglContext = eglCreateContext(EGL2.eglDisplay, EGL2.eglConfig, nullptr, attrs);
+        if (EGL2.eglContext == nullptr) {
+            LOGE("Failed to create OpenGL context");
+            return nullptr;
+        }
     }
-
-    JNI::surface_release = env->GetMethodID(JNI::surface_class, "release", "()V");
-    if (JNI::surface_release == nullptr) {
-        LOGE("Surface.release() method got fail");
-        return 0;
+    if (EGL2.eglSurface == nullptr) {
+        EGLint format;
+        if (!eglGetConfigAttrib(EGL2.eglDisplay, EGL2.eglConfig, EGL_NATIVE_VISUAL_ID, &format)) {
+            LOGE("eglGetConfigAttrib returned error %d.", eglGetError());
+            return nullptr;
+        }
+        ANativeWindow_setBuffersGeometry(::g_nativeWindow, 0, 0, format);
+        if (EGL2.eglConfig == nullptr) {
+            LOGE("OpenGL config is null");
+            return nullptr;
+        }
+        EGL2.eglSurface = eglCreateWindowSurface(EGL2.eglDisplay, EGL2.eglConfig,
+                                                 ::g_nativeWindow,
+                                                 nullptr);
+        if (EGL2.eglSurface == nullptr) {
+            LOGE("Failed to create OpenGL Window surface.");
+            return nullptr;
+        }
     }
-    rebuildTexture(env, texture);
-    if (JNI::surface_view == nullptr) {
-        LOGE("No surface");
+    return g_nativeWindow;
+}
+
+void EglGpuRender::CloseGLSurface()
+{
+    EGLBoolean success = eglReleaseThread();
+    if (!success) {
+        LOGE("eglReleaseThread failure.");
+    }
+    success = eglDestroySurface(EGL2.eglDisplay, EGL2.eglSurface);
+    if (!success) {
+        LOGE("eglDestroySurface failure.");
+    }
+    success = eglDestroyContext(EGL2.eglDisplay, EGL2.eglContext);
+    if (!success) {
+        LOGE("eglDestroySurface failure.");
+    }
+    success = eglTerminate(EGL2.eglDisplay);
+    if (!success) {
+        LOGE("eglDestroySurface failure.");
+    }
+    EGL2.eglSurface = nullptr;
+    EGL2.eglContext = nullptr;
+    EGL2.eglDisplay = nullptr;
+}
+
+int EglGpuRender::MakeGLTexture(int width, int height)
+{
+    if (EGL2.eglSurface == nullptr) {
+        LOGE("surface is nullptr");
         return -1;
     }
-    ::g_nativeWindow = ANativeWindow_fromSurface(env, JNI::surface_view);
-    if (::g_nativeWindow == nullptr) {
-        LOGE("Failed to obtain window");
-        return -1;
+    if (!eglMakeCurrent(EGL2.eglDisplay, EGL2.eglSurface, EGL2.eglSurface, EGL2.eglContext)) {
+        LOGE("Failed to attach eglContext!");
+        return -2;
     }
-    return env->GetVersion();
+    //编译着色器代码并链接到着色器程序
+    EGL2.glProgram = EglShader::CreateProgram((char*)vShaderStr, (char*)fShaderStr, g_vertexShader, g_fragmentShader);
+    // Store the program object
+
+    // Get the attribute locations
+    EGL2.positionLoc = glGetAttribLocation(EGL2.glProgram , "v_position");
+    EGL2.width = width;
+    EGL2.height = height;
+
+    glGenTextures(1, &EGL2.mTextureID);
+    glBindTexture(GL_TEXTURE_2D, EGL2.mTextureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glEnable(GL_TEXTURE_2D);
+
+    return 0;
+}
+
+void setUniforms(int uTextureUnitLocation, int textureId) {
+    // Pass the matrix into the shader program.
+    //glUniformMatrix4fv(uMatrixLocation, 1, false, matrix);
+
+    // Set the active texture unit to texture unit 0.
+    glActiveTexture(GL_TEXTURE0);
+
+    // Bind the texture to this unit.
+    glBindTexture(GL_TEXTURE_2D, textureId);
+
+    // Tell the texture uniform sampler to use this texture in the shader by
+    // telling it to read from texture unit 0.
+    glUniform1i(uTextureUnitLocation, 0);
+}
+
+void renderPixel(uint8_t *pixel, size_t)
+{
+    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
+                            0.0f };
+    // Set the viewport
+    glViewport(0, 0, EGL2.width, EGL2.height);
+
+    // Use the program object
+    glUseProgram(EGL2.glProgram);
+    // Clear the color buffer
+    // glClear(GL_COLOR_BUFFER_BIT);
+
+    // RGB format needed: pixel
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, EGL2.width,
+                 EGL2.height, 0, GL_RGB,
+                 GL_UNSIGNED_SHORT_5_6_5, pixel);
+
+    // Retrieve uniform locations for the shader program.
+    GLint uTextureUnitLocation = glGetUniformLocation(EGL2.glProgram,
+                                                      "u_TextureUnit");
+    setUniforms(uTextureUnitLocation, EGL2.mTextureID);
+
+    // Retrieve attribute locations for the shader program.
+    GLint aPositionLocation = glGetAttribLocation(EGL2.glProgram,
+                                                  "a_Position");
+    GLint aTextureCoordinatesLocation = glGetAttribLocation(
+            EGL2.glProgram, "a_TextureCoordinates");
+
+    // Order of coordinates: X, Y, S, T
+    // Triangle Fan
+    GLfloat VERTEX_DATA[] = { 0.0f, 0.0f, 0.5f, 0.5f, -1.0f, -1.0f, 0.0f, 1.0f,
+                              1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f,
+                              0.0f, -1.0f, -1.0f, 0.0f, 1.0f };
+
+    glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT,
+                          false, STRIDE_SIZE, VERTEX_DATA);
+    glEnableVertexAttribArray(aPositionLocation);
+
+    glVertexAttribPointer(aTextureCoordinatesLocation, POSITION_COMPONENT_COUNT,
+                          GL_FLOAT, false, STRIDE_SIZE, &VERTEX_DATA[POSITION_COMPONENT_COUNT]);
+    glEnableVertexAttribArray(aTextureCoordinatesLocation);
+
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
+
+    eglSwapBuffers(EGL2.eglDisplay, EGL2.eglSurface);
+}
+
+void EglGpuRender::RenderSurface(uint8_t *pixel)
+{
+    if (EGL2.quit) {
+        glDisable(GL_TEXTURE_2D);
+        glDeleteTextures(1, &EGL2.mTextureID);
+        glDeleteProgram(EGL2.glProgram);
+        return;
+    }
+
+    if (EGL2.pause) {
+        return;
+    }
+
+    renderPixel(pixel, 1);
 }
 
 /**
@@ -214,69 +338,18 @@ GLint compileShader(const char *code, GLenum type)
 }
 
 /**
- * Draw by CPU.
- *
- * @param color Color to draw (ARGB).
- */
-void TextureView::drawRGBColor(uint32_t argb)
-{
-    if (g_nativeWindow == nullptr) {
-        LOGE("g_nativeWindow nullptr error");
-        return;
-    }
-    const int hOut = 1;
-    const int wOut = 1;
-    // -*-*-*-*-*-*- CPU rendering -*-*-*-*-*-*-
-    // For our example, scale the surface to 1×1 pixel and fill it with a color
-    auto ret = ANativeWindow_setBuffersGeometry(::g_nativeWindow, wOut, hOut,
-                                                AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
-            // WINDOW_FORMAT_RGBA_8888
-    );
-    if (ret != 0) {
-        LOGE("Failed to set buffers geometry");
-        return;
-    }
-
-    ANativeWindow_Buffer surface;
-    ARect bounds{0, 0, 1, 1};
-    ret = ANativeWindow_lock(g_nativeWindow, &surface, &bounds);
-    if (ret != 0) {
-        LOGE("Failed to lock");
-        return;
-    }
-    // TODO Locked bounds can be larger than requested, we should check them
-    auto *dest = static_cast<uint32_t *>(surface.bits);
-    // Value in color is ARGB but the surface expects RGBA
-    dest[0] = argb >> 16;
-    dest[1] = argb >> 8;
-    dest[2] = argb >> 0;
-    dest[3] = argb >> 24;
-
-    if (ANativeWindow_unlockAndPost(g_nativeWindow) != 0) {
-        LOGE("Failed to post window");
-        return;
-    }
-    LOGD("Draws %08x using Native Window", argb);
-}
-
-void TextureView::Unlock()
-{
-    ANativeWindow_unlockAndPost(g_nativeWindow);
-}
-
-/**
  * Draw by OpenGL.
  *
  * @param color Color to draw (ARGB).
  */
-int TextureView::drawRGBColor(size_t height, size_t width)
+int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
 {
     if (g_fileDesc == nullptr) {
         LOGE("file describer is nullptr");
         return -1;
     }
     // -*-*-*-*-*-*- OpenGL rendering -*-*-*-*-*-*-
-    if (EGL2.surface == nullptr) {
+    if (EGL2.eglSurface == nullptr) {
         LOGE("surface is nullptr");
         return -1;
     }
@@ -285,7 +358,7 @@ int TextureView::drawRGBColor(size_t height, size_t width)
      * current context and the easiest way to keep track of the current surface is to change it on
      * each draw so that's what is shown here. Each thread has its own current context and one
      * context cannot be current on multiple threads at the same time. */
-    if (!eglMakeCurrent(EGL2.display, EGL2.surface, EGL2.surface, EGL2.context)) {
+    if (!eglMakeCurrent(EGL2.eglDisplay, EGL2.eglSurface, EGL2.eglSurface, EGL2.eglContext)) {
         LOGE("Failed to attach context");
         return -2;
     }
@@ -527,7 +600,7 @@ int TextureView::drawRGBColor(size_t height, size_t width)
         //三维绘制
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        EGLBoolean stat = eglSwapBuffers(EGL2.display, EGL2.surface);
+        EGLBoolean stat = eglSwapBuffers(EGL2.eglDisplay, EGL2.eglSurface);
         if (stat == EGL_FALSE) {
             LOGE("Draws %08x status EGL_FALSE", *pixel[i]);
         } else {

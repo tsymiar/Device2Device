@@ -10,7 +10,7 @@
 namespace EglShader {
     GLuint CreateProgram(const char *pVertexShaderSource, const char *pFragShaderSource, GLuint &vertexShaderHandle, GLuint &fragShaderHandle);
     void DeleteProgram(GLuint &program);
-    GLuint LoadShader(GLenum shaderType, const char *pSource);
+    GLuint GetShader(GLenum shaderType, const char *pSource);
     void CheckGLError(const char *pGLOperation);
 }
 

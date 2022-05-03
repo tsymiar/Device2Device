@@ -33,11 +33,13 @@ JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv *, jclass clazz);
 JNIEXPORT void
 CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass clazz, jstring method, jint action,
                               jstring content, jboolean statics = JNI_TRUE);
-JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring url);
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint selection);
+CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject texture, jstring file);
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateTextureFile)(JNIEnv *env, jclass, jobject texture, jstring file);
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateTextureView)(JNIEnv *env, jclass, jobject texture, jint selection);
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);

@@ -10,9 +10,10 @@
 #include <time/TimeStamp.h>
 #include <Scadup/Scadup.h>
 #include <message/Message.h>
+#include <files/FileUtils.h>
 #include <network/KcpEmulator.h>
-#include <gles/EglSurface.h>
-#include <gles/TextureView.h>
+#include <gles/EglGpuRender.h>
+#include <gles/CpuTextureView.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
 
@@ -21,6 +22,7 @@ extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
 extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
+extern long g_fileSize;
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -187,39 +189,55 @@ CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
     return JNI_TRUE;
 }
 
+extern void renderPixel(uint8_t *pixel, size_t len);
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture, jstring url)
+CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject texture, jstring file)
 {
-    int jvs = TextureView::loadSurfaceView(env, texture);
+    int jvs = CpuTextureView::loadSurfaceView(env, texture);
     if (jvs > 0) {
         LOGI("loaded Surface class: %x", jvs);
     }
-    const char *filename = env->GetStringUTFChars(url, JNI_FALSE);
-    ANativeWindow *window = EglSurface::InitGLSurface();
-    EglSurface::ReadGLFile(filename);
-    if (window != nullptr) {
+    const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+    ANativeWindow *window = EglGpuRender::OpenGLSurface();
+    unsigned char * pixel = FileUtils::readLocalFile(filename);
+    EglGpuRender::MakeGLTexture(1280, 720);
+    if (pixel != nullptr && window != nullptr) {
         LOGD("OpenGL rendering initialized");
-        TextureView::drawRGBColor(1280, 720);
+        FileUtils::readBinaryFile(filename, 1280*720, renderPixel);
+        // EglGpuRender::RenderSurface(pixel);
     } else {
         LOGE("native window = null while initOpenGL.");
     }
-    env->ReleaseStringUTFChars(url, filename);
+    env->ReleaseStringUTFChars(file, filename);
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item)
+CPP_FUNC_VIEW(updateTextureFile)(JNIEnv *env, jclass, jobject texture, jstring file)
 {
-    using namespace TextureView;
-    if (item != 1 && item != 2) {
-        int jvs = loadSurfaceView(env, texture);
-        if (jvs > 0) {
-            LOGI("loaded Surface class: %x", jvs);
-        }
+    int jvs = CpuTextureView::loadSurfaceView(env, texture);
+    if (jvs > 0) {
+        LOGI("loaded Surface class: %x", jvs);
     }
+    const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+    ANativeWindow *window = EglGpuRender::OpenGLSurface();
+    uint8_t *pixel = FileUtils::readLocalFile(filename);
+    Statics::printBuffer((char*)pixel, g_fileSize);
+    if (window != nullptr) {
+        LOGD("OpenGL rendering initialized");
+        EglGpuRender::DrawRGBTexture(1280, 720);
+    } else {
+        LOGE("native window = null while initOpenGL.");
+    }
+    env->ReleaseStringUTFChars(file, filename);
+}
+
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateTextureView)(JNIEnv *env, jclass, jobject texture, jint item)
+{
     switch (item) {
         case 0:
             // No implementation selected
-            LOGD("De-initialized");
+            LOGD("De-initialize");
             return;
         case 1: {
             LOGD("CPU rendering initialized");
@@ -233,11 +251,16 @@ CPP_FUNC_VIEW(updateSurfaceView)(JNIEnv *env, jclass, jobject texture, jint item
                     0xaa0055ff,
                     0xffffffff
             };
-            drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+            int jvs = CpuTextureView::loadSurfaceView(env, texture);
+            if (jvs > 0) {
+                LOGI("loaded Surface class: %x", jvs);
+            }
+            CpuTextureView::drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
             break;
         }
-        case 3:
-            Unlock();
+        case 4:
+            EglGpuRender::CloseGLSurface();
+            CpuTextureView::releaseSurfaceView(env);
             break;
         default:
             Message::instance().setMessage("Rendering initialize fail", TOAST);
@@ -257,7 +280,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <unistd.h>
 #include <iostream>
-#include <files/Pcm2Wav.h>
+#include <audio/Pcm2Wav.h>
 #include <network/UdpSocket.h>
 #include <network/TcpSocket.h>
 

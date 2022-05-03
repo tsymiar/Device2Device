@@ -10,7 +10,7 @@
 #endif
 #include <Utils/logging.h>
 
-GLuint EglShader::LoadShader(GLenum shaderType, const char *pSource)
+GLuint EglShader::GetShader(GLenum shaderType, const char *pSource)
 {
     GLuint shader = 0;
     shader = glCreateShader(shaderType);
@@ -30,7 +30,7 @@ GLuint EglShader::LoadShader(GLenum shaderType, const char *pSource)
                 if (buf)
                 {
                     glGetShaderInfoLog(shader, infoLen, NULL, buf);
-                    LOGI("GLUtils::LoadShader Could not compile shader %d:\n%s\n", shaderType, buf);
+                    LOGI("GetShader Could not compile shader %d:\n%s", shaderType, buf);
                     free(buf);
                 }
                 glDeleteShader(shader);
@@ -44,19 +44,22 @@ GLuint EglShader::LoadShader(GLenum shaderType, const char *pSource)
 GLuint EglShader::CreateProgram(const char *pVertexShaderSource, const char *pFragShaderSource, GLuint &vertexShaderHandle, GLuint &fragShaderHandle)
 {
     GLuint program = 0;
-    vertexShaderHandle = LoadShader(GL_VERTEX_SHADER, pVertexShaderSource);
+    vertexShaderHandle = GetShader(GL_VERTEX_SHADER, pVertexShaderSource);
     if (!vertexShaderHandle) return program;
 
-    fragShaderHandle = LoadShader(GL_FRAGMENT_SHADER, pFragShaderSource);
+    fragShaderHandle = GetShader(GL_FRAGMENT_SHADER, pFragShaderSource);
     if (!fragShaderHandle) return program;
 
     program = glCreateProgram();
     if (program)
     {
+        // Attaches a shader object to a program object
         glAttachShader(program, vertexShaderHandle);
         CheckGLError("glAttachShader");
         glAttachShader(program, fragShaderHandle);
         CheckGLError("glAttachShader");
+        // Bind vPosition to attribute 0
+        glBindAttribLocation(program, 0, "vPosition");
         glLinkProgram(program);
         GLint linkStatus = GL_FALSE;
         glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
@@ -77,7 +80,7 @@ GLuint EglShader::CreateProgram(const char *pVertexShaderSource, const char *pFr
                 if (buf)
                 {
                     glGetProgramInfoLog(program, bufLength, NULL, buf);
-                    LOGI("GLUtils::CreateProgram Could not link program:\n%s\n", buf);
+                    LOGI("CreateProgram Could not link program:\n%s", buf);
                     free(buf);
                 }
             }
@@ -85,13 +88,13 @@ GLuint EglShader::CreateProgram(const char *pVertexShaderSource, const char *pFr
             program = 0;
         }
     }
-    LOGI("GLUtils::CreateProgram program = %d", program);
+    LOGI("CreateProgram: %d", program);
     return program;
 }
 
 void EglShader::DeleteProgram(GLuint &program)
 {
-    LOGI("GLUtils::DeleteProgram");
+    LOGI("DeleteProgram");
     if (program)
     {
         glUseProgram(0);
@@ -100,10 +103,10 @@ void EglShader::DeleteProgram(GLuint &program)
     }
 }
 
-void EglShader::CheckGLError(const char *pGLOperation)
+void EglShader::CheckGLError(const char *operation)
 {
     for (GLint error = glGetError(); error; error = glGetError())
     {
-        LOGI("GLUtils::CheckGLError GL Operation %s() glError (0x%x)\n", pGLOperation, error);
+        LOGE("CheckGLError GL Operation %s() glError (0x%x)", operation, error);
     }
 }
