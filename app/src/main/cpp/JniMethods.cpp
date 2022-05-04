@@ -57,9 +57,11 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
         jclass objectClass = env->FindClass("com/tsymiar/devidroid/data/Receiver");
         jfieldID value = (env)->GetFieldID(objectClass, "message", "Ljava/lang/String;");
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
-        env->SetObjectField(clazz, value, env->NewStringUTF(receiving.message.c_str()));
+        jstring msg = env->NewStringUTF(receiving.message.c_str());
+        env->SetObjectField(clazz, value, msg);
         env->SetIntField(clazz, key, (int) receiving.massager);
-        LOGI("message pop %d %s", receiving.massager, receiving.message.c_str());
+        LOGI("message pop [%d], %s", receiving.massager, receiving.message.c_str());
+        env->DeleteLocalRef(msg);
         return clazz;
     } else {
         return nullptr;
@@ -189,7 +191,6 @@ CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
     return JNI_TRUE;
 }
 
-extern void renderPixel(uint8_t *pixel, size_t len);
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject texture, jstring file)
 {
@@ -199,12 +200,10 @@ CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject texture, jstring fil
     }
     const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
     ANativeWindow *window = EglGpuRender::OpenGLSurface();
-    unsigned char * pixel = FileUtils::readLocalFile(filename);
     EglGpuRender::MakeGLTexture(1280, 720);
-    if (pixel != nullptr && window != nullptr) {
+    if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
-        FileUtils::readBinaryFile(filename, 1280*720, renderPixel);
-        // EglGpuRender::RenderSurface(pixel);
+        FileUtils::readBinaryFile(filename, 1280 * 720, EglGpuRender::RenderSurface);
     } else {
         LOGE("native window = null while initOpenGL.");
     }
@@ -221,7 +220,6 @@ CPP_FUNC_VIEW(updateTextureFile)(JNIEnv *env, jclass, jobject texture, jstring f
     const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
     ANativeWindow *window = EglGpuRender::OpenGLSurface();
     uint8_t *pixel = FileUtils::readLocalFile(filename);
-    Statics::printBuffer((char*)pixel, g_fileSize);
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
         EglGpuRender::DrawRGBTexture(1280, 720);
@@ -280,13 +278,13 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 
 #include <unistd.h>
 #include <iostream>
-#include <audio/Pcm2Wav.h>
+#include <decode/Pcm2Wav.h>
 #include <network/UdpSocket.h>
 #include <network/TcpSocket.h>
-
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>
-static int g_msgLen;
+
+static int g_msgLen = 6;
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
@@ -300,7 +298,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     std::string txt = Jstring2Cstring(env, text);
     const char *tx = txt.c_str();
     std::string message;
-    message = "text = [" + txt + "](" + std::to_string(len) + ")";
+    message = "text(" + std::to_string(len) + ") = [" + txt + "]";
     Message::instance().setMessage(message, UDP_CLIENT);
     LOGI("%s", message.c_str());
     g_msgLen = len;
@@ -332,9 +330,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass)
                 auto *sock = new UdpSocket();
                 int size;
                 do {
+                    std::string message = "udp receiver starting";
+                    Message::instance().setMessage(message, UDP_SERVER);
                     size = sock->Receiver(msg, total, callback);
-                    std::string message = "UdpSocket Receiver bind success";
-                    Message::instance().setMessage(message, TOAST);
                     usleep(10000);
                 } while (size != 0);
                 delete sock;
@@ -371,7 +369,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv *, jclass)
         KcpEmulator emulator;
         emulator.KcpRun(index);
         char hint[64];
-        sprintf(hint, "Kcp emulator run in mode: %d.", index);
+        sprintf(hint, "Kcp emulator finish in mode: %d.", index);
         Message::instance().setMessage(hint, TOAST);
         if (index > 2)
             index = 0;

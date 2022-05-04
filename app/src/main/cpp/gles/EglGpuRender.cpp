@@ -11,6 +11,8 @@
 #include <cerrno>
 #include <utils/statics.h>
 #include "EglShader.h"
+#include "decode/Yuv2Rgb.h"
+
 #define BYTES_PER_FLOAT 4
 #define POSITION_COMPONENT_COUNT 2
 #define TEXTURE_COORDINATES_COMPONENT_COUNT 2
@@ -24,34 +26,7 @@ namespace {
 EGL2 EGL2{};
 ANativeWindow *g_nativeWindow = nullptr;
 extern FILE *g_fileDesc;
-/*
-GLbyte vShaderStr[] =
-        "attribute vec4 vPosition;    \n"
-        "attribute vec2 a_texCoord;   \n"
-        "varying vec2 tc;             \n"
-        "void main()                  \n"
-        "{                            \n"
-        "   gl_Position = vPosition;  \n"
-        "   tc = a_texCoord;          \n"
-        "}                            \n";
 
-GLbyte fShaderStr[] =
-        "precision mediump float;     \n"
-        "uniform sampler2D tex_y;     \n"
-        "uniform sampler2D tex_u;     \n"
-        "uniform sampler2D tex_v;     \n"
-        "varying vec2 tc;             \n"
-        "void main()                  \n"
-        "{                            \n"
-        "  vec4 c = vec4((texture2D(tex_y, tc).r - 16./255.) * 1.164);\n"
-        "  vec4 U = vec4(texture2D(tex_u, tc).r - 128./255.);\n"
-        "  vec4 V = vec4(texture2D(tex_v, tc).r - 128./255.);\n"
-        "  c += V * vec4(1.596, -0.813, 0, 0);\n"
-        "  c += U * vec4(0, -0.392, 2.017, 0);\n"
-        "  c.a = 1.0;\n"
-        "  gl_FragColor = c;\n"
-        "}                  \n";
-*/
 GLbyte vShaderStr[] = "attribute vec4 a_Position;                          \n"
                       "attribute vec2 a_TextureCoordinates;                \n"
                       "varying vec2 v_TextureCoordinates;                  \n"
@@ -157,7 +132,7 @@ void EglGpuRender::CloseGLSurface()
     EGL2.eglDisplay = nullptr;
 }
 
-int EglGpuRender::MakeGLTexture(int width, int height)
+int EglGpuRender::MakeGLTexture(int height, int width)
 {
     if (EGL2.eglSurface == nullptr) {
         LOGE("surface is nullptr");
@@ -182,6 +157,10 @@ int EglGpuRender::MakeGLTexture(int width, int height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glEnable(GL_TEXTURE_2D);
 
+    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
+                            0.0f };
+    // Set the viewport
+    // glViewport(0, 0, EGL2.width, EGL2.height);
     return 0;
 }
 
@@ -202,20 +181,15 @@ void setUniforms(int uTextureUnitLocation, int textureId) {
 
 void renderPixel(uint8_t *pixel, size_t)
 {
-    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
-                            0.0f };
-    // Set the viewport
-    glViewport(0, 0, EGL2.width, EGL2.height);
-
     // Use the program object
     glUseProgram(EGL2.glProgram);
     // Clear the color buffer
-    // glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     // RGB format needed: pixel
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, EGL2.width,
                  EGL2.height, 0, GL_RGB,
-                 GL_UNSIGNED_SHORT_5_6_5, pixel);
+                 GL_UNSIGNED_SHORT_5_6_5, (int*)pixel);
 
     // Retrieve uniform locations for the shader program.
     GLint uTextureUnitLocation = glGetUniformLocation(EGL2.glProgram,
@@ -247,7 +221,7 @@ void renderPixel(uint8_t *pixel, size_t)
     eglSwapBuffers(EGL2.eglDisplay, EGL2.eglSurface);
 }
 
-void EglGpuRender::RenderSurface(uint8_t *pixel)
+void EglGpuRender::RenderSurface(uint8_t *pixel, size_t len)
 {
     if (EGL2.quit) {
         glDisable(GL_TEXTURE_2D);
@@ -260,7 +234,14 @@ void EglGpuRender::RenderSurface(uint8_t *pixel)
         return;
     }
 
-    renderPixel(pixel, 1);
+    int h = (int)(EGL2.height * 2);
+    int w = (int)(EGL2.width / 4);
+
+    int *buff = new int[len];
+    Statics::printBuffer((char*)pixel, len);
+    Yuv2Rgb::convertYUV420SPToARGB8888((char*)pixel, h, w, buff);
+    renderPixel((uint8_t*)buff, len);
+    delete[] buff;
 }
 
 /**

@@ -85,7 +85,7 @@ public class WaveActivity extends AppCompatActivity {
 
     File mFile;
     Thread mLoadSoundFileThread;
-    SoundFile mSoundFile;
+    SoundFile mSoundFile = new SoundFile(this);
     boolean mLoadingKeepGoing;
     static SamplePlayer mPlayer;
     float mDensity;

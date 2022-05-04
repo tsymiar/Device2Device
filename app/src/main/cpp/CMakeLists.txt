@@ -21,9 +21,9 @@ include_directories(
 if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
-add_subdirectory(audio)
 add_subdirectory(time)
 add_subdirectory(gles)
+add_subdirectory(decode)
 add_subdirectory(network)
 add_subdirectory(callback)
 # add_subdirectory(template)
@@ -85,7 +85,7 @@ target_link_libraries( # Specifies the target library.
         jniComm
         # template
         ${PROJECT_SOURCE_DIR}/scadup/jniLibs/${ANDROID_ABI}/libscadup.so
-        Network audiotools callback timestamp texture
+        Network converter callback timestamp texture
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})

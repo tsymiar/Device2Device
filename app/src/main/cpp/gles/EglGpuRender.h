@@ -48,9 +48,9 @@ namespace EglGpuRender {
 
     void CloseGLSurface();
 
-    void RenderSurface(uint8_t *pixel);
+    void RenderSurface(uint8_t *pixel, size_t len);
 
-    int MakeGLTexture(int width, int height);
+    int MakeGLTexture(int height, int width);
 
     int DrawRGBTexture(size_t height, size_t width);
 }

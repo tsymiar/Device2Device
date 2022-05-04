@@ -16,7 +16,9 @@
 
 package com.tsymiar.devidroid.utils;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaCodec;
@@ -28,6 +30,8 @@ import android.os.Environment;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -65,7 +69,11 @@ public class SoundFile {
     private int[] mFrameLens;
     private int[] mFrameOffsets;
     private float mNumFramesFloat;
+    private AppCompatActivity context = null;
 
+    public SoundFile(AppCompatActivity activity) {
+        context = activity;
+    }
 
     public float getNumFramesFloat() {
         return mNumFramesFloat;
@@ -222,7 +230,7 @@ public class SoundFile {
         // find and select the first audio track present in the file.
         for (i = 0; i < numTracks; i++) {
             format = extractor.getTrackFormat(i);
-            if (format.getString(MediaFormat.KEY_MIME).startsWith("audio/")) {
+            if (format.getString(MediaFormat.KEY_MIME).startsWith("decode/")) {
                 extractor.selectTrack(i);
                 break;
             }
@@ -262,7 +270,7 @@ public class SoundFile {
             if (!done_reading && inputBufferIndex >= 0) {
                 sample_size = extractor.readSampleData(inputBuffers[inputBufferIndex], 0);
                 if (firstSampleData
-                        && format.getString(MediaFormat.KEY_MIME).equals("audio/mp4a-latm")
+                        && format.getString(MediaFormat.KEY_MIME).equals("decode/mp4a-latm")
                         && sample_size == 2) {
                     // For some reasons on some devices (e.g. the Samsung S3) you should not
                     // provide the first two bytes of an AAC stream, otherwise the MediaCodec will
@@ -431,6 +439,16 @@ public class SoundFile {
         if (minBufferSize < mSampleRate * 2) {
             minBufferSize = mSampleRate * 2;
         }
+        if (context != null && ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
         AudioRecord audioRecord = new AudioRecord(
                 MediaRecorder.AudioSource.DEFAULT,
                 mSampleRate,
@@ -526,7 +544,7 @@ public class SoundFile {
         // Some devices have problems reading mono AAC files (e.g. Samsung S3). Making it stereo.
         int numChannels = (mChannels == 1) ? 2 : mChannels;
 
-        String mimeType = "audio/mp4a-latm";
+        String mimeType = "decode/mp4a-latm";
         int bitrate = 64000 * numChannels;  // rule of thumb for a good quality: 64kbps per channel.
         MediaCodec codec = MediaCodec.createEncoderByType(mimeType);
         MediaFormat format = MediaFormat.createAudioFormat(mimeType, mSampleRate, numChannels);

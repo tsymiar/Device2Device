@@ -11,6 +11,7 @@
 #define LOG_TAG "CpuTextureView"
 #endif
 #include <Utils/logging.h>
+#include <message/Message.h>
 
 extern FILE *g_fileDesc;
 extern unsigned char *g_fileContent;
@@ -153,7 +154,9 @@ void CpuTextureView::drawRGBColor(uint32_t argb)
     ARect bounds{0, 0, 1, 1};
     ret = ANativeWindow_lock(g_nativeWindow, &surface, &bounds);
     if (ret != 0) {
-        LOGE("Failed to lock");
+        std::string hint = "Native window may busy";
+        Message::instance().setMessage(hint, TOAST);
+        LOGE("%s", hint.c_str());
         return;
     }
     // TODO Locked bounds can be larger than requested, we should check them
