@@ -30,14 +30,15 @@ steps:
     Contents: '**'
     RemoveSourceFolder: true
     RemoveDotFiles: true
-- script: cd Device2Device && ls -al
+
+- script: pwd && ls -al
   workingDirectory: 'Device2Device'
   displayName: List contents
 
 - task: Gradle@1
   inputs:
     workingDirectory: 'Device2Device'
-    gradleWrapperFile: 'gradlew'
+    gradleWrapperFile: 'Device2Device/gradlew'
     gradleOptions: '-Xmx3072m'
     javaHomeOption: 'JDKVersion'
     jdkVersionOption: '1.8'
