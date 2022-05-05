@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="@color/grey"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/sendingTextView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:autoLink="all"
+        android:text="@string/sdcard_device2device"
+        android:textAlignment="center"
+        android:textColor="@color/menu_submenu"
+        tools:ignore="ObsoleteLayoutParam" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:layout_below="@id/sendingTextView1"
+        tools:ignore="ObsoleteLayoutParam" />
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/switch0"
+            android:layout_width="90sp"
+            android:layout_height="90sp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/switch0"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/right"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toEndOf="@id/switch0"
+            android:layout_toRightOf="@id/switch0"
+            android:src="@drawable/arr_right"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/up"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_above="@id/switch0"
+            android:layout_centerHorizontal="true"
+            android:src="@drawable/arr_up"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/left"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/switch0"
+            android:layout_toLeftOf="@id/switch0"
+            android:src="@drawable/arr_left"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/down"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_below="@id/switch0"
+            android:layout_centerHorizontal="true"
+            android:src="@drawable/arr_down"
+            tools:ignore="ContentDescription" />
+
+        <Button
+            android:id="@+id/btn0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/edit_text"
+            android:layout_centerHorizontal="true"
+            android:text="@string/_0" />
+
+        <ImageView
+            android:id="@+id/imageView2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/btn0"
+            android:layout_toEndOf="@id/edit_text"
+            android:layout_toRightOf="@id/edit_text"
+            android:src="@drawable/btn_send"
+            tools:ignore="ContentDescription" />
+
+        <EditText
+            android:id="@+id/edit_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_toStartOf="@id/imageView2"
+            android:layout_toLeftOf="@id/imageView2"
+            android:layout_weight="2"
+            android:width="70dp"
+            android:hint="@string/edit_text"
+            android:inputType="textCapCharacters"
+            android:maxLength="8"
+            android:textColor="@android:color/background_dark"
+            android:textColorHint="#779988"
+            android:textIsSelectable="false"
+            android:typeface="monospace"
+            tools:ignore="ObsoleteLayoutParam,RelativeOverlap" />
+
+        <TextView
+            android:id="@+id/sdt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@+id/imageView2"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentLeft="true"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:textColor="@color/black"
+            tools:ignore="NotSibling" />
+
+    </RelativeLayout>
+
+</LinearLayout>
