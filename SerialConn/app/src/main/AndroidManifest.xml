@@ -4,6 +4,10 @@
     tools:ignore="MissingVersion">
 
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -12,11 +16,11 @@
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/AppName"
-        android:theme="@style/AppTheme"
-        tools:targetApi="donut">
+        android:theme="@style/AppTheme">
 
         <activity
             android:name="com.tsymiar.SerialConn.MainActivity"
+            android:exported="true"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -26,6 +30,7 @@
 
         <activity
             android:name="com.tsymiar.SerialConn.ConnectActivity"
+            android:exported="true"
             android:label="@string/title">
             <intent-filter>
                 <action android:name="android.intent.action.CONNECTION" />
@@ -35,6 +40,7 @@
         <activity
             android:name="com.tsymiar.SerialConn.TransferActivity"
             android:alwaysRetainTaskState="true"
+            android:exported="true"
             android:label="@string/window"
             android:theme="@style/AppDialog"
             tools:ignore="NewApi">
@@ -47,12 +53,13 @@
             android:name="com.tsymiar.SerialConn.DeviceListActivity"
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/title_activity_e"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullSensor"
             android:theme="@android:style/Theme.Holo.Dialog"
             tools:ignore="NewApi" />
 
         <activity
             android:name="com.tsymiar.SerialConn.MyGitActivity"
+            android:exported="true"
             android:screenOrientation="unspecified"
             android:theme="@style/AppDialog">
             <intent-filter>
@@ -67,6 +74,7 @@
 
         <activity
             android:name="com.tsymiar.SerialConn.BuggerActivity"
+            android:exported="true"
             android:screenOrientation="unspecified"
             android:theme="@style/AppDialog">
             <intent-filter>
@@ -108,7 +116,7 @@
         <service android:name="com.tsymiar.SerialConn.ReceiverService" />
         <service android:name="com.tsymiar.SerialConn.Sensor.SensorService" />
         <service android:name="com.tsymiar.SerialConn.ShowViewService" />
-        <service android:name="com.tsymiar.SerialConn.MiniService" />
+        <service android:name="com.tsymiar.SerialConn.WindowService" />
 
         <meta-data
             android:name="InstallChannel"

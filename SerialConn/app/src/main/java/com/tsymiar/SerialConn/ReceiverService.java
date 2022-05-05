@@ -37,7 +37,7 @@ public class ReceiverService extends Service {
     private float y;
     private long mLastTime, mCurTime;
 
-    @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
+    @androidx.annotation.RequiresApi(api = Build.VERSION_CODES.M)
     @SuppressLint("InflateParams")
     @Override
     public void onCreate() {
@@ -46,7 +46,7 @@ public class ReceiverService extends Service {
         Context context = this.getApplicationContext();
         Intent notificationIntent = new Intent(this, DeviceListActivity.class);
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(context)
                 .setAutoCancel(true)
                 .setContentTitle(getText(R.string.edit_text))
@@ -106,6 +106,7 @@ public class ReceiverService extends Service {
         }
     };
 
+    @SuppressLint("WrongConstant")
     private void createView() {
         wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
 

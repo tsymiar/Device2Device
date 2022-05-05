@@ -30,7 +30,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Vibrator;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -48,7 +48,7 @@ import android.widget.Toast;
 
 import com.tsymiar.SerialConn.DeviceListActivity;
 import com.tsymiar.SerialConn.ExitApplication;
-import com.tsymiar.SerialConn.MiniService;
+import com.tsymiar.SerialConn.WindowService;
 import com.tsymiar.SerialConn.R;
 
 import java.util.ArrayList;
@@ -178,7 +178,8 @@ public class SensorService extends Service {
                 Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         canvas.drawBitmap(mBitmap, matrix, mPaint);
-        canvas.save(Canvas.ALL_SAVE_FLAG);
+        // Canvas.ALL_SAVE_FLAG
+        canvas.save();
         canvas.restore();
         return bitmap;
     }
@@ -246,7 +247,7 @@ public class SensorService extends Service {
                 Toast toast = Toast.makeText(SensorService.this, getString(R.string.min), Toast.LENGTH_SHORT);
                 toast.setGravity(Gravity.BOTTOM, 0, 30);
                 toast.show();
-                Intent t = new Intent(SensorService.this, MiniService.class);
+                Intent t = new Intent(SensorService.this, WindowService.class);
                 Bundle e = new Bundle();
                 e.putString("t", getString(R.string.minimized));
                 t.putExtras(e);
@@ -267,7 +268,7 @@ public class SensorService extends Service {
                 if (msg.what == 0) if (f)
                     myview.setText(temp + "");
                 else {
-                    Intent t = new Intent(SensorService.this, MiniService.class);
+                    Intent t = new Intent(SensorService.this, WindowService.class);
                     Bundle e = new Bundle();
                     e.putString("t", temp + "");
                     t.putExtras(e);

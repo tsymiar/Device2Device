@@ -54,8 +54,8 @@
     <string name="openbt">请打开蓝牙</string>
     <string name="dbclick">双击退出界面</string>
     <string name="exitapp">双击完全退出应用</string>
-    <string name="github">https://github.com/tsymiar/Device2Device/tree/master/SerialConn</string>
-    <string name="developing">该功能尚在开发…请稍等</string>
+    <string name="github">https://github.com/tsymiar/Device2Device/tree/myapp/SerialConn</string>
+    <string name="developing">功能尚在完善…无法使用</string>
     <string name="saved">已保存。</string>
     <string name="filelocal">/Device2Device/signal.dat</string>
     <string name="data_recvd">接收的数据</string>

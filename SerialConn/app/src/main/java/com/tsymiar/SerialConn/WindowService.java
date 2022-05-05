@@ -19,7 +19,7 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 @SuppressLint("Registered")
-public class MiniService extends Service {
+public class WindowService extends Service {
     WindowManager wm = null;
 
     WindowManager.LayoutParams wmParams = null;

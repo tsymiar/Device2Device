@@ -23,7 +23,7 @@ public class ShowViewService extends Service {
 
     public void stopService(Activity me) {
         Intent intent = new Intent(me, SensorService.class);
-        Intent i_0 = new Intent(me, MiniService.class);
+        Intent i_0 = new Intent(me, WindowService.class);
         Bundle bundle = new Bundle();
         bundle.putString("temp", "");
         intent.putExtras(bundle);

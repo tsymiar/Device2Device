@@ -1,12 +1,15 @@
 package com.tsymiar.SerialConn;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,6 +33,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 import android.widget.Toast;
+
+import androidx.core.app.ActivityCompat;
 
 import java.io.File;
 import java.io.IOError;
@@ -73,8 +78,8 @@ public class TransferActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setFinishOnTouchOutside(false);
-        setContentView(R.layout.activity_transfer);
+        this.setFinishOnTouchOutside(false);
+        this.setContentView(R.layout.activity_transfer);
         ExitApplication.getInstance().addActivity(this);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
@@ -91,7 +96,7 @@ public class TransferActivity extends Activity {
         img = (ImageView) findViewById(R.id.imageView2);
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
-            public void run() {
+            public void run(){
                 assert editText != null;
                 InputMethodManager inputmanager = (InputMethodManager) editText.getContext().getSystemService(TransferActivity.INPUT_METHOD_SERVICE);
                 if (inputmanager != null) {
@@ -118,7 +123,7 @@ public class TransferActivity extends Activity {
     public void onResume() {
         super.onResume();
         Intent hint = new Intent(TransferActivity.this, ReceiverService.class);
-        Bundle ble = new Bundle();
+        android.os.Bundle ble = new android.os.Bundle();
         ble.putString("temp", getString(R.string.data_recvd));
         hint.putExtras(ble);
         sendBroadcast(hint);
@@ -128,7 +133,7 @@ public class TransferActivity extends Activity {
         ////
         Log.d(TAG, "...onResume - try connect...");
         Intent intent = this.getIntent();
-        Bundle bundle = intent.getExtras();
+        android.os.Bundle bundle = intent.getExtras();
         String address = bundle != null ? bundle.getString("address") : null;
         // Set up a pointer to the remote node using it's address.
         BluetoothDevice device = btAdapter.getRemoteDevice(address);
@@ -144,6 +149,16 @@ public class TransferActivity extends Activity {
             try {
                 btSocket = createBluetoothSocket(device);
             } catch (IOException e) {
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    return;
+                }
                 this.btAdapter.disable();
                 msg = msg + "串口已关闭。";
                 Toast.makeText(getBaseContext(), "\n" + msg + e.getMessage() + ".", Toast.LENGTH_SHORT).show();
@@ -199,7 +214,7 @@ public class TransferActivity extends Activity {
                         imageView2.setAlpha(50);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 i2.sendMessage(msg);
@@ -284,7 +299,7 @@ public class TransferActivity extends Activity {
                         switch0.setAlpha(90/*Color.GRAY, PorterDuff.Mode.LIGHTEN*/);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 h0.sendMessage(msg);
@@ -313,7 +328,7 @@ public class TransferActivity extends Activity {
                         up.setAlpha(50);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 hu.sendMessage(msg);
@@ -342,7 +357,7 @@ public class TransferActivity extends Activity {
                         right.setAlpha(50);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 hr.sendMessage(msg);
@@ -371,7 +386,7 @@ public class TransferActivity extends Activity {
                         left.setAlpha(50);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 hl.sendMessage(msg);
@@ -394,12 +409,12 @@ public class TransferActivity extends Activity {
         down.setOnTouchListener(new View.OnTouchListener() {
 
             public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
+                switch (event.getAction()){
                     case MotionEvent.ACTION_MOVE:
                         down.setAlpha(50);
                         vibrator.vibrate(50);
                         new Thread() {
-                            public void run() {
+                            public void run(){
                                 Message msg = new Message();
                                 msg.what = 0;
                                 hd.sendMessage(msg);
@@ -543,7 +558,7 @@ public class TransferActivity extends Activity {
                 // 类型转化
                 Intent ss = new Intent(TransferActivity.this, SaveDataService.class);
                 Intent rs = new Intent(TransferActivity.this, ReceiverService.class);
-                Bundle ble = new Bundle();
+                android.os.Bundle ble = new android.os.Bundle();
                 ble.putString("temp", "" + str);
                 rs.putExtras(ble);
                 ss.putExtras(ble);
@@ -557,12 +572,21 @@ public class TransferActivity extends Activity {
     };
 
     private BluetoothSocket createBluetoothSocket(BluetoothDevice device) throws IOException {
-        try {
+        try{
             final Method m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class);
-            return (BluetoothSocket) m.invoke(device, MY_UUID);
+            return (BluetoothSocket)m.invoke(device, MY_UUID);
         } catch (Exception e) {
             Log.e(TAG, "Could not create Insecure RFComm Connection", e);
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT);// TODO: Consider calling
+        }
+//    ActivityCompat#requestPermissions
+// here to request the missing permissions, and then overriding
+//   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+//                                          int[] grantResults)
+// to handle the case where the user grants the permission. See the documentation
+// for ActivityCompat#requestPermissions for more details.
         return device.createRfcommSocketToServiceRecord(MY_UUID);
     }
 
@@ -570,7 +594,7 @@ public class TransferActivity extends Activity {
 
         // Check for Bluetooth support and then check to make sure it is turned on
         // Emulator doesn't support Bluetooth and will return null
-        if (btAdapter == null) {
+        if(btAdapter == null) {
             errorExit("Fatal Error", "Bluetooth not support");
         } else {
             if (btAdapter.isEnabled()) {
@@ -579,6 +603,16 @@ public class TransferActivity extends Activity {
                 this.finish();
                 // Prompt user to turn on Bluetooth
                 Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    return;
+                }
                 startActivityForResult(enableBtIntent, 1);
             }
         }
@@ -589,20 +623,31 @@ public class TransferActivity extends Activity {
         finish();
     }
 
-    @SuppressLint("WrongConstant")
+    @SuppressLint({"WrongConstant", "RtlHardcoded"})
     private void sendData(String message) {
         byte[] msgBuffer = message.getBytes();
         String hint = "数据发送不成功。";
         Log.d(TAG, "...Send data: " + message + "...");
         try {
             outStream.write(msgBuffer);
-            if (message == null || message.equals(" ") || message.equals("")) message = "null";
-            if (!(btAdapter.getState() == BluetoothAdapter.STATE_DISCONNECTED)) {
-                toast = Toast.makeText(getBaseContext(), message + "\n已发送。", Toast.LENGTH_SHORT);
-                toast.setGravity(53, 50, 100);
+            if(message.equals(" ") || message.isEmpty()) message = "null";
+            if(!(btAdapter.getState() == BluetoothAdapter.STATE_DISCONNECTED)) {
+                toast = Toast.makeText(getBaseContext(), message + "\n已发送。"+message.getBytes().length, Toast.LENGTH_SHORT);
+                toast.setGravity(Gravity.RIGHT,0,10);
                 toast.show();
             }
+
         } catch (IOException e) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
             this.btAdapter.disable();
             Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableIntent, 2);

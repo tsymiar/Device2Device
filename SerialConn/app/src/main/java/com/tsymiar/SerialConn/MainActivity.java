@@ -1,10 +1,12 @@
 package com.tsymiar.SerialConn;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.annotation.NonNull;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
@@ -13,6 +15,9 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 
 import com.tsymiar.SerialConn.Sensor.SensorActivity;
 import com.tsymiar.SerialConn.Sensor.SensorListActivity;
@@ -37,12 +42,20 @@ public class MainActivity extends Activity {
         super.onResume();
 
         ViewGroup vg = findViewById(R.id.anim);
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                startActivity(new Intent(MainActivity.this, ConnectActivity.class));
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
             }
+            startActivity(new Intent(MainActivity.this, ConnectActivity.class));
         }, 2000);
+
         assert vg != null;
         vg.setOnClickListener(new View.OnClickListener() {
 
@@ -84,41 +97,34 @@ public class MainActivity extends Activity {
         ExitApplication.getInstance().exit();
     }
 
+    @SuppressLint("NonConstantResourceId")
     public boolean ItemSelected(MenuItem item, Activity activity) {
-        switch (item.getItemId()) {
-            case R.id.item: {
-                //
-            }
-        }
         Intent intent;
         // Handle item selection
-        switch (item.getItemId()) {
-            case R.id.sensor:
-                intent = new Intent(activity, SensorListActivity.class);
-                activity.startActivity(intent);
-                return true;
-            case R.id.chart:
-                intent = new Intent(activity, SensorActivity.class);
-                activity.startActivity(intent);
-                return true;
-            case R.id.feedback:
-                intent = new Intent(activity, BuggerActivity.class);
-                activity.startActivity(intent);
-                return true;
-            case R.id.url:
-                intent = new Intent(activity, MyGitActivity.class);
-                activity.startActivity(intent);
-                return true;
-            case R.id.more:
-                intent = new Intent(activity, ThankActivity.class);
-                activity.startActivity(intent);
-                return true;
-            case R.id.exit:
-                this.exit(activity);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        int itemId = item.getItemId();
+        if (itemId == R.id.sensor) {
+            intent = new Intent(activity, SensorListActivity.class);
+            activity.startActivity(intent);
+        } else if (itemId == R.id.chart) {
+            intent = new Intent(activity, SensorActivity.class);
+            activity.startActivity(intent);
+        } else if (itemId == R.id.feedback) {
+            intent = new Intent(activity, BuggerActivity.class);
+            activity.startActivity(intent);
+        } else if (itemId == R.id.url) {
+            intent = new Intent(activity, MyGitActivity.class);
+            activity.startActivity(intent);
+        } else if (itemId == R.id.more) {
+            intent = new Intent(activity, ThankActivity.class);
+            activity.startActivity(intent);
+        } else if (itemId == R.id.exit) {
+            this.exit(activity);
+        } else if (itemId != R.id.item) {
+            Toast.makeText(MainActivity.this, "select item", Toast.LENGTH_SHORT).show();
+        } else {
+            return false;
         }
+        return true;
     }
 
     @Override
