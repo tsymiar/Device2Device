@@ -1,0 +1,12 @@
+*.iml
+.idea*
+.gradle
+.vscode
+local.*
+.DS_Store
+test
+build
+*/build
+*/jniLibs
+*/*.cxx
+app/src
