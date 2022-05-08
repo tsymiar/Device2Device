@@ -16,7 +16,7 @@ GLuint EglShader::GetShader(GLenum shaderType, const char *pSource)
     shader = glCreateShader(shaderType);
     if (shader)
     {
-        glShaderSource(shader, 1, &pSource, NULL);
+        glShaderSource(shader, 1, &pSource, nullptr);
         glCompileShader(shader);
         GLint compiled = 0;
         glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
@@ -29,7 +29,7 @@ GLuint EglShader::GetShader(GLenum shaderType, const char *pSource)
                 char* buf = (char*) malloc((size_t)infoLen);
                 if (buf)
                 {
-                    glGetShaderInfoLog(shader, infoLen, NULL, buf);
+                    glGetShaderInfoLog(shader, infoLen, nullptr, buf);
                     LOGI("GetShader Could not compile shader %d:\n%s", shaderType, buf);
                     free(buf);
                 }
@@ -79,7 +79,7 @@ GLuint EglShader::CreateProgram(const char *pVertexShaderSource, const char *pFr
                 char* buf = (char*) malloc((size_t)bufLength);
                 if (buf)
                 {
-                    glGetProgramInfoLog(program, bufLength, NULL, buf);
+                    glGetProgramInfoLog(program, bufLength, nullptr, buf);
                     LOGI("CreateProgram Could not link program:\n%s", buf);
                     free(buf);
                 }

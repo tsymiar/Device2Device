@@ -31,13 +31,11 @@ import com.tsymiar.devidroid.event.EventNotify;
 import com.tsymiar.devidroid.service.FloatingService;
 import com.tsymiar.devidroid.service.PublishDialog;
 import com.tsymiar.devidroid.utils.JvmMethods;
+import com.tsymiar.devidroid.utils.Utils;
 import com.tsymiar.devidroid.wrapper.CallbackWrapper;
 import com.tsymiar.devidroid.wrapper.NetWrapper;
 import com.tsymiar.devidroid.wrapper.TimeWrapper;
 
-import java.math.BigInteger;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
@@ -65,56 +63,6 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         this.mServiceConnection = mServiceConnection;
     }
 
-    public static class Time {
-        int x;
-        short y;
-        char z;
-        long t;
-
-        public static int length = 16;
-
-        byte[] toByte() {
-            byte[] b = new byte[16];
-            int v = x;
-            for (int i = 0; i < 4; i++) {
-                b[i] = Integer.valueOf(v & 0xff).byteValue();
-                v = v >> 8;
-            }
-            v = y;
-            for (int i = b.length - 14; i > -1; i--) {
-                b[i] = Integer.valueOf(v & 0xff).byteValue();
-                v = v >> 8;
-            }
-            b[6] = (byte) (z >>> 8);
-            b[7] = (byte) z;
-            b[8] = (byte) (t);
-            b[9] = (byte) (t >>> 8);
-            b[10] = (byte) (t >>> 16);
-            b[11] = (byte) (t >>> 24);
-            b[12] = (byte) (t >>> 32);
-            b[13] = (byte) (t >>> 40);
-            b[14] = (byte) (t >>> 48);
-            b[15] = (byte) (t >>> 56);
-            return b;
-        }
-    }
-
-    public static String MD5(String plainText)
-    {
-        byte[] secretBytes;
-        try {
-            secretBytes = MessageDigest.getInstance("md5").digest(
-                    plainText.getBytes());
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("no such md5!");
-        }
-        StringBuilder md5code = new StringBuilder(new BigInteger(1, secretBytes).toString(16));
-        for (int i = 0; i < 32 - md5code.length(); i++) {
-            md5code.insert(0, "0");
-        }
-        return md5code.toString();
-    }
-
     @Override
     public void handle(EventEntity... event) {
         Log.i(TAG, Arrays.toString(event));
@@ -139,10 +87,13 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     tv = findViewById(R.id.txt_client);
                     tv.setText(msg.obj.toString());
                     break;
+                case Receiver.TOAST:
                 case Receiver.KAI_SUBSCRIBE:
                 case Receiver.KAI_PUBLISHER:
-                case Receiver.TOAST:
                     Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+                    break;
+                case Receiver.LOG_VIEW:
+                    TextureActivity.log(msg.obj.toString());
                     break;
                 default:
                     break;
@@ -159,7 +110,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         // a call to a native method
         TextView textView = findViewById(R.id.sample_text);
         textView.setText((new CallbackWrapper()).stringGetJNI());
-        Time time = new Time();
+        Utils.Time time = new Utils.Time();
 
         CallbackWrapper.initJvmEnv(JvmMethods.TAG);
         CallbackWrapper.callJavaMethod("hello", 0, "non-static call", false);
@@ -225,7 +176,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     time.x = (int) tv.getX();
                     time.t = System.currentTimeMillis();
                     Log.i(TAG, time.t + "\n---- " + Arrays.toString(time.toByte()));
-                    tv.setText(String.valueOf(new CallbackWrapper().timeSetJNI(time.toByte(), Time.length)));
+                    tv.setText(String.valueOf(new CallbackWrapper().timeSetJNI(time.toByte(), Utils.Time.length)));
                 }
         );
         findViewById(R.id.btn_event).setOnClickListener(
@@ -252,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         findViewById(R.id.btn_client).setOnClickListener(
                 v -> {
-                    String text = MD5(gValue + "").substring(0, 6);
+                    String text = Utils.MD5(gValue + "").substring(0, 6);
                     NetWrapper.sendUdpData(text, text.length());
                     gValue++;
                     if (wifiLock.isHeld()) {

@@ -10,6 +10,9 @@
 #include <Utils/logging.h>
 #include <cerrno>
 #include <utils/statics.h>
+#include <files/FileUtils.h>
+#include <unistd.h>
+#include <message/Message.h>
 #include "EglShader.h"
 #include "decode/Yuv2Rgb.h"
 
@@ -25,7 +28,6 @@ namespace {
 
 EGL2 EGL2{};
 ANativeWindow *g_nativeWindow = nullptr;
-extern FILE *g_fileDesc;
 
 GLbyte vShaderStr[] = "attribute vec4 a_Position;                          \n"
                       "attribute vec2 a_TextureCoordinates;                \n"
@@ -102,15 +104,16 @@ ANativeWindow *EglGpuRender::OpenGLSurface()
                                                  ::g_nativeWindow,
                                                  nullptr);
         if (EGL2.eglSurface == nullptr) {
-            LOGE("Failed to create OpenGL Window surface.");
+            Message::instance().setMessage("ERROR creating OpenGL Window surface!", LOG_VIEW);
             return nullptr;
         }
     }
-    return g_nativeWindow;
+    return ::g_nativeWindow;
 }
 
 void EglGpuRender::CloseGLSurface()
 {
+    EglShader::DeleteProgram(EGL2.glProgram);
     EGLBoolean success = eglReleaseThread();
     if (!success) {
         LOGE("eglReleaseThread failure.");
@@ -132,7 +135,12 @@ void EglGpuRender::CloseGLSurface()
     EGL2.eglDisplay = nullptr;
 }
 
-int EglGpuRender::MakeGLTexture(int height, int width)
+void EglGpuRender::SetWindowSize(int height, int width) {
+    EGL2.width = width;
+    EGL2.height = height;
+}
+
+int EglGpuRender::MakeGLTexture()
 {
     if (EGL2.eglSurface == nullptr) {
         LOGE("surface is nullptr");
@@ -148,8 +156,6 @@ int EglGpuRender::MakeGLTexture(int height, int width)
 
     // Get the attribute locations
     EGL2.positionLoc = glGetAttribLocation(EGL2.glProgram , "v_position");
-    EGL2.width = width;
-    EGL2.height = height;
 
     glGenTextures(1, &EGL2.mTextureID);
     glBindTexture(GL_TEXTURE_2D, EGL2.mTextureID);
@@ -157,10 +163,13 @@ int EglGpuRender::MakeGLTexture(int height, int width)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glEnable(GL_TEXTURE_2D);
 
-    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
-                            0.0f };
     // Set the viewport
     // glViewport(0, 0, EGL2.width, EGL2.height);
+    // Use the program object
+    glUseProgram(EGL2.glProgram);
+    // Clear the color buffer
+    glClear(GL_COLOR_BUFFER_BIT);
+
     return 0;
 }
 
@@ -181,15 +190,10 @@ void setUniforms(int uTextureUnitLocation, int textureId) {
 
 void renderPixel(uint8_t *pixel, size_t)
 {
-    // Use the program object
-    glUseProgram(EGL2.glProgram);
-    // Clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT);
-
     // RGB format needed: pixel
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, EGL2.width,
                  EGL2.height, 0, GL_RGB,
-                 GL_UNSIGNED_SHORT_5_6_5, (int*)pixel);
+                 GL_UNSIGNED_SHORT_5_6_5, pixel);
 
     // Retrieve uniform locations for the shader program.
     GLint uTextureUnitLocation = glGetUniformLocation(EGL2.glProgram,
@@ -202,18 +206,24 @@ void renderPixel(uint8_t *pixel, size_t)
     GLint aTextureCoordinatesLocation = glGetAttribLocation(
             EGL2.glProgram, "a_TextureCoordinates");
 
+    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
     // Order of coordinates: X, Y, S, T
     // Triangle Fan
-    GLfloat VERTEX_DATA[] = { 0.0f, 0.0f, 0.5f, 0.5f, -1.0f, -1.0f, 0.0f, 1.0f,
-                              1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f,
-                              0.0f, -1.0f, -1.0f, 0.0f, 1.0f };
+    GLfloat VERTEX_DATA[] = { 0.0f, 0.0f, 0.5f, 0.5f,
+                              -1.0f, -1.0f, 0.0f, 1.0f,
+                              1.0f, -1.0f, 1.0f, 1.0f,
+                              1.0f, 1.0f, 1.0f, 0.0f,
+                              -1.0f, 1.0f, 0.0f, 0.0f,
+                              -1.0f, -1.0f, 0.0f, 1.0f };
 
-    glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT,
-                          false, STRIDE_SIZE, VERTEX_DATA);
+    glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT,
+                          GL_FLOAT, false, STRIDE_SIZE,
+                          VERTEX_DATA);
     glEnableVertexAttribArray(aPositionLocation);
 
     glVertexAttribPointer(aTextureCoordinatesLocation, POSITION_COMPONENT_COUNT,
-                          GL_FLOAT, false, STRIDE_SIZE, &VERTEX_DATA[POSITION_COMPONENT_COUNT]);
+                          GL_FLOAT, false, STRIDE_SIZE,
+                          &VERTEX_DATA[POSITION_COMPONENT_COUNT]);
     glEnableVertexAttribArray(aTextureCoordinatesLocation);
 
     glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
@@ -238,9 +248,10 @@ void EglGpuRender::RenderSurface(uint8_t *pixel, size_t len)
     int w = (int)(EGL2.width / 4);
 
     int *buff = new int[len];
-    Statics::printBuffer((char*)pixel, len);
     Yuv2Rgb::convertYUV420SPToARGB8888((char*)pixel, h, w, buff);
     renderPixel((uint8_t*)buff, len);
+    // Statics::printBuffer((char*)buff, len);
+    usleep(1000);
     delete[] buff;
 }
 
@@ -323,12 +334,8 @@ GLint compileShader(const char *code, GLenum type)
  *
  * @param color Color to draw (ARGB).
  */
-int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
+int EglGpuRender::DrawRGBTexture(const char* filename)
 {
-    if (g_fileDesc == nullptr) {
-        LOGE("file describer is nullptr");
-        return -1;
-    }
     // -*-*-*-*-*-*- OpenGL rendering -*-*-*-*-*-*-
     if (EGL2.eglSurface == nullptr) {
         LOGE("surface is nullptr");
@@ -385,9 +392,9 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
     // 3D下同样道理。
     static float vers[] = {
             1.0f, -1.0f, 0.0f,  //右下
-            -1.0f, -1.0f, 0.0f, //左下
-            1.0f, 1.0f, 0.0f,   //右上
-            -1.0f, 1.0f, 0.0f,  //左上
+            -1.0f, -1.0f, 0.0f,  //左下
+            1.0f,  1.0f, 0.0f,  //右上
+            -1.0f,  1.0f, 0.0f,  //左上
     };
     GLuint attr = (GLuint) glGetAttribLocation(program, "aPosition");
     glEnableVertexAttribArray(attr);
@@ -459,7 +466,7 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
             //gpu内部格式 亮度，灰度图
             GL_LUMINANCE,
             //纹理图像的宽度和高度 拉升到全屏
-            width, height,
+            EGL2.width, EGL2.height,
             //边框大小
             0,
             //像素数据的格式 亮度，灰度图 要与上面一致
@@ -469,6 +476,7 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
             //纹理的数据(像素数据)
             NULL
     );
+    LOGI("EGL2 size [%d, %d]", EGL2.height, EGL2.width);
     //绑定纹理2。
     glBindTexture(GL_TEXTURE_2D, texts[1]);
     //调用glTexParameter设置纹理滤镜
@@ -483,7 +491,7 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
             //gpu内部格式 亮度，灰度图
             GL_LUMINANCE,
             //纹理图像的宽度和高度 拉升到全屏
-            width, height,
+            EGL2.width, EGL2.height,
             //边框大小
             0,
             //像素数据的格式 亮度，灰度图 要与上面一致
@@ -507,7 +515,7 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
             //gpu内部格式 亮度，灰度图
             GL_LUMINANCE,
             //纹理图像的宽度和高度 拉升到全屏
-            width, height,
+            EGL2.width, EGL2.height,
             //边框大小
             0,
             //像素数据的格式 亮度，灰度图 要与上面一致
@@ -519,29 +527,54 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
     );
     LOGI("glTexImage2D success");
     /**************************纹理设置********************************************/
-    unsigned char *pixel[3] = {0};
-    pixel[0] = new unsigned char[width * height];
-    pixel[1] = new unsigned char[width * height / 4];
-    pixel[2] = new unsigned char[width * height / 4];
-    if (g_fileDesc == nullptr) {
-        LOGE("Get file / url fail, G_filePtr = nullptr");
+    unsigned char *pixel[3] = {nullptr};
+    long fullSize = EGL2.width * EGL2.height;
+
+    pixel[0] = new unsigned char[fullSize];
+    pixel[1] = new unsigned char[fullSize / 4];
+    pixel[2] = new unsigned char[fullSize / 4];
+    memset(*pixel, '\0', fullSize);
+    memset(*(pixel + 1) , '\0', fullSize / 4);
+    memset(*(pixel + 2), '\0', fullSize / 4);
+
+    FILE *file = fopen(filename, "rbe");
+    if (file == nullptr) {
+        LOGE("Get file content fail, file = nullptr");
         return -5;
     }
-    fseek(g_fileDesc, 0, SEEK_END); //定位到文件末
-    int fileSize = ftell(g_fileDesc);
-    fseek(g_fileDesc, 0, SEEK_SET);
-    for (int i = 0; i < fileSize; i++) {
-        // memset(pixel[0], rgba[i], width * height);
-        // memset(pixel[1], rgba[i], width * height / 4);
-        // memset(pixel[2], rgba[i], width * height / 4);
+    fseek(file, 0, SEEK_END); //定位到文件末
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    long pictureSize = fileSize / fullSize;
+    if (pictureSize < 1) pictureSize = 1;
+    auto* rgba = new unsigned char[pictureSize];
+    memset(rgba, '\0', pictureSize);
+    fread(rgba, pictureSize, 1, file);
+
+    for (long i = 0; i < pictureSize; i++) {
+        if (i % 4 == 0) {
+            *(pixel[2] + i / 4) = rgba[i];
+        }
+        if (i % 2 == 0) {
+            *(pixel[1] + i / 2) = rgba[i];
+        }
+        *(pixel[0] + i) = rgba[i];
+//        if (*pixel + i == nullptr) {
+//            continue;
+//        }
+        memset(pixel[0], rgba[i], fullSize);
+        memset(pixel[1], rgba[i], fullSize / 4);
+        memset(pixel[2], rgba[i], fullSize / 4);
         //420 yy uu vv
-        if (feof(g_fileDesc) == 0) {
-            fread(pixel[0], 1, width * height, g_fileDesc);
-            fread(pixel[1], 1, width * height / 4, g_fileDesc);
-            fread(pixel[2], 1, width * height / 4, g_fileDesc);
+        if (feof(file) == 0) {
+            fread(pixel[0], 1, fullSize, file);
+            fread(pixel[1], 1, fullSize / 4, file);
+            fread(pixel[2], 1, fullSize / 4, file);
         } else {
             break;
         }
+
         //激活第1层纹理,绑定到创建的OpenGL纹理
         glActiveTexture(GL_TEXTURE0);
         // glBindTexture可以创建或使用一个已命名的纹理
@@ -563,20 +596,20 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
             @param format,type:表示图像的数据格式和类型
             @param pixels:子图像的纹理数据
          */
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, EGL2.width, EGL2.height, GL_LUMINANCE, GL_UNSIGNED_BYTE,
                         pixel[0]);
         //激活第2层纹理
         glActiveTexture(GL_TEXTURE0 + 1);
         glBindTexture(GL_TEXTURE_2D, texts[1]);
         //替换纹理内容
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width / 2, height / 2, GL_LUMINANCE,
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, EGL2.width / 2, EGL2.height / 2, GL_LUMINANCE,
                         GL_UNSIGNED_BYTE, pixel[1]);
 
         //激活第3层纹理
         glActiveTexture(GL_TEXTURE0 + 2);
         glBindTexture(GL_TEXTURE_2D, texts[2]);
         //替换纹理内容
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width / 2, height / 2, GL_LUMINANCE,
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, EGL2.width / 2, EGL2.height / 2, GL_LUMINANCE,
                         GL_UNSIGNED_BYTE, pixel[2]);
         //三维绘制
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -585,8 +618,12 @@ int EglGpuRender::DrawRGBTexture(size_t height, size_t width)
         if (stat == EGL_FALSE) {
             LOGE("Draws %08x status EGL_FALSE", *pixel[i]);
         } else {
-            LOGD("Draws %08x, total = %d, using OpenGL", *pixel[i], fileSize);
+            LOGD("Draws %08x, remain = %d, using OpenGL [%d, %d]", pixel[i], pictureSize - i, EGL2.height, EGL2.width);
         }
+        usleep(100);
     }
+    fclose(file);
+    delete[] rgba;
+    delete *pixel;
     return 0;
 }

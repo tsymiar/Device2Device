@@ -24,6 +24,9 @@ import androidx.annotation.StringRes;
 
 import com.github.mikephil.charting.data.Entry;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -217,4 +220,53 @@ public class Utils {
         STOPPING
     }
 
+    public static class Time {
+        public int x;
+        public short y;
+        public char z;
+        public long t;
+
+        public static int length = 16;
+
+        public byte[] toByte() {
+            byte[] b = new byte[16];
+            int v = x;
+            for (int i = 0; i < 4; i++) {
+                b[i] = Integer.valueOf(v & 0xff).byteValue();
+                v = v >> 8;
+            }
+            v = y;
+            for (int i = b.length - 14; i > -1; i--) {
+                b[i] = Integer.valueOf(v & 0xff).byteValue();
+                v = v >> 8;
+            }
+            b[6] = (byte) (z >>> 8);
+            b[7] = (byte) z;
+            b[8] = (byte) (t);
+            b[9] = (byte) (t >>> 8);
+            b[10] = (byte) (t >>> 16);
+            b[11] = (byte) (t >>> 24);
+            b[12] = (byte) (t >>> 32);
+            b[13] = (byte) (t >>> 40);
+            b[14] = (byte) (t >>> 48);
+            b[15] = (byte) (t >>> 56);
+            return b;
+        }
+    }
+
+    public static String MD5(String plainText)
+    {
+        byte[] secretBytes;
+        try {
+            secretBytes = MessageDigest.getInstance("md5").digest(
+                    plainText.getBytes());
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("no such md5!");
+        }
+        StringBuilder md5code = new StringBuilder(new BigInteger(1, secretBytes).toString(16));
+        for (int i = 0; i < 32 - md5code.length(); i++) {
+            md5code.insert(0, "0");
+        }
+        return md5code.toString();
+    }
 }

@@ -11,6 +11,7 @@
 enum MASSAGER {
     MESSAGE,
     TOAST,
+    LOG_VIEW,
     UDP_SERVER,
     UDP_CLIENT,
     SUBSCRIBER,

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.AdapterView;
@@ -17,7 +18,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.devidroid.R;
-import com.tsymiar.devidroid.wrapper.TimeWrapper;
 import com.tsymiar.devidroid.wrapper.ViewWrapper;
 
 import java.io.File;
@@ -25,6 +25,7 @@ import java.util.Locale;
 
 public class TextureActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener,
         TextureView.SurfaceTextureListener {
+    private static final String TAG = TextureActivity.class.getCanonicalName();
     /**
      * Spinner for implementation selection.
      */
@@ -38,7 +39,12 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     /**
      * Log text views.
      */
-    private final TextView[] mLog = new TextView[3];
+    private final static TextView[] mLog = new TextView[3];
+
+    private final int CPU_TEXTURE_FILE = 1;
+    private final int EGL_TEXTURE_FILE = 2;
+    private final int EGL_SURFACE_VIEW = 3;
+    private final int DISCONNECT_WINDOW = 4;
 
     @SuppressLint("SdCardPath")
     public String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
@@ -95,6 +101,13 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        ViewWrapper.setWindowSize(getWindowManager().getDefaultDisplay().getHeight(),
+                getWindowManager().getDefaultDisplay().getWidth());
+    }
+
+    @Override
     public void onNothingSelected(@NonNull AdapterView<?> parent) {
         updateSurfaceView(0);
     }
@@ -104,9 +117,6 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
                                           @IntRange(from = 1) int width,
                                           @IntRange(from = 1) int height) {
         log(String.format(Locale.ROOT, "Texture created (%d×%d)", width, height));
-        final int position = mSpinner.getSelectedItemPosition();
-        if (position >= 0)
-            updateSurfaceView(position);
     }
 
     @Override
@@ -117,36 +127,50 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         /* The surface remains valid so no reinitialization is needed but its dimensions have
          * changed. You may want to recalculate OpenGL matrix or update buffer geometry here,
          * or rather call native method that does that. */
+        ViewWrapper.setWindowSize(height, width);
     }
 
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
-        log("Texture destroyed");
         // De-initialize
-        updateSurfaceView(0);
+        ViewWrapper.unloadSurfaceView();
+        Log.i(TAG, "Texture destroyed");
         return true;
     }
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
         // Each draw updates the texture and logs on its own
+        log("Texture updated");
     }
 
     public void updateSurfaceView(@IntRange(from = 0) int item) {
-        final SurfaceTexture texture = mTextureView.getSurfaceTexture();
         String[] selValue = getResources().getStringArray(R.array.types);
-        log(String.format(Locale.ROOT, "updateSurfaceView (%d, %s)", item, selValue[item]));
-        final int EGL_TEXTURE_FILE = 2;
-        final int EGL_SURFACE_VIEW = 3;
-        String filename = DATA_DIRECTORY + "test.h264";
-        if (texture != null) {
-            if (item == EGL_TEXTURE_FILE) {
+        log(String.format(Locale.ROOT, "status: (item = %d, %s)", item, selValue[item]));
+        SurfaceTexture texture = mTextureView.getSurfaceTexture();
+        if (texture == null) {
+            return;
+        }
+        String filename = DATA_DIRECTORY + "test.jpg";
+        switch (item) {
+            case CPU_TEXTURE_FILE:
                 ViewWrapper.updateTextureFile(texture, filename);
-            } else if (item == EGL_SURFACE_VIEW) {
+                break;
+            case EGL_TEXTURE_FILE:
+                filename = DATA_DIRECTORY + "test.yuv";
                 ViewWrapper.updateEglRender(texture, filename);
-            } else { // CPU
-                ViewWrapper.updateTextureView(texture, item);
-            }
+                break;
+            case EGL_SURFACE_VIEW:
+                ViewWrapper.updateCpuRender(texture, item, filename);
+                break;
+            case DISCONNECT_WINDOW:
+                ViewWrapper.updateCpuRender(texture, item, filename);
+                mTextureView.setVisibility(View.GONE);
+                mTextureView.setVisibility(View.VISIBLE);
+                break;
+            default:
+                log("not implement item " + item);
+                break;
         }
     }
 
@@ -154,12 +178,12 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         updateSurfaceView(mSpinner.getSelectedItemPosition());
     }
 
-    private void log(@NonNull String message) {
+    public static void log(@NonNull String message) {
         for (TextView textView : mLog) {
             textView.setTextSize(14);
         }
         mLog[2].setText(mLog[1].getText());
         mLog[1].setText(mLog[0].getText());
-        mLog[0].setText(String.format(Locale.ROOT, "%s [%d]", message, TimeWrapper.getBootTimestamp()));
+        mLog[0].setText(String.format(Locale.ROOT, "%s", message));
     }
 }

@@ -4,9 +4,15 @@
 #include <jni.h>
 
 namespace CpuTextureView {
-    int loadSurfaceView(JNIEnv *env, jobject texture);
-    void drawRGBColor(uint32_t color);
+    int setupSurfaceView(JNIEnv *env, jobject texture);
+
     void releaseSurfaceView(JNIEnv *env);
+
+    void setDisplaySize(int height, int width);
+
+    void drawRGBColor(uint32_t color);
+
+    void drawPicture(const char* data);
 }
 
 #endif //DEVIDROID_CPUTEXTUREVIEW_H

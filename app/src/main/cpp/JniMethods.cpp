@@ -22,7 +22,10 @@ extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
 extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
-extern long g_fileSize;
+namespace {
+    int g_height = -1;
+    int g_width = -1;
+}
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
 {
@@ -104,7 +107,7 @@ void RecvHook(const Scadup::Message& msg) {
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
-    // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.data.body);
+    // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.payload.content);
 }
 
 JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jstring viewId, jint id) {
@@ -171,92 +174,119 @@ CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, 
                               jboolean statics)
 {
     JavaFuncCalls::GetInstance().CallBack(Jstring2Cstring(env, method),
-                                                  static_cast<int>(action),
-                                                 Jstring2Cstring(env, content).c_str(),
-                                                  statics);
+                                          static_cast<int>(action),
+                                          Jstring2Cstring(env, content).c_str(),
+                                          statics);
     JavaFuncCalls::CALLBACK call = callback;
     int val = JavaFuncCalls::GetInstance().Register(const_cast<char *>("aaa"), call);
     LOGI("callback = %p, val = %d.", call, val);
 }
 
-JNIEXPORT jboolean JNICALL
-CPP_FUNC_VIEW(setFileLocate)(JNIEnv *env, jclass, jstring filename)
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv *env, jclass, jobject texture)
 {
-    std::string file_in = Jstring2Cstring(env, filename);
-    FILE *fp_in = fopen(file_in.c_str(), "rbe");
-    if (nullptr == fp_in) {
-        LOGE("open input h264 video file failed, filename [%s]", file_in.c_str());
-        return (jboolean) JNI_FALSE;
+    if (CpuTextureView::setupSurfaceView(env, texture) <= 0) {
+        LOGI("load Surface fail");
+        return;
     }
-    return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_VIEW(unloadSurfaceView)(JNIEnv *env, jclass)
+{
+    CpuTextureView::releaseSurfaceView(env);
+}
+
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(setWindowSize)(JNIEnv *, jclass, jint height, jint width)
+{
+    g_height = height;
+    g_width = width;
+    EglGpuRender::SetWindowSize(height, width);
 }
 
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject texture, jstring file)
 {
-    int jvs = CpuTextureView::loadSurfaceView(env, texture);
-    if (jvs > 0) {
-        LOGI("loaded Surface class: %x", jvs);
+    if (CpuTextureView::setupSurfaceView(env, texture) > 0) {
+        LOGI("loaded Surface class");
     }
-    const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
     ANativeWindow *window = EglGpuRender::OpenGLSurface();
-    EglGpuRender::MakeGLTexture(1280, 720);
     if (window != nullptr) {
-        LOGD("OpenGL rendering initialized");
-        FileUtils::readBinaryFile(filename, 1280 * 720, EglGpuRender::RenderSurface);
+        extern EGL2 EGL2;
+        EglGpuRender::MakeGLTexture();
+        const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+        LOGD("OpenGL rendering initialized(%d, %d)", EGL2.width * EGL2.height);
+        FileUtils::ReadBinaryFile(filename, EGL2.width * EGL2.height, EglGpuRender::RenderSurface);
+        env->ReleaseStringUTFChars(file, filename);
+        EglGpuRender::CloseGLSurface();
     } else {
-        LOGE("native window = null while initOpenGL.");
+        LOGE("native window is null while [updateTextureFile]");
     }
-    env->ReleaseStringUTFChars(file, filename);
 }
 
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateTextureFile)(JNIEnv *env, jclass, jobject texture, jstring file)
 {
-    int jvs = CpuTextureView::loadSurfaceView(env, texture);
-    if (jvs > 0) {
-        LOGI("loaded Surface class: %x", jvs);
+    if (CpuTextureView::setupSurfaceView(env, texture) > 0) {
+        LOGI("loaded Surface class");
     }
-    const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
     ANativeWindow *window = EglGpuRender::OpenGLSurface();
-    uint8_t *pixel = FileUtils::readLocalFile(filename);
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
-        EglGpuRender::DrawRGBTexture(1280, 720);
+        const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+        EglGpuRender::DrawRGBTexture(filename);
+        env->ReleaseStringUTFChars(file, filename);
+        EglGpuRender::CloseGLSurface();
     } else {
-        LOGE("native window = null while initOpenGL.");
+        LOGE("native window is null while [updateTextureFile]");
     }
-    env->ReleaseStringUTFChars(file, filename);
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateTextureView)(JNIEnv *env, jclass, jobject texture, jint item)
-{
+CPP_FUNC_VIEW(updateCpuRender)(JNIEnv *env, jclass, jobject texture, jint item, jstring file) {
     switch (item) {
         case 0:
-            // No implementation selected
-            LOGD("De-initialize");
+            LOGD("No-implementation");
             return;
-        case 1: {
-            LOGD("CPU rendering initialized");
-            static int iteration = 0;
-            static constexpr uint32_t colors[] = {
-                    0x00000000,
-                    0x0055aaff,
-                    0x5500aaff,
-                    0xaaff0055,
-                    0xff55aa00,
-                    0xaa0055ff,
-                    0xffffffff
-            };
-            int jvs = CpuTextureView::loadSurfaceView(env, texture);
-            if (jvs > 0) {
-                LOGI("loaded Surface class: %x", jvs);
+        case 3: {
+            if (CpuTextureView::setupSurfaceView(env, texture) > 0) {
+                LOGI("loaded Surface class");
             }
-            CpuTextureView::drawRGBColor(colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+            long size = 0;
+            const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+            unsigned char *content = FileUtils::GetFileContentNeedFree(filename, size);
+            LOGD("CPU rendering initialized [%d]", size);
+            int height = -1;
+            int width = -1;
+            if (content != nullptr) {
+                if (size > 0 && size < g_height * g_width) {
+                    float rate = (float) (g_height * g_width * 1.) / (float) (size)+ 1;
+                    height = (int) (g_height * 1. / rate);
+                    width = (int) (g_width * 1. / rate);
+                }
+                CpuTextureView::setDisplaySize(height, width);
+                CpuTextureView::drawPicture((const char *) content);
+            } else {
+                static constexpr uint32_t colors[] = {
+                        0x00000000,
+                        0x0055aaff,
+                        0x5500aaff,
+                        0xaaff0055,
+                        0xff55aa00,
+                        0xaa0055ff,
+                        0xffffffff
+                };
+                static int iteration = 0;
+                CpuTextureView::drawRGBColor(
+                        colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+            }
+            CpuTextureView::releaseSurfaceView(env);
+            env->ReleaseStringUTFChars(file, filename);
+            delete[] content;
             break;
         }
         case 4:
+            LOGD("Disconnect");
             EglGpuRender::CloseGLSurface();
             CpuTextureView::releaseSurfaceView(env);
             break;
@@ -330,7 +360,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass)
                 auto *sock = new UdpSocket();
                 int size;
                 do {
-                    std::string message = "udp receiver starting";
+                    std::string message = "udp receiver starts";
                     Message::instance().setMessage(message, UDP_SERVER);
                     size = sock->Receiver(msg, total, callback);
                     usleep(10000);

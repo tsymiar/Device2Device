@@ -7,12 +7,15 @@
 
 #include <cstdint>
 #include <string>
+#include <fstream>
 
 typedef void (*FileCallback)(uint8_t *, size_t);
 
 namespace FileUtils {
-    unsigned char *readLocalFile(const char *filename);
-    long readBinaryFile(const std::string& filename, size_t maxSize, FileCallback callback);
-};
+    long GetFileSize(FILE *file);
+    std::string GetFileAsString(const std::string& filename);
+    unsigned char *GetFileContentNeedFree(const char *filename, long& size);
+    long ReadBinaryFile(const std::string& filename, size_t maxSize, FileCallback callback);
+}
 
 #endif //DEVIDROID_FILEUTILS_H

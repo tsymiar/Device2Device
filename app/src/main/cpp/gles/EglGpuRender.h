@@ -50,9 +50,11 @@ namespace EglGpuRender {
 
     void RenderSurface(uint8_t *pixel, size_t len);
 
-    int MakeGLTexture(int height, int width);
+    void SetWindowSize(int height, int width);
 
-    int DrawRGBTexture(size_t height, size_t width);
+    int MakeGLTexture();
+
+    int DrawRGBTexture(const char* filename);
 }
 
 #endif //DEVIDROID_EGLGPURENDER_H
