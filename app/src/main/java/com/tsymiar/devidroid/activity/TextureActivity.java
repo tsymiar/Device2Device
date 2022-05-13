@@ -41,10 +41,14 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
      */
     private final static TextView[] mLog = new TextView[3];
 
-    private final int CPU_TEXTURE_FILE = 1;
-    private final int EGL_TEXTURE_FILE = 2;
-    private final int EGL_SURFACE_VIEW = 3;
-    private final int DISCONNECT_WINDOW = 4;
+    private final int EGL_TEXTURE_FILE = 1;
+    private final int EGL_SURFACE_FILE = 2;
+    private final int CPU_TEXTURE_FILE = 3;
+    private final int CPU_SURFACE_FILE = 4;
+    private final int DISCONNECT_WINDOW = 5;
+
+    private int mDisplayHeight = 0;
+    private int mDisplayWidth = 0;
 
     @SuppressLint("SdCardPath")
     public String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
@@ -103,8 +107,9 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     @Override
     public void onResume() {
         super.onResume();
-        ViewWrapper.setWindowSize(getWindowManager().getDefaultDisplay().getHeight(),
-                getWindowManager().getDefaultDisplay().getWidth());
+        mDisplayHeight =getWindowManager().getDefaultDisplay().getHeight();
+        mDisplayWidth = getWindowManager().getDefaultDisplay().getWidth();
+        ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
     }
 
     @Override
@@ -127,7 +132,7 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         /* The surface remains valid so no reinitialization is needed but its dimensions have
          * changed. You may want to recalculate OpenGL matrix or update buffer geometry here,
          * or rather call native method that does that. */
-        ViewWrapper.setWindowSize(height, width);
+        ViewWrapper.setRenderSize(height, width);
     }
 
     @Override
@@ -151,20 +156,26 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         if (texture == null) {
             return;
         }
-        String filename = DATA_DIRECTORY + "test.jpg";
+        ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
         switch (item) {
-            case CPU_TEXTURE_FILE:
-                ViewWrapper.updateTextureFile(texture, filename);
-                break;
             case EGL_TEXTURE_FILE:
-                filename = DATA_DIRECTORY + "test.yuv";
-                ViewWrapper.updateEglRender(texture, filename);
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
+                ViewWrapper.updateEglTexture(texture);
                 break;
-            case EGL_SURFACE_VIEW:
-                ViewWrapper.updateCpuRender(texture, item, filename);
+            case EGL_SURFACE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
+                ViewWrapper.updateEglSurface(texture);
+                break;
+            case CPU_TEXTURE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
+                ViewWrapper.updateCpuTexture(texture, item);
+                break;
+            case CPU_SURFACE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
+                ViewWrapper.updateCpuSurface(texture);
                 break;
             case DISCONNECT_WINDOW:
-                ViewWrapper.updateCpuRender(texture, item, filename);
+                ViewWrapper.updateCpuTexture(texture, item);
                 mTextureView.setVisibility(View.GONE);
                 mTextureView.setVisibility(View.VISIBLE);
                 break;

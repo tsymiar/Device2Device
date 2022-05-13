@@ -63,7 +63,7 @@ unsigned char* FileUtils::GetFileContentNeedFree(const char *filename, long& siz
     return content;
 }
 
-long FileUtils::ReadBinaryFile(const std::string& filename, size_t maxSize, FileCallback callback)
+long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, FileCallback callback)
 {
     using namespace std;
     ifstream fin;
@@ -75,31 +75,32 @@ long FileUtils::ReadBinaryFile(const std::string& filename, size_t maxSize, File
     }
 
     fin.seekg(0, ios::end);
-    long fsize = fin.tellg();
+    long size = fin.tellg();
+    long fileSize = size;
 
     fin.seekg(0, ios::beg);
 
-    long len = maxSize;
-    uint8_t szin[maxSize];
-    memset(szin, 0, maxSize);
+    long len = sliceSize;
+    uint8_t frame[sliceSize];
+    memset(frame, 0, sliceSize);
 
-    if (fsize <= maxSize)
-        len = fsize;
+    if (fileSize <= sliceSize)
+        len = fileSize;
 
-    while (fin.read((char*)szin, len))
+    while (fin.read((char*)frame, len))
     {
         if (callback != nullptr) {
-            callback(szin, len);
+            callback(frame, len);
         }
-        fsize -= maxSize;
-        if (fsize <= maxSize)
+        fileSize -= sliceSize;
+        if (fileSize <= sliceSize)
         {
-            len = fsize;
+            len = fileSize;
         }
-        if (fsize < 0)
+        if (fileSize < 0)
             break;
     }
 
     fin.close();
-    return fsize;
+    return size;
 }

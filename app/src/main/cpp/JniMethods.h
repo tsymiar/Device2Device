@@ -40,13 +40,17 @@ CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv *env, jclass, jobject texture);
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(unloadSurfaceView)(JNIEnv *env, jclass);
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setWindowSize)(JNIEnv *env, jclass, jint height, jint width);
+CPP_FUNC_VIEW(setRenderSize)(JNIEnv *env, jclass, jint height, jint width);
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateEglRender)(JNIEnv *env, jclass, jobject , jstring);
+CPP_FUNC_VIEW(setLocalFile)(JNIEnv *env, jclass, jstring);
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateTextureFile)(JNIEnv *env, jclass, jobject, jstring);
+CPP_FUNC_VIEW(updateEglTexture)(JNIEnv *env, jclass, jobject);
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateCpuRender)(JNIEnv *env, jclass, jobject , jint, jstring);
+CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject );
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject , jint);
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture);
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);

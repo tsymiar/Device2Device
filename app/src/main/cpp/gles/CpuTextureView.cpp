@@ -176,7 +176,7 @@ void CpuTextureView::setDisplaySize(int height, int width)
         ANativeWindow_release(g_nativeWindow);
         g_nativeWindow = nullptr;
         LOGE("Display size was not set");
-        Message::instance().setMessage("Window display bounds error", TOAST);
+        Message::instance().setMessage("Window display bounds fail!", TOAST);
         return;
     }
 
@@ -190,7 +190,7 @@ void CpuTextureView::setDisplaySize(int height, int width)
     }
 }
 
-void CpuTextureView::drawPicture(const char *data)
+void CpuTextureView::drawPicture(uint8_t *data, size_t size)
 {
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
@@ -207,12 +207,14 @@ void CpuTextureView::drawPicture(const char *data)
 
     auto *pixes = (uint32_t *) data;
     auto *line = (uint32_t *) buffer.bits;
+    uint32_t *temp = line;
     for (int y = 0; y < buffer.height; y++) {
         for (int x = 0; x < buffer.width; x++) {
-            line[x] = pixes[buffer.height * y + x];
+            temp[x] = pixes[buffer.height * y + x]; // fixme crash
         }
-        line = line + buffer.stride;
+        temp += buffer.stride;
     }
+
     if (ANativeWindow_unlockAndPost(g_nativeWindow) < 0) {
         LOGE("Unable to unlock and post to native window");
     }

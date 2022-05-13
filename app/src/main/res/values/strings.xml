@@ -2,9 +2,10 @@
     <string name="app_name">Devidroid</string>
     <string-array name="types">
         <item>None</item>
-        <item>OpenGL</item>
-        <item>GPU-Render</item>
-        <item>CPU-Render</item>
+        <item>GPI-OpenGL</item>
+        <item>GPU-surface</item>
+        <item>CPU-photo</item>
+        <item>CPU-video</item>
         <item>Disconnect</item>
     </string-array>
 

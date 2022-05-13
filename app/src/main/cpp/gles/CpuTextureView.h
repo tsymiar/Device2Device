@@ -12,7 +12,7 @@ namespace CpuTextureView {
 
     void drawRGBColor(uint32_t color);
 
-    void drawPicture(const char* data);
+    void drawPicture(uint8_t *data, size_t size = 0);
 }
 
 #endif //DEVIDROID_CPUTEXTUREVIEW_H
