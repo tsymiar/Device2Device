@@ -10,7 +10,7 @@ resources:
     name: tsymiar/scadup
 
 trigger:
-- master
+- main
 
 pool:
   vmImage: 'macos-latest'

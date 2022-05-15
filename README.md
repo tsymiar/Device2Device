@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/tsymiar/Device2Device.svg?branch=master)](https://travis-ci.com/tsymiar/Device2Device)
+[![Build Status](https://tsymiar.visualstudio.com/MyAutomatic/_apis/build/status/tsymiar.Device2Device?repoName=tsymiar%2FDevice2Device&branchName=main)](https://tsymiar.visualstudio.com/MyAutomatic/_build/latest?definitionId=72&repoName=tsymiar%2FDevice2Device&branchName=main)
 
 # Devidroid
 ### An Android test application.
