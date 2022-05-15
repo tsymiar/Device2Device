@@ -1,4 +1,5 @@
 [![Build Status](https://tsymiar.visualstudio.com/MyAutomatic/_apis/build/status/tsymiar.Device2Device?repoName=tsymiar%2FDevice2Device&branchName=main)](https://tsymiar.visualstudio.com/MyAutomatic/_build/latest?definitionId=72&repoName=tsymiar%2FDevice2Device&branchName=main)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/6cb8f83fb83d4e50a33bc39e470f2891)](https://www.codacy.com/gh/tsymiar/Device2Device/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=tsymiar/Device2Device&amp;utm_campaign=Badge_Grade)
 
 # Devidroid
 ### An Android test application.
