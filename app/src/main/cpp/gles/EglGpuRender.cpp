@@ -19,7 +19,7 @@
 #define BYTES_PER_FLOAT 4
 #define POSITION_COMPONENT_COUNT 2
 #define TEXTURE_COORDINATES_COMPONENT_COUNT 2
-#define STRIDE_SIZE ((POSITION_COMPONENT_COUNT + TEXTURE_COORDINATES_COMPONENT_COUNT)*BYTES_PER_FLOAT)
+#define STRIDE_NUMBER ((POSITION_COMPONENT_COUNT + TEXTURE_COORDINATES_COMPONENT_COUNT)*BYTES_PER_FLOAT)
 
 namespace {
     GLuint g_vertexShader;
@@ -159,8 +159,11 @@ int EglGpuRender::MakeGLTexture()
 
     glGenTextures(1, &EGL2.mTextureID);
     glBindTexture(GL_TEXTURE_2D, EGL2.mTextureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, GL_ONE);
     glEnable(GL_TEXTURE_2D);
 
     // Set the viewport
@@ -178,7 +181,7 @@ void setUniforms(int uTextureUnitLocation, int textureId) {
     //glUniformMatrix4fv(uMatrixLocation, 1, false, matrix);
 
     // Set the active texture unit to texture unit 0.
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE2);
 
     // Bind the texture to this unit.
     glBindTexture(GL_TEXTURE_2D, textureId);
@@ -188,13 +191,14 @@ void setUniforms(int uTextureUnitLocation, int textureId) {
     glUniform1i(uTextureUnitLocation, 0);
 }
 
-void renderPixel(uint8_t *pixel, size_t)
+void pixelRender(unsigned char* pixel, size_t)
 {
     // RGB format needed: pixel
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, EGL2.width,
-                 EGL2.height, 0, GL_RGB,
-                 GL_UNSIGNED_SHORT_5_6_5, pixel);
-
+    glTexImage2D(GL_TEXTURE_2D,
+                 0, GL_RGB,
+                 EGL2.width, EGL2.height,
+                 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, pixel);
     // Retrieve uniform locations for the shader program.
     GLint uTextureUnitLocation = glGetUniformLocation(EGL2.glProgram,
                                                       "u_TextureUnit");
@@ -217,16 +221,16 @@ void renderPixel(uint8_t *pixel, size_t)
                               -1.0f, -1.0f, 0.0f, 1.0f };
 
     glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT,
-                          GL_FLOAT, false, STRIDE_SIZE,
+                          GL_FLOAT, false, STRIDE_NUMBER,
                           VERTEX_DATA);
     glEnableVertexAttribArray(aPositionLocation);
 
     glVertexAttribPointer(aTextureCoordinatesLocation, POSITION_COMPONENT_COUNT,
-                          GL_FLOAT, false, STRIDE_SIZE,
+                          GL_FLOAT, false, STRIDE_NUMBER,
                           &VERTEX_DATA[POSITION_COMPONENT_COUNT]);
     glEnableVertexAttribArray(aTextureCoordinatesLocation);
-
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
+    // glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
     eglSwapBuffers(EGL2.eglDisplay, EGL2.eglSurface);
 }
@@ -244,15 +248,15 @@ void EglGpuRender::RenderSurface(uint8_t *pixel, size_t len)
         return;
     }
 
-    int h = (int)(EGL2.height * 2);
-    int w = (int)(EGL2.width / 4);
-
-    int *buff = new int[len];
-    Yuv2Rgb::convertYUV420SPToARGB8888((char*)pixel, h, w, buff);
-    renderPixel((uint8_t*)buff, len);
-    // Statics::printBuffer((char*)buff, len);
+    auto *data = new unsigned char[len];
+    Yuv2Rgb::convertYUV420SPToARGB8888(reinterpret_cast<char *>(pixel),
+                                       (int)(EGL2.height * 2),
+                                       (int)(EGL2.width / 4),
+                                       data);
+    pixelRender(data, len);
+    // Statics::printBuffer((char*)data, len);
+    delete[] data;
     usleep(1000);
-    delete[] buff;
 }
 
 /**

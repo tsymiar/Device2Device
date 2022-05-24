@@ -12,6 +12,7 @@
 typedef void (*FileCallback)(uint8_t *, size_t);
 
 namespace FileUtils {
+    int MakeDirs(const char *fullPath);
     long GetFileSize(FILE *file);
     std::string GetFileAsString(const std::string& filename);
     unsigned char *GetFileContentNeedFree(const char *filename, long& size);

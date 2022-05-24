@@ -1,7 +1,5 @@
 #include <cstdarg>
-#include <sys/stat.h>
 #include <cstring>
-#include <unistd.h>
 #include <cstdio>
 
 #ifndef LOG_TAG
@@ -9,42 +7,12 @@
 #endif
 
 #include <Utils/logging.h>
+#include <files/FileUtils.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};
 const char fileID[] = {'R', 'I', 'F', 'F'};
 const char fmtHdrID[] = {'f', 'm', 't', ' '};
 const char dataHdrID[] = {'d', 'a', 't', 'a'};
-
-int mkdirs(const char *fullPath)
-{
-    size_t len = strlen(fullPath) + 1;
-    char *pszDir = new char(len);
-    memcpy(pszDir, fullPath, len);
-    int iLen = strlen(pszDir);
-    if (access(fullPath, F_OK) == 0) {
-        LOGI("fullPath '%s' already exist.", fullPath);
-        return 1;
-    }
-    if (pszDir[iLen - 1] != '\\' && pszDir[iLen - 1] != '/') {
-        pszDir[iLen] = '/';
-        pszDir[iLen + 1] = '\0';
-    }
-    for (int i = 0; i <= iLen; i++) {
-        if (pszDir[i] == '\\' || pszDir[i] == '/') {
-            pszDir[i] = '\0';
-            int iRet = access(pszDir, 0);
-            if (iRet != 0) {
-                iRet = mkdir(pszDir, 0755);
-                if (iRet != 0) {
-                    return -1;
-                }
-            }
-            pszDir[i] = '/';
-        }
-    }
-    delete pszDir;
-    return 0;
-}
 
 int writeShort(char *l, int s)
 {
@@ -157,7 +125,7 @@ int convertAudioFiles(const char *from, const char *target)
     fclose(fp);
 
     //write data stream
-    if (mkdirs(target) < 0) {
+    if (FileUtils::MakeDirs(target) < 0) {
         LOGE("write target file '%s' failed.", target);
         return -3;
     }

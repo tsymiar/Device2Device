@@ -7,7 +7,8 @@
 
 
 namespace Yuv2Rgb {
-    void convertYUV420SPToARGB8888(char* input, int height, int width, int* output);
+    void convertYUV420SPToARGB8888(const char* input, int height, int width, unsigned char* output);
+    void convertYUV420ToARGB8888(const char* input, int width, int height, int* output);
 }
 
 

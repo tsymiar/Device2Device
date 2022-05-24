@@ -10,8 +10,12 @@
  /*
   * Include necessary headers.
   */
-
+#ifndef GLubyte
+typedef unsigned char GLubyte;
+#else
 #  include "GL/glut.h"
+#endif
+
 #  ifdef WIN32
 #    include <windows.h>
 #    include <wingdi.h>
@@ -38,26 +42,32 @@ extern "C" {
 #  ifndef WIN32
     typedef struct                       /**** BMP file header structure ****/
     {
-        unsigned short bfType;           /* Magic number for file */
+        // unsigned short bfType;        /* Magic number for file */
         unsigned int   bfSize;           /* Size of file */
         unsigned short bfReserved1;      /* Reserved */
         unsigned short bfReserved2;      /* ... */
         unsigned int   bfOffBits;        /* Offset to bitmap data */
     } BITMAPFILEHEADER;
 
+    typedef struct
+    {
+        unsigned short bfType;           /* Magic number for file */
+        BITMAPFILEHEADER bsHeader;
+    } BITMAPFILETYPEHEADER;
+
 #  define BF_TYPE 0x4D42                 /* "MB" */
 
     typedef struct                       /**** BMP file info structure ****/
     {
         unsigned int   biSize;           /* Size of info header */
-        int            biWidth;          /* Width of image */
-        int            biHeight;         /* Height of image */
+        unsigned int   biWidth;          /* Width of image */
+        unsigned int   biHeight;         /* Height of image */
         unsigned short biPlanes;         /* Number of color planes */
         unsigned short biBitCount;       /* Number of bits per pixel */
         unsigned int   biCompression;    /* Type of compression to use */
         unsigned int   biSizeImage;      /* Size of image data */
-        int            biXPelsPerMeter;  /* X pixels per meter */
-        int            biYPelsPerMeter;  /* Y pixels per meter */
+        long           biXPelsPerMeter;  /* X pixels per meter */
+        long           biYPelsPerMeter;  /* Y pixels per meter */
         unsigned int   biClrUsed;        /* Number of colors used */
         unsigned int   biClrImportant;   /* Number of important colors */
     } BITMAPINFOHEADER;
@@ -90,9 +100,16 @@ extern "C" {
      * Prototypes...
      */
 
+    typedef struct
+    {
+        unsigned int biWidth;
+        unsigned int biHeight;
+        long blSize;
+    } BITMAPPROP;
+
     extern GLubyte *LoadDIBitmap(const char *filename, BITMAPINFO **info);
-    extern int     SaveDIBitmap(const char *filename, BITMAPINFO *info,
-        GLubyte *bits);
+    extern int SaveDIBitmap(const char *filename, BITMAPINFO *info, GLubyte *bits);
+    extern BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba);
 
 #  ifdef __cplusplus
 }

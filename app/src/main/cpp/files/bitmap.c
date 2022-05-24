@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#ifndef LOG_TAG
+#define LOG_TAG "bitmap"
+#endif
+#include <Utils/logging.h>
 
 #ifdef WIN32
  /*
@@ -217,7 +221,7 @@ LoadDIBitmap(const char *filename, /* I - File to load */
     int              length;       /* Line length */
     int              bitsize;      /* Size of bitmap */
     int              infosize;     /* Size of header information */
-    BITMAPFILEHEADER header;       /* File header */
+    BITMAPFILETYPEHEADER header;       /* File header */
 
 
     /* Try opening the file; use "rb" mode to read this *binary* file. */
@@ -226,19 +230,19 @@ LoadDIBitmap(const char *filename, /* I - File to load */
 
     /* Read the file header and any following bitmap information... */
     header.bfType = read_word(fp);
-    header.bfSize = read_dword(fp);
-    header.bfReserved1 = read_word(fp);
-    header.bfReserved2 = read_word(fp);
-    header.bfOffBits = read_dword(fp);
+    header.bsHeader.bfSize = read_dword(fp);
+    header.bsHeader.bfReserved1 = read_word(fp);
+    header.bsHeader.bfReserved2 = read_word(fp);
+    header.bsHeader.bfOffBits = read_dword(fp);
 
     if (header.bfType != BF_TYPE) /* Check for BM reversed... */
     {
         /* Not a bitmap file - return NULL... */
-        fclose(fp);
-        return (NULL);
+         fclose(fp);
+         return (NULL);
     }
 
-    infosize = header.bfOffBits - 18;
+    infosize = header.bsHeader.bfOffBits - 18;
     if ((*info = (BITMAPINFO *)malloc(sizeof(BITMAPINFO))) == NULL)
     {
         /* Couldn't allocate memory for bitmap info - return NULL... */
@@ -247,7 +251,7 @@ LoadDIBitmap(const char *filename, /* I - File to load */
     }
 
     (*info)->bmiHeader.biSize = read_dword(fp);
-    (*info)->bmiHeader.biWidth = read_long(fp);
+    (*info)->bmiHeader.biWidth = read_dword(fp);
     (*info)->bmiHeader.biHeight = read_long(fp);
     (*info)->bmiHeader.biPlanes = read_word(fp);
     (*info)->bmiHeader.biBitCount = read_word(fp);
@@ -392,7 +396,6 @@ SaveDIBitmap(const char *filename, /* I - File to load */
             return (-1);
         }
 
-#if 0
     /* Swap red and blue */
     length = (info->bmiHeader.biWidth * 3 + 3) & ~3;
     for (y = 0; y < info->bmiHeader.biHeight; y++)
@@ -404,7 +407,6 @@ SaveDIBitmap(const char *filename, /* I - File to load */
         ptr[0] = ptr[2];
         ptr[2] = temp;
     }
-#endif /* 0 */
 
     if (fwrite(bits, 1, bitsize, fp) < bitsize)
     {
@@ -512,4 +514,91 @@ write_long(FILE *fp, /* I - File to write to */
     putc(l >> 16, fp);
     return (putc(l >> 24, fp));
 }
+
+unsigned char *channelChange(int imageChannel, unsigned char* data, unsigned int width, unsigned int height) {
+    unsigned char *pBmpBits = (unsigned char *) calloc(sizeof(unsigned char),
+                                                       width * height * 4);
+    for (int i = 0; i < height; i++) {
+        unsigned char *pSrc = data + i * width * imageChannel;
+        unsigned char *pDst = pBmpBits + i * width * 4;
+
+        for (int j = 0; j < width; j++) {
+            if (imageChannel == 1) {
+                unsigned char p = *(pSrc++);
+                *(pDst++) = p;    //B Channel
+                *(pDst++) = p;    //G Channel
+                *(pDst++) = p;    //R Channel
+                *(pDst++) = 0;    //Alpha Channel (fixed to 0)
+            } else if (imageChannel == 3) {
+                *(pDst++) = *(pSrc++);    //B Channel
+                *(pDst++) = *(pSrc++);    //G Channel
+                *(pDst++) = *(pSrc++);    //R Channel
+                *(pDst++) = 0;            //Alpha Channel (fixed to 0)
+            } else if (imageChannel == 4) {
+                *(pDst++) = *(pSrc++);    //B Channel
+                *(pDst++) = *(pSrc++);    //G Channel
+                *(pDst++) = *(pSrc++);    //R Channel
+                *(pDst++) = *(pSrc++);    //Alpha Channel (fixed to 0)
+            }
+        }
+    }
+    return pBmpBits;
+}
+
+BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba)
+{
+    BITMAPPROP prop;
+    FILE *fpBmp;
+    if ((fpBmp = fopen(filename, "rb")) == NULL) {
+        LOGE("the bmp file can not open!");
+        prop.blSize = -1;
+        return prop;
+    }
+
+    unsigned short fileType;
+    fread(&fileType,1, sizeof (unsigned short), fpBmp);
+    if (fileType != BF_TYPE)
+    {
+        LOGE("file type(0x%x) error!", fileType);
+        prop.blSize = -2;
+        return prop;
+    }
+
+    BITMAPFILEHEADER bmpHeader;
+    //read the BITMAPFILEHEADER
+    fread(&bmpHeader, 1, sizeof(BITMAPFILEHEADER), fpBmp);
+
+    BITMAPINFOHEADER bmpInfHeader;
+    //read the BITMAPINFOHEADER
+    fread(&bmpInfHeader, 1, sizeof(BITMAPINFOHEADER), fpBmp);
+
+    if (bmpInfHeader.biWidth % 4 != 0) {
+        bmpInfHeader.biWidth = (bmpInfHeader.biWidth / 4 + 1) * 4;
+    }
+    if ((int)bmpInfHeader.biHeight <= 0 || (int)bmpInfHeader.biWidth <= 0) {
+        LOGE("the bmp size invalid: [%d]x[%d]!", bmpInfHeader.biHeight, bmpInfHeader.biWidth);
+        prop.blSize = -3;
+        fclose(fpBmp);
+        return prop;
+    } else {
+        prop.biWidth = bmpInfHeader.biWidth;
+        prop.biHeight = bmpInfHeader.biHeight;
+    }
+
+    // read bmp data
+    prop.blSize = (int)bmpInfHeader.biHeight * bmpInfHeader.biWidth * 3;
+    *pRgba = (unsigned char *) malloc(prop.blSize);
+    fseek(fpBmp, bmpHeader.bfOffBits, SEEK_SET);
+
+    size_t len;
+    if ((len = fread(*pRgba, 1, prop.blSize, fpBmp)) != prop.blSize) {
+        LOGE("bmp size not match: [%d][%d]", len, prop.blSize);
+    }
+
+    channelChange(3, *pRgba, prop.biWidth, prop.biHeight);
+
+    fclose(fpBmp);
+    return prop;
+}
+
 #endif /* WIN32 */

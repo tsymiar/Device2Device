@@ -167,11 +167,11 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
                 ViewWrapper.updateEglSurface(texture);
                 break;
             case CPU_TEXTURE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
                 ViewWrapper.updateCpuTexture(texture, item);
                 break;
             case CPU_SURFACE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
                 ViewWrapper.updateCpuSurface(texture);
                 break;
             case DISCONNECT_WINDOW:

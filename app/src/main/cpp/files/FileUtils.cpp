@@ -9,6 +9,39 @@
 #endif
 #include <Utils/logging.h>
 #include <cerrno>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int FileUtils::MakeDirs(const char *fullPath)
+{
+    size_t len = strlen(fullPath) + 1;
+    char *pszDir = new char(len);
+    memcpy(pszDir, fullPath, len);
+    int iLen = strlen(pszDir);
+    if (access(fullPath, F_OK) == 0) {
+        LOGI("fullPath '%s' already exist.", fullPath);
+        return -1;
+    }
+    if (pszDir[iLen - 1] != '\\' && pszDir[iLen - 1] != '/') {
+        pszDir[iLen] = '/';
+        pszDir[iLen + 1] = '\0';
+    }
+    for (int i = 0; i <= iLen; i++) {
+        if (pszDir[i] == '\\' || pszDir[i] == '/') {
+            pszDir[i] = '\0';
+            int iRet = access(pszDir, 0);
+            if (iRet != 0) {
+                iRet = mkdir(pszDir, 0755);
+                if (iRet != 0) {
+                    return -1;
+                }
+            }
+            pszDir[i] = '/';
+        }
+    }
+    delete pszDir;
+    return 0;
+}
 
 long FileUtils::GetFileSize(FILE *file)
 {

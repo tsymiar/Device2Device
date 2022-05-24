@@ -14,6 +14,7 @@
 #include <network/KcpEmulator.h>
 #include <gles/EglGpuRender.h>
 #include <gles/CpuTextureView.h>
+#include <files/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
 
@@ -223,7 +224,7 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture)
     if (window != nullptr) {
         EglGpuRender::MakeGLTexture();
         extern EGL2 EGL2;
-        LOGD("OpenGL rendering initialized wxh(%d, %d)", EGL2.width, EGL2.height);
+        LOGD("OpenGL rendering initialized WxH = (%d, %d)", EGL2.width, EGL2.height);
         FileUtils::ReadBinaryFile(g_filename, EGL2.width * EGL2.height, EglGpuRender::RenderSurface);
         EglGpuRender::CloseGLSurface();
     } else {
@@ -260,19 +261,17 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject texture, jint item)
             long size = 0;
             unsigned char *content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
             LOGD("CPU rendering initialized [%d]", size);
-            int height = -1;
-            int width = -1;
             if (content != nullptr) {
-                if (size > 0 && size < g_height * g_width) {
-                    float rate = (float) (g_height * g_width * 1.) / (float) (size)+ 1;
-                    height = (int) (g_height * 1. / rate);
-                    width = (int) (g_width * 1. / rate);
-                } else {
-                    height = g_height;
-                    width = g_width;
+                BITMAPINFO *info;
+                uint8_t * data = LoadDIBitmap(g_filename.c_str(), &info);
+                if (info == nullptr) {
+                    LOGE("LoadDIBitmap failed");
+                    return;
+
                 }
-                CpuTextureView::setDisplaySize(height, width);
-                CpuTextureView::drawPicture((uint8_t *) content);
+                CpuTextureView::setDisplaySize((int)info->bmiHeader.biHeight,
+                                               (int)info->bmiHeader.biWidth);
+                CpuTextureView::drawSurface(data);
             } else {
                 static constexpr uint32_t colors[] = {
                         0x00000000,
@@ -285,7 +284,7 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject texture, jint item)
                 };
                 static int iteration = 0;
                 CpuTextureView::drawRGBColor(
-                        colors[iteration++ % (sizeof(colors) / sizeof(*colors))]);
+                        colors[iteration++ % (sizeof(colors) / sizeof(*colors))], g_filename.c_str());
             }
             CpuTextureView::releaseSurfaceView(env);
             delete[] content;
@@ -306,7 +305,7 @@ JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture) {
     if (CpuTextureView::setupSurfaceView(env, texture) > 0) {
         LOGD("OpenGL rendering initialized(%d, %d)", g_height, g_width);
-        FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuTextureView::drawPicture);
+        FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuTextureView::drawSurface);
         CpuTextureView::releaseSurfaceView(env);
     } else {
         LOGE("native window is null while [updateCpuVideoFile]");

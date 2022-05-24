@@ -10,9 +10,9 @@ namespace CpuTextureView {
 
     void setDisplaySize(int height, int width);
 
-    void drawRGBColor(uint32_t color);
+    void drawRGBColor(uint32_t color, const char *filename = nullptr);
 
-    void drawPicture(uint8_t *data, size_t size = 0);
+    void drawSurface(uint8_t *data, size_t size = 0);
 }
 
 #endif //DEVIDROID_CPUTEXTUREVIEW_H

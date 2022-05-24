@@ -5,7 +5,6 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_library(texture STATIC
         EglShader.cpp
         EglGpuRender.cpp
-        CpuTextureView.cpp
-        ../files/FileUtils.cpp)
+        CpuTextureView.cpp)
 
-target_link_libraries(texture converter log)
+target_link_libraries(texture converter fileutils log)

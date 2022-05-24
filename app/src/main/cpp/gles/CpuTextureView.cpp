@@ -13,6 +13,7 @@
 #include <Utils/logging.h>
 #include <message/Message.h>
 #include <utils/statics.h>
+#include <files/bitmap.h>
 
 extern ANativeWindow *g_nativeWindow;
 
@@ -118,31 +119,71 @@ int CpuTextureView::setupSurfaceView(JNIEnv *env, jobject texture)
     return env->GetVersion();
 }
 
-void setRGBValue(uint32_t argb, void* bits) {
+void setRGBValue(uint32_t rgba, void* bits) {
     // Locked bounds can be larger than requested, we should check them
     auto *dest = static_cast<uint8_t *>(bits);
     // Value in color is ARGB but the surface expects RGBA
-    dest[0] = (argb >> 16) & 0xFF;
-    dest[1] = (argb >> 8) & 0xFF;
-    dest[2] = (argb >> 0) & 0xFF;
-    dest[3] = (argb >> 24) & 0xFF;
+    dest[0] = (rgba >> 16) & 0xFF;
+    dest[1] = (rgba >> 8) & 0xFF;
+    dest[2] = (rgba >> 0) & 0xFF;
+    dest[3] = (rgba >> 24) & 0xFF;
 }
+
+void setFrameBuffer(ANativeWindow_Buffer *buf, uint8_t *src) {
+    // src is either null: to blank the screen
+    //     or holding exact pixels with the same fmt [stride is the SAME]
+    auto *dst = reinterpret_cast<uint8_t *> (buf->bits);
+    uint32_t bpp;
+    switch (buf->format) {
+        case WINDOW_FORMAT_RGB_565:
+            bpp = 2;
+            break;
+        case WINDOW_FORMAT_RGBA_8888:
+        case WINDOW_FORMAT_RGBX_8888:
+            bpp = 4;
+            break;
+        default:
+            return;
+    }
+    uint32_t stride, width;
+    stride = buf->stride * bpp;
+    width = buf->width * bpp;
+    if (src) {
+        for (auto height = 0; height < buf->height; ++height) {
+            memcpy(dst, src, width);
+            dst += stride, src += width;
+        }
+    } else {
+        for (auto height = 0; height < buf->height; ++height) {
+            memset(dst, 0, width);
+            dst += stride;
+        }
+    }
+}
+
 /**
  * Draw by CPU.
  *
  * @param color Color to draw (ARGB).
  */
-void CpuTextureView::drawRGBColor(uint32_t color)
-{
+void CpuTextureView::drawRGBColor(uint32_t color, const char *filename) {
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
         return;
     }
+
+    BITMAPPROP imgProp = {1,1,0};
+    unsigned char *data = nullptr;
+    if (filename != nullptr && (imgProp = BitmapToRgba(filename, &data)).blSize <= 0) {
+        LOGE("bitmap content invalid");
+        return;
+    }
+    LOGD("imgSize = [%d]x[%d]: %p", imgProp.biWidth, imgProp.biHeight, data);
     // -*-*-*-*-*-*- CPU rendering -*-*-*-*-*-*-
     // For our example, scale the surface to 1×1 pixel and fill it with a color
-    auto ret = ANativeWindow_setBuffersGeometry(g_nativeWindow, 1, 1,
-                                                AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
-            // WINDOW_FORMAT_RGBA_8888
+    auto ret = ANativeWindow_setBuffersGeometry(g_nativeWindow, imgProp.biWidth, imgProp.biHeight,
+                                                // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
+                                                WINDOW_FORMAT_RGBA_8888
     );
     if (ret != 0) {
         ANativeWindow_release(g_nativeWindow);
@@ -162,12 +203,20 @@ void CpuTextureView::drawRGBColor(uint32_t color)
         LOGE("%s", hint.c_str());
         return;
     }
-    setRGBValue(color, buffer.bits);
+
+    if (filename == nullptr) {
+        setRGBValue(color, buffer.bits);
+    } else {
+        setFrameBuffer(&buffer, data);
+    }
 
     if (ANativeWindow_unlockAndPost(g_nativeWindow) != 0) {
         LOGE("Unable to unlock and post to native window");
     }
     LOGD("Draws %08x using Native Window", color);
+    if (data != nullptr) {
+        free(data);
+    }
 }
 
 void CpuTextureView::setDisplaySize(int height, int width)
@@ -181,16 +230,18 @@ void CpuTextureView::setDisplaySize(int height, int width)
     }
 
     int32_t result = ANativeWindow_setBuffersGeometry(g_nativeWindow, width, height,
-                                                      WINDOW_FORMAT_RGBA_8888);
+                                                      AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
     if (result < 0) {
         LOGE("Unable to set buffers geometry");
         ANativeWindow_release(g_nativeWindow);
         g_nativeWindow = nullptr;
         return;
     }
+
+    ANativeWindow_acquire(g_nativeWindow);
 }
 
-void CpuTextureView::drawPicture(uint8_t *data, size_t size)
+void CpuTextureView::drawSurface(uint8_t *data, size_t size)
 {
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
@@ -205,14 +256,17 @@ void CpuTextureView::drawPicture(uint8_t *data, size_t size)
         return;
     }
 
-    auto *pixes = (uint32_t *) data;
-    auto *line = (uint32_t *) buffer.bits;
-    uint32_t *temp = line;
-    for (int y = 0; y < buffer.height; y++) {
-        for (int x = 0; x < buffer.width; x++) {
-            temp[x] = pixes[buffer.height * y + x]; // fixme crash
+    auto *pixes = (uint8_t *) data;
+    auto *line = (uint8_t *) buffer.bits;
+    if (size > 0) {
+        memcpy(line, data, size);
+    } else {
+        for (int y = 0; y < buffer.height; y++) {
+            for (int x = 0; x < buffer.width; x++) {
+                line[x] = pixes[buffer.height * y + x]; // fixme crash
+            }
+            line += buffer.stride;
         }
-        temp += buffer.stride;
     }
 
     if (ANativeWindow_unlockAndPost(g_nativeWindow) < 0) {

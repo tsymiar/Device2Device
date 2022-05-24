@@ -43,7 +43,7 @@ void convertYUV420ToARGB8888(char* yData, char* uData, char* vData, int width, i
     }
 }
 
-void convertYUV420ToARGB8888(char* input, int width, int height, int* output)
+void Yuv2Rgb::convertYUV420ToARGB8888(const char* input, int width, int height, int* output)
 {
     int frameSize = width * height;
     for (int j = 0, yp = 0; j < height; j++) {
@@ -64,7 +64,7 @@ void convertYUV420ToARGB8888(char* input, int width, int height, int* output)
     }
 }
 
-void Yuv2Rgb::convertYUV420SPToARGB8888(char* input, int height, int width, int* output)
+void Yuv2Rgb::convertYUV420SPToARGB8888(const char* input, int height, int width, unsigned char* output)
 {
     int frameSize = width * height;
     for (int j = 0, yp = 0; j < height; j++) {
