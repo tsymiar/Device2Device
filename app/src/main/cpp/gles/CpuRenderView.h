@@ -1,9 +1,9 @@
-#ifndef DEVIDROID_CPUTEXTUREVIEW_H
-#define DEVIDROID_CPUTEXTUREVIEW_H
+#ifndef DEVIDROID_CPURENDERVIEW_H
+#define DEVIDROID_CPURENDERVIEW_H
 
 #include <jni.h>
 
-namespace CpuTextureView {
+namespace CpuRenderView {
     int setupSurfaceView(JNIEnv *env, jobject texture);
 
     void releaseSurfaceView(JNIEnv *env);
@@ -15,4 +15,4 @@ namespace CpuTextureView {
     void drawSurface(uint8_t *data, size_t size = 0);
 }
 
-#endif //DEVIDROID_CPUTEXTUREVIEW_H
+#endif //DEVIDROID_CPURENDERVIEW_H

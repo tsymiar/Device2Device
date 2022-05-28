@@ -10,8 +10,7 @@
 namespace EglShader {
     GLuint CreateProgram(const char *pVertexShaderSource, const char *pFragShaderSource, GLuint &vertexShaderHandle, GLuint &fragShaderHandle);
     void DeleteProgram(GLuint &program);
-    GLuint GetShader(GLenum shaderType, const char *pSource);
-    void CheckGLError(const char *pGLOperation);
+    GLuint GetShaderProgram();
 }
 
 #endif //DEVIDROID_EGLSHADER_H

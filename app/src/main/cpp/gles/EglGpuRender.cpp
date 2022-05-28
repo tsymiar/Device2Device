@@ -108,6 +108,10 @@ ANativeWindow *EglGpuRender::OpenGLSurface()
             return nullptr;
         }
     }
+    if (!eglMakeCurrent(EGL2.eglDisplay, EGL2.eglSurface, EGL2.eglSurface, EGL2.eglContext)) {
+        LOGE("attach eglContext fail!");
+        return nullptr;
+    }
     return ::g_nativeWindow;
 }
 
@@ -145,10 +149,6 @@ int EglGpuRender::MakeGLTexture()
     if (EGL2.eglSurface == nullptr) {
         LOGE("surface is nullptr");
         return -1;
-    }
-    if (!eglMakeCurrent(EGL2.eglDisplay, EGL2.eglSurface, EGL2.eglSurface, EGL2.eglContext)) {
-        LOGE("Failed to attach eglContext!");
-        return -2;
     }
     //编译着色器代码并链接到着色器程序
     EGL2.glProgram = EglShader::CreateProgram((char*)vShaderStr, (char*)fShaderStr, g_vertexShader, g_fragmentShader);
@@ -630,4 +630,53 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
     delete[] rgba;
     delete *pixel;
     return 0;
+}
+
+#include "EglTexture.h"
+
+extern GLuint g_Texture2D[3];
+extern GLuint g_vertexPosBuffer;
+extern GLuint g_texturePosBuffer;
+
+void EglGpuRender::FrameRender(unsigned char* frameData, size_t)
+{
+    if (frameData == nullptr || EGL2.width <= 0 || EGL2.height <= 0) {
+        return;
+    }
+    glClearColor(0.8f, 0.8f, 1.0f, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_Texture2D[Y]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, EGL2.width, EGL2.height, 0, GL_LUMINANCE,
+                 GL_UNSIGNED_BYTE, frameData);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, g_Texture2D[U]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, EGL2.width / 2, EGL2.height / 2, 0, GL_LUMINANCE,
+                 GL_UNSIGNED_BYTE, frameData + EGL2.width * EGL2.height * 5 / 4);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, g_Texture2D[V]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, EGL2.width / 2, EGL2.height / 2, 0, GL_LUMINANCE,
+                 GL_UNSIGNED_BYTE, frameData + EGL2.width * EGL2.height);
+
+    glUseProgram(EGL2.glProgram);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vertexPosBuffer);
+    GLint posLoc = glGetAttribLocation(EGL2.glProgram, "position");
+    glEnableVertexAttribArray(posLoc);
+    glVertexAttribPointer(posLoc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, NULL);
+
+    glBindBuffer(GL_ARRAY_BUFFER, g_texturePosBuffer);
+    GLint texcoordLoc = glGetAttribLocation(EGL2.glProgram, "texCoord");
+    glEnableVertexAttribArray(texcoordLoc);
+    glVertexAttribPointer(texcoordLoc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, NULL);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDisableVertexAttribArray(posLoc);
+    glDisableVertexAttribArray(texcoordLoc);
+
+    glUseProgram(NULL);
 }

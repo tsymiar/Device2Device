@@ -55,6 +55,8 @@ namespace EglGpuRender {
     int MakeGLTexture();
 
     int DrawRGBTexture(const char* filename);
+
+    void FrameRender(unsigned char* frameData, size_t);
 }
 
 #endif //DEVIDROID_EGLGPURENDER_H

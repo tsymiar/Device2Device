@@ -1,4 +1,4 @@
-#include "CpuTextureView.h"
+#include "CpuRenderView.h"
 
 #include <cerrno>
 #include <cstring>
@@ -52,7 +52,7 @@ void createSurface(JNIEnv *env, jobject texture)
  *
  * @param env JNI environment.
  */
-void CpuTextureView::releaseSurfaceView(JNIEnv *env)
+void CpuRenderView::releaseSurfaceView(JNIEnv *env)
 {
     if (JNI::surface_view != nullptr) {
         env->CallVoidMethod(JNI::surface_view, JNI::surface_release);
@@ -72,11 +72,11 @@ void rebuildTexture(JNIEnv *env, jobject texture)
      * rendering on a surface (OpenGL can be disconnected with eglMakeCurrent(EGL_NO_CONTEXT)).
      * So each time you want to switch, you need to create a new surface for the surface
      * texture, but to be able to do so, you need to release the original surface first. */
-    CpuTextureView::releaseSurfaceView(env);
+    CpuRenderView::releaseSurfaceView(env);
     createSurface(env, texture);
 }
 
-int CpuTextureView::setupSurfaceView(JNIEnv *env, jobject texture)
+int CpuRenderView::setupSurfaceView(JNIEnv *env, jobject texture)
 {
     jobject surface = env->FindClass("android/view/Surface");
     if (surface == nullptr) {
@@ -166,7 +166,7 @@ void setFrameBuffer(ANativeWindow_Buffer *buf, uint8_t *src) {
  *
  * @param color Color to draw (ARGB).
  */
-void CpuTextureView::drawRGBColor(uint32_t color, const char *filename) {
+void CpuRenderView::drawRGBColor(uint32_t color, const char *filename) {
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
         return;
@@ -219,7 +219,7 @@ void CpuTextureView::drawRGBColor(uint32_t color, const char *filename) {
     }
 }
 
-void CpuTextureView::setDisplaySize(int height, int width)
+void CpuRenderView::setDisplaySize(int height, int width)
 {
     if (width < 0 || height < 0) {
         ANativeWindow_release(g_nativeWindow);
@@ -241,7 +241,7 @@ void CpuTextureView::setDisplaySize(int height, int width)
     ANativeWindow_acquire(g_nativeWindow);
 }
 
-void CpuTextureView::drawSurface(uint8_t *data, size_t size)
+void CpuRenderView::drawSurface(uint8_t *data, size_t size)
 {
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
