@@ -12,10 +12,10 @@
 #include <message/Message.h>
 #include <files/FileUtils.h>
 #include <network/KcpEmulator.h>
-#include <gles/EglShader.h>
-#include <gles/EglTexture.h>
-#include <gles/EglGpuRender.h>
-#include <gles/CpuRenderView.h>
+#include <render/gles/EglShader.h>
+#include <render/gles/EglTexture.h>
+#include <render/gles/EglGpuRender.h>
+#include <render/CpuRenderView.h>
 #include <files/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
@@ -339,8 +339,13 @@ static int g_msgLen = 6;
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
 {
-    return convertAudioFiles(Jstring2Cstring(env, from).c_str(),
-                             Jstring2Cstring(env, save).c_str());
+    std::string source = Jstring2Cstring(env, from);
+    std::string target = Jstring2Cstring(env, save);
+    int stat = convertAudioFiles(source.c_str(), target.c_str());
+    if (stat < 0) {
+        LOGE("covert audio file from '%s' to '%s' failed", source.c_str(), target.c_str());
+    }
+    return stat;
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,

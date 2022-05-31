@@ -106,7 +106,7 @@ int convertAudioFiles(const char *from, const char *target)
     //write header
     size_t size = 44;
     char *h = WaveHeader::getHeader(content);
-    if (strlen(h) != size) {
+    if (h == nullptr) {
         return -1;
     }
     memcpy(buf, h, size);
@@ -125,16 +125,16 @@ int convertAudioFiles(const char *from, const char *target)
     fclose(fp);
 
     //write data stream
-    if (FileUtils::MakeDirs(target) < 0) {
-        LOGE("write target file '%s' failed.", target);
-        return -3;
-    }
+    FileUtils::MakeDirs(target);
     fp = fopen(target, "w");
     if (fp == nullptr) {
         LOGE("can not load '%s' file!", target);
         return -4;
     }
-    fwrite(buf, 1, size, fp);
+    if (fwrite(buf, 1, size, fp)) {
+        LOGE("write target file '%s' failed.", target);
+        return -3;
+    }
     fclose(fp);
     return 0;
 }

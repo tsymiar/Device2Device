@@ -8,12 +8,15 @@
 - TEXTURE
 
     a test page for image/video `encode/decode` include `CPU/GPU` render, `OpenGL` render
-- WAVE
+
+- AUDIO
 
     to record sounds and draw waves
+
 - CHART
 
-    a line chart using `com.github.PhilJay:MPAndroidChart:v3.0.1`
+    a line chart using [`com.github.PhilJay:MPAndroidChart:v3.0.1`](https://github.com/PhilJay/MPAndroidChart)
+
 - SERVER
 
     click to start a udp server
@@ -46,4 +49,4 @@
 
     click to update timestamp
 
-    <img src="file/MainActivity.jpeg" title="MainActivity" height="60%" width="60%">
+    <img src="pic/MainActivity.jpg" title="MainActivity" height="60%" width="60%">

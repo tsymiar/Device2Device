@@ -11,9 +11,9 @@
 
     <string name="reload">Re-do</string>
     <string name="texture">Texture</string>
-    <string name="wave">Wave</string>
+    <string name="wave">Audio</string>
     <string name="status">status</string>
-    <string name="read">read</string>
+    <string name="read">load</string>
     <string name="record">record</string>
     <string name="chart">chart</string>
     <string name="viewGithub">View on GitHub</string>

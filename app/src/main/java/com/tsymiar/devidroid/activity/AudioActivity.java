@@ -1,22 +1,31 @@
 package com.tsymiar.devidroid.activity;
 
+import static com.tsymiar.devidroid.activity.MainActivity.RequestAudio;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
@@ -30,20 +39,21 @@ import com.tsymiar.devidroid.view.WaveformsView;
 
 import java.io.File;
 
-public class WaveActivity extends AppCompatActivity {
+public class AudioActivity extends AppCompatActivity {
 
-    public final String TAG = WaveActivity.class.getSimpleName();
+    public final String TAG = AudioActivity.class.getSimpleName();
     public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
             + "/Android/data/" + "com.tsymiar.devidroid" + "/record/";
     private static final int FREQUENCY = 16000;// 设置音频采样率,44100是目前的标准,某些设备仍然支持22050，16000，11025
     private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
     public final static int AUDIO_SOURCE = MediaRecorder.AudioSource.MIC;// 音频获取源
-    private static final String mFileName = "test";
+    private static final String mFileName = "audio";
     WaveSurface waveView;
     WaveformsView waveform;
     WaveCanvas waveCanvas = null;
     TextView status;
+    Button recdBtn;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -68,7 +78,7 @@ public class WaveActivity extends AppCompatActivity {
             int start = 0;
             playWaveAudio(start);
         });
-        Button recdBtn = findViewById(R.id.wave_record);
+        recdBtn = findViewById(R.id.wave_record);
         recdBtn.setOnClickListener(view -> {
             waveView.setVisibility(View.VISIBLE);
             waveform.setVisibility(View.VISIBLE);
@@ -77,8 +87,25 @@ public class WaveActivity extends AppCompatActivity {
                 waveCanvas.Stop();
                 waveCanvas = null;
             } else {
-                startDrawWave();
-                recdBtn.setText("Recording");
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+                        || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    new AlertDialog.Builder(this)
+                            .setMessage("Storage and Record Permission needed, jump to setting?")
+                            .setPositiveButton("yes", (dialog12, which) -> {
+                                dialog12.dismiss();
+                                Toast.makeText(this, "Please enable Storage and Record PERMISSION", Toast.LENGTH_SHORT).show();
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    startActivityForResult(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())), RequestAudio);
+                                }
+                            }).setNegativeButton("no", (dialog1, which) -> dialog1.dismiss()).setCancelable(false).show();
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                } else {
+                    startDrawWave();
+                }
             }
         });
     }
@@ -122,7 +149,7 @@ public class WaveActivity extends AppCompatActivity {
                         waveView.setVisibility(View.INVISIBLE);
                         waveform.setVisibility(View.VISIBLE);
                     };
-                    WaveActivity.this.runOnUiThread(runnable);
+                    AudioActivity.this.runOnUiThread(runnable);
                 }
                 statusHandle.sendMessage(statusHandle.obtainMessage(0, "loaded wave file."));
             }
@@ -192,21 +219,13 @@ public class WaveActivity extends AppCompatActivity {
         waveView.invalidate();
     }
 
+    @SuppressLint("SetTextI18n")
     public void startDrawWave() {
         int bufSize = AudioRecord.getMinBufferSize(
                 FREQUENCY,
                 CHANNEL_CONFIGURATION,
                 AUDIO_ENCODING);// 录音组件
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
-        }
+        @SuppressLint("MissingPermission")
         AudioRecord audioRecord = new AudioRecord(AUDIO_SOURCE,// 指定音频来源，麦克风
                 FREQUENCY, // 16000HZ采样频率
                 CHANNEL_CONFIGURATION,// 录制通道
@@ -219,6 +238,16 @@ public class WaveActivity extends AppCompatActivity {
         waveCanvas.Start(audioRecord, bufSize, waveView, mFileName, DATA_DIRECTORY, msgCallback);
         int baseLine = waveCanvas.getBaseLine();
         Log.i(TAG, "waveCanvas baseline = " + baseLine);
+        recdBtn.setText("Recording");
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RequestAudio && resultCode == RESULT_OK) {
+            startDrawWave();
+        }
     }
 
     @Override

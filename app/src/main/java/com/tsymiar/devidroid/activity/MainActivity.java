@@ -40,8 +40,9 @@ import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = MainActivity.class.getCanonicalName();
-    public static final int RequestPublish = 10002;
-    public static final int RequestFloat = 10003;
+    public static final int RequestStorage = 10001;
+    public static final int RequestFloat = 10002;
+    public static final int RequestAudio = 10003;
     static MainActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
     private ServiceConnection mServiceConnection = null;
@@ -165,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 v -> startActivity(new Intent(MainActivity.this, TextureActivity.class))
         );
         findViewById(R.id.btn_audio).setOnClickListener(
-                v -> startActivity(new Intent(MainActivity.this, WaveActivity.class))
+                v -> startActivity(new Intent(MainActivity.this, AudioActivity.class))
         );
         findViewById(R.id.btn_chart).setOnClickListener(
                 v -> startActivity(new Intent(MainActivity.this, GraphActivity.class))
@@ -291,15 +292,6 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RequestPublish && resultCode == RESULT_OK) {
-            String string = data.getStringExtra("Publish");
-            if (string != null && string.equals("SUCCESS")) {
-                Log.i(TAG, "Publish " + string + ":\n" + PubSubSetting.getSetting().toString());
-                CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
-            } else {
-                Log.i(TAG, PubSubSetting.getSetting().toString() + " with " + string);
-            }
-        }
         if (requestCode == RequestFloat) {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show();

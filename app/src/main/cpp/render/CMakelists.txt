@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.4.1)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 add_library(texture STATIC
-        EglShader.cpp
-        EglTexture.cpp
-        EglGpuRender.cpp
+        gles/EglShader.cpp
+        gles/EglTexture.cpp
+        gles/EglGpuRender.cpp
         CpuRenderView.cpp)
 
 target_link_libraries(texture converter fileutils log)
