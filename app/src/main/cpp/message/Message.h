@@ -7,6 +7,7 @@
 
 #include <string>
 #include <queue>
+#include <mutex>
 
 enum MASSAGER {
     MESSAGE,
@@ -15,7 +16,8 @@ enum MASSAGER {
     UDP_SERVER,
     UDP_CLIENT,
     SUBSCRIBER,
-    PUBLISHER
+    PUBLISHER,
+    UPDATE_VIEW
 };
 
 struct Messaging {
@@ -36,6 +38,7 @@ private:
 
     ~Message() {};
     static std::queue <Messaging> m_msgQue;
+    std::mutex m_mtx = {};
 };
 
 

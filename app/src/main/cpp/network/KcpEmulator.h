@@ -182,8 +182,9 @@ protected:
 
 private:
     const int RECVWND = 128;
+    void freeKcp();
 public:
-    void KcpRun(int mode);
+    void KcpRun(int speed);
 };
 
 #endif

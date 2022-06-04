@@ -16,6 +16,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,6 +44,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     public static final int RequestStorage = 10001;
     public static final int RequestFloat = 10002;
     public static final int RequestAudio = 10003;
+    @SuppressLint("StaticFieldLeak")
     static MainActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
     private ServiceConnection mServiceConnection = null;
@@ -50,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
     private int gValue = 1;
     Intent publisherIntent;
     Intent subscribeIntent;
+    Button mKcpBtn;
 
     public static MainActivity getInstance()
     {
@@ -71,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
 
     @SuppressLint("HandlerLeak")
     private final Handler handler = new Handler() {
+        @SuppressLint("SetTextI18n")
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
@@ -95,6 +99,9 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     break;
                 case Receiver.LOG_VIEW:
                     TextureActivity.log(msg.obj.toString());
+                    break;
+                case Receiver.UPDATE_VIEW:
+                    mKcpBtn.setText("kcp-" + msg.obj.toString());
                     break;
                 default:
                     break;
@@ -235,7 +242,8 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_tcp).setOnClickListener(
                 v-> NetWrapper.startTcpServer(8700)
         );
-        findViewById(R.id.btn_ikcp).setOnClickListener(
+        mKcpBtn = findViewById(R.id.btn_ikcp);
+        mKcpBtn.setOnClickListener(
                 v-> NetWrapper.KcpRun()
         );
     }

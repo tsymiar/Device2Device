@@ -35,5 +35,5 @@
     <string name="hint_address">address</string>
     <string name="hint_port">port</string>
     <string name="tcp">TCP</string>
-    <string name="kcprun">iKcp</string>
+    <string name="kcprun">Kcp</string>
 </resources>

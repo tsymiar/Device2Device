@@ -561,6 +561,7 @@ BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba)
     {
         LOGE("file type(0x%x) error!", fileType);
         prop.blSize = -2;
+        fclose(fpBmp);
         return prop;
     }
 
@@ -595,7 +596,7 @@ BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba)
         LOGE("bmp size not match: [%d][%d]", len, prop.blSize);
     }
 
-    channelChange(3, *pRgba, prop.biWidth, prop.biHeight);
+    *pRgba = channelChange(3, *pRgba, prop.biWidth, prop.biHeight);
 
     fclose(fpBmp);
     return prop;

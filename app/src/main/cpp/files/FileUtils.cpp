@@ -20,6 +20,7 @@ int FileUtils::MakeDirs(const char *fullPath)
     int iLen = strlen(pszDir);
     if (access(fullPath, F_OK) == 0) {
         LOGI("fullPath '%s' already exist.", fullPath);
+        delete pszDir;
         return 1;
     }
     if (pszDir[iLen - 1] != '\\' && pszDir[iLen - 1] != '/') {
@@ -33,6 +34,7 @@ int FileUtils::MakeDirs(const char *fullPath)
             if (iRet != 0) {
                 iRet = mkdir(pszDir, 0755);
                 if (iRet != 0) {
+                    delete pszDir;
                     return -1;
                 }
             }

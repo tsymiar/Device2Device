@@ -60,15 +60,18 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
 JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
 {
     Messaging receiving = Message::instance().getMessage();
-    if (!receiving.message.empty()) {
+    if (!receiving.message.empty() && env != nullptr) {
         jclass objectClass = env->FindClass("com/tsymiar/devidroid/data/Receiver");
         jfieldID value = (env)->GetFieldID(objectClass, "message", "Ljava/lang/String;");
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         jstring msg = env->NewStringUTF(receiving.message.c_str());
-        env->SetObjectField(clazz, value, msg);
-        env->SetIntField(clazz, key, (int) receiving.massager);
-        LOGI("message pop [%d], %s", receiving.massager, receiving.message.c_str());
-        env->DeleteLocalRef(msg);
+        if (msg != nullptr) {
+            env->SetObjectField(clazz, value, msg);
+            env->SetIntField(clazz, key, (int) receiving.massager);
+            LOGI("message pop type: [%d], value: [%s]", receiving.massager,
+                 receiving.message.c_str());
+            env->DeleteLocalRef(msg);
+        }
         return clazz;
     } else {
         return nullptr;
@@ -406,12 +409,11 @@ int tcp_callback(uint8_t *data, size_t size)
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint port)
 {
-    std::thread th(
-            [](int port) -> void {
-                TcpSocket tcp;
-                tcp.RegisterCallback(tcp_callback);
-                tcp.Start(port);
-            }, port);
+    std::thread th([](int port) -> void {
+        TcpSocket tcp;
+        tcp.RegisterCallback(tcp_callback);
+        tcp.Start(port);
+    }, port);
     if (th.joinable())
         th.detach();
     return 0;
@@ -419,16 +421,23 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint p
 
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv *, jclass)
 {
-    std::thread th([&]()-> void {
-        static int index = 0;
-        KcpEmulator emulator;
-        emulator.KcpRun(index);
-        char hint[64];
-        sprintf(hint, "Kcp emulator finish in mode: %d.", index);
-        Message::instance().setMessage(hint, TOAST);
+    static int index = 0;
+    static bool running = false;
+    char hint[128];
+    std::thread th([&]() -> void {
+        if (running)
+            return;
+        else
+            running = true;
         if (index > 2)
             index = 0;
+        Message::instance().setMessage(std::to_string(index), UPDATE_VIEW);
+        KcpEmulator emulator;
+        emulator.KcpRun(index);
+        sprintf(hint, "Kcp emulator finish in speed: %d.", index);
+        Message::instance().setMessage(hint, TOAST);
         index++;
+        running = false;
     });
     if (th.joinable())
         th.detach();

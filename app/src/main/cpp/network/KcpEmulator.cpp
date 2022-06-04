@@ -1,7 +1,11 @@
+#ifndef LOG_TAG
+#define LOG_TAG "KcpEmulator"
+#endif
+#include <Utils/logging.h>
 #include "KcpEmulator.h"
 
 // 模拟网络
-KcpEmulator *vnet;
+KcpEmulator *vnet = nullptr;
 
 class iterator;
 
@@ -9,9 +13,8 @@ class iterator;
 // rttmin：rtt最小值，默认 60
 // rttmax：rtt最大值，默认 125
 KcpEmulator::KcpEmulator(int lostrate, int rttmin, int rttmax, int nmax) :
-        r12(100), r21(100)
+        current(iclock()), r12(100), r21(100)
 {
-    current = iclock();
     this->lostrate = lostrate / 2;    // 上面数据是往返丢包率，单程除以2
     this->rttmin = rttmin / 2;
     this->rttmax = rttmax / 2;
@@ -19,18 +22,7 @@ KcpEmulator::KcpEmulator(int lostrate, int rttmin, int rttmax, int nmax) :
     tx1 = tx2 = 0;
 }
 
-KcpEmulator::~KcpEmulator()
-{
-    DelayTunnel::iterator it;
-    for (it = p12.begin(); it != p12.end(); it++) {
-        delete *it;
-    }
-    for (it = p21.begin(); it != p21.end(); it++) {
-        delete *it;
-    }
-    p12.clear();
-    p21.clear();
-}
+KcpEmulator::~KcpEmulator() = default;
 
 // 发送数据
 // peer - 端点0/1，从0发送，从1接收；从1发送从0接收
@@ -61,16 +53,20 @@ int KcpEmulator::Receiver(int peer, void *data, int maxsize)
 {
     DelayTunnel::iterator it;
     if (peer == 0) {
+        if (p21.empty()) return -1;
         it = p21.begin();
-        if (p21.size() == 0) return -1;
+        if (*it == nullptr) return -1;
     } else {
+        if (p12.empty()) return -1;
         it = p12.begin();
-        if (p12.size() == 0) return -1;
+        if (*it == nullptr) return -1;
     }
     DelayPacket *pkt = *it;
     current = iclock();
-    if (current < pkt->ts()) return -2;
-    if (maxsize < pkt->size()) return -3;
+    if (current < pkt->ts())
+        return -2;
+    if (maxsize < pkt->size())
+        return -3;
     if (peer == 0) {
         p21.erase(it);
     } else {
@@ -90,12 +86,14 @@ int udp_output(const char *buf, int len, ikcpcb *kcp, void *user)
         void *ptr;
     } parameter{};
     parameter.ptr = user;
-    vnet->Sender(parameter.id, buf, len);
+    if (vnet != nullptr) {
+        vnet->Sender(parameter.id, buf, len);
+    }
     return 0;
 }
 
 // 测试用例
-void KcpEmulator::KcpRun(int mode)
+void KcpEmulator::KcpRun(int speed)
 {
     // 创建模拟网络：丢包率10%，Rtt 60ms~125ms
     vnet = new KcpEmulator(10, 60, 125);
@@ -123,11 +121,11 @@ void KcpEmulator::KcpRun(int mode)
     ikcp_wndsize(kcp2, RECVWND, RECVWND);
 
     // 判断测试用例的模式
-    if (mode == 0) {
+    if (speed == 0) {
         // 默认模式
         ikcp_nodelay(kcp1, 0, 10, 0, 0);
         ikcp_nodelay(kcp2, 0, 10, 0, 0);
-    } else if (mode == 1) {
+    } else if (speed == 1) {
         // 普通模式，关闭流控等
         ikcp_nodelay(kcp1, 0, 10, 0, 1);
         ikcp_nodelay(kcp2, 0, 10, 0, 1);
@@ -199,7 +197,7 @@ void KcpEmulator::KcpRun(int mode)
 
             if (sn != next) {
                 // 如果收到的包不连续
-                printf("ERROR sn %d<->%d\n", (int) count, (int) next);
+                LOGI("ERROR sn %d<->%d\n", (int) count, (int) next);
                 return;
             }
 
@@ -208,7 +206,7 @@ void KcpEmulator::KcpRun(int mode)
             count++;
             if (rtt > (IUINT32) maxrtt) maxrtt = rtt;
 
-            printf("[RECV] mode=%d sn=%d rtt=%d\n", mode, (int) sn, (int) rtt);
+            LOGI("[RECV] speed=%d sn=%d rtt=%d\n", speed, (int) sn, (int) rtt);
         }
         if (next > 1000) break;
     }
@@ -219,9 +217,32 @@ void KcpEmulator::KcpRun(int mode)
     ikcp_release(kcp2);
 
     const char *names[3] = {"default", "normal", "fast"};
-    printf("%s mode result (%dms):\n", names[mode], (int) ts1);
-    printf("avgrtt=%d maxrtt=%d tx=%d\n", (int) (sumrtt / count), (int) maxrtt, (int) vnet->tx1);
-    printf("press enter to next ...\n");
-    char ch;
-    scanf("%c", &ch);
+    LOGI("%s speed result (%dms):\n", names[speed], (int) ts1);
+    LOGI("avgrtt=%d maxrtt=%d tx=%d\n", (int) (sumrtt / count), (int) maxrtt, (int) vnet->tx1);
+
+    freeKcp();
+}
+
+void KcpEmulator::freeKcp()
+{
+    auto it = p12.begin();
+    for (; it != p12.end(); ++it) {
+        if (*it != nullptr) {
+            delete *it;
+            *it = nullptr;
+        }
+    }
+    p12.clear();
+    it = p21.begin();
+    for (; it != p21.end(); ++it) {
+        if (*it != nullptr) {
+            delete *it;
+            *it = nullptr;
+        }
+    }
+    p21.clear();
+    if (vnet != nullptr) {
+        delete vnet;
+        vnet = nullptr;
+    }
 }

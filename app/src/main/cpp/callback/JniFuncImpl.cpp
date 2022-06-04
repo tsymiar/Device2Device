@@ -88,7 +88,7 @@ jstring Cstring2Jstring(JNIEnv *env, const char *pat)
 
 std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
 {
-    char *rtn = nullptr;
+    char *str = nullptr;
     jclass clz = env->FindClass("java/lang/String");
     jstring encode = env->NewStringUTF("utf-8");
     jmethodID mid = env->GetMethodID(clz, "getBytes", "(Ljava/lang/String;)[B");
@@ -96,13 +96,16 @@ std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
     auto len = static_cast<size_t>(env->GetArrayLength(barr));
     jbyte *ba = env->GetByteArrayElements(barr, JNI_FALSE);
     if (len > 0) {
-        rtn = (char *) malloc(len + 1);
-        memcpy(rtn, ba, len);
-        rtn[len] = 0;
+        str = (char *) malloc(len + 1);
+        memcpy(str, ba, len);
+        str[len] = 0;
     }
     env->ReleaseByteArrayElements(barr, ba, 0);
-    std::string temp(rtn);
-    free(rtn);
+    std::string temp;
+    if (str != nullptr) {
+        temp = str;
+        free(str);
+    }
     return temp;
 }
 

@@ -8,6 +8,7 @@ std::queue <Messaging> Message::m_msgQue;
 
 Messaging Message::getMessage()
 {
+    std::lock_guard<std::mutex> lock(m_mtx);
     Messaging messaging{};
     if (m_msgQue.empty())
         return messaging;
@@ -26,6 +27,7 @@ Message& Message::instance()
 
 void Message::setMessage(const std::string& message, MASSAGER massager)
 {
+    std::lock_guard<std::mutex> lock(m_mtx);
     Messaging messaging;
     messaging.massager = massager;
     messaging.message = message;
