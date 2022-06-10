@@ -45,7 +45,7 @@ import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
 import java.util.Arrays;
 
-public class SoundFile {
+public class SoundRecord {
     private ProgressListener mProgressListener = null;
     private File mInputFile = null;
 
@@ -71,7 +71,7 @@ public class SoundFile {
     private float mNumFramesFloat;
     private AppCompatActivity context = null;
 
-    public SoundFile(AppCompatActivity activity) {
+    public SoundRecord(AppCompatActivity activity) {
         context = activity;
     }
 
@@ -115,8 +115,8 @@ public class SoundFile {
     }
 
     // Create and return a SoundFile object using the file fileName.
-    public static SoundFile create(String fileName,
-                                   ProgressListener progressListener)
+    public static SoundRecord create(String fileName,
+                                     ProgressListener progressListener)
             throws java.io.FileNotFoundException,
             IOException, InvalidInputException {
         // First check that the file exists and that its extension is supported.
@@ -132,22 +132,22 @@ public class SoundFile {
         if (!Arrays.asList(getSupportedExtensions()).contains(components[components.length - 1])) {
             return null;
         }
-        SoundFile soundFile = new SoundFile();
-        soundFile.setProgressListener(progressListener);
-        soundFile.ReadFile(f);
-        return soundFile;
+        SoundRecord soundRecord = new SoundRecord();
+        soundRecord.setProgressListener(progressListener);
+        soundRecord.ReadRecordFile(f);
+        return soundRecord;
     }
 
-    // Create and return a SoundFile object by recording a mono audio stream.
-    public static SoundFile record(ProgressListener progressListener) {
+    // Create and return a SoundRecord object by recording a mono audio stream.
+    public static SoundRecord record(ProgressListener progressListener) {
         if (progressListener == null) {
             // must have a progessListener to stop the recording.
             return null;
         }
-        SoundFile soundFile = new SoundFile();
-        soundFile.setProgressListener(progressListener);
-        soundFile.RecordAudio();
-        return soundFile;
+        SoundRecord soundRecord = new SoundRecord();
+        soundRecord.setProgressListener(progressListener);
+        soundRecord.RecordAudio();
+        return soundRecord;
     }
 
     public String getFiletype() {
@@ -205,7 +205,7 @@ public class SoundFile {
     }
 
     // A SoundFile object should only be created using the static methods create() and record().
-    private SoundFile() {
+    private SoundRecord() {
     }
 
     private void setProgressListener(ProgressListener progressListener) {
@@ -213,21 +213,21 @@ public class SoundFile {
     }
 
     @SuppressLint("NewApi")
-    private void ReadFile(File inputFile)
-            throws java.io.FileNotFoundException,
-            IOException, InvalidInputException {
+    private void ReadRecordFile(File inputFile) throws IOException, InvalidInputException {
         MediaExtractor extractor = new MediaExtractor();
         MediaFormat format = null;
-        int i;
 
-        mInputFile = inputFile;
-        String[] components = mInputFile.getPath().split("\\.");
+        String[] components = inputFile.getPath().split("\\.");
         mFileType = components[components.length - 1];
-        mFileSize = (int) mInputFile.length();
-
-        extractor.setDataSource(mInputFile.getPath());
+        mFileSize = (int) inputFile.length();
+        if (mFileSize <= 0) {
+            Log.e(SoundRecord.class.getSimpleName(), "file size invalid: " + mFileSize);
+            return;
+        }
+        extractor.setDataSource(inputFile.getAbsolutePath());
         int numTracks = extractor.getTrackCount();
         // find and select the first audio track present in the file.
+        int i;
         for (i = 0; i < numTracks; i++) {
             format = extractor.getTrackFormat(i);
             if (format.getString(MediaFormat.KEY_MIME).startsWith("decode/")) {
@@ -238,11 +238,15 @@ public class SoundFile {
         if (i == numTracks) {
             throw new InvalidInputException("No audio track found in " + mInputFile);
         }
-        mChannels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
-        mSampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+        if (format != null) {
+            mChannels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+            mSampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+        }
         // Expected total number of samples per channel.
-        int expectedNumSamples =
-                (int) ((format.getLong(MediaFormat.KEY_DURATION) / 1000000.f) * mSampleRate + 0.5f);
+        if (format == null) {
+            return;
+        }
+        int expectedNumSamples = (int) ((format.getLong(MediaFormat.KEY_DURATION) / 1000000.f) * mSampleRate + 0.5f);
 
         MediaCodec codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME));
         codec.configure(format, null, null, 0);
@@ -263,7 +267,7 @@ public class SoundFile {
         // estimate of the total size needed to store all the samples in order to resize the buffer
         // only once.
         mDecodedBytes = ByteBuffer.allocate(1 << 20);
-        Boolean firstSampleData = true;
+        boolean firstSampleData = true;
         while (true) {
             // read data from file and feed it to the decoder input buffers.
             int inputBufferIndex = codec.dequeueInputBuffer(100);
@@ -295,10 +299,8 @@ public class SoundFile {
                             // We are asked to stop reading the file. Returning immediately. The 停止閱讀文件
                             // SoundFile object is invalid and should NOT be used afterward!
                             extractor.release();
-                            extractor = null;
                             codec.stop();
                             codec.release();
-                            codec = null;
                             return;
                         }
                     }
@@ -345,7 +347,9 @@ public class SoundFile {
                     }
                     //ByteBuffer newDecodedBytes = ByteBuffer.allocate(newSize);
                     mDecodedBytes.rewind();
-                    newDecodedBytes.put(mDecodedBytes);
+                    if (newDecodedBytes != null) {
+                        newDecodedBytes.put(mDecodedBytes);
+                    }
                     mDecodedBytes = newDecodedBytes;
                     mDecodedBytes.position(position);
                 }

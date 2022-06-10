@@ -25,7 +25,7 @@ import android.util.AttributeSet;
 import android.view.View;
 
 import com.tsymiar.devidroid.R;
-import com.tsymiar.devidroid.utils.SoundFile;
+import com.tsymiar.devidroid.utils.SoundRecord;
 
 public class WaveformsView extends View {
     // Colors
@@ -37,7 +37,7 @@ public class WaveformsView extends View {
     private int line_offset;
     private int playFinish;
 
-    private SoundFile mSoundFile;
+    private SoundRecord mSoundRecord;
     private int[] mLenByZoomLevel;
     private double[][] mValuesByZoomLevel;
     private double[] mZoomFactorByZoomLevel;
@@ -126,7 +126,7 @@ public class WaveformsView extends View {
                 getResources().getColor(R.color.time_value_shadow));
 
 
-        mSoundFile = null;
+        mSoundRecord = null;
         mLenByZoomLevel = null;
         mValuesByZoomLevel = null;
         mHeightsAtThisZoomLevel = null;
@@ -140,13 +140,13 @@ public class WaveformsView extends View {
 
 
     public boolean hasSoundFile() {
-        return mSoundFile != null;
+        return mSoundRecord != null;
     }
 
-    public void setSoundFile(SoundFile soundFile) {
-        mSoundFile = soundFile;
-        mSampleRate = mSoundFile.getSampleRate();
-        mSamplesPerFrame = mSoundFile.getSamplesPerFrame();
+    public void setSoundFile(SoundRecord soundRecord) {
+        mSoundRecord = soundRecord;
+        mSampleRate = mSoundRecord.getSampleRate();
+        mSamplesPerFrame = mSoundRecord.getSamplesPerFrame();
         computeDoublesForAllZoomLevels();
         mHeightsAtThisZoomLevel = null;
     }
@@ -222,7 +222,7 @@ public class WaveformsView extends View {
 
     public double pixelsToSeconds(int pixels) {
         double z = mZoomFactorByZoomLevel[0];
-        return (mSoundFile.getNumFramesFloat() * 2 * (double) mSamplesPerFrame / (mSampleRate * z));
+        return (mSoundRecord.getNumFramesFloat() * 2 * (double) mSamplesPerFrame / (mSampleRate * z));
     }
 
     public int millisecsToPixels(int msecs) {
@@ -239,7 +239,7 @@ public class WaveformsView extends View {
 
     public int pixelsToMillisecsTotal() {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int) (mSoundFile.getNumFramesFloat() * 1 * (1000.0 * mSamplesPerFrame) /
+        return (int) (mSoundRecord.getNumFramesFloat() * 1 * (1000.0 * mSamplesPerFrame) /
                 (mSampleRate * 1) + 0.5);
     }
 
@@ -305,12 +305,12 @@ public class WaveformsView extends View {
         canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth, measuredHeight - line_offset / 2 - 1, paintLine);//最下面的那根线
 //        }
         if (state == 1) {
-            mSoundFile = null;
+            mSoundRecord = null;
             state = 0;
             return;
         }
 
-        if (mSoundFile == null) {
+        if (mSoundRecord == null) {
             height = measuredHeight - line_offset;
             centerLine = new Paint();
             centerLine.setColor(Color.rgb(39, 199, 175));
@@ -391,8 +391,8 @@ public class WaveformsView extends View {
      * Called once when a new sound file is added
      */
     private void computeDoublesForAllZoomLevels() {
-        int numFrames = mSoundFile.getNumFrames();
-        int[] frameGains = mSoundFile.getFrameGains();
+        int numFrames = mSoundRecord.getNumFrames();
+        int[] frameGains = mSoundRecord.getFrameGains();
         double[] smoothedGains = new double[numFrames];
         if (numFrames == 1) {
             smoothedGains[0] = frameGains[0];

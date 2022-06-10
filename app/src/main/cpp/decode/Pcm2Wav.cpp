@@ -132,7 +132,7 @@ int convertAudioFiles(const char *from, const char *target)
         return -4;
     }
     if (fwrite(buf, 1, size, fp)) {
-        LOGE("write target file '%s' failed.", target);
+        LOGE("write[%d] to target file '%s' failed.", size, target);
         return -3;
     }
     fclose(fp);

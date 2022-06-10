@@ -132,12 +132,11 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
     g_pubSubParam.id = id;
     std::thread th(
             [&status](const PubSubParam& param) -> void {
-                Scadup Scadup;
-                Scadup.Initialize(param.addr.c_str(), param.port);
-                status = Scadup.Subscriber(param.topic, param.hook);
+                Scadup::GetInstance().Initialize(param.addr.c_str(), param.port);
+                status = Scadup::GetInstance().Subscriber(param.topic, param.hook);
                 char content[256];
                 memset(content, 0, 256);
-                sprintf(content, "message from %s:%d, topic = '%s', hook = %p, status = %d",
+                sprintf(content, "message of %s:%d, topic: '%s', hook = %p, status = %d",
                         param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
                 Message::instance().setMessage(content, SUBSCRIBER);
                 // SetTextView(&param.env, param.clz, param.view, content);
@@ -159,9 +158,8 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstri
     }
     std::string topicParam = Jstring2Cstring(env, topic);
     std::string payloadParam = Jstring2Cstring(env, payload);
-    Scadup Scadup;
-    Scadup.Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
-    ssize_t stat = Scadup.Publisher(topicParam, payloadParam);
+    Scadup::GetInstance().Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
+    ssize_t stat = Scadup::GetInstance().Publisher(topicParam, payloadParam);
     if (stat < 0) {
         Message::instance().setMessage("Message Publisher failed!", TOAST);
     }

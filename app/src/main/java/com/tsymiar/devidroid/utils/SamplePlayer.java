@@ -84,7 +84,7 @@ public class SamplePlayer {
         mListener = null;
     }
 
-    public SamplePlayer(SoundFile sf) {
+    public SamplePlayer(SoundRecord sf) {
         this(sf.getSamples(), sf.getSampleRate(), sf.getChannels(), sf.getNumSamples());
     }
 

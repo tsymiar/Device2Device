@@ -1,5 +1,7 @@
 package com.tsymiar.devidroid.utils;
 
+import androidx.annotation.NonNull;
+
 class Atom {  // note: latest versions of spec simply call it 'box' instead of 'atom'.
     private int mSize;  // includes atom header (8 bytes)
     private final int mType;
@@ -153,6 +155,7 @@ class Atom {  // note: latest versions of spec simply call it 'box' instead of '
     }
 
     // Used for debugging purpose only.
+    @NonNull
     public String toString() {
         StringBuilder str = new StringBuilder();
         byte[] atom_bytes = getBytes();

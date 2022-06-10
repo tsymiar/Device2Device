@@ -57,7 +57,7 @@ public class FloatingService extends Service {
         connecting = false;
     }
 
-    private WindowManager windowManager;
+    private WindowManager windowManager = null;
     private LayoutInflater layoutInflater;
     View floatView;
 

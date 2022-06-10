@@ -32,7 +32,7 @@ import androidx.core.app.ActivityCompat;
 import com.tsymiar.devidroid.R;
 import com.tsymiar.devidroid.utils.LocalFile;
 import com.tsymiar.devidroid.utils.SamplePlayer;
-import com.tsymiar.devidroid.utils.SoundFile;
+import com.tsymiar.devidroid.utils.SoundRecord;
 import com.tsymiar.devidroid.utils.WaveCanvas;
 import com.tsymiar.devidroid.view.WaveSurface;
 import com.tsymiar.devidroid.view.WaveformsView;
@@ -43,7 +43,7 @@ public class AudioActivity extends AppCompatActivity {
 
     public final String TAG = AudioActivity.class.getSimpleName();
     public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/Android/data/" + "com.tsymiar.devidroid" + "/record/";
+            + "/Android/data/" + "com.tsymiar.devidroid" + "/files/record/";
     private static final int FREQUENCY = 16000;// 设置音频采样率,44100是目前的标准,某些设备仍然支持22050，16000，11025
     private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
@@ -112,7 +112,7 @@ public class AudioActivity extends AppCompatActivity {
 
     File mFile;
     Thread mLoadSoundFileThread;
-    SoundFile mSoundFile = new SoundFile(this);
+    SoundRecord mSoundRecord = new SoundRecord(this);
     boolean mLoadingKeepGoing;
     static SamplePlayer mPlayer;
     float mDensity;
@@ -129,11 +129,11 @@ public class AudioActivity extends AppCompatActivity {
         mLoadSoundFileThread = new Thread() {
             public void run() {
                 try {
-                    mSoundFile = SoundFile.create(mFile.getAbsolutePath(), null);
-                    if (mSoundFile == null) {
+                    mSoundRecord = SoundRecord.create(mFile.getAbsolutePath(), null);
+                    if (mSoundRecord == null) {
                         return;
                     }
-                    mPlayer = new SamplePlayer(mSoundFile);
+                    mPlayer = new SamplePlayer(mSoundRecord);
                 } catch (final Exception e) {
                     e.printStackTrace();
                     statusHandle.sendMessage(statusHandle.obtainMessage(-1, e.toString()));
@@ -141,7 +141,7 @@ public class AudioActivity extends AppCompatActivity {
                 }
                 if (mLoadingKeepGoing) {
                     Runnable runnable = () -> {
-                        waveform.setSoundFile(mSoundFile);
+                        waveform.setSoundFile(mSoundRecord);
                         DisplayMetrics metrics = new DisplayMetrics();
                         getWindowManager().getDefaultDisplay().getMetrics(metrics);
                         mDensity = metrics.density;

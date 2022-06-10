@@ -49,4 +49,4 @@
 
     click to update timestamp
 
-    <img src="pic/MainActivity.jpg" title="MainActivity" height="60%" width="60%">
+    <img src="screenshots/MainActivity.jpg" title="MainActivity" height="60%" width="60%">

@@ -302,8 +302,8 @@ public class WaveCanvas {
     class WriteRunnable implements Runnable {
         @Override
         public void run() {
+            FileOutputStream fos2wav = null;
             try {
-                FileOutputStream fos2wav = null;
                 File file2wav;
                 try {
                     file2wav = new File(savePcmPath);
@@ -329,12 +329,17 @@ public class WaveCanvas {
                         e.printStackTrace();
                     }
                 }
-                assert fos2wav != null;
-                fos2wav.close();
                 //将pcm格式转换成wav一个44字节的头信息
                 FileWrapper.convertAudioFiles(savePcmPath, saveWavPath);
             } catch (Throwable t) {
                 Log.e(TAG, t.toString());
+            } finally {
+                assert fos2wav != null;
+                try {
+                    fos2wav.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
