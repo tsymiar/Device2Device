@@ -666,17 +666,17 @@ void EglGpuRender::FrameRender(unsigned char* frameData, size_t)
     GLint posLoc = glGetAttribLocation(EGL2.glProgram, "position");
     glEnableVertexAttribArray(posLoc);
     glVertexAttribPointer(posLoc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, NULL);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, g_texturePosBuffer);
     GLint texcoordLoc = glGetAttribLocation(EGL2.glProgram, "texCoord");
     glEnableVertexAttribArray(texcoordLoc);
     glVertexAttribPointer(texcoordLoc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, NULL);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(posLoc);
     glDisableVertexAttribArray(texcoordLoc);
 
-    glUseProgram(NULL);
+    glUseProgram(0);
 }

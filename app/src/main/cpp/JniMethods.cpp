@@ -110,7 +110,7 @@ struct PubSubParam {
 } g_pubSubParam;
 
 void RecvHook(const Scadup::Message& msg) {
-    std::string message = "header:\t[" + std::string(msg.header.topic)
+    std::string message = "header:\t[" + std::string(msg.header.keyword)
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
