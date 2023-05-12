@@ -16,6 +16,7 @@
 
 package com.tsymiar.devidroid.fragment;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
@@ -40,8 +41,8 @@ import java.util.ArrayList;
 public class HistogramChart extends RelativeLayout implements View.OnClickListener {
 
     static final float GROUP_SPACE = 0.1f;
-    private HistogramData histogramData;
-    private BarChart barChart;
+    private final HistogramData histogramData;
+    private final BarChart barChart;
 
     public HistogramChart(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -186,6 +187,7 @@ public class HistogramChart extends RelativeLayout implements View.OnClickListen
         barChart.invalidate();
     }
 
+    @SuppressLint("NonConstantResourceId")
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
@@ -195,7 +197,7 @@ public class HistogramChart extends RelativeLayout implements View.OnClickListen
     }
 
     static class HistogramData {
-        private float binWidth;
+        private final float binWidth;
         private final ArrayList<ArrayList<Double>> rawData;
         private double minBin = 0;
         private double maxBin = 100;

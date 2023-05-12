@@ -26,7 +26,7 @@ public:
     void Finish();
 
 private:
-    int Reciever(SOCKETHOOK callback) const;
+    int Receiver(SOCKETHOOK callback) const;
     const int m_recvSize;
     SOCKETHOOK m_callback = nullptr;
     int m_recvSock = 0;

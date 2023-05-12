@@ -17,7 +17,7 @@
 #include <Utils/logging.h>
 #include <cerrno>
 
-int TcpSocket::Reciever(SOCKETHOOK callback) const
+int TcpSocket::Receiver(SOCKETHOOK callback) const
 {
     int sock = this->GetSocket();
     size_t size = this->GetSize();
@@ -101,7 +101,7 @@ int TcpSocket::Start(unsigned short port)
                     [=](TcpSocket *clazz) -> int {
                         int ret = 0;
                         while (m_running) {
-                            ret = Reciever(m_callback);
+                            ret = Receiver(m_callback);
                         }
                         return ret;
                     }, this);

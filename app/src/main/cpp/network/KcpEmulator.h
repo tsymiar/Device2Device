@@ -63,7 +63,7 @@ static inline IINT64 iclock64(void)
 
 static inline IUINT32 iclock()
 {
-    return (IUINT32) (iclock64() & 0xfffffffful);
+    return (IUINT32) (iclock64() & 0xffffffffull);
 }
 
 /* sleep in millisecond */
