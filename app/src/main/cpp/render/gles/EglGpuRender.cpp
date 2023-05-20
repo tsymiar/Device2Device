@@ -7,7 +7,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "EglGpuRender"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include <cerrno>
 #include <utils/statics.h>
 #include <files/FileUtils.h>
@@ -210,7 +210,7 @@ void pixelRender(unsigned char* pixel, size_t)
     GLint aTextureCoordinatesLocation = glGetAttribLocation(
             EGL2.glProgram, "a_TextureCoordinates");
 
-    GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
+    static GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
     // Order of coordinates: X, Y, S, T
     // Triangle Fan
     GLfloat VERTEX_DATA[] = { 0.0f, 0.0f, 0.5f, 0.5f,

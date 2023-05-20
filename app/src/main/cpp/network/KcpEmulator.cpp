@@ -1,7 +1,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "KcpEmulator"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include "KcpEmulator.h"
 
 // 模拟网络
@@ -107,8 +107,7 @@ void KcpEmulator::KcpRun(int speed)
     kcp1->output = udp_output;
     kcp2->output = udp_output;
 
-    IUINT32 current = iclock();
-    IUINT32 slap = current + 20;
+    IUINT32 slap = iclock() + 20;
     IUINT32 index = 0;
     IUINT32 next = 0;
     IINT64 sumrtt = 0;

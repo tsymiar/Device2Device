@@ -101,7 +101,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                     TextureActivity.log(msg.obj.toString());
                     break;
                 case Receiver.UPDATE_VIEW:
-                    mKcpBtn.setText("kcp-" + msg.obj.toString());
+                    mKcpBtn.setText(msg.obj.toString());
                     break;
                 default:
                     break;
@@ -206,7 +206,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_server).setOnClickListener(
                 v -> {
                     wifiLock.acquire();
-                    NetWrapper.startUdpServer();
+                    NetWrapper.startUdpServer(8899);
                 }
         );
         findViewById(R.id.btn_client).setOnClickListener(
@@ -244,7 +244,10 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         );
         mKcpBtn = findViewById(R.id.btn_ikcp);
         mKcpBtn.setOnClickListener(
-                v-> NetWrapper.KcpRun()
+                v-> {
+                    NetWrapper.startKcpServer(8090);
+                    NetWrapper.startKcpClient("127.0.0.1", 8090);
+                }
         );
     }
     private class BroadcastReceiverClass extends BroadcastReceiver {

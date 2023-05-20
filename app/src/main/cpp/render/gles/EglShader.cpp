@@ -8,7 +8,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "EglShader"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 
 #define SR_FAIL 1;
 

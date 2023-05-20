@@ -15,9 +15,9 @@ public:
 
     static JavaFuncCalls& GetInstance();
 
-    int Register(char* method, CALLBACK call);
+    static int Register(char* method, CALLBACK call);
 
-    void CallBack(const std::string &method, int action, const char *content, bool statics);
+    static void CallBack(const std::string &method, int action, const char *content, bool statics);
 };
 
 #endif //DEVIDROID_JavaFuncCalls_H

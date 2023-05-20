@@ -12,7 +12,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "bitmap"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 
 #ifdef WIN32
  /*

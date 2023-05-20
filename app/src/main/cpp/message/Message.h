@@ -41,5 +41,4 @@ private:
     std::mutex m_mtx = {};
 };
 
-
 #endif //DEVIDROID_MESSAGE_H

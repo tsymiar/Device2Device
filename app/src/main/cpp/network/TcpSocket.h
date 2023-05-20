@@ -33,5 +33,4 @@ private:
     volatile bool m_running = false;
 };
 
-
 #endif //DEVIDROID_TCPSOCKET_H

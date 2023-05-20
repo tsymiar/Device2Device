@@ -6,7 +6,7 @@
 #define LOG_TAG "Pcm2Wav"
 #endif
 
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include <files/FileUtils.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};

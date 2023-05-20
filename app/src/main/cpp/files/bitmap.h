@@ -61,7 +61,7 @@ extern "C" {
     {
         unsigned int   biSize;           /* Size of info header */
         unsigned int   biWidth;          /* Width of image */
-        unsigned int   biHeight;         /* Height of image */
+        int            biHeight;         /* Height of image */
         unsigned short biPlanes;         /* Number of color planes */
         unsigned short biBitCount;       /* Number of bits per pixel */
         unsigned int   biCompression;    /* Type of compression to use */

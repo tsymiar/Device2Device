@@ -10,7 +10,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "CpuTextureView"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include <message/Message.h>
 #include <utils/statics.h>
 #include <files/bitmap.h>

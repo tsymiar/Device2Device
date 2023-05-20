@@ -5,7 +5,7 @@
 #include "JavaFuncCalls.h"
 #include <algorithm>
 #include <thread>
-#include <Utils/logging.h>
+#include <utils/logging.h>
 
 JavaFuncCalls& JavaFuncCalls::GetInstance()
 {

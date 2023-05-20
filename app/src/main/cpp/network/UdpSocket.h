@@ -28,6 +28,8 @@ private:
 public:
     UdpSocket();
 
+    UdpSocket(int);
+
     UdpSocket(const std::string &, int);
 
     int Sender(const char *, size_t);

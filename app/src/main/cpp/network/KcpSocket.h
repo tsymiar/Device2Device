@@ -15,9 +15,13 @@ typedef struct {
     char content[KCP_MSG_LEN];
 } stKcpMsg;
 
-int initKcpSock(stKcpMsg* msg);
-
-void startClient(stKcpMsg* msg);
-
-[[noreturn]] void startServer(stKcpMsg* msg);
-void uninitKcpSock(stKcpMsg* msg);
+class KcpSocket {
+public:
+    int init(int port, bool client = false, const char* ip = nullptr);
+    void startClient() const;
+    void startServer() const;
+    void destroy();
+private:
+    bool m_running;
+    stKcpMsg m_kcpMsg;
+};

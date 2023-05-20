@@ -9,7 +9,7 @@
 #define LOG_TAG "UdpSocket"
 #endif
 
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include <cerrno>
 
 #include "UdpSocket.h"
@@ -17,6 +17,11 @@
 constexpr const int LOCAL_PORT = 8899;
 
 UdpSocket::UdpSocket() = default;
+
+UdpSocket::UdpSocket(int _port)
+{
+    this->m_port = _port;
+}
 
 UdpSocket::UdpSocket(const std::string &_ip, int _port)
 {

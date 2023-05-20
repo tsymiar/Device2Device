@@ -6,12 +6,12 @@
 #ifndef LOG_TAG
 #define LOG_TAG "jniComm"
 #endif
-#include <Utils/logging.h>
+#include <utils/logging.h>
 #include <time/TimeStamp.h>
-#include <Scadup/Scadup.h>
+#include <scadup/Scadup.h>
 #include <message/Message.h>
 #include <files/FileUtils.h>
-#include <network/KcpEmulator.h>
+#include <network/KcpSocket.h>
 #include <render/gles/EglShader.h>
 #include <render/gles/EglTexture.h>
 #include <render/gles/EglGpuRender.h>
@@ -336,6 +336,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
 // #include <template/Clazz2.h>
 
 static int g_msgLen = 6;
+static int g_udpPort = 8899;
 
 JNIEXPORT jint JNICALL
 CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
@@ -358,7 +359,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
     Message::instance().setMessage(message, UDP_CLIENT);
     LOGI("%s", message.c_str());
     g_msgLen = len;
-    auto *sock = new UdpSocket("127.0.0.1", 8899);
+    auto *sock = new UdpSocket("127.0.0.1", g_udpPort);
     sock->Sender(tx, (unsigned int) len + 1);
     delete sock;
 /*
@@ -377,13 +378,14 @@ void callback(char* data)
     }
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass, jint port)
 {
     std::thread th(
-            []() -> void {
+            [&]() -> void {
                 int total = g_msgLen + (int)sizeof(NetProtocol);
                 char msg[total];
-                auto *sock = new UdpSocket();
+                auto *sock = new UdpSocket(port);
+                g_udpPort = port;
                 int size;
                 do {
                     std::string message = "udp receiver starts";
@@ -411,32 +413,42 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint p
         TcpSocket tcp;
         tcp.RegisterCallback(tcp_callback);
         tcp.Start(port);
+        tcp.Finish();
     }, port);
     if (th.joinable())
         th.detach();
     return 0;
 }
 
-JNIEXPORT void JNICALL CPP_FUNC_NETWORK(KcpRun)(JNIEnv *, jclass)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv *, jclass, jint port)
 {
-    static int index = 0;
-    static bool running = false;
-    char hint[128];
-    std::thread th([&]() -> void {
-        if (running)
-            return;
-        else
-            running = true;
-        if (index > 2)
-            index = 0;
-        Message::instance().setMessage(std::to_string(index), UPDATE_VIEW);
-        KcpEmulator emulator;
-        emulator.KcpRun(index);
-        sprintf(hint, "Kcp emulator finish in speed: %d.", index);
-        Message::instance().setMessage(hint, TOAST);
-        index++;
-        running = false;
-    });
+    std::thread th([](int port) -> void {
+        KcpSocket kcpSocket{};
+        kcpSocket.init(port, false);
+        Message::instance().setMessage("Kcp server " + std::to_string(port), UPDATE_VIEW);
+        kcpSocket.startServer();
+    }, port);
     if (th.joinable())
         th.detach();
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* env, jclass, jstring ipstr, jint port)
+{
+    std::string addr = Jstring2Cstring(env, ipstr);
+    auto* ipaddr = new unsigned char[addr.size() +1];
+    memset(ipaddr, 0, addr.size() + 1);
+    memcpy(ipaddr, addr.c_str(), addr.size());
+    std::thread th([](int port, unsigned char* ip) -> void {
+        KcpSocket kcpSocket{};
+        kcpSocket.init(port, true, (const char*)ip);
+        char hint[128];
+        sprintf(hint, "Kcp client start %s:%d.", ip, port);
+        Message::instance().setMessage(hint, TOAST);
+        kcpSocket.startClient();
+        delete ip;
+    }, port, ipaddr);
+    if (th.joinable())
+        th.detach();
+    return 0;
 }
