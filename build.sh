@@ -34,7 +34,7 @@ export PATH=${PATH}:${toolPath}/sdk_root/platform-tools
 export ANDROID_SDK_ROOT=${toolPath}/sdk_root
 
 if [ ! -d "${toolPath}/gradle-7.0.2/bin" ]; then
-    wget https://downloads.gradle-dn.com/distributions/gradle-7.0.2-bin.zip
+    wget https://services.gradle.org/distributions/gradle-7.0.2-bin.zip
     unzip gradle-7.0.2-bin.zip
     rm -f gradle-7.0.2-bin.zip
 else

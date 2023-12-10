@@ -102,7 +102,7 @@ struct PubSubParam {
     std::string addr;
     int port{};
     std::string topic;
-    Scadup::RECVCALLBACK hook{};
+    Scadup::RECV_CALLBACK hook{};
     JNIEnv env{};
     jclass clz{};
     std::string view;
