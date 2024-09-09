@@ -30,7 +30,7 @@ import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.IBarDataSet;
 import com.github.mikephil.charting.utils.ColorTemplate;
 import com.tsymiar.devidroid.R;
@@ -84,7 +84,7 @@ public class HistogramChart extends RelativeLayout implements View.OnClickListen
         xAxis.setGranularityEnabled(true);
         xAxis.setGranularity(1);
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setValueFormatter(new IAxisValueFormatter() {
+        xAxis.setValueFormatter(new ValueFormatter() {
             DecimalFormat df = new DecimalFormat("#.##");
 
             @Override

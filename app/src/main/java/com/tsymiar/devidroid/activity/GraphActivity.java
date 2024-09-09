@@ -2,6 +2,7 @@ package com.tsymiar.devidroid.activity;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.WindowManager;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 
 public class GraphActivity extends AppCompatActivity {
 
+    public final String TAG = GraphActivity.class.getSimpleName();
     private final LineChart[] charts = new LineChart[4];
 
     @Override
@@ -37,7 +39,7 @@ public class GraphActivity extends AppCompatActivity {
 
         for (int i = 0; i < charts.length; i++) {
 
-            LineData data = getData(36, 100);
+            LineData data = getData();
             //data.setValueTypeface(mTf);
             if (i != 2) continue;
             // add some transparency to the color with "& 0x90FFFFFF"
@@ -54,7 +56,7 @@ public class GraphActivity extends AppCompatActivity {
 
     private void setupChart(LineChart chart, LineData data, int color) {
 
-        ((LineDataSet) data.getDataSetByIndex(0)).setCircleColorHole(color);
+        ((LineDataSet) data.getDataSetByIndex(0)).setCircleHoleColor(color);
 
         // no description text
         chart.getDescription().setEnabled(false);
@@ -98,7 +100,11 @@ public class GraphActivity extends AppCompatActivity {
         chart.animateX(2500);
     }
 
-    private LineData getData(int count, float range) {
+    private LineData getData() {
+
+        int count = 36;
+        float range = 100;
+        Log.i(TAG, "getData: count = " + count + ", range=" + range);
 
         ArrayList<Entry> values = new ArrayList<>();
 

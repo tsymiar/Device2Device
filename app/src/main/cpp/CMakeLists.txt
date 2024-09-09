@@ -18,7 +18,7 @@ include_directories(
         ${CMAKE_SOURCE_DIR}/scadup/src
 )
 
-if(${BUILD_SCADUP_LIB} AND ${BUILD_SCADUP_LIB} EQUAL 1)
+if(${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
 add_subdirectory(time)
@@ -85,7 +85,7 @@ find_library(GLESv2 GLESv2)
 target_link_libraries( # Specifies the target library.
         jniComm
         # template
-        ${PROJECT_SOURCE_DIR}/scadup/jniLibs/${ANDROID_ABI}/libscadup.so
+        ${PROJECT_SOURCE_DIR}/../../../jniLibs/${ANDROID_ABI}/libscadup.so
         Network converter callback timestamp texture
         # Links the target library to the log library
         # included in the NDK.
