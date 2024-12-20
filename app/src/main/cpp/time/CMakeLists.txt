@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 2.8...3.16)
 
 add_library(timestamp STATIC TimeStamp.cpp)
 aux_source_directory(. DIR_SRCS)

@@ -7,7 +7,7 @@
 #endif
 
 #include <utils/logging.h>
-#include <files/FileUtils.h>
+#include <bitfile/FileUtils.h>
 
 const char wavTag[] = {'W', 'A', 'V', 'E'};
 const char fileID[] = {'R', 'I', 'F', 'F'};

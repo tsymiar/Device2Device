@@ -3,7 +3,7 @@
 
 # Sets the minimum version of CMake required to build the native library.
 
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 2.8...3.16)
 PROJECT(Devidroid CXX C)
 
 set(CMAKE_BUILD_TYPE "Debug")
@@ -22,10 +22,10 @@ if(${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
 add_subdirectory(time)
-add_subdirectory(files)
 add_subdirectory(render)
 add_subdirectory(decode)
 add_subdirectory(network)
+add_subdirectory(bitfile)
 add_subdirectory(callback)
 # add_subdirectory(template)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
@@ -42,7 +42,7 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         message/Message.cpp
-        files/FileUtils.cpp
+        bitfile/FileUtils.cpp
         JniMethods.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)

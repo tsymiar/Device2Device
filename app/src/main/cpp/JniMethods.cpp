@@ -10,15 +10,16 @@
 #include <time/TimeStamp.h>
 #include <scadup/Scadup.h>
 #include <message/Message.h>
-#include <files/FileUtils.h>
 #include <network/KcpSocket.h>
 #include <render/gles/EglShader.h>
 #include <render/gles/EglTexture.h>
 #include <render/gles/EglGpuRender.h>
 #include <render/CpuRenderView.h>
-#include <files/bitmap.h>
+#include <bitfile/FileUtils.h>
+#include <bitfile/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
+#include "utils/statics.h"
 
 extern JavaVM *g_jniJVM;
 extern std::string g_className;
@@ -40,8 +41,6 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name
             Jstring2Cstring(env, class_name);
     LOGI("class_name = %s, state = %d.", g_className.c_str(), state);
 }
-
-#include "utils/statics.h"
 
 JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
         JNIEnv *env,
@@ -101,7 +100,7 @@ JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time,
 struct PubSubParam {
     std::string addr;
     int port{};
-    std::string topic;
+    uint32_t topic;
     Scadup::RECV_CALLBACK hook{};
     JNIEnv env{};
     jclass clz{};
@@ -110,7 +109,7 @@ struct PubSubParam {
 } g_pubSubParam;
 
 void RecvHook(const Scadup::Message& msg) {
-    std::string message = "header:\t[" + std::string(msg.header.keyword)
+    std::string message = "header:\t[" + std::to_string(msg.head.topic)
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
@@ -122,7 +121,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
     std::string address = Jstring2Cstring(env, addr);
     g_pubSubParam.addr = address;
     const std::string msg = Jstring2Cstring(env, topic);
-    g_pubSubParam.topic = msg;
+    g_pubSubParam.topic = atoi(msg.c_str());
     g_pubSubParam.port = port;
     g_pubSubParam.hook = RecvHook;
     g_pubSubParam.env = *env;
@@ -132,12 +131,13 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
     g_pubSubParam.id = id;
     std::thread th(
             [&status](const PubSubParam& param) -> void {
-                Scadup::GetInstance().Initialize(param.addr.c_str(), param.port);
-                status = Scadup::GetInstance().Subscriber(param.topic, param.hook);
+                Scadup::Subscriber sub;
+                sub.setup(param.addr.c_str(), param.port);
+                status = sub.subscribe(param.topic, param.hook);
                 char content[256];
                 memset(content, 0, 256);
-                sprintf(content, "message of %s:%d, topic: '%s', hook = %p, status = %d",
-                        param.addr.c_str(), param.port, param.topic.c_str(),param.hook, status);
+                sprintf(content, "message of %s:%d, topic: '0x%04x', hook = %p, status = %d",
+                        param.addr.c_str(), param.port, param.topic,param.hook, status);
                 Message::instance().setMessage(content, SUBSCRIBER);
                 // SetTextView(&param.env, param.clz, param.view, content);
             }, g_pubSubParam);
@@ -148,7 +148,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
 
 JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv *, jclass)
 {
-    Scadup::GetInstance().exit();
+    Scadup::Subscriber::exit();
 }
 
 JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstring payload) {
@@ -156,16 +156,17 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstri
         LOGI("g_pubSubParam: addr is null or port == 0.");
         return;
     }
-    std::string topicParam = Jstring2Cstring(env, topic);
+    uint32_t iTopic = atoi(Jstring2Cstring(env, topic).c_str());
     std::string payloadParam = Jstring2Cstring(env, payload);
-    Scadup::GetInstance().Initialize(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
-    ssize_t stat = Scadup::GetInstance().Publisher(topicParam, payloadParam);
+    Scadup::Publisher pub{};
+    pub.setup(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
+    ssize_t stat = pub.publish(iTopic, payloadParam);
     if (stat < 0) {
         Message::instance().setMessage("Message Publisher failed!", TOAST);
     }
-    LOGI("Publish(%ld) to [%s:%d]: message: [%s][%s].", stat,
+    LOGI("Publish(%ld) to [%s:%d]: [topic=0x%04x] message: [%s].", stat,
          g_pubSubParam.addr.c_str(), g_pubSubParam.port,
-         topicParam.c_str(), payloadParam.c_str());
+         iTopic, payloadParam.c_str());
 }
 
 int callback(const char *c, int i)

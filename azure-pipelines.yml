@@ -24,16 +24,10 @@ steps:
     Contents: '**'
     TargetFolder: 'Device2Device/app/src/main/cpp/scadup'
     OverWrite: true
-- task: DeleteFiles@1
-  inputs:
-    SourceFolder: 'scadup'
-    Contents: '**'
-    RemoveSourceFolder: true
-    RemoveDotFiles: true
 
 - script: pwd && ls -al
-  workingDirectory: 'Device2Device'
-  displayName: List contents
+  workingDirectory: 'Device2Device/app/src/main/cpp'
+  displayName: ProjectFiles
 
 - task: Gradle@1
   inputs:
@@ -49,3 +43,10 @@ steps:
     findBugsRunAnalysis: false
     jdkArchitectureOption: 'x64'
   displayName: gradlew assembleDebug test
+
+- task: DeleteFiles@1
+  inputs:
+    SourceFolder: 'scadup'
+    Contents: '**'
+    RemoveSourceFolder: true
+    RemoveDotFiles: true

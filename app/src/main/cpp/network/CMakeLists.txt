@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 2.8...3.16)
 set(CMAKE_BUILD_TYPE "Debug")
 add_definitions("-Wno-unused-parameter -Wno-implicit-function-declaration")
 #add_definitions(-D_KCP_TEST_)
