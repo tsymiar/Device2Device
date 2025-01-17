@@ -8,7 +8,7 @@
 #endif
 #include <utils/logging.h>
 #include <time/TimeStamp.h>
-#include <scadup/Scadup.h>
+#include <common/Scadup.h>
 #include <message/Message.h>
 #include <network/KcpSocket.h>
 #include <render/gles/EglShader.h>
@@ -121,7 +121,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
     std::string address = Jstring2Cstring(env, addr);
     g_pubSubParam.addr = address;
     const std::string msg = Jstring2Cstring(env, topic);
-    g_pubSubParam.topic = atoi(msg.c_str());
+    g_pubSubParam.topic = strtol(msg.c_str(), nullptr, 16);
     g_pubSubParam.port = port;
     g_pubSubParam.hook = RecvHook;
     g_pubSubParam.env = *env;

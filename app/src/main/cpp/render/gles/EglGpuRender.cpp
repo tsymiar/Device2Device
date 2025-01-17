@@ -254,7 +254,7 @@ void EglGpuRender::RenderSurface(uint8_t *pixel, size_t len)
                                        (int)(EGL2.width / 4),
                                        data);
     pixelRender(data, len);
-    // Statics::printBuffer((char*)data, len);
+    Statics::printBuffer((char*)data, len);
     delete[] data;
     usleep(1000);
 }

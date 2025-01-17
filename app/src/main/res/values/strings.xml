@@ -27,9 +27,9 @@
     <string name="publish">Publish</string>
     <string name="exit">❌</string>
     <string name="confirm">Confirm</string>
-    <string name="address">192.168.0.6</string>
+    <string name="address">192.168.3.213</string>
     <string name="minimum">－</string>
-    <string name="topic">topic</string>
+    <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
     <string name="pub_payload">payload</string>
     <string name="hint_address">address</string>
