@@ -27,6 +27,15 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Update CMake
+      run: |
+        sudo apt-get remove -y cmake
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+        sudo apt-get update
+        sudo apt-get install -y cmake
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     - name: Build with Gradle

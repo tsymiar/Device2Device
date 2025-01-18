@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">Devidroid</string>
+    <string name="app_name">Device2Device</string>
     <string-array name="types">
         <item>None</item>
         <item>GPU-OpenGL</item>

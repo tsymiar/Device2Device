@@ -2,8 +2,8 @@
 // Created by dell-pc on 2019/11/20.
 //
 
-#ifndef DEVIDROID_STATICS_H
-#define DEVIDROID_STATICS_H
+#ifndef DEVICE2DEVICE_STATICS_H
+#define DEVICE2DEVICE_STATICS_H
 
 #include <malloc.h>
 #include <mutex>
@@ -49,4 +49,4 @@ namespace Statics {
         singlePrint((buf + BYTES_PER_LINE * i), (size - limit * BYTES_PER_LINE), i);
     }
 }
-#endif //DEVIDROID_STATICS_H
+#endif //DEVICE2DEVICE_STATICS_H

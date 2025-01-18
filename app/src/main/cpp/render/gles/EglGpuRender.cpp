@@ -10,7 +10,7 @@
 #include <utils/logging.h>
 #include <cerrno>
 #include <utils/statics.h>
-#include <bitfile/FileUtils.h>
+#include <utils/FileUtils.h>
 #include <unistd.h>
 #include <message/Message.h>
 #include "EglShader.h"

@@ -184,7 +184,7 @@ void SetContentView(JNIEnv *env, jclass cls)
         return;
     }
     g_jniJVM->AttachCurrentThread(&env, nullptr);
-    jclass layout_res = env->FindClass("com/tsymiar/devidroid/R$layout");
+    jclass layout_res = env->FindClass("com/tsymiar/device2device/R$layout");
     jfieldID fieldID_main = env->GetStaticFieldID(layout_res, "main", "I");
     jint main = env->GetStaticIntField(layout_res, fieldID_main);
 
@@ -215,7 +215,7 @@ void SetTextView(JNIEnv *env, jclass cls, const std::string& viewId, const std::
         LOGE("FindClass activity_clazz error");
         return;
     }
-    jclass id_res = env->FindClass("com/tsymiar/devidroid/R$id");
+    jclass id_res = env->FindClass("com/tsymiar/device2device/R$id");
     jfieldID field_id = env->GetStaticFieldID(id_res, viewId.c_str(), "I");
     jint field_val = env->GetStaticIntField(id_res, field_id);
     jmethodID findViewById = env->GetMethodID(activity_clazz, "findViewById",
@@ -254,7 +254,7 @@ void SetActivityViewText(JNIEnv *env, int viewId, const char* text)
     jstring msg = env->NewStringUTF(text);
     if (viewId <= 0) {
         LOGE("invalid viewId = %d", viewId);
-        std::string main_activity = "com/tsymiar/devidroid/activity/MainActivity";
+        std::string main_activity = "com/tsymiar/device2device/activity/MainActivity";
         jclass activity = env->FindClass(main_activity.c_str());
         auto cls = (jclass) env->NewGlobalRef(activity);
         jmethodID showText = env->GetMethodID(

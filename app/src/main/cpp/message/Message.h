@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2022/4/28.
 //
 
-#ifndef DEVIDROID_MESSAGE_H
-#define DEVIDROID_MESSAGE_H
+#ifndef DEVICE2DEVICE_MESSAGE_H
+#define DEVICE2DEVICE_MESSAGE_H
 
 #include <string>
 #include <queue>
@@ -41,4 +41,4 @@ private:
     std::mutex m_mtx = {};
 };
 
-#endif //DEVIDROID_MESSAGE_H
+#endif //DEVICE2DEVICE_MESSAGE_H

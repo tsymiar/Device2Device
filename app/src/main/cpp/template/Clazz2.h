@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2020/8/21.
 //
 
-#ifndef DEVIDROID_CLAZZ2_H
-#define DEVIDROID_CLAZZ2_H
+#ifndef DEVICE2DEVICE_CLAZZ2_H
+#define DEVICE2DEVICE_CLAZZ2_H
 
 
 #include "Base.hpp"
@@ -16,4 +16,4 @@ public:
 };
 
 
-#endif //DEVIDROID_CLAZZ2_H
+#endif //DEVICE2DEVICE_CLAZZ2_H

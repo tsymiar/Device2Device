@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_CPURENDERVIEW_H
-#define DEVIDROID_CPURENDERVIEW_H
+#ifndef DEVICE2DEVICE_CPURENDERVIEW_H
+#define DEVICE2DEVICE_CPURENDERVIEW_H
 
 #include <jni.h>
 
@@ -15,4 +15,4 @@ namespace CpuRenderView {
     void drawSurface(uint8_t *data, size_t size = 0);
 }
 
-#endif //DEVIDROID_CPURENDERVIEW_H
+#endif //DEVICE2DEVICE_CPURENDERVIEW_H

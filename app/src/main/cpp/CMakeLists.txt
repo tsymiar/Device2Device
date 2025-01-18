@@ -4,7 +4,7 @@
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 2.8...3.16)
-PROJECT(Devidroid CXX C)
+PROJECT(Device2Device CXX C)
 
 set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb -std=c++11")
@@ -21,12 +21,20 @@ include_directories(
 if(${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
-add_subdirectory(time)
-add_subdirectory(render)
-add_subdirectory(decode)
-add_subdirectory(network)
-add_subdirectory(bitfile)
-add_subdirectory(callback)
+set(BUILD_SUB 1)
+set(build_list time binfile decode network callback render)
+foreach(item IN LISTS build_list)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/${item}/CMakeLists.txt")
+        if (${BUILD_SUB} EQUAL 1)
+            add_subdirectory(${item})
+        endif()
+    else()
+        if ("${item}" EQUAL "binfile" OR "${item}" EQUAL "decode")
+            set(BUILD_SUB 0)
+        endif()
+        message(WARNING "${CMAKE_SOURCE_DIR}/${item} does not contain a CMakeLists.txt file.")
+    endif()
+endforeach()
 # add_subdirectory(template)
 AUX_SOURCE_DIRECTORY(. DIR_SRCS)
 # Creates and names a library, sets it as either STATIC
@@ -42,7 +50,7 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         message/Message.cpp
-        bitfile/FileUtils.cpp
+        utils/FileUtils.cpp
         JniMethods.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)

@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2022/5/2.
 //
 
-#ifndef DEVIDROID_EGLGPURENDER_H
-#define DEVIDROID_EGLGPURENDER_H
+#ifndef DEVICE2DEVICE_EGLGPURENDER_H
+#define DEVICE2DEVICE_EGLGPURENDER_H
 
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
@@ -59,4 +59,4 @@ namespace EglGpuRender {
     void FrameRender(unsigned char* frameData, size_t);
 }
 
-#endif //DEVIDROID_EGLGPURENDER_H
+#endif //DEVICE2DEVICE_EGLGPURENDER_H

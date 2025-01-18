@@ -15,8 +15,8 @@
 #include <render/gles/EglTexture.h>
 #include <render/gles/EglGpuRender.h>
 #include <render/CpuRenderView.h>
-#include <bitfile/FileUtils.h>
-#include <bitfile/bitmap.h>
+#include <utils/FileUtils.h>
+#include <binfile/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
 #include "utils/statics.h"
@@ -60,7 +60,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
 {
     Messaging receiving = Message::instance().getMessage();
     if (!receiving.message.empty() && env != nullptr) {
-        jclass objectClass = env->FindClass("com/tsymiar/devidroid/data/Receiver");
+        jclass objectClass = env->FindClass("com/tsymiar/device2device/data/Receiver");
         jfieldID value = (env)->GetFieldID(objectClass, "message", "Ljava/lang/String;");
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         jstring msg = env->NewStringUTF(receiving.message.c_str());

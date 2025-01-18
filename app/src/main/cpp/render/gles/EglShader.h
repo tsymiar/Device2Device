@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2022/5/2.
 //
 
-#ifndef DEVIDROID_EGLSHADER_H
-#define DEVIDROID_EGLSHADER_H
+#ifndef DEVICE2DEVICE_EGLSHADER_H
+#define DEVICE2DEVICE_EGLSHADER_H
 
 #include <GLES2/gl2.h>
 
@@ -13,4 +13,4 @@ namespace EglShader {
     GLuint GetShaderProgram();
 }
 
-#endif //DEVIDROID_EGLSHADER_H
+#endif //DEVICE2DEVICE_EGLSHADER_H

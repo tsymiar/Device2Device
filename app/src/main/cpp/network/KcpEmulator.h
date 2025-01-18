@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_KCPEMULATOR_H
-#define DEVIDROID_KCPEMULATOR_H
+#ifndef DEVICE2DEVICE_KCPEMULATOR_H
+#define DEVICE2DEVICE_KCPEMULATOR_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -189,4 +189,4 @@ public:
 
 #endif
 
-#endif //DEVIDROID_KCPEMULATOR_H
+#endif //DEVICE2DEVICE_KCPEMULATOR_H

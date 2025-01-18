@@ -1,9 +1,0 @@
-cmake_minimum_required(VERSION 2.8...3.16)
-
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-add_library(fileutils STATIC
-        bitmap.c
-        FileUtils.cpp)
-
-target_link_libraries(fileutils log)

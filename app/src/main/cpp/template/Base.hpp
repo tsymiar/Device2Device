@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2020/8/21.
 //
 
-#ifndef DEVIDROID_BASE_HPP
-#define DEVIDROID_BASE_HPP
+#ifndef DEVICE2DEVICE_BASE_HPP
+#define DEVICE2DEVICE_BASE_HPP
 
 #ifndef LOG_TAG
 #define LOG_TAG "Base"
@@ -70,4 +70,4 @@ int Base::parseBase(vector<GetSet<T>> vec)
     return 0;
 }
 
-#endif //DEVIDROID_BASE_HPP
+#endif //DEVICE2DEVICE_BASE_HPP

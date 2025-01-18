@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_TIMESTAMP_H
-#define DEVIDROID_TIMESTAMP_H
+#ifndef DEVICE2DEVICE_TIMESTAMP_H
+#define DEVICE2DEVICE_TIMESTAMP_H
 
 class TimeStamp {
 private:
@@ -16,4 +16,4 @@ public:
     static unsigned long long AbsoluteTime();
 };
 
-#endif //DEVIDROID_TIMESTAMP_H
+#endif //DEVICE2DEVICE_TIMESTAMP_H

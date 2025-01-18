@@ -1,19 +1,19 @@
-#ifndef DEVIDROID_JNIMETHODS_H
-#define DEVIDROID_JNIMETHODS_H
+#ifndef DEVICE2DEVICE_JNIMETHODS_H
+#define DEVICE2DEVICE_JNIMETHODS_H
 
-#define Callback_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_CallbackWrapper_##func
+#define Callback_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_CallbackWrapper_##func
 #define CPP_FUNC_CALL(func) JNICALL Callback_WRAPPER(func)
 
-#define View_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_ViewWrapper_##func
+#define View_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_ViewWrapper_##func
 #define CPP_FUNC_VIEW(func) JNICALL View_WRAPPER(func)
 
-#define Time_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_TimeWrapper_##func
+#define Time_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_TimeWrapper_##func
 #define CPP_FUNC_TIME(func) JNICALL Time_WRAPPER(func)
 
-#define File_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_FileWrapper_##func
+#define File_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_FileWrapper_##func
 #define CPP_FUNC_FILE(func) JNICALL File_WRAPPER(func)
 
-#define Network_WRAPPER(func) Java_com_tsymiar_devidroid_wrapper_NetWrapper_##func
+#define Network_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_NetWrapper_##func
 #define CPP_FUNC_NETWORK(func) JNICALL Network_WRAPPER(func)
 
 #include <jni.h>
@@ -67,4 +67,4 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* , jclass, jstrin
 }
 #endif
 
-#endif //DEVIDROID_JNIMETHODS_H
+#endif //DEVICE2DEVICE_JNIMETHODS_H

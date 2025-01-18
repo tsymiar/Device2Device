@@ -1,5 +1,5 @@
-#ifndef DEVIDROID_UdpSocket_H
-#define DEVIDROID_UdpSocket_H
+#ifndef DEVICE2DEVICE_UdpSocket_H
+#define DEVICE2DEVICE_UdpSocket_H
 
 #include <arpa/inet.h>
 #include <string>
@@ -40,4 +40,4 @@ private:
     int SendBySlice(const char *, size_t);
 };
 
-#endif //DEVIDROID_UdpSocket_H
+#endif //DEVICE2DEVICE_UdpSocket_H

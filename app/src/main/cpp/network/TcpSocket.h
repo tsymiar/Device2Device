@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2022/5/2.
 //
 
-#ifndef DEVIDROID_TCPSOCKET_H
-#define DEVIDROID_TCPSOCKET_H
+#ifndef DEVICE2DEVICE_TCPSOCKET_H
+#define DEVICE2DEVICE_TCPSOCKET_H
 
 #include <cstdint>
 
@@ -33,4 +33,4 @@ private:
     volatile bool m_running = false;
 };
 
-#endif //DEVIDROID_TCPSOCKET_H
+#endif //DEVICE2DEVICE_TCPSOCKET_H

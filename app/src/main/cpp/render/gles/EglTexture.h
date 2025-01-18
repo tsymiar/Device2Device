@@ -2,8 +2,8 @@
 // Created by Shenyrion on 2022/5/26.
 //
 
-#ifndef DEVIDROID_EGLTEXTURE_H
-#define DEVIDROID_EGLTEXTURE_H
+#ifndef DEVICE2DEVICE_EGLTEXTURE_H
+#define DEVICE2DEVICE_EGLTEXTURE_H
 
 #include "EglShader.h"
 
@@ -33,4 +33,4 @@ namespace EglTexture {
     void SetTextureBuffers(GLuint glProgram);
 };
 
-#endif //DEVIDROID_EGLTEXTURE_H
+#endif //DEVICE2DEVICE_EGLTEXTURE_H
