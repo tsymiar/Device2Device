@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2008 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (C) 2008 Google Inc. Licensed under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law
+ * or agreed to in writing, software distributed under the License is
+ * distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  */
 
 package com.tsymiar.device2device.view;
@@ -84,47 +79,35 @@ public class WaveformsView extends View {
 
         // We don't want keys, the markers get these
         setFocusable(false);
-        circlePaint = new Paint();//画圆
+        circlePaint = new Paint();// 画圆
         circlePaint.setColor(Color.rgb(246, 131, 126));
         circlePaint.setAntiAlias(true);
 
         Paint gridPaint = new Paint();
         gridPaint.setAntiAlias(false);
-        gridPaint.setColor(
-                getResources().getColor(R.color.grid_line));
+        gridPaint.setColor(getResources().getColor(R.color.grid_line));
         mSelectedLinePaint = new Paint();
         mSelectedLinePaint.setAntiAlias(false);
-        mSelectedLinePaint.setColor(
-                getResources().getColor(R.color.waveform_selected));
+        mSelectedLinePaint.setColor(getResources().getColor(R.color.waveform_selected));
         mUnselectedLinePaint = new Paint();
         mUnselectedLinePaint.setAntiAlias(false);
-        mUnselectedLinePaint.setColor(
-                getResources().getColor(R.color.waveform_unselected));
+        mUnselectedLinePaint.setColor(getResources().getColor(R.color.waveform_unselected));
         Paint unselectedBkgndLinePaint = new Paint();
         unselectedBkgndLinePaint.setAntiAlias(false);
-        unselectedBkgndLinePaint.setColor(
-                getResources().getColor(
-                        R.color.waveform_unselected_overlay));
+        unselectedBkgndLinePaint.setColor(getResources().getColor(R.color.waveform_unselected_overlay));
         Paint borderLinePaint = new Paint();
         borderLinePaint.setAntiAlias(true);
         borderLinePaint.setStrokeWidth(1.5f);
-        borderLinePaint.setPathEffect(
-                new DashPathEffect(new float[]{3.0f, 2.0f}, 0.0f));
-        borderLinePaint.setColor(
-                getResources().getColor(R.color.selection_border));
+        borderLinePaint.setPathEffect(new DashPathEffect(new float[] { 3.0f, 2.0f }, 0.0f));
+        borderLinePaint.setColor(getResources().getColor(R.color.selection_border));
         Paint playbackLinePaint = new Paint();
         playbackLinePaint.setAntiAlias(false);
-        playbackLinePaint.setColor(
-                getResources().getColor(R.color.playback_indicator));
+        playbackLinePaint.setColor(getResources().getColor(R.color.playback_indicator));
         mTimeValuePaint = new Paint();
         mTimeValuePaint.setTextSize(12);
         mTimeValuePaint.setAntiAlias(true);
-        mTimeValuePaint.setColor(
-                getResources().getColor(R.color.time_value));
-        mTimeValuePaint.setShadowLayer(
-                2, 1, 1,
-                getResources().getColor(R.color.time_value_shadow));
-
+        mTimeValuePaint.setColor(getResources().getColor(R.color.time_value));
+        mTimeValuePaint.setShadowLayer(2, 1, 1, getResources().getColor(R.color.time_value_shadow));
 
         mSoundRecord = null;
         mLenByZoomLevel = null;
@@ -137,7 +120,6 @@ public class WaveformsView extends View {
         mDensity = 1.0f;
         mInitialized = false;
     }
-
 
     public boolean hasSoundFile() {
         return mSoundRecord != null;
@@ -212,35 +194,32 @@ public class WaveformsView extends View {
     }
 
     public int secondsToFrames(double seconds) {
-        return (int) (1.0 * seconds * mSampleRate / mSamplesPerFrame + 0.5);
+        return (int)(1.0 * seconds * mSampleRate / mSamplesPerFrame + 0.5);
     }
 
     public int secondsToPixels(double seconds) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int) (z * seconds * mSampleRate / mSamplesPerFrame + 0.5);
+        return (int)(z * seconds * mSampleRate / mSamplesPerFrame + 0.5);
     }
 
     public double pixelsToSeconds(int pixels) {
         double z = mZoomFactorByZoomLevel[0];
-        return (mSoundRecord.getNumFramesFloat() * 2 * (double) mSamplesPerFrame / (mSampleRate * z));
+        return (mSoundRecord.getNumFramesFloat() * 2 * (double)mSamplesPerFrame / (mSampleRate * z));
     }
 
     public int millisecsToPixels(int msecs) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int) ((msecs * 1.0 * mSampleRate * z) /
-                (1000.0 * mSamplesPerFrame) + 0.5);
+        return (int)((msecs * 1.0 * mSampleRate * z) / (1000.0 * mSamplesPerFrame) + 0.5);
     }
 
     public int pixelsToMillisecs(int pixels) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int) (pixels * (1000.0 * mSamplesPerFrame) /
-                (mSampleRate * z) + 0.5);
+        return (int)(pixels * (1000.0 * mSamplesPerFrame) / (mSampleRate * z) + 0.5);
     }
 
     public int pixelsToMillisecsTotal() {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int) (mSoundRecord.getNumFramesFloat() * 1 * (1000.0 * mSamplesPerFrame) /
-                (mSampleRate * 1) + 0.5);
+        return (int)(mSoundRecord.getNumFramesFloat() * 1 * (1000.0 * mSamplesPerFrame) / (mSampleRate * 1) + 0.5);
     }
 
     public void setParameters(int start, int end, int offset) {
@@ -265,24 +244,18 @@ public class WaveformsView extends View {
         mPlaybackPos = pos;
     }
 
-
     public void recomputeHeights(float density) {
         mHeightsAtThisZoomLevel = null;
         mDensity = density;
-        mTimeValuePaint.setTextSize((int) (12 * density));
+        mTimeValuePaint.setTextSize((int)(12 * density));
         invalidate();
     }
 
-
-    protected void drawWaveformLine(Canvas canvas,
-                                    int x, int y0, int y1,
-                                    Paint paint) {
-
+    protected void drawWaveformLine(Canvas canvas, int x, int y0, int y1, Paint paint) {
         int pos = maxPos();
-        float rat = ((float) getMeasuredWidth() / pos);
-        canvas.drawLine((int) (x * rat), y0, (int) (x * rat), y1, paint);
+        float rat = ((float)getMeasuredWidth() / pos);
+        canvas.drawLine((int)((x - mOffset) * rat), y0, (int)((x - mOffset) * rat), y1, paint);
     }
-
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -295,15 +268,18 @@ public class WaveformsView extends View {
 
         Paint centerLine = new Paint();
         centerLine.setColor(Color.rgb(39, 199, 175));
-        canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2, centerLine);//中心线
+        canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2, centerLine);// 中心线
 
         paintLine = new Paint();
         paintLine.setColor(Color.rgb(169, 169, 169));
-        canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);//最上面的那根线
-//            canvas.drawLine(0, height*0.25f+20, measuredWidth, height*0.25f+20, paintLine);//第二根线
-//            canvas.drawLine(0, height*0.75f+20, measuredWidth, height*0.75f+20, paintLine);//第3根线
-        canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth, measuredHeight - line_offset / 2 - 1, paintLine);//最下面的那根线
-//        }
+        canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);// 最上面的那根线
+        // canvas.drawLine(0, height*0.25f+20, measuredWidth, height*0.25f+20,
+        // paintLine);//第二根线
+        // canvas.drawLine(0, height*0.75f+20, measuredWidth, height*0.75f+20,
+        // paintLine);//第3根线
+        canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth, measuredHeight - line_offset / 2 - 1,
+                paintLine);// 最下面的那根线
+        // }
         if (state == 1) {
             mSoundRecord = null;
             state = 0;
@@ -314,13 +290,17 @@ public class WaveformsView extends View {
             height = measuredHeight - line_offset;
             centerLine = new Paint();
             centerLine.setColor(Color.rgb(39, 199, 175));
-            canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2, centerLine);//中心线
+            canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2,
+                    centerLine);// 中心线
             paintLine = new Paint();
             paintLine.setColor(Color.rgb(169, 169, 169));
-            canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);//最上面的那根线
-//           canvas.drawLine(0, height*0.25f+20, measuredWidth, height*0.25f+20, paintLine);//第二根线
-//           canvas.drawLine(0, height*0.75f+20, measuredWidth, height*0.75f+20, paintLine);//第3根线
-            canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth, measuredHeight - line_offset / 2 - 1, paintLine);//最下面的那根线
+            canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);// 最上面的那根线
+            // canvas.drawLine(0, height*0.25f+20, measuredWidth,
+            // height*0.25f+20, paintLine);//第二根线
+            // canvas.drawLine(0, height*0.75f+20, measuredWidth,
+            // height*0.75f+20, paintLine);//第3根线
+            canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth,
+                    measuredHeight - line_offset / 2 - 1, paintLine);// 最下面的那根线
             return;
         }
         if (mHeightsAtThisZoomLevel == null)
@@ -337,23 +317,21 @@ public class WaveformsView extends View {
         double onePixelInSecs = pixelsToSeconds(1);
         boolean onlyEveryFiveSecs = (onePixelInSecs > 1.0 / 50.0);
         double fractionalSecs = mOffset * onePixelInSecs;
-        int integerSecs = (int) fractionalSecs;
+        int integerSecs = (int)fractionalSecs;
         int i = 0;
         while (i < width) {
             i++;
             fractionalSecs += onePixelInSecs;
-            int integerSecsNew = (int) fractionalSecs;
+            int integerSecsNew = (int)fractionalSecs;
             if (integerSecsNew != integerSecs) {
                 integerSecs = integerSecsNew;
             }
         }
 
-
         // Draw waveform
         for (i = 0; i < maxPos(); i++) {
             Paint paint;
-            if (i + start >= mSelectionStart &&
-                    i + start < mSelectionEnd) {
+            if (i + start >= mSelectionStart && i + start < mSelectionEnd) {
                 paint = mSelectedLinePaint;
             } else {
                 paint = mUnselectedLinePaint;
@@ -361,18 +339,18 @@ public class WaveformsView extends View {
             paint.setColor(Color.rgb(39, 199, 175));
             paint.setStrokeWidth(1);
 
-            drawWaveformLine(
-                    canvas, i,
-                    (ctr - mHeightsAtThisZoomLevel[start + i]),
-                    (ctr + 1 + mHeightsAtThisZoomLevel[start + i]),
-                    paint);
+            drawWaveformLine(canvas, i, (ctr - mHeightsAtThisZoomLevel[start + i]),
+                    (ctr + 1 + mHeightsAtThisZoomLevel[start + i]), paint);
 
             if (i + start == mPlaybackPos && playFinish != 1) {
                 canvas.drawCircle(i * getMeasuredWidth() / maxPos(), line_offset / 4, line_offset / 4, circlePaint);// 上圆
-                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), getMeasuredHeight() - line_offset / 4, line_offset / 4, circlePaint);// 下圆
-                canvas.drawLine(i * getMeasuredWidth() / maxPos(), 0, i * getMeasuredWidth() / maxPos(), getMeasuredHeight(), circlePaint);//垂直的线
-                //画正在播放的线
-                //canvas.drawLine(i*getMeasuredWidth()/maxPos(), 0, i*getMeasuredWidth()/maxPos(), measuredHeight, paint);
+                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), getMeasuredHeight() - line_offset / 4,
+                        line_offset / 4, circlePaint);// 下圆
+                canvas.drawLine(i * getMeasuredWidth() / maxPos(), 0, i * getMeasuredWidth() / maxPos(),
+                        getMeasuredHeight(), circlePaint);// 垂直的线
+                // 画正在播放的线
+                // canvas.drawLine(i*getMeasuredWidth()/maxPos(), 0,
+                // i*getMeasuredWidth()/maxPos(), measuredHeight, paint);
             }
         }
 
@@ -385,7 +363,6 @@ public class WaveformsView extends View {
             timeIntervalSecs = 15.0;
         }
     }
-
 
     /**
      * Called once when a new sound file is added
@@ -400,18 +377,13 @@ public class WaveformsView extends View {
             smoothedGains[0] = frameGains[0];
             smoothedGains[1] = frameGains[1];
         } else if (numFrames > 2) {
-            smoothedGains[0] = (double) (
-                    (frameGains[0] / 2.0) +
-                            (frameGains[1] / 2.0));
+            smoothedGains[0] = (double)((frameGains[0] / 2.0) + (frameGains[1] / 2.0));
             for (int i = 1; i < numFrames - 1; i++) {
-                smoothedGains[i] = (double) (
-                        (frameGains[i - 1] / 3.0) +
-                                (frameGains[i] / 3.0) +
-                                (frameGains[i + 1] / 3.0));
+                smoothedGains[i] = (double)((frameGains[i - 1] / 3.0) + (frameGains[i] / 3.0)
+                        + (frameGains[i + 1] / 3.0));
             }
-            smoothedGains[numFrames - 1] = (double) (
-                    (frameGains[numFrames - 2] / 2.0) +
-                            (frameGains[numFrames - 1] / 2.0));
+            smoothedGains[numFrames
+                    - 1] = (double)((frameGains[numFrames - 2] / 2.0) + (frameGains[numFrames - 1] / 2.0));
         }
 
         // Make sure the range is no more than 0 - 255
@@ -430,7 +402,7 @@ public class WaveformsView extends View {
         maxGain = 0;
         int gainHist[] = new int[256];
         for (int i = 0; i < numFrames; i++) {
-            int smoothedGain = (int) (smoothedGains[i] * scaleFactor);
+            int smoothedGain = (int)(smoothedGains[i] * scaleFactor);
             if (smoothedGain < 0)
                 smoothedGain = 0;
             if (smoothedGain > 255)
@@ -445,14 +417,14 @@ public class WaveformsView extends View {
         double minGain = 0;
         int sum = 0;
         while (minGain < 255 && sum < numFrames / 20) {
-            sum += gainHist[(int) minGain];
+            sum += gainHist[(int)minGain];
             minGain++;
         }
 
         // Re-calibrate the max to be 99%
         sum = 0;
         while (maxGain > 2 && sum < numFrames / 100) {
-            sum += gainHist[(int) maxGain];
+            sum += gainHist[(int)maxGain];
             maxGain--;
         }
         if (maxGain <= 50) {
@@ -462,7 +434,6 @@ public class WaveformsView extends View {
         } else {
             maxGain += 10;
         }
-
 
         // Compute the heights
         double[] heights = new double[numFrames];
@@ -509,12 +480,10 @@ public class WaveformsView extends View {
             mValuesByZoomLevel[j] = new double[mLenByZoomLevel[j]];
             mZoomFactorByZoomLevel[j] = mZoomFactorByZoomLevel[j - 1] / 2.0;
             for (int i = 0; i < mLenByZoomLevel[j]; i++) {
-                mValuesByZoomLevel[j][i] =
-                        0.5 * (mValuesByZoomLevel[j - 1][2 * i] +
-                                mValuesByZoomLevel[j - 1][2 * i + 1]);
+                mValuesByZoomLevel[j][i] = 0.5
+                        * (mValuesByZoomLevel[j - 1][2 * i] + mValuesByZoomLevel[j - 1][2 * i + 1]);
             }
         }
-
 
         if (numFrames > 5000) {
             mZoomLevel = 3;
@@ -530,16 +499,15 @@ public class WaveformsView extends View {
     }
 
     /**
-     * Called the first time we need to draw when the zoom level has changed
-     * or the screen is resized
+     * Called the first time we need to draw when the zoom level has changed or
+     * the screen is resized
      */
     private void computeIntsForThisZoomLevel() {
 
         int halfHeight = (getMeasuredHeight() / 2) - 1;
         mHeightsAtThisZoomLevel = new int[mLenByZoomLevel[mZoomLevel]];
         for (int i = 0; i < mLenByZoomLevel[mZoomLevel]; i++) {
-            mHeightsAtThisZoomLevel[i] =
-                    (int) (mValuesByZoomLevel[mZoomLevel][i] * halfHeight);
+            mHeightsAtThisZoomLevel[i] = (int)(mValuesByZoomLevel[mZoomLevel][i] * halfHeight);
         }
     }
 }

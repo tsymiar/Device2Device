@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
@@ -23,8 +24,8 @@ import com.tsymiar.device2device.wrapper.ViewWrapper;
 import java.io.File;
 import java.util.Locale;
 
-public class TextureActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener,
-        TextureView.SurfaceTextureListener {
+public class TextureActivity extends AppCompatActivity
+        implements AdapterView.OnItemSelectedListener, TextureView.SurfaceTextureListener {
     private static final String TAG = TextureActivity.class.getCanonicalName();
     /**
      * Spinner for implementation selection.
@@ -51,8 +52,8 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     private int mDisplayWidth = 0;
 
     @SuppressLint("SdCardPath")
-    public String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/Android/data/" + "com.tsymiar.device2device" + "/files/cache/";
+    public String DATA_DIRECTORY = Environment.getExternalStorageDirectory() + "/Android/data/"
+            + "com.tsymiar.device2device" + "/files/cache/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +71,6 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     }
 
     protected void InitViews() {
-        super.onResume();
         final ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.types,
                 android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -97,18 +97,17 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     }
 
     @Override
-    public void onItemSelected(@NonNull AdapterView<?> parent,
-                               @NonNull View view,
-                               int position,
-                               long id) {
+    public void onItemSelected(@NonNull AdapterView<?> parent, @NonNull View view, int position, long id) {
         updateSurfaceView(position);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        mDisplayHeight =getWindowManager().getDefaultDisplay().getHeight();
-        mDisplayWidth = getWindowManager().getDefaultDisplay().getWidth();
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        mDisplayHeight = metrics.heightPixels;
+        mDisplayWidth = metrics.widthPixels;
         ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
     }
 
@@ -118,20 +117,21 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
     }
 
     @Override
-    public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface,
-                                          @IntRange(from = 1) int width,
-                                          @IntRange(from = 1) int height) {
+    public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
+            @IntRange(from = 1) int height) {
         log(String.format(Locale.ROOT, "Texture created (%d×%d)", width, height));
     }
 
     @Override
-    public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface,
-                                            @IntRange(from = 1) int width,
-                                            @IntRange(from = 1) int height) {
+    public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
+            @IntRange(from = 1) int height) {
         log(String.format(Locale.ROOT, "Texture resized (%d×%d)", width, height));
-        /* The surface remains valid so no reinitialization is needed but its dimensions have
-         * changed. You may want to recalculate OpenGL matrix or update buffer geometry here,
-         * or rather call native method that does that. */
+        /*
+         * The surface remains valid so no reinitialization is needed but its
+         * dimensions have changed. You may want to recalculate OpenGL matrix or
+         * update buffer geometry here, or rather call native method that does
+         * that.
+         */
         ViewWrapper.setRenderSize(height, width);
     }
 
@@ -158,30 +158,30 @@ public class TextureActivity extends AppCompatActivity implements AdapterView.On
         }
         ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
         switch (item) {
-            case EGL_TEXTURE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
-                ViewWrapper.updateEglTexture(texture);
-                break;
-            case EGL_SURFACE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
-                ViewWrapper.updateEglSurface(texture);
-                break;
-            case CPU_TEXTURE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
-                ViewWrapper.updateCpuTexture(texture, item);
-                break;
-            case CPU_SURFACE_FILE:
-                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
-                ViewWrapper.updateCpuSurface(texture);
-                break;
-            case DISCONNECT_WINDOW:
-                ViewWrapper.updateCpuTexture(texture, item);
-                mTextureView.setVisibility(View.GONE);
-                mTextureView.setVisibility(View.VISIBLE);
-                break;
-            default:
-                log("not implement item " + item);
-                break;
+        case EGL_TEXTURE_FILE:
+            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
+            ViewWrapper.updateEglTexture(texture);
+            break;
+        case EGL_SURFACE_FILE:
+            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
+            ViewWrapper.updateEglSurface(texture);
+            break;
+        case CPU_TEXTURE_FILE:
+            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
+            ViewWrapper.updateCpuTexture(texture, item);
+            break;
+        case CPU_SURFACE_FILE:
+            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
+            ViewWrapper.updateCpuSurface(texture);
+            break;
+        case DISCONNECT_WINDOW:
+            ViewWrapper.updateCpuTexture(texture, item);
+            mTextureView.setVisibility(View.GONE);
+            mTextureView.setVisibility(View.VISIBLE);
+            break;
+        default:
+            log("not implement item " + item);
+            break;
         }
     }
 

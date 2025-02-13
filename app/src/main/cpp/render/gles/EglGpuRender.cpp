@@ -544,6 +544,9 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
     FILE *file = fopen(filename, "rbe");
     if (file == nullptr) {
         LOGE("Get file content fail, file = nullptr");
+        delete[] pixel[0];
+        delete[] pixel[1];
+        delete[] pixel[2];
         return -5;
     }
     fseek(file, 0, SEEK_END); //定位到文件末
@@ -628,7 +631,9 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
     }
     fclose(file);
     delete[] rgba;
-    delete *pixel;
+    delete[] pixel[0];
+    delete[] pixel[1];
+    delete[] pixel[2];
     return 0;
 }
 

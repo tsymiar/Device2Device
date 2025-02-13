@@ -17,6 +17,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.Settings;
+import android.speech.RecognizerIntent;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
@@ -24,6 +25,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -38,6 +40,7 @@ import com.tsymiar.device2device.view.WaveSurface;
 import com.tsymiar.device2device.view.WaveformsView;
 
 import java.io.File;
+import java.util.ArrayList;
 
 public class AudioActivity extends AppCompatActivity {
 
@@ -54,6 +57,11 @@ public class AudioActivity extends AppCompatActivity {
     WaveCanvas waveCanvas = null;
     TextView status;
     Button recdBtn;
+    private int mPlayFullMisc;
+    private final int UPDATE_WAV = 100;
+
+    private static final int REQUEST_CODE_SPEECH_INPUT = 100;
+    private TextView tvResult;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -155,10 +163,35 @@ public class AudioActivity extends AppCompatActivity {
             }
         };
         mLoadSoundFileThread.start();
+
+        Button btnSpeak = findViewById(R.id.btnSpeak);
+        tvResult = findViewById(R.id.tvResult);
+        // 检查设备是否支持语音输入
+        if (!isSpeechRecognizerAvailable()) {
+            Toast.makeText(this, "设备不支持语音输入", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+
+        btnSpeak.setOnClickListener(v -> startVoiceInput());
     }
 
-    private int mPlayFullMisc;
-    private final int UPDATE_WAV = 100;
+    private boolean isSpeechRecognizerAvailable() {
+        // 检查语音识别是否可用
+        return RecognizerIntent.getVoiceDetailsIntent(this) != null;
+    }
+
+    private void startVoiceInput() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请开始说话...");
+
+        try {
+            startActivityForResult(intent, REQUEST_CODE_SPEECH_INPUT);
+        } catch (Exception e) {
+            Toast.makeText(this, "语音识别错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
 
     /**
      * 播放音频
@@ -247,6 +280,30 @@ public class AudioActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == RequestAudio && resultCode == RESULT_OK) {
             startDrawWave();
+        }
+        if (requestCode == REQUEST_CODE_SPEECH_INPUT) {
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> result =
+                        data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (result != null && !result.isEmpty()) {
+                    tvResult.setText(result.get(0));
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == RequestAudio) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 权限被授予，开始录音
+                startDrawWave();
+            } else {
+                // 权限被拒绝，显示提示信息
+                Toast.makeText(this, "权限被拒绝，无法录音", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 

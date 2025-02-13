@@ -36,4 +36,5 @@
     <string name="hint_port">port</string>
     <string name="tcp">TCP</string>
     <string name="kcprun">Kcp</string>
+    <string name="speak">Speak</string>
 </resources>

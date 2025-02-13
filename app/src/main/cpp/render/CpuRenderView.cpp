@@ -166,34 +166,41 @@ void setFrameBuffer(ANativeWindow_Buffer *buf, uint8_t *src) {
  *
  * @param color Color to draw (ARGB).
  */
-void CpuRenderView::drawRGBColor(uint32_t color, const char *filename) {
+void CpuRenderView::drawRGBColor(uint32_t color, const char* filename)
+{
     if (g_nativeWindow == nullptr) {
         LOGE("NativeWindow nullptr error");
         return;
     }
 
-    BITMAPPROP imgProp = {1,1,0};
-    unsigned char *data = nullptr;
+    BITMAPPROP imgProp = { 1,1,0 };
+    unsigned char* data = nullptr;
     if (filename != nullptr && (imgProp = BitmapToRgba(filename, &data)).blSize <= 0) {
         LOGE("bitmap content invalid");
+        if (data != nullptr) {
+            free(data);
+        }
         return;
     }
     LOGD("imgSize = [%d]x[%d]: %p", imgProp.biWidth, imgProp.biHeight, data);
     // -*-*-*-*-*-*- CPU rendering -*-*-*-*-*-*-
     // For our example, scale the surface to 1×1 pixel and fill it with a color
     auto ret = ANativeWindow_setBuffersGeometry(g_nativeWindow, imgProp.biWidth, imgProp.biHeight,
-                                                // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
-                                                WINDOW_FORMAT_RGBA_8888
+        // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
+        WINDOW_FORMAT_RGBA_8888
     );
     if (ret != 0) {
         ANativeWindow_release(g_nativeWindow);
         g_nativeWindow = nullptr;
         LOGE("Failed to set buffers geometry");
+        if (data != nullptr) {
+            free(data);
+        }
         return;
     }
 
     ANativeWindow_Buffer buffer;
-    ARect bounds{0, 0, 1, 1};
+    ARect bounds{ 0, 0, 1, 1 };
     ret = ANativeWindow_lock(g_nativeWindow, &buffer, &bounds);
     if (ret != 0) {
         ANativeWindow_release(g_nativeWindow);
@@ -201,6 +208,9 @@ void CpuRenderView::drawRGBColor(uint32_t color, const char *filename) {
         std::string hint = "Native window may busy";
         Message::instance().setMessage(hint, TOAST);
         LOGE("%s", hint.c_str());
+        if (data != nullptr) {
+            free(data);
+        }
         return;
     }
 

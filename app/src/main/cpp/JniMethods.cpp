@@ -21,18 +21,18 @@
 #include "callback/JavaFuncCalls.h"
 #include "utils/statics.h"
 
-extern JavaVM *g_jniJVM;
+extern JavaVM * g_jniJVM;
 extern std::string g_className;
-extern std::string Jstring2Cstring(JNIEnv *env, jstring jstr);
-extern void SetTextView(JNIEnv *env, jclass thiz, const std::string& viewId, const std::string& text);
-extern void SetActivityViewText(JNIEnv *env, int viewId, const char* text);
+extern std::string Jstring2Cstring(JNIEnv* env, jstring jstr);
+extern void SetTextView(JNIEnv* env, jclass thiz, const std::string& viewId, const std::string& text);
+extern void SetActivityViewText(JNIEnv* env, int viewId, const char* text);
 namespace {
     int g_height = -1;
     int g_width = -1;
     std::string g_filename;
 }
 
-JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name)
+JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv* env, jclass, jstring class_name)
 {
     int state = env->GetJavaVM(&g_jniJVM);
     g_className =
@@ -43,7 +43,7 @@ JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv *env, jclass, jstring class_name
 }
 
 JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
-        JNIEnv *env,
+        JNIEnv* env,
         jobject /* this */)
 {
     std::string hello = "C++ string of JNI!";
@@ -56,7 +56,7 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
     return env->NewStringUTF(hello.c_str());
 }
 
-JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
+JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv* env, jobject, jobject clazz)
 {
     Messaging receiving = Message::instance().getMessage();
     if (!receiving.message.empty() && env != nullptr) {
@@ -66,7 +66,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
         jstring msg = env->NewStringUTF(receiving.message.c_str());
         if (msg != nullptr) {
             env->SetObjectField(clazz, value, msg);
-            env->SetIntField(clazz, key, (int) receiving.massager);
+            env->SetIntField(clazz, key, (int)receiving.massager);
             LOGI("message pop type: [%d], value: [%s]", receiving.massager,
                  receiving.message.c_str());
             env->DeleteLocalRef(msg);
@@ -77,12 +77,12 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject, jobject clazz)
     }
 }
 
-JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time, jint len)
+JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv* env, jobject, jbyteArray time, jint len)
 {
-    auto *byte = (unsigned char *) env->GetByteArrayElements(time, nullptr);
-    unsigned char stamp[len * 3];
+    auto* byte = (unsigned char*)env->GetByteArrayElements(time, nullptr);
+    unsigned char stamp[len * 3 + 1]; // 修正数组大小
     for (size_t i = 0; i < len; i++) {
-        sprintf(reinterpret_cast<char *>(stamp + i * 3), "%02x ", byte[i]);
+        sprintf(reinterpret_cast<char*>(stamp + i * 3), "%02x ", byte[i]);
     }
     LOGI("time hex = %s", stamp);
     uint64_t val =
@@ -90,10 +90,11 @@ JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject, jbyteArray time,
             | (byte[9] << 8 & 0xff00)
             | (byte[10] << 16 & 0xff0000)
             | (byte[11] << 24 & 0xff000000)
-            | ((uint64_t) byte[12] << 32 & 0xff00000000)
-            | ((uint64_t) byte[13] << 40 & 0xff0000000000)
-            | ((uint64_t) byte[14] << 48 & 0xff000000000000)
-            | ((uint64_t) byte[15] << 56 & 0xff00000000000000);
+            | ((uint64_t)byte[12] << 32 & 0xff00000000)
+            | ((uint64_t)byte[13] << 40 & 0xff0000000000)
+            | ((uint64_t)byte[14] << 48 & 0xff000000000000)
+            | ((uint64_t)byte[15] << 56 & 0xff00000000000000);
+    env->ReleaseByteArrayElements(time, reinterpret_cast<jbyte*>(byte), 0); // 释放资源
     return val;
 }
 
@@ -108,7 +109,8 @@ struct PubSubParam {
     int id{};
 } g_pubSubParam;
 
-void RecvHook(const Scadup::Message& msg) {
+void RecvHook(const Scadup::Message& msg)
+{
     std::string message = "header:\t[" + std::to_string(msg.head.topic)
                           + "]\npayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
@@ -116,7 +118,8 @@ void RecvHook(const Scadup::Message& msg) {
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.payload.content);
 }
 
-JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring addr, jint port, jstring topic, jstring viewId, jint id) {
+JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass clz, jstring addr, jint port, jstring topic, jstring viewId, jint id)
+{
     jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
     g_pubSubParam.addr = address;
@@ -137,21 +140,22 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clz , jstring a
                 char content[256];
                 memset(content, 0, 256);
                 sprintf(content, "message of %s:%d, topic: '0x%04x', hook = %p, status = %d",
-                        param.addr.c_str(), param.port, param.topic,param.hook, status);
+                        param.addr.c_str(), param.port, param.topic, param.hook, status);
                 Message::instance().setMessage(content, SUBSCRIBER);
                 // SetTextView(&param.env, param.clz, param.view, content);
-            }, g_pubSubParam);
+            }, std::ref(g_pubSubParam)); // 使用 std::ref 捕获 g_pubSubParam
     if (th.joinable())
         th.detach();
     return status;
 }
 
-JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv *, jclass)
+JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
 {
     Scadup::Subscriber::exit();
 }
 
-JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstring payload) {
+JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring payload)
+{
     if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
         LOGI("g_pubSubParam: addr is null or port == 0.");
         return;
@@ -169,14 +173,14 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass , jstring topic, jstri
          iTopic, payloadParam.c_str());
 }
 
-int callback(const char *c, int i)
+int callback(const char* c, int i)
 {
     LOGD("JavaFuncCalls::Register c = %s, a = %d.", c, i);
     return i;
 }
 
 JNIEXPORT void
-CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, jstring content,
+CPP_FUNC_CALL(callJavaMethod)(JNIEnv* env, jclass, jstring method, jint action, jstring content,
                               jboolean statics)
 {
     JavaFuncCalls::GetInstance().CallBack(Jstring2Cstring(env, method),
@@ -184,12 +188,12 @@ CPP_FUNC_CALL(callJavaMethod)(JNIEnv *env, jclass, jstring method, jint action, 
                                           Jstring2Cstring(env, content).c_str(),
                                           statics);
     JavaFuncCalls::CALLBACK call = callback;
-    int val = JavaFuncCalls::GetInstance().Register(const_cast<char *>("aaa"), call);
+    int val = JavaFuncCalls::GetInstance().Register(const_cast<char*>("aaa"), call);
     LOGI("callback = %p, val = %d.", call, val);
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv *env, jclass, jobject texture)
+CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
         LOGI("load Surface fail");
@@ -197,13 +201,13 @@ CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv *env, jclass, jobject texture)
     }
 }
 
-JNIEXPORT void JNICALL CPP_FUNC_VIEW(unloadSurfaceView)(JNIEnv *env, jclass)
+JNIEXPORT void JNICALL CPP_FUNC_VIEW(unloadSurfaceView)(JNIEnv* env, jclass)
 {
     CpuRenderView::releaseSurfaceView(env);
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setRenderSize)(JNIEnv *, jclass, jint height, jint width)
+CPP_FUNC_VIEW(setRenderSize)(JNIEnv*, jclass, jint height, jint width)
 {
     g_height = height;
     g_width = width;
@@ -211,20 +215,20 @@ CPP_FUNC_VIEW(setRenderSize)(JNIEnv *, jclass, jint height, jint width)
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setLocalFile)(JNIEnv *env, jclass, jstring file)
+CPP_FUNC_VIEW(setLocalFile)(JNIEnv* env, jclass, jstring file)
 {
-    const char *filename = env->GetStringUTFChars(file, JNI_FALSE);
+    const char* filename = env->GetStringUTFChars(file, JNI_FALSE);
     g_filename = filename;
     env->ReleaseStringUTFChars(file, filename);
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture)
+CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGI("loaded Surface class");
     }
-    ANativeWindow *window = EglGpuRender::OpenGLSurface();
+    ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
         // EglGpuRender::MakeGLTexture();
         GLuint program = EglShader::GetShaderProgram();
@@ -239,12 +243,12 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject texture)
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateEglTexture)(JNIEnv *env, jclass, jobject texture)
+CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGI("loaded Surface class");
     }
-    ANativeWindow *window = EglGpuRender::OpenGLSurface();
+    ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
         EglGpuRender::DrawRGBTexture(g_filename.c_str());
@@ -255,7 +259,8 @@ CPP_FUNC_VIEW(updateEglTexture)(JNIEnv *env, jclass, jobject texture)
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject texture, jint item) {
+CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
+{
     switch (item) {
         case 0:
             LOGD("No-implementation");
@@ -265,18 +270,18 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject texture, jint item)
                 LOGI("loaded Surface class");
             }
             long size = 0;
-            unsigned char *content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
+            unsigned char* content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
             LOGD("CPU rendering initialized [%d]", size);
             if (content != nullptr) {
-                BITMAPINFO *info;
-                uint8_t * data = LoadDIBitmap(g_filename.c_str(), &info);
+                BITMAPINFO* info;
+                uint8_t* data = LoadDIBitmap(g_filename.c_str(), &info);
                 if (info == nullptr) {
                     LOGE("LoadDIBitmap failed");
                     return;
 
                 }
                 CpuRenderView::setDisplaySize((int)info->bmiHeader.biHeight,
-                                               (int)info->bmiHeader.biWidth);
+                                              (int)info->bmiHeader.biWidth);
                 CpuRenderView::drawSurface(data);
             } else {
                 static constexpr uint32_t colors[] = {
@@ -308,7 +313,8 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject texture, jint item)
 }
 
 JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture) {
+CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv* env, jclass, jobject texture)
+{
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGD("OpenGL rendering initialized(%d, %d)", g_height, g_width);
         FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuRenderView::drawSurface);
@@ -318,12 +324,12 @@ CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture) {
     }
 }
 
-JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass)
+JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv*, jclass)
 {
     return TimeStamp::AbsoluteTime();
 }
 
-JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass)
+JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv*, jclass)
 {
     return TimeStamp::BootTime();
 }
@@ -340,7 +346,7 @@ static int g_msgLen = 6;
 static int g_udpPort = 8899;
 
 JNIEXPORT jint JNICALL
-CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save)
+CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save)
 {
     std::string source = Jstring2Cstring(env, from);
     std::string target = Jstring2Cstring(env, save);
@@ -351,24 +357,25 @@ CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *env, jclass, jstring from, jstring save
     return stat;
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *env, jclass,
-                                                     jstring text, jint len) {
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass,
+                                                     jstring text, jint len)
+{
     std::string txt = Jstring2Cstring(env, text);
-    const char *tx = txt.c_str();
+    const char* tx = txt.c_str();
     std::string message;
     message = "text(" + std::to_string(len) + ") = [" + txt + "]";
     Message::instance().setMessage(message, UDP_CLIENT);
     LOGI("%s", message.c_str());
     g_msgLen = len;
-    auto *sock = new UdpSocket("127.0.0.1", g_udpPort);
-    sock->Sender(tx, (unsigned int) len + 1);
+    auto* sock = new UdpSocket("127.0.0.1", g_udpPort);
+    sock->Sender(tx, (unsigned int)len + 1);
     delete sock;
-/*
-    auto *clz1 = new Clazz1();
-    clz1->setBase<Clazz1>("AAA", 3);
-    auto *clz2 = new Clazz2();
-    clz2->setBase<Clazz2>("22", 2);
-*/
+    /*
+        auto *clz1 = new Clazz1();
+        clz1->setBase<Clazz1>("AAA", 3);
+        auto *clz2 = new Clazz2();
+        clz2->setBase<Clazz2>("22", 2);
+    */
     return 0;
 }
 
@@ -379,13 +386,13 @@ void callback(char* data)
     }
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass, jint port)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv*, jclass, jint port)
 {
     std::thread th(
             [&]() -> void {
                 int total = g_msgLen + (int)sizeof(NetProtocol);
                 char msg[total];
-                auto *sock = new UdpSocket(port);
+                auto* sock = new UdpSocket(port);
                 g_udpPort = port;
                 int size;
                 do {
@@ -402,13 +409,13 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass, jint p
     return 0;
 }
 
-int tcp_callback(uint8_t *data, size_t size)
+int tcp_callback(uint8_t* data, size_t size)
 {
     Statics::printBuffer((char*)data, size);
     return 0;
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint port)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint port)
 {
     std::thread th([](int port) -> void {
         TcpSocket tcp;
@@ -421,7 +428,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv *, jclass, jint p
     return 0;
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv *, jclass, jint port)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv*, jclass, jint port)
 {
     std::thread th([](int port) -> void {
         KcpSocket kcpSocket{};

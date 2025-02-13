@@ -25,9 +25,11 @@ const GLfloat g_TexCoord[] = {
         1.0f, 1.0f,
 };
 
-#define Y 0
-#define U 1
-#define V 2
+enum TextureIndex {
+    Y = 0,
+    U = 1,
+    V = 2
+};
 
 namespace EglTexture {
     void SetTextureBuffers(GLuint glProgram);
