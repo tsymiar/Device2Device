@@ -8,4 +8,4 @@ add_library(texture STATIC
         gles/EglGpuRender.cpp
         CpuRenderView.cpp)
 
-target_link_libraries(texture converter binfile log)
+target_link_libraries(texture converter bitmap log)

@@ -13,7 +13,7 @@
 #include <utils/logging.h>
 #include <message/Message.h>
 #include <utils/statics.h>
-#include <binfile/bitmap.h>
+#include <bitmap/bitmap.h>
 
 extern ANativeWindow *g_nativeWindow;
 

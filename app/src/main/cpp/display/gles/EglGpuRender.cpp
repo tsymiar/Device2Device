@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include <message/Message.h>
 #include "EglShader.h"
-#include "decode/Yuv2Rgb.h"
+#include "convert/Yuv2Rgb.h"
 
 #define BYTES_PER_FLOAT 4
 #define POSITION_COMPONENT_COUNT 2

@@ -10,13 +10,13 @@
 #include <time/TimeStamp.h>
 #include <common/Scadup.h>
 #include <message/Message.h>
-#include <network/KcpSocket.h>
-#include <render/gles/EglShader.h>
-#include <render/gles/EglTexture.h>
-#include <render/gles/EglGpuRender.h>
-#include <render/CpuRenderView.h>
+#include <socket/KcpSocket.h>
+#include <display/gles/EglShader.h>
+#include <display/gles/EglTexture.h>
+#include <display/gles/EglGpuRender.h>
+#include <display/CpuRenderView.h>
 #include <utils/FileUtils.h>
-#include <binfile/bitmap.h>
+#include <bitmap/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
 #include "utils/statics.h"
@@ -336,9 +336,9 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv*, jclass)
 
 #include <unistd.h>
 #include <iostream>
-#include <decode/Pcm2Wav.h>
-#include <network/UdpSocket.h>
-#include <network/TcpSocket.h>
+#include <convert/Pcm2Wav.h>
+#include <socket/UdpSocket.h>
+#include <socket/TcpSocket.h>
 // #include <template/Clazz1.h>
 // #include <template/Clazz2.h>
 
