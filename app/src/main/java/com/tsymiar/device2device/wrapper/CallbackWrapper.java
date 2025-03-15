@@ -1,6 +1,6 @@
 package com.tsymiar.device2device.wrapper;
 
-import com.tsymiar.device2device.data.Receiver;
+import com.tsymiar.device2device.entity.Receiver;
 
 public class CallbackWrapper {
     static {

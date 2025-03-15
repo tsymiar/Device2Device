@@ -210,10 +210,9 @@ void pixelRender(unsigned char* pixel, size_t)
     GLint aTextureCoordinatesLocation = glGetAttribLocation(
             EGL2.glProgram, "a_TextureCoordinates");
 
-    static GLfloat vVertices[] = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
     // Order of coordinates: X, Y, S, T
     // Triangle Fan
-    GLfloat VERTEX_DATA[] = { 0.0f, 0.0f, 0.5f, 0.5f,
+    GLfloat vVertices[] = { 0.0f, 0.0f, 0.5f, 0.5f,
                               -1.0f, -1.0f, 0.0f, 1.0f,
                               1.0f, -1.0f, 1.0f, 1.0f,
                               1.0f, 1.0f, 1.0f, 0.0f,
@@ -222,12 +221,12 @@ void pixelRender(unsigned char* pixel, size_t)
 
     glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT,
                           GL_FLOAT, false, STRIDE_NUMBER,
-                          VERTEX_DATA);
+                          vVertices);
     glEnableVertexAttribArray(aPositionLocation);
 
     glVertexAttribPointer(aTextureCoordinatesLocation, POSITION_COMPONENT_COUNT,
                           GL_FLOAT, false, STRIDE_NUMBER,
-                          &VERTEX_DATA[POSITION_COMPONENT_COUNT]);
+                          &vVertices[POSITION_COMPONENT_COUNT]);
     glEnableVertexAttribArray(aTextureCoordinatesLocation);
     // glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
@@ -543,7 +542,7 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
 
     FILE *file = fopen(filename, "rbe");
     if (file == nullptr) {
-        LOGE("Get file content fail, file = nullptr");
+        LOGE("Get file content fail, file[%s] = nullptr", filename);
         delete[] pixel[0];
         delete[] pixel[1];
         delete[] pixel[2];

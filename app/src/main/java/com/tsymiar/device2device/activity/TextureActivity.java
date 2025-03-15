@@ -5,7 +5,6 @@ import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.AdapterView;
@@ -52,8 +51,9 @@ public class TextureActivity extends AppCompatActivity
     private int mDisplayWidth = 0;
 
     @SuppressLint("SdCardPath")
-    public String DATA_DIRECTORY = Environment.getExternalStorageDirectory() + "/Android/data/"
-            + "com.tsymiar.device2device" + "/files/cache/";
+    public String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
+            // + "/Android/data/com.tsymiar.device2device"
+            + "/files/cache/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,11 +61,12 @@ public class TextureActivity extends AppCompatActivity
         setContentView(R.layout.activity_texture);
         InitViews();
         File file = getExternalFilesDir("cache");
-        DATA_DIRECTORY = file.getAbsolutePath() + "/";
+        assert file != null;
+        // DATA_DIRECTORY = file.getAbsolutePath() + "/";
         if (!file.exists()) {
             boolean status = file.mkdirs();
             if (!status) {
-                System.out.println("make dirs fail");
+                log("make dirs fail");
             }
         }
     }
@@ -125,7 +126,6 @@ public class TextureActivity extends AppCompatActivity
     @Override
     public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
             @IntRange(from = 1) int height) {
-        log(String.format(Locale.ROOT, "Texture resized (%d×%d)", width, height));
         /*
          * The surface remains valid so no reinitialization is needed but its
          * dimensions have changed. You may want to recalculate OpenGL matrix or
@@ -133,56 +133,63 @@ public class TextureActivity extends AppCompatActivity
          * that.
          */
         ViewWrapper.setRenderSize(height, width);
+        log(String.format(Locale.ROOT, "Texture resized (%d×%d)", width, height));
     }
 
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
         // De-initialize
         ViewWrapper.unloadSurfaceView();
-        Log.i(TAG, "Texture destroyed");
+        log("Texture destroy");
         return true;
     }
 
     @Override
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
         // Each draw updates the texture and logs on its own
-        log("Texture updated");
+        log("Texture update");
     }
 
     public void updateSurfaceView(@IntRange(from = 0) int item) {
         String[] selValue = getResources().getStringArray(R.array.types);
-        log(String.format(Locale.ROOT, "status: (item = %d, %s)", item, selValue[item]));
         SurfaceTexture texture = mTextureView.getSurfaceTexture();
         if (texture == null) {
             return;
         }
         ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
+        int state = 0;
+        String msg = "";
         switch (item) {
         case EGL_TEXTURE_FILE:
             ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
-            ViewWrapper.updateEglTexture(texture);
+            state = ViewWrapper.updateEglTexture(texture);
+            msg = selValue[item];
             break;
         case EGL_SURFACE_FILE:
             ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
-            ViewWrapper.updateEglSurface(texture);
+            state = ViewWrapper.updateEglSurface(texture);
+            msg = selValue[item];
             break;
         case CPU_TEXTURE_FILE:
             ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
-            ViewWrapper.updateCpuTexture(texture, item);
+            state = ViewWrapper.updateCpuTexture(texture, item);
+            msg = selValue[item];
             break;
         case CPU_SURFACE_FILE:
             ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
-            ViewWrapper.updateCpuSurface(texture);
+            state = ViewWrapper.updateCpuSurface(texture);
+            msg = selValue[item];
             break;
         case DISCONNECT_WINDOW:
-            ViewWrapper.updateCpuTexture(texture, item);
             mTextureView.setVisibility(View.GONE);
             mTextureView.setVisibility(View.VISIBLE);
+            msg = selValue[item];
             break;
         default:
-            log("not implement item " + item);
+            msg = "Not implement: " + item;
             break;
         }
+        log(String.format(Locale.ROOT, "(%s: item=%d stat=%d)", msg, item, state));
     }
 
     public void ReLoad(@NonNull View view) {

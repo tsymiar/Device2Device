@@ -42,11 +42,11 @@ import com.tsymiar.device2device.view.WaveformsView;
 import java.io.File;
 import java.util.ArrayList;
 
-public class AudioActivity extends AppCompatActivity {
+public class WaveActivity extends AppCompatActivity {
 
-    public final String TAG = AudioActivity.class.getSimpleName();
-    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/Android/data/" + "com.tsymiar.device2device" + "/files/record/";
+    public final String TAG = WaveActivity.class.getSimpleName();
+    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory() + "/Android/data/"
+            + "com.tsymiar.device2device" + "/files/record/";
     private static final int FREQUENCY = 16000;// 设置音频采样率,44100是目前的标准,某些设备仍然支持22050，16000，11025
     private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位
@@ -55,7 +55,7 @@ public class AudioActivity extends AppCompatActivity {
     WaveSurface waveView;
     WaveformsView waveform;
     WaveCanvas waveCanvas = null;
-    TextView status;
+    TextView statView;
     Button recdBtn;
     private int mPlayFullMisc;
     private final int UPDATE_WAV = 100;
@@ -71,13 +71,13 @@ public class AudioActivity extends AppCompatActivity {
         waveView = findViewById(R.id.wave_surface);
         if (waveView != null) {
             waveView.setLine_off(42);
-            //解决surfaceView黑色闪动效果
+            // 解决surfaceView黑色闪动效果
             waveView.setZOrderOnTop(true);
             waveView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
         }
         waveform = findViewById(R.id.wave_form);
         waveform.setLine_offset(42);
-        status = findViewById(R.id.wave_status);
+        statView = findViewById(R.id.wave_status);
         findViewById(R.id.wave_read).setOnClickListener(view -> {
             waveView.setVisibility(View.VISIBLE);
             waveform.setVisibility(View.INVISIBLE);
@@ -95,21 +95,28 @@ public class AudioActivity extends AppCompatActivity {
                 waveCanvas.Stop();
                 waveCanvas = null;
             } else {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
-                        || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    new AlertDialog.Builder(this)
-                            .setMessage("Storage and Record Permission needed, jump to setting?")
+                if (ActivityCompat.checkSelfPermission(this,
+                        Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+                        || ActivityCompat.checkSelfPermission(this,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    new AlertDialog.Builder(this).setMessage("Storage and Record Permission needed, jump to setting?")
                             .setPositiveButton("yes", (dialog12, which) -> {
                                 dialog12.dismiss();
-                                Toast.makeText(this, "Please enable Storage and Record PERMISSION", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, "Please enable Storage and Record PERMISSION", Toast.LENGTH_SHORT)
+                                        .show();
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    startActivityForResult(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())), RequestAudio);
+                                    startActivityForResult(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.parse("package:" + getPackageName())), RequestAudio);
                                 }
-                            }).setNegativeButton("no", (dialog1, which) -> dialog1.dismiss()).setCancelable(false).show();
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
+                            }).setNegativeButton("no", (dialog1, which) -> dialog1.dismiss()).setCancelable(false)
+                            .show();
+                    // here to request the missing permissions, and then
+                    // overriding
+                    // public void onRequestPermissionsResult(int requestCode,
+                    // String[] permissions,
+                    // int[] grantResults)
+                    // to handle the case where the user grants the permission.
+                    // See the documentation
                     // for ActivityCompat#requestPermissions for more details.
                 } else {
                     startDrawWave();
@@ -129,7 +136,7 @@ public class AudioActivity extends AppCompatActivity {
         try {
             Thread.sleep(300);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            statusHandle.sendMessage(statusHandle.obtainMessage(-1, e.toString()));
         }
         mFile = new File(DATA_DIRECTORY + mFileName + ".wav");
         mLoadingKeepGoing = true;
@@ -137,13 +144,15 @@ public class AudioActivity extends AppCompatActivity {
         mLoadSoundFileThread = new Thread() {
             public void run() {
                 try {
-                    mSoundRecord = SoundRecord.create(mFile.getAbsolutePath(), null);
+                    mSoundRecord = SoundRecord.create(mFile.getAbsolutePath(), fractionComplete -> {
+                        statusHandle.sendMessage(statusHandle.obtainMessage(0, fractionComplete + "%"));
+                        return false;
+                    });
                     if (mSoundRecord == null) {
                         return;
                     }
                     mPlayer = new SamplePlayer(mSoundRecord);
                 } catch (final Exception e) {
-                    e.printStackTrace();
                     statusHandle.sendMessage(statusHandle.obtainMessage(-1, e.toString()));
                     return;
                 }
@@ -157,7 +166,7 @@ public class AudioActivity extends AppCompatActivity {
                         waveView.setVisibility(View.INVISIBLE);
                         waveform.setVisibility(View.VISIBLE);
                     };
-                    AudioActivity.this.runOnUiThread(runnable);
+                    WaveActivity.this.runOnUiThread(runnable);
                 }
                 statusHandle.sendMessage(statusHandle.obtainMessage(0, "loaded wave file."));
             }
@@ -169,7 +178,7 @@ public class AudioActivity extends AppCompatActivity {
         // 检查设备是否支持语音输入
         if (!isSpeechRecognizerAvailable()) {
             Toast.makeText(this, "设备不支持语音输入", Toast.LENGTH_SHORT).show();
-            finish();
+            return;
         }
 
         btnSpeak.setOnClickListener(v -> startVoiceInput());
@@ -182,8 +191,7 @@ public class AudioActivity extends AppCompatActivity {
 
     private void startVoiceInput() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请开始说话...");
 
         try {
@@ -221,7 +229,7 @@ public class AudioActivity extends AppCompatActivity {
 
     @SuppressLint("HandlerLeak")
     final Handler updateWaveTime = new Handler() {
-        public void handleMessage(Message msg) {
+        public void handleMessage(@NonNull Message msg) {
             setDisplaySpeed();
             updateWaveTime.sendMessageDelayed(new Message(), 10);
         }
@@ -231,7 +239,7 @@ public class AudioActivity extends AppCompatActivity {
     Handler statusHandle = new Handler() {
         @SuppressLint("HandlerLeak")
         public void handleMessage(Message msg) {
-            status.setText(String.valueOf(msg.obj));
+            statView.setText(String.valueOf(msg.obj));
         }
     };
 
@@ -254,15 +262,12 @@ public class AudioActivity extends AppCompatActivity {
 
     @SuppressLint("SetTextI18n")
     public void startDrawWave() {
-        int bufSize = AudioRecord.getMinBufferSize(
-                FREQUENCY,
-                CHANNEL_CONFIGURATION,
-                AUDIO_ENCODING);// 录音组件
+        int bufSize = AudioRecord.getMinBufferSize(FREQUENCY, CHANNEL_CONFIGURATION, AUDIO_ENCODING);// 录音组件
         @SuppressLint("MissingPermission")
-        AudioRecord audioRecord = new AudioRecord(AUDIO_SOURCE,// 指定音频来源，麦克风
+        AudioRecord audioRecord = new AudioRecord(AUDIO_SOURCE, // 指定音频来源，麦克风
                 FREQUENCY, // 16000HZ采样频率
-                CHANNEL_CONFIGURATION,// 录制通道
-                AUDIO_SOURCE,// 录制编码格式
+                CHANNEL_CONFIGURATION, // 录制通道
+                AUDIO_SOURCE, // 录制编码格式
                 bufSize);// 录制缓冲区大小
         LocalFile.createDirectory(DATA_DIRECTORY);
         waveCanvas = new WaveCanvas();
@@ -283,8 +288,7 @@ public class AudioActivity extends AppCompatActivity {
         }
         if (requestCode == REQUEST_CODE_SPEECH_INPUT) {
             if (resultCode == RESULT_OK && data != null) {
-                ArrayList<String> result =
-                        data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                 if (result != null && !result.isEmpty()) {
                     tvResult.setText(result.get(0));
                 }

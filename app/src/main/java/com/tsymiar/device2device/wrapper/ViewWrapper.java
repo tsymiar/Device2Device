@@ -1,6 +1,7 @@
 package com.tsymiar.device2device.wrapper;
 
 import android.graphics.SurfaceTexture;
+import android.view.Surface;
 
 public class ViewWrapper {
 
@@ -14,12 +15,14 @@ public class ViewWrapper {
 
     public static native void setLocalFile(String filename);
 
-    public static native void updateEglTexture(SurfaceTexture tex);
+    public static native int updateEglTexture(SurfaceTexture tex);
 
-    public static native void updateEglSurface(SurfaceTexture tex);
+    public static native int updateEglSurface(SurfaceTexture tex);
 
-    public static native void updateCpuTexture(SurfaceTexture tex, int item);
+    public static native int updateCpuTexture(SurfaceTexture tex, int item);
 
-    public static native void updateCpuSurface(SurfaceTexture tex);
+    public static native int updateCpuSurface(SurfaceTexture tex);
+
+    public native void nativeRender(Surface surface, SurfaceTexture tex, String filePath);
 
 }

@@ -186,8 +186,8 @@ void CpuRenderView::drawRGBColor(uint32_t color, const char* filename)
     // -*-*-*-*-*-*- CPU rendering -*-*-*-*-*-*-
     // For our example, scale the surface to 1×1 pixel and fill it with a color
     auto ret = ANativeWindow_setBuffersGeometry(g_nativeWindow, imgProp.biWidth, imgProp.biHeight,
-        // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
-        WINDOW_FORMAT_RGBA_8888
+            // AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM
+                                                WINDOW_FORMAT_RGBA_8888
     );
     if (ret != 0) {
         ANativeWindow_release(g_nativeWindow);

@@ -20,7 +20,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.data.PubSubSetting;
+import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.wrapper.CallbackWrapper;
 
 public class FloatingService extends Service {

@@ -6,6 +6,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "jniComm"
 #endif
+#include <sstream>
 #include <utils/logging.h>
 #include <time/TimeStamp.h>
 #include <common/Scadup.h>
@@ -14,7 +15,7 @@
 #include <display/gles/EglShader.h>
 #include <display/gles/EglTexture.h>
 #include <display/gles/EglGpuRender.h>
-#include <display/CpuRenderView.h>
+#include <display/cpu/CpuRenderView.h>
 #include <utils/FileUtils.h>
 #include <bitmap/bitmap.h>
 #include "../jni/jniInc.h"
@@ -60,14 +61,14 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv* env, jobject, jobject clazz)
 {
     Messaging receiving = Message::instance().getMessage();
     if (!receiving.message.empty() && env != nullptr) {
-        jclass objectClass = env->FindClass("com/tsymiar/device2device/data/Receiver");
+        jclass objectClass = env->FindClass("com/tsymiar/device2device/entity/Receiver");
         jfieldID value = (env)->GetFieldID(objectClass, "message", "Ljava/lang/String;");
         jfieldID key = (env)->GetFieldID(objectClass, "receiver", "I");
         jstring msg = env->NewStringUTF(receiving.message.c_str());
         if (msg != nullptr) {
             env->SetObjectField(clazz, value, msg);
             env->SetIntField(clazz, key, (int)receiving.massager);
-            LOGI("message pop type: [%d], value: [%s]", receiving.massager,
+            LOGI("message pop type=%d, value=%s", receiving.massager,
                  receiving.message.c_str());
             env->DeleteLocalRef(msg);
         }
@@ -111,8 +112,10 @@ struct PubSubParam {
 
 void RecvHook(const Scadup::Message& msg)
 {
-    std::string message = "header:\t[" + std::to_string(msg.head.topic)
-                          + "]\npayload:\t[" + msg.payload.status
+    std::stringstream ss;
+    ss << std::hex << msg.head.topic;
+    std::string message = "Topic:\t[0x" + ss.str()
+                          + "]\nPayload:\t[" + msg.payload.status
                           + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
     // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.payload.content);
@@ -160,7 +163,7 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstrin
         LOGI("g_pubSubParam: addr is null or port == 0.");
         return;
     }
-    uint32_t iTopic = atoi(Jstring2Cstring(env, topic).c_str());
+    uint32_t iTopic = strtol(Jstring2Cstring(env, topic).c_str(), nullptr, 16);
     std::string payloadParam = Jstring2Cstring(env, payload);
     Scadup::Publisher pub{};
     pub.setup(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
@@ -222,7 +225,7 @@ CPP_FUNC_VIEW(setLocalFile)(JNIEnv* env, jclass, jstring file)
     env->ReleaseStringUTFChars(file, filename);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
@@ -235,14 +238,16 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
         EglTexture::SetTextureBuffers(program);
         extern EGL2 EGL2;
         LOGD("OpenGL rendering initialized WxH = (%d, %d)", EGL2.width, EGL2.height);
-        FileUtils::ReadBinaryFile(g_filename, EGL2.width * EGL2.height, EglGpuRender::FrameRender);
+        int state = FileUtils::ReadBinaryFile(g_filename, EGL2.width * EGL2.height, EglGpuRender::FrameRender);
         EglGpuRender::CloseGLSurface();
+        return state;
     } else {
         LOGE("native window is null while [updateTextureFile]");
+        return -1;
     }
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
@@ -251,20 +256,22 @@ CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
     ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
         LOGD("OpenGL rendering initialized");
-        EglGpuRender::DrawRGBTexture(g_filename.c_str());
+        int state = EglGpuRender::DrawRGBTexture(g_filename.c_str());
         EglGpuRender::CloseGLSurface();
+        return state;
     } else {
         LOGE("native window is null while [updateTextureFile]");
+        return -1;
     }
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
 {
     switch (item) {
         case 0:
             LOGD("No-implementation");
-            return;
+            return -1;
         case 3: {
             if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
                 LOGI("loaded Surface class");
@@ -277,7 +284,7 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
                 uint8_t* data = LoadDIBitmap(g_filename.c_str(), &info);
                 if (info == nullptr) {
                     LOGE("LoadDIBitmap failed");
-                    return;
+                    return -2;
 
                 }
                 CpuRenderView::setDisplaySize((int)info->bmiHeader.biHeight,
@@ -308,19 +315,22 @@ CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
             break;
         default:
             Message::instance().setMessage("CpuRender initialize fail", TOAST);
-            return;
+            return -3;
     }
+    return 0;
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGD("OpenGL rendering initialized(%d, %d)", g_height, g_width);
-        FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuRenderView::drawSurface);
+        int state = FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuRenderView::drawSurface);
         CpuRenderView::releaseSurfaceView(env);
+        return state;
     } else {
         LOGE("native window is null while [updateCpuVideoFile]");
+        return 0;
     }
 }
 

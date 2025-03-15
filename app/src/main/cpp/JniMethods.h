@@ -42,13 +42,13 @@ JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(setRenderSize)(JNIEnv *env, jclass, jint height, jint width);
 JNIEXPORT void JNICALL
 CPP_FUNC_VIEW(setLocalFile)(JNIEnv *env, jclass, jstring);
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateEglTexture)(JNIEnv *env, jclass, jobject);
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateEglSurface)(JNIEnv *env, jclass, jobject );
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject , jint);
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture);
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);

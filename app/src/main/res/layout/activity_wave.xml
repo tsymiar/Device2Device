@@ -30,7 +30,6 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/wave_status"
         android:text="@string/read"
-        android:layout_marginRight="@android:dimen/thumbnail_width"
         android:layout_marginEnd="@android:dimen/thumbnail_width" />
 
     <Button
@@ -39,7 +38,6 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/wave_status"
         android:text="@string/record"
-        android:layout_marginLeft="@android:dimen/thumbnail_width"
         android:layout_marginStart="@android:dimen/thumbnail_width" />
 
     <LinearLayout

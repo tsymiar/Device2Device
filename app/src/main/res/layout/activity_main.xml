@@ -24,33 +24,29 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/texture"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/btn_audio"
+        android:id="@+id/btn_wave"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/wave"
         app:layout_constraintLeft_toRightOf="@id/btn_texture"
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints" />
 
-    <Button
-        android:id="@+id/btn_chart"
+    <Button android:id="@+id/btn_chart"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/chart"
-        app:layout_constraintLeft_toRightOf="@id/btn_audio"
+        app:layout_constraintLeft_toRightOf="@id/btn_wave"
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints" />
 
@@ -59,18 +55,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="48dp"
         android:text="@string/dftHint"
         app:layout_constraintLeft_toRightOf="@id/btn_server"
-        app:layout_constraintTop_toBottomOf="@id/btn_audio" />
+        app:layout_constraintTop_toBottomOf="@id/btn_wave" />
 
     <Button
         android:id="@+id/btn_server"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/server"
         app:layout_constraintStart_toStartOf="parent"
@@ -82,11 +76,10 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp"
-        android:layout_marginRight="32dp"
         android:text="@string/subscribe"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toRightOf="@id/btn_server"
-        app:layout_constraintTop_toBottomOf="@id/btn_chart" />
+        app:layout_constraintTop_toBottomOf="@id/btn_wave" />
 
     <Button
         android:id="@+id/btn_publisher"
@@ -94,7 +87,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp"
-        android:layout_marginRight="32dp"
         android:text="@string/publish"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toRightOf="@id/btn_client"
@@ -106,7 +98,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp"
-        android:layout_marginRight="32dp"
         android:text="@string/tcp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toRightOf="@id/btn_event"
@@ -118,7 +109,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="32dp"
-        android:layout_marginRight="32dp"
         android:text="@string/kcprun"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintLeft_toRightOf="@id/btn_event"
@@ -129,7 +119,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/client"
         app:layout_constraintStart_toStartOf="parent"
@@ -140,7 +129,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="64dp"
         android:text="@string/dftHint"
         app:layout_constraintLeft_toRightOf="@id/btn_client"
@@ -151,7 +139,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/event"
         app:layout_constraintStart_toStartOf="parent"
@@ -162,7 +149,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="64dp"
         android:text="@string/dftHint"
         app:layout_constraintLeft_toRightOf="@id/btn_event"
@@ -173,7 +159,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginLeft="32dp"
         android:layout_marginTop="32dp"
         android:text="@string/time"
         app:layout_constraintStart_toStartOf="parent"
@@ -184,7 +169,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
         android:layout_marginTop="48dp"
         android:text="@string/dftHint"
         app:layout_constraintLeft_toRightOf="@id/btn_time"

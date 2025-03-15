@@ -9,9 +9,9 @@
         <item>Disconnect</item>
     </string-array>
 
-    <string name="reload">Re-do</string>
+    <string name="reload">Re-fresh</string>
     <string name="texture">Texture</string>
-    <string name="wave">Audio</string>
+    <string name="wave">Wave</string>
     <string name="status">status</string>
     <string name="read">load</string>
     <string name="record">record</string>
@@ -37,4 +37,9 @@
     <string name="tcp">TCP</string>
     <string name="kcprun">Kcp</string>
     <string name="speak">Speak</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="ngravity">------------------------------\nGravity:</string>
+    <string name="accelerator">Accelerator:</string>
+    <string name="nliner_accelerator">------------------------------\nLiner-accelerator:</string>
+    <string name="start_chart">Start Chart</string>
 </resources>

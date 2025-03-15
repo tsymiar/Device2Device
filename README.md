@@ -15,7 +15,7 @@
 
 - CHART
 
-    a line chart using [`com.github.PhilJay:MPAndroidChart`](https://github.com/PhilJay/MPAndroidChart)
+    a line chart to show sensors
 
 - SERVER
 

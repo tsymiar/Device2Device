@@ -37,7 +37,7 @@ namespace Statics {
         free(text);
     }
 
-    static void printBuffer(char *buf, unsigned int size)
+    inline void printBuffer(char *buf, unsigned int size)
     {
         std::mutex mtxLck{};
         std::lock_guard <std::mutex> lock(mtxLck);

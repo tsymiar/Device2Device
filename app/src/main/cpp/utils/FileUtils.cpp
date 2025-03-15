@@ -105,7 +105,7 @@ long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, Fi
     fin.open(filename, ios_base::binary);
     if (!fin.is_open())
     {
-        LOGE("Error In Open...");
+        LOGE("Error In Open[%s]...", filename.c_str());
         return -1;
     }
 
@@ -116,7 +116,7 @@ long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, Fi
     fin.seekg(0, ios::beg);
 
     long len = sliceSize;
-    uint8_t frame[sliceSize];
+    uint8_t frame[len];
     memset(frame, 0, sliceSize);
 
     if (fileSize <= sliceSize)

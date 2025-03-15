@@ -1,4 +1,4 @@
-package com.tsymiar.device2device.data;
+package com.tsymiar.device2device.entity;
 
 import androidx.annotation.NonNull;
 
