@@ -31,7 +31,7 @@
     <string name="minimum">－</string>
     <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
-    <string name="pub_payload">payload</string>
+    <string name="pub_payload">some message</string>
     <string name="hint_address">address</string>
     <string name="hint_port">port</string>
     <string name="tcp">TCP</string>

@@ -240,7 +240,7 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (action.equals(FloatingService.BROADCAST_ACTION)) {
+            if (action != null && action.equals(FloatingService.BROADCAST_ACTION)) {
                 String subscribe = intent.getStringExtra("Subscribe");
                 System.out.println("Subscribe status ==> " + subscribe);
                 TextView tv = findViewById(R.id.txt_status);
@@ -261,12 +261,12 @@ public class MainActivity extends AppCompatActivity implements EventHandle {
                 if (publish != null && publish.equals("SUCCESS")) {
                     PubSubSetting setting = PubSubSetting.getSetting();
                     if (setting != null) {
-                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting.toString());
+                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting);
                     }
                     if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
                         Toast.makeText(MainActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
                     } else {
-                        CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload());
+                        CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
                     }
                 }
             }

@@ -157,14 +157,20 @@ JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
     Scadup::Subscriber::exit();
 }
 
-JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring payload)
+JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring message, jstring addr, jint port)
 {
     if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
-        LOGI("g_pubSubParam: addr is null or port == 0.");
-        return;
+        std::string csip = Jstring2Cstring(env, addr);
+        if (!csip.empty() && port > 0) {
+            g_pubSubParam.addr = csip;
+            g_pubSubParam.port = port;
+        } else {
+            LOGI("g_pubSubParam: addr is null or port == 0.");
+            return;
+        }
     }
     uint32_t iTopic = strtol(Jstring2Cstring(env, topic).c_str(), nullptr, 16);
-    std::string payloadParam = Jstring2Cstring(env, payload);
+    std::string payloadParam = Jstring2Cstring(env, message);
     Scadup::Publisher pub{};
     pub.setup(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
     ssize_t stat = pub.publish(iTopic, payloadParam);

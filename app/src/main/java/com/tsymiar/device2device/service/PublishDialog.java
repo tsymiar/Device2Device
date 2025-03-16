@@ -44,7 +44,7 @@ public class PublishDialog extends Service {
     @Override
     public void onStart(Intent intent, int startId) {
         super.onStart(intent, startId);
-        floatView = layoutInflater.inflate(R.layout.dialog_publisher, null);
+        floatView = layoutInflater.inflate(R.layout.dialog_publish, null);
 
         WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

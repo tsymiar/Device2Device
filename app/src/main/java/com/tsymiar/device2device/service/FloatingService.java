@@ -129,7 +129,7 @@ public class FloatingService extends Service {
     @Override
     public void onStart(Intent intent, int startId) {
         super.onStart(intent, startId);
-        floatView = layoutInflater.inflate(R.layout.subscribe, null);
+        floatView = layoutInflater.inflate(R.layout.dialog_subscribe, null);
 
         WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -175,6 +175,10 @@ public class FloatingService extends Service {
         );
         floatView.findViewById(R.id.btn_minium).setOnClickListener(
                 v -> {
+                    if (editAddr != null)
+                        PubSubSetting.setAddr(editAddr.getText().toString());
+                    if (editPort != null)
+                        PubSubSetting.setPort(Integer.parseInt(editPort.getText().toString()));
                     if (windowManager != null) {
                         windowManager.removeView(floatView);
                     }
