@@ -9,7 +9,7 @@
 
     a test page for image/video `encode/decode` include `CPU/GPU` render, `OpenGL` render
 
-- AUDIO
+- WAVE
 
     to record sounds and draw waves
 
@@ -49,4 +49,4 @@
 
     click to update timestamp
 
-    <img src="screenshots/MainActivity.jpg" title="MainActivity" height="60%" width="60%">
+    <img src="images/MainActivity.jpg" title="MainActivity" height="60%" width="60%">

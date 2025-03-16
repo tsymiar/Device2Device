@@ -28,7 +28,7 @@ import com.tsymiar.device2device.R;
 
 import java.util.ArrayList;
 
-public class ChartFragment extends Fragment implements SensorEventListener { // 改为继承Fragment
+public class DefaultFragment extends Fragment implements SensorEventListener {
 
 	private Handler mHandler;
 	private NewChart mView;
@@ -41,17 +41,16 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 	private double[] linear_acceleration = new double[3];
 	private double[] gravity = new double[3];
 
-	// Fragment生命周期方法修改
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
 			@Nullable Bundle savedInstanceState) {
-		View rootView = inflater.inflate(R.layout.view_chart, container, false); // 加载布局
+		View rootView = inflater.inflate(R.layout.view_chart, container, false);
 
-		sensorManager = (SensorManager)requireActivity().getSystemService(Context.SENSOR_SERVICE); // 使用requireActivity()
+		sensorManager = (SensorManager)requireActivity().getSystemService(Context.SENSOR_SERVICE);
 		chart0 = new Chart(sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION));
 
-		mView = new NewChart(requireActivity()); // 传递Context
-		LinearLayout mLayout = rootView.findViewById(R.id.toor); // 从rootView查找
+		mView = new NewChart(requireActivity());
+		LinearLayout mLayout = rootView.findViewById(R.id.toor);
 		mLayout.addView(mView);
 
 		mHandler = new Handler();
@@ -64,18 +63,17 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 	public void onResume() {
 		super.onResume();
 		chart0.register();
-		sensorManager.registerListener(this, chart0.sensor, SensorManager.SENSOR_DELAY_GAME); // 注册传感器监听
+		sensorManager.registerListener(this, chart0.sensor, SensorManager.SENSOR_DELAY_GAME);
 	}
 
 	@Override
 	public void onPause() {
 		super.onPause();
 		chart0.unregister();
-		sensorManager.unregisterListener(this); // 注销监听
-		mHandler.removeCallbacksAndMessages(null); // 停止Handler
+		sensorManager.unregisterListener(this);
+		mHandler.removeCallbacksAndMessages(null);
 	}
 
-	// 新增：避免内存泄漏
 	@Override
 	public void onDestroyView() {
 		super.onDestroyView();
@@ -94,7 +92,6 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 		}
 	}
 
-	// 实现SensorEventListener接口方法
 	@Override
 	public void onSensorChanged(SensorEvent event) {
 		long currentUpdateTime = System.currentTimeMillis();
@@ -104,7 +101,6 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 		lastUpdateTime = currentUpdateTime;
 
 		final float alpha = 0.8f;
-
 		// 修正数组索引错误
 		gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
 		gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
@@ -117,7 +113,6 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {
-		// 空实现
 	}
 
 	class NewChart extends View {
@@ -153,35 +148,28 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 
 		private void drawTable(Canvas canvas) {
 
-			mPaint.setColor(Color.WHITE);// 设置要画出图形的颜色
+			mPaint.setColor(Color.WHITE);
 
-			// 画出外框
 			mPaint.setStyle(Paint.Style.STROKE);
-			// mPinat.setStrokeWidth(Pain);
-			// 画出一个矩形图
 			mPaint.setStrokeWidth(1);
 			Rect chartRec = new Rect(OFFSET_LEFT, OFFSET_TOP, CHARTW + OFFSET_LEFT, CHARTH + OFFSET_TOP);
 			canvas.drawRect(chartRec, mPaint);
 
-			// 顶端的文字
 			Path textPaint = new Path();
-			mPaint.setStyle(Paint.Style.FILL);// 设置画笔的样式
-			textPaint.moveTo(400, 40);// 文字排版起始点
-			textPaint.lineTo(600, 40);// 结束点
-			mPaint.setTextSize(27);// 字号
-			mPaint.setAntiAlias(true);// 设置锯齿效果，true消除。
+			mPaint.setStyle(Paint.Style.FILL);
+			textPaint.moveTo(400, 40);
+			textPaint.lineTo(600, 40);
+			mPaint.setTextSize(27);
+			mPaint.setAntiAlias(true);
 			canvas.drawTextOnPath("线性加速度传感器", textPaint, 0, 0, mPaint);
-			// 左侧数字
 			mPaint.setTextSize(20);
 			for (int j = 5; j >= 1; j--) {
 				canvas.drawText("+" + 0.5 * j, OFFSET_LEFT - TEXT_OFFSET, OFFSET_TOP + CHARTH / 10 * (5 - j), mPaint);
 			}
 			canvas.drawText("0", OFFSET_LEFT - TEXT_OFFSET, OFFSET_TOP + CHARTH / 2, mPaint);
 			for (int i = 1; i <= 5; i++) {
-				canvas.drawText("-" + 0.5 * i, OFFSET_LEFT - TEXT_OFFSET, OFFSET_TOP + CHARTH / 10 * (i + 5), mPaint);
-			}
+				canvas.drawText("-" + 0.5 * i, OFFSET_LEFT - TEXT_OFFSET, OFFSET_TOP + CHARTH / 10 * (i + 5), mPaint);			}
 
-			// 画表格中的虚线
 			Path path = new Path();
 			PathEffect effect = new DashPathEffect(new float[] { 2, 2, 2, 2 }, 1);
 			mPaint.setStyle(Paint.Style.STROKE);
@@ -197,7 +185,7 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 		private PointF[] getPoints(ArrayList<PointF> dlk, ArrayList<Integer> xlist) {
 			///////////////////////
 			int widt = getWidth();
-			final float scale = ChartFragment.this.getResources().getDisplayMetrics().density;
+			final float scale = DefaultFragment.this.getResources().getDisplayMetrics().density;
 			int widh = (int)(50 * scale + 0.5f);
 			for (int i = 0; i < dlk.size(); i++) {
 				xlist.add(widh + (widt - widh) / dlk.size() * i);
@@ -289,11 +277,11 @@ public class ChartFragment extends Fragment implements SensorEventListener { // 
 		}
 
 		public void register() {
-			sensorManager.registerListener(ChartFragment.this, sensor, SensorManager.SENSOR_DELAY_GAME);
+			sensorManager.registerListener(DefaultFragment.this, sensor, SensorManager.SENSOR_DELAY_GAME);
 		}
 
 		public void unregister() {
-			sensorManager.unregisterListener(ChartFragment.this);
+			sensorManager.unregisterListener(DefaultFragment.this);
 		}
 	}
 }

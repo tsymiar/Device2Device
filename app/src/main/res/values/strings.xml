@@ -42,4 +42,16 @@
     <string name="accelerator">Accelerator:</string>
     <string name="nliner_accelerator">------------------------------\nLiner-accelerator:</string>
     <string name="start_chart">Start Chart</string>
+    <string name="testing">测试测试</string>
+    <string name="begin">开始</string>
+    <string name="pause">暂停</string>
+    <string name="hide">隐藏</string>
+    <string name="range">幅度</string>
+    <string name="legend">图例：</string>
+    <string name="arrows">⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂</string>
+    <string name="pull">拖动</string>
+    <string name="min">最小化</string>
+    <string name="notify">返回</string>
+    <string name="CH0">CH0</string>
+    <string name="CH1">CH1</string>
 </resources>

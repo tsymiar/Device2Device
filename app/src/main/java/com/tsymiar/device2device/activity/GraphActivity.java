@@ -15,7 +15,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.acceleration.ChartFragment;
+import com.tsymiar.device2device.acceleration.SensorFragment;
 
 public class GraphActivity extends AppCompatActivity {
 
@@ -42,7 +42,7 @@ public class GraphActivity extends AppCompatActivity {
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
                 if (savedInstanceState == null) {
-                    getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new ChartFragment())
+                    getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new SensorFragment())
                             .commit();
                 }
             }
