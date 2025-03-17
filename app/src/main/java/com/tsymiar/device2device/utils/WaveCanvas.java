@@ -10,14 +10,11 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.media.AudioRecord;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Handler.Callback;
 import android.os.Message;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
-
-import androidx.annotation.RequiresApi;
 
 import com.tsymiar.device2device.view.WaveSurface;
 import com.tsymiar.device2device.wrapper.FileWrapper;
@@ -129,7 +126,6 @@ public class WaveCanvas {
      * @author cokus
      */
     @SuppressLint("StaticFieldLeak")
-    @RequiresApi(api = Build.VERSION_CODES.CUPCAKE)
     class PaintingTask extends AsyncTask<Object, Object, Object> {
         private final int recBufSize;
         private final AudioRecord audioRecord;
@@ -311,17 +307,16 @@ public class WaveCanvas {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                while (isWriting || write_data.size() > 0) {
+                while (isWriting || !write_data.isEmpty()) {
                     byte[] buffer = null;
                     synchronized (write_data) {
-                        if (write_data.size() > 0) {
+                        if (!write_data.isEmpty()) {
                             buffer = write_data.get(0);
                             write_data.remove(0);
                         }
                     }
                     try {
-                        if (buffer != null) {
-                            assert fos2wav != null;
+                        if (buffer != null && fos2wav != null) {
                             fos2wav.write(buffer);
                             fos2wav.flush();
                         }
@@ -334,9 +329,9 @@ public class WaveCanvas {
             } catch (Throwable t) {
                 Log.e(TAG, t.toString());
             } finally {
-                assert fos2wav != null;
                 try {
-                    fos2wav.close();
+                    if (fos2wav != null)
+                        fos2wav.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

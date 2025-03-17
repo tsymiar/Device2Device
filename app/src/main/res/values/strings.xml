@@ -54,4 +54,15 @@
     <string name="notify">返回</string>
     <string name="CH0">CH0</string>
     <string name="CH1">CH1</string>
+    <string name="item" tools:ignore="ExtraTranslation" />
+    <string name="sensor">传感器</string>
+    <string name="url">源码</string>
+    <string name="feed">反馈</string>
+    <string name="thank">鸣谢</string>
+    <string name="illreply">请输入你要说的话,我应该会很快回复的。</string>
+    <string name="email">mailto:909006258@qq.com</string>
+    <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
+    <string name="developing">感谢</string>
+    <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
+    <string name="exitapp">双击完全退出应用</string>
 </resources>

@@ -3,8 +3,8 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="70dip"
-    android:background="@drawable/ic_msgbkg"
+    android:layout_height="wrap_content"
+    android:background="@drawable/ic_msg_bkg"
     android:orientation="vertical">
 
     <TextView

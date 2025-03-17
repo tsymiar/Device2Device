@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--colors-->
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
@@ -11,5 +12,6 @@
     <color name="waveform_selected">#33b5e5</color>
     <color name="waveform_unselected">#195a72</color>
     <color name="waveform_unselected_overlay">#0a242d</color>
+    <color name="menu_submenu">#ccffff</color>
     <color name="darkgrey">#888888</color>
 </resources>

@@ -123,7 +123,7 @@ public class SensorService extends Service {
             builder.setContentIntent(pendingIntent);
         }
         builder.setAutoCancel(false);
-        builder.setSmallIcon(R.drawable.ic_launcher);
+        builder.setSmallIcon(R.drawable.ic_notify);
         builder.setContentTitle(R.string.app_name + " Notification");
         builder.setContentText("You have a new message");
         builder.setTicker("this is ticker text");
@@ -135,7 +135,7 @@ public class SensorService extends Service {
         //								getText(R.string.notif), pendingIntent);
         startForeground(1, notification);
         manager.notify(11, notification);
-        view = LayoutInflater.from(this).inflate(R.layout.text_float, null);
+        view = LayoutInflater.from(this).inflate(R.layout.dialog_view_text, null);
         myview = (TextView) view.findViewById(R.id.notification);
         click = (TextView) view.findViewById(R.id.click);
         pause_bn = (Button) view.findViewById(R.id.pause_bn);

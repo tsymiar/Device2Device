@@ -1,6 +1,6 @@
 package com.tsymiar.device2device.activity;
 
-import static com.tsymiar.device2device.activity.MainActivity.RequestAudio;
+import static com.tsymiar.device2device.activity.EntryActivity.RequestAudio;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -45,8 +45,9 @@ import java.util.ArrayList;
 public class WaveActivity extends AppCompatActivity {
 
     public final String TAG = WaveActivity.class.getSimpleName();
-    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory() + "/Android/data/"
-            + "com.tsymiar.device2device" + "/files/record/";
+    public final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
+            // + "/Android/data/" + "com.tsymiar.device2device"
+            + "/files/record/";
     private static final int FREQUENCY = 16000;// 设置音频采样率,44100是目前的标准,某些设备仍然支持22050，16000，11025
     private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
     private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;// 音频数据格式：每个样本16位

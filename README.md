@@ -37,7 +37,7 @@
 
     click to start a tcp server to receive data
 
-- IKCP
+- KCP
 
     a test case for `kcp`
 

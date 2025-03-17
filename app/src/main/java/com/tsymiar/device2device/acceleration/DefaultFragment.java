@@ -44,7 +44,7 @@ public class DefaultFragment extends Fragment implements SensorEventListener {
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
 			@Nullable Bundle savedInstanceState) {
-		View rootView = inflater.inflate(R.layout.view_chart, container, false);
+		View rootView = inflater.inflate(R.layout.dialog_view_chart, container, false);
 
 		sensorManager = (SensorManager)requireActivity().getSystemService(Context.SENSOR_SERVICE);
 		chart0 = new Chart(sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION));

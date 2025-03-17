@@ -13,7 +13,8 @@
     <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"
+        tools:ignore="HighSamplingRate" />
 
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:roundIcon="@mipmap/ic_launcher_round" android:supportsRtl="true" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true" tools:ignore="AllowBackup,GoogleAppIndexingWarning">
 
@@ -24,12 +25,52 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".activity.EntryActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.CONNECTION" />
+            </intent-filter>
+        </activity>
         <activity android:name=".activity.TextureActivity" />
         <activity android:name=".activity.WaveActivity" />
         <activity android:name=".activity.GraphActivity" />
-
-        <service android:name=".service.PublishDialog" />
+        <activity android:name=".acceleration.Sensor.SensorListActivity" />
+        <service
+            android:name=".service.PublishDialog"
+            android:theme="@android:style/Theme.Holo.Dialog" />
         <service android:name=".service.FloatingService" />
+        <service android:name=".acceleration.Sensor.SensorIntentService" />
+        <service android:name=".acceleration.Sensor.SensorService" />
+        <service android:name=".acceleration.Voice.Voice"
+            tools:ignore="MissingClass" />
+        <activity android:name=".activity.BuggerActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SENDTO" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="mail's" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".activity.MyGitActivity"
+            android:exported="true"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".activity.ThanksActivity"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/thank"
+            android:theme="@android:style/Theme.Material.Dialog.Alert"
+            tools:ignore="NewApi" />
     </application>
 
 </manifest>

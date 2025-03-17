@@ -1,12 +1,10 @@
 package com.tsymiar.device2device.acceleration.Voice;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.IntentService;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.media.MediaPlayer;
-import android.os.Build;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -14,7 +12,6 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-@TargetApi(Build.VERSION_CODES.CUPCAKE)
 public class Voice extends IntentService {
 
     private static final String TAG = "Voice";

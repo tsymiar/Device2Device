@@ -1,192 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".activity.MainActivity">
+    android:id="@+id/anim"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:gravity="center"
+    android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/sample_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="32dp"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintHorizontal_bias="0.397"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.916" />
+    <ImageView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:contentDescription=""
+        android:src="@drawable/auth_ic"
+        tools:ignore="ContentDescription" />
 
-    <Button
-        android:id="@+id/btn_texture"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/texture"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/btn_wave"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/wave"
-        app:layout_constraintLeft_toRightOf="@id/btn_texture"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints" />
-
-    <Button android:id="@+id/btn_chart"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/chart"
-        app:layout_constraintLeft_toRightOf="@id/btn_wave"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints" />
-
-    <TextView
-        android:id="@+id/txt_server"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="48dp"
-        android:text="@string/dftHint"
-        app:layout_constraintLeft_toRightOf="@id/btn_server"
-        app:layout_constraintTop_toBottomOf="@id/btn_wave" />
-
-    <Button
-        android:id="@+id/btn_server"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/server"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_texture" />
-
-    <Button
-        android:id="@+id/btn_subscribe"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="32dp"
-        android:text="@string/subscribe"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/btn_server"
-        app:layout_constraintTop_toBottomOf="@id/btn_wave" />
-
-    <Button
-        android:id="@+id/btn_publisher"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="32dp"
-        android:text="@string/publish"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/btn_client"
-        app:layout_constraintTop_toBottomOf="@id/btn_subscribe" />
-
-    <Button
-        android:id="@+id/btn_tcp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="32dp"
-        android:text="@string/tcp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/btn_event"
-        app:layout_constraintTop_toBottomOf="@id/btn_publisher"  />
-
-    <Button
-        android:id="@+id/btn_ikcp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="32dp"
-        android:text="@string/kcprun"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/btn_event"
-        app:layout_constraintTop_toBottomOf="@id/btn_tcp"  />
-
-    <Button
-        android:id="@+id/btn_client"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/client"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btn_server" />
-
-    <TextView
-        android:id="@+id/txt_client"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="64dp"
-        android:text="@string/dftHint"
-        app:layout_constraintLeft_toRightOf="@id/btn_client"
-        app:layout_constraintTop_toBottomOf="@id/txt_server" />
-
-    <Button
-        android:id="@+id/btn_event"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/event"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_client" />
-
-    <TextView
-        android:id="@+id/txt_event"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="64dp"
-        android:text="@string/dftHint"
-        app:layout_constraintLeft_toRightOf="@id/btn_event"
-        app:layout_constraintTop_toBottomOf="@id/txt_client" />
-
-    <Button
-        android:id="@+id/btn_time"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="32dp"
-        android:text="@string/time"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btn_event" />
-
-    <TextView
-        android:id="@+id/txt_time"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="48dp"
-        android:text="@string/dftHint"
-        app:layout_constraintLeft_toRightOf="@id/btn_time"
-        app:layout_constraintTop_toBottomOf="@id/txt_event" />
-
-    <TextView
-        android:id="@+id/txt_status"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="8dp"
-        android:layout_marginTop="32dp"
-        android:foregroundGravity="center_horizontal"
-        android:gravity="center_horizontal|left"
-        android:text="@string/dftHint"
-        android:textStyle="normal"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_time"
-        tools:ignore="MissingConstraints,RtlHardcoded" />
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <ImageView
+        android:id="@+id/ofofof"
+        android:layout_width="30sp"
+        android:layout_height="30sp"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:contentDescription=""
+        android:src="@drawable/ofofof"
+        tools:ignore="ContentDescription" />
+</RelativeLayout>
