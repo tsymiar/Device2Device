@@ -6,7 +6,7 @@ import androidx.annotation.NonNull;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
-public class ThankActivity extends Activity {
+public class ThanksActivity extends Activity {
 
     public void onCreate(Bundle savedInstanceState) {
         {

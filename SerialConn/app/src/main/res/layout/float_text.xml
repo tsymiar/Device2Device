@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="70dip"
-    android:background="@drawable/ic_msgbkg"
+    android:background="@drawable/ic_background"
     android:orientation="vertical">
 
     <TextView
@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:layout_gravity="center"
-        android:shadowColor="@color/darkgrey"
+        android:shadowColor="@color/dark_grey"
         android:shadowDx="2"
         android:shadowDy="2"
         android:shadowRadius="2"

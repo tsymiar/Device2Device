@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:paddingBottom="25dip"
-            android:text="@string/tobegin"
+            android:text="@string/click2begin"
             android:textColor="@color/black"
             android:textSize="24.5sp"
             android:typeface="monospace" />
@@ -40,7 +40,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="15dip"
-            android:text="@string/entery" />
+            android:text="@string/entry" />
 
     </LinearLayout>
 

@@ -5,7 +5,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.net.Uri;
 
-public class MyGitActivity extends Activity {
+public class ViewGitActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

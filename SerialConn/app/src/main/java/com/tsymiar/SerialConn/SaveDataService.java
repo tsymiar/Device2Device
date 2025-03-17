@@ -41,11 +41,13 @@ public class SaveDataService extends Service {
                 File dir = new File(android.os.Environment.getExternalStorageDirectory()
                         + "/Device2Device");
                 if (!dir.exists()) {
-                    dir.mkdirs();
+                    if (!dir.mkdirs())
+                        Log.e(SaveDataService.class.getSimpleName(), "mkdirs failed!");
                 }
-                File file = new File(dir, getString(R.string.filelocal));
+                File file = new File(dir, getString(R.string.file_local));
                 if(!file.exists()){
-                    file.createNewFile();
+                    if (!file.createNewFile())
+                        Log.e(SaveDataService.class.getSimpleName(), "createNewFile failed!");
                 }
                 OutputStreamWriter writer = new OutputStreamWriter(new java.io.FileOutputStream(file, true));
                 writer.write(temp + "\t");
@@ -61,7 +63,7 @@ public class SaveDataService extends Service {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     Toast.makeText(SaveDataService.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
-                Log.e("SaveDataService", "saveData failed", e);
+                Log.e("SaveDataService", "saveData failed!", e);
             }
         }).start();
     }

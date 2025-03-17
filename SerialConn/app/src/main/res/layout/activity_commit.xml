@@ -32,11 +32,11 @@
         android:orientation="vertical">
 
         <ImageView
-            android:id="@+id/switch0"
+            android:id="@+id/img_switch"
             android:layout_width="90sp"
             android:layout_height="90sp"
             android:layout_centerInParent="true"
-            android:src="@drawable/switch0"
+            android:src="@drawable/ic_switch"
             tools:ignore="ContentDescription" />
 
         <ImageView
@@ -44,18 +44,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            android:layout_toEndOf="@id/switch0"
-            android:layout_toRightOf="@id/switch0"
-            android:src="@drawable/arr_right"
+            android:layout_toEndOf="@id/img_switch"
+            android:src="@drawable/a_right"
             tools:ignore="ContentDescription" />
 
         <ImageView
             android:id="@+id/up"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_above="@id/switch0"
+            android:layout_above="@id/img_switch"
             android:layout_centerHorizontal="true"
-            android:src="@drawable/arr_up"
+            android:src="@drawable/a_up"
             tools:ignore="ContentDescription" />
 
         <ImageView
@@ -63,18 +62,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            android:layout_toStartOf="@id/switch0"
-            android:layout_toLeftOf="@id/switch0"
-            android:src="@drawable/arr_left"
+            android:layout_toStartOf="@id/img_switch"
+            android:src="@drawable/a_left"
             tools:ignore="ContentDescription" />
 
         <ImageView
             android:id="@+id/down"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_below="@id/switch0"
+            android:layout_below="@id/img_switch"
             android:layout_centerHorizontal="true"
-            android:src="@drawable/arr_down"
+            android:src="@drawable/a_down"
             tools:ignore="ContentDescription" />
 
         <Button
@@ -83,16 +81,15 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/edit_text"
             android:layout_centerHorizontal="true"
-            android:text="@string/_0" />
+            android:text="@string/is_0" />
 
         <ImageView
-            android:id="@+id/imageView2"
+            android:id="@+id/img_submit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_above="@id/btn0"
             android:layout_toEndOf="@id/edit_text"
-            android:layout_toRightOf="@id/edit_text"
-            android:src="@drawable/btn_send"
+            android:src="@drawable/submit"
             tools:ignore="ContentDescription" />
 
         <EditText
@@ -100,9 +97,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:layout_toStartOf="@id/imageView2"
-            android:layout_toLeftOf="@id/imageView2"
+            android:layout_toStartOf="@id/img_submit"
             android:layout_weight="2"
+            android:autofillHints="true"
             android:width="70dp"
             android:hint="@string/edit_text"
             android:inputType="textCapCharacters"
@@ -114,12 +111,11 @@
             tools:ignore="ObsoleteLayoutParam,RelativeOverlap" />
 
         <TextView
-            android:id="@+id/sdt"
+            android:id="@+id/text_send"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignBottom="@+id/imageView2"
+            android:layout_alignBottom="@+id/img_submit"
             android:layout_alignParentStart="true"
-            android:layout_alignParentLeft="true"
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:textColor="@color/black"
             tools:ignore="NotSibling" />

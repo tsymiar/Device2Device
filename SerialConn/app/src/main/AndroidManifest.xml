@@ -3,18 +3,21 @@
     package="com.tsymiar.SerialConn"
     tools:ignore="MissingVersion">
 
+    <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/ic_app_logo"
         android:label="@string/AppName"
         android:theme="@style/AppTheme">
 
@@ -38,7 +41,7 @@
         </activity>
 
         <activity
-            android:name="com.tsymiar.SerialConn.TransferActivity"
+            android:name="com.tsymiar.SerialConn.CommitActivity"
             android:alwaysRetainTaskState="true"
             android:exported="true"
             android:label="@string/window"
@@ -58,7 +61,7 @@
             tools:ignore="NewApi" />
 
         <activity
-            android:name="com.tsymiar.SerialConn.MyGitActivity"
+            android:name="com.tsymiar.SerialConn.ViewGitActivity"
             android:exported="true"
             android:screenOrientation="unspecified"
             android:theme="@style/AppDialog">
@@ -89,33 +92,14 @@
         </activity>
 
         <activity
-            android:name="com.tsymiar.SerialConn.ThankActivity"
+            android:name="com.tsymiar.SerialConn.ThanksActivity"
             android:configChanges="orientation|keyboardHidden"
-            android:label="@string/_new"
+            android:label="@string/more"
             android:theme="@android:style/Theme.Material.Dialog.Alert"
             tools:ignore="NewApi" />
 
-        <service android:name="com.tsymiar.SerialConn.Sensor.SensorIntentService" />
-
-        <service android:name="com.tsymiar.SerialConn.Voice.Voice" />
-
-        <activity
-            android:name=".Sensor.SensorActivity"
-            android:label="@string/sensor_title"
-            tools:ignore="DuplicateActivity" />
-
-        <activity
-            android:name=".Sensor.SensorListActivity"
-            android:label="@string/AppName"
-            android:smoothScrollbar="true"
-            android:theme="@android:style/Theme.Holo.Light" />
-
-        <activity android:name="org.achartengine.GraphicalActivity" />
-
         <service android:name="com.tsymiar.SerialConn.SaveDataService" />
         <service android:name="com.tsymiar.SerialConn.ReceiverService" />
-        <service android:name="com.tsymiar.SerialConn.Sensor.SensorService" />
-        <service android:name="com.tsymiar.SerialConn.ShowViewService" />
         <service android:name="com.tsymiar.SerialConn.WindowService" />
 
         <meta-data

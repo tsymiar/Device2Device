@@ -4,12 +4,6 @@
         android:title="@string/item"
         android:visible="false" />
     <item
-        android:id="@+id/sensor"
-        android:title="@string/sensor" />
-    <item
-        android:id="@+id/chart"
-        android:title="@string/vChart" />
-    <item
         android:id="@+id/feedback"
         android:title="@string/feed" />
     <item

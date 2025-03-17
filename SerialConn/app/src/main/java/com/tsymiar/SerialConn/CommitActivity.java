@@ -2,12 +2,10 @@ package com.tsymiar.SerialConn;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -34,6 +32,7 @@ import android.widget.TextView;
 import android.widget.TextView.OnEditorActionListener;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
 import java.io.File;
@@ -41,22 +40,23 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 
-public class TransferActivity extends Activity {
+public class CommitActivity extends Activity {
     private static final String TAG = "ChatAct";
     private BluetoothAdapter btAdapter = null;
     private BluetoothSocket btSocket = null;
     private OutputStream outStream = null;
     private String data = "1";
     private Toast toast;
-    private int READ = 1;
+    private final int READ = 1;
     private String s;
     private boolean h;
-    private TextView sdt;
+    private TextView text;
     ImageView img;
     ImageView switch0;
     ImageView up;
@@ -74,33 +74,32 @@ public class TransferActivity extends Activity {
      * Called when the activity is first created.
      **/
     @SuppressLint("CutPasteId")
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setFinishOnTouchOutside(false);
-        this.setContentView(R.layout.activity_transfer);
+        this.setContentView(R.layout.activity_commit);
         ExitApplication.getInstance().addActivity(this);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 
-        editText = (EditText) findViewById(R.id.edit_text);
-        switch0 = (ImageView) findViewById(R.id.switch0);
-        up = (ImageView) findViewById(R.id.up);
-        right = (ImageView) findViewById(R.id.right);
-        left = (ImageView) findViewById(R.id.left);
-        down = (ImageView) findViewById(R.id.down);
-        st = (TextView) findViewById(R.id.sendingTextView1);
+        editText = findViewById(R.id.edit_text);
+        switch0 = findViewById(R.id.img_switch);
+        up = findViewById(R.id.up);
+        right = findViewById(R.id.right);
+        left = findViewById(R.id.left);
+        down = findViewById(R.id.down);
+        st = findViewById(R.id.sendingTextView1);
 
-        sdt = (TextView) findViewById(R.id.sdt);
-        img = (ImageView) findViewById(R.id.imageView2);
+        text = findViewById(R.id.text_send);
+        img = findViewById(R.id.img_submit);
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             public void run(){
                 assert editText != null;
-                InputMethodManager inputmanager = (InputMethodManager) editText.getContext().getSystemService(TransferActivity.INPUT_METHOD_SERVICE);
-                if (inputmanager != null) {
-                    inputmanager.showSoftInput(editText, 0);
+                InputMethodManager inputManager = (InputMethodManager) editText.getContext().getSystemService(CommitActivity.INPUT_METHOD_SERVICE);
+                if (inputManager != null) {
+                    inputManager.showSoftInput(editText, 0);
                 }
             }
         }, 200);
@@ -113,18 +112,17 @@ public class TransferActivity extends Activity {
         return true;
     }
 
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         return mainActivity.ItemSelected(item, this);
     }
 
     @SuppressLint({"RtlHardcoded", "WrongConstant", "ClickableViewAccessibility"})
-    @TargetApi(Build.VERSION_CODES.GINGERBREAD)
     @Override
     public void onResume() {
         super.onResume();
-        Intent hint = new Intent(TransferActivity.this, ReceiverService.class);
+        Intent hint = new Intent(CommitActivity.this, ReceiverService.class);
         android.os.Bundle ble = new android.os.Bundle();
-        ble.putString("temp", getString(R.string.data_recvd));
+        ble.putString("temp", getString(R.string.received));
         hint.putExtras(ble);
         sendBroadcast(hint);
         startService(hint);
@@ -150,18 +148,17 @@ public class TransferActivity extends Activity {
                 btSocket = createBluetoothSocket(device);
             } catch (IOException e) {
                 if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        final int requestCode = 0;
+                        ActivityCompat.requestPermissions(CommitActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+                    }
                     return;
                 }
                 this.btAdapter.disable();
                 msg = msg + "串口已关闭。";
                 Toast.makeText(getBaseContext(), "\n" + msg + e.getMessage() + ".", Toast.LENGTH_SHORT).show();
+            } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
+                throw new RuntimeException(e);
             }
 
             try {
@@ -176,7 +173,7 @@ public class TransferActivity extends Activity {
             Log.d(TAG, "...Connecting...");
             try {
                 btSocket.connect();
-                toast = Toast.makeText(TransferActivity.this, "蓝牙地址为:\n" + address, Toast.LENGTH_LONG);
+                toast = Toast.makeText(CommitActivity.this, "蓝牙地址为:\n" + address, Toast.LENGTH_LONG);
                 toast.setGravity(Gravity.RIGHT, 0, 30);
                 toast.show();
                 Log.d(TAG, "...Connection ok...");
@@ -201,37 +198,34 @@ public class TransferActivity extends Activity {
                 new RecieveThread(btSocket).start();
         } catch (IOError ignored) {
         }
-        final ImageView imageView2;
-        imageView2 = (ImageView) findViewById(R.id.imageView2);
+        final ImageView submit;
+        submit = (ImageView) findViewById(R.id.img_submit);
         Button btn0 = (Button) findViewById(R.id.btn0);
 
-        assert imageView2 != null;
-        imageView2.setOnTouchListener(new View.OnTouchListener() {
-
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_MOVE:
-                        imageView2.setAlpha(50);
-                        vibrator.vibrate(50);
-                        new Thread() {
-                            public void run(){
-                                Message msg = new Message();
-                                msg.what = 0;
-                                i2.sendMessage(msg);
-                                try {
-                                    sleep(200);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
+        assert submit != null;
+        submit.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_MOVE:
+                    submit.setAlpha(50);
+                    vibrator.vibrate(50);
+                    new Thread() {
+                        public void run(){
+                            Message msg = new Message();
+                            msg.what = 0;
+                            i2.sendMessage(msg);
+                            try {
+                                sleep(200);
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "onTouch submit sleep failed!", e);
                             }
-                        }.start();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        imageView2.setAlpha(255);
-                        break;
-                }
-                return true;
+                        }
+                    }.start();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    submit.setAlpha(255);
+                    break;
             }
+            return true;
         });
         // 监听回车键
         assert editText != null;
@@ -240,10 +234,10 @@ public class TransferActivity extends Activity {
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 data = editText.getText().toString();
                 sendData(data);
-                if (data.equals(" ") || data.equals("")) {
-                    Toast.makeText(TransferActivity.this, "未输入", Toast.LENGTH_SHORT).show();
+                if (data.equals(" ") || data.isEmpty()) {
+                    Toast.makeText(CommitActivity.this, "未输入", Toast.LENGTH_SHORT).show();
                 } else {
-                    toast = Toast.makeText(TransferActivity.this, data, Toast.LENGTH_SHORT);
+                    toast = Toast.makeText(CommitActivity.this, data, Toast.LENGTH_SHORT);
                     toast.show();
                     toast.setGravity(Gravity.BOTTOM, 0, 30);
                 }
@@ -270,8 +264,8 @@ public class TransferActivity extends Activity {
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 data = editText.getText().toString();
                 sendData(data);
-                if (data.equals(" ") || data.equals("")) {
-                    Toast.makeText(TransferActivity.this, getString(R.string.typenone), Toast.LENGTH_SHORT).show();
+                if (data.equals(" ") || data.isEmpty()) {
+                    Toast.makeText(CommitActivity.this, getString(R.string.none_type), Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(getBaseContext(), data + ".", Toast.LENGTH_SHORT).show();
                 }
@@ -282,10 +276,10 @@ public class TransferActivity extends Activity {
         assert img != null;
         img.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-                if (data.equals(" ") || data.equals("")) {
-                    Toast.makeText(TransferActivity.this, getString(R.string.typenone), Toast.LENGTH_SHORT).show();
+                if (data.equals(" ") || data.isEmpty()) {
+                    Toast.makeText(CommitActivity.this, getString(R.string.none_type), Toast.LENGTH_SHORT).show();
                 } else {
-                    sdt.setText(data);
+                    text.setText(data);
                 }
             }
         });
@@ -306,7 +300,7 @@ public class TransferActivity extends Activity {
                                 try {
                                     sleep(200);
                                 } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "onTouch switch0 sleep failed!", e);
                                 }
                             }
                         }.start();
@@ -335,7 +329,7 @@ public class TransferActivity extends Activity {
                                 try {
                                     sleep(200);
                                 } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "onTouch up sleep failed!", e);
                                 }
                             }
                         }.start();
@@ -364,7 +358,7 @@ public class TransferActivity extends Activity {
                                 try {
                                     sleep(200);
                                 } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                    Log.e(TAG, "onTouch right sleep failed!", e);
                                 }
                             }
                         }.start();
@@ -378,70 +372,65 @@ public class TransferActivity extends Activity {
         });
 
         assert left != null;
-        left.setOnTouchListener(new View.OnTouchListener() {
-
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_MOVE:
-                        left.setAlpha(50);
-                        vibrator.vibrate(50);
-                        new Thread() {
-                            public void run(){
-                                Message msg = new Message();
-                                msg.what = 0;
-                                hl.sendMessage(msg);
-                                try {
-                                    sleep(200);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
+        left.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_MOVE:
+                    left.setAlpha(50);
+                    vibrator.vibrate(50);
+                    new Thread() {
+                        public void run(){
+                            Message msg = new Message();
+                            msg.what = 0;
+                            hl.sendMessage(msg);
+                            try {
+                                sleep(200);
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "onTouch left sleep failed!", e);
                             }
-                        }.start();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        left.setAlpha(255);
-                        break;
-                }
-                return true;
+                        }
+                    }.start();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    left.setAlpha(255);
+                    break;
             }
+            return true;
         });
 
-        down.setOnTouchListener(new View.OnTouchListener() {
-
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()){
-                    case MotionEvent.ACTION_MOVE:
-                        down.setAlpha(50);
-                        vibrator.vibrate(50);
-                        new Thread() {
-                            public void run(){
-                                Message msg = new Message();
-                                msg.what = 0;
-                                hd.sendMessage(msg);
-                                try {
-                                    sleep(200);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
+        down.setOnTouchListener((v, event) -> {
+            switch (event.getAction()){
+                case MotionEvent.ACTION_MOVE:
+                    down.setAlpha(50);
+                    vibrator.vibrate(50);
+                    new Thread() {
+                        public void run(){
+                            Message msg = new Message();
+                            msg.what = 0;
+                            hd.sendMessage(msg);
+                            try {
+                                sleep(200);
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "setOnTouchListener sleep failed!", e);
                             }
-                        }.start();
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        down.setAlpha(255);
-                        break;
-                }
-                return true;
+                        }
+                    }.start();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    down.setAlpha(255);
+                    break;
             }
+            return true;
         });
     }
 
     Handler h0 = new Handler() {
+        @SuppressLint("HandlerLeak")
         @Override
         public void handleMessage(Message msg) {
 
             if (msg.what == 0) {
                 sendData(getString(R.string.cmd_0));
-                sdt.setText(getString(R.string.cmd_0));
+                text.setText(getString(R.string.cmd_0));
             }
             super.handleMessage(msg);
         }
@@ -453,7 +442,7 @@ public class TransferActivity extends Activity {
 
             if (msg.what == 0) {
                 sendData(getString(R.string.cmd_hu));
-                sdt.setText(getString(R.string.cmd_hu));
+                text.setText(getString(R.string.cmd_hu));
             }
             super.handleMessage(msg);
         }
@@ -465,7 +454,7 @@ public class TransferActivity extends Activity {
 
             if (msg.what == 0) {
                 sendData(getString(R.string.cmd_hr));
-                sdt.setText(getString(R.string.cmd_hr));
+                text.setText(getString(R.string.cmd_hr));
             }
             super.handleMessage(msg);
         }
@@ -477,7 +466,7 @@ public class TransferActivity extends Activity {
 
             if (msg.what == 0) {
                 sendData(getString(R.string.cmd_hl));
-                sdt.setText(getString(R.string.cmd_hl));
+                text.setText(getString(R.string.cmd_hl));
             }
             super.handleMessage(msg);
         }
@@ -489,7 +478,7 @@ public class TransferActivity extends Activity {
 
             if (msg.what == 0) {
                 sendData(getString(R.string.cmd_hd));
-                sdt.setText(getString(R.string.cmd_hd));
+                text.setText(getString(R.string.cmd_hd));
             }
             super.handleMessage(msg);
         }
@@ -510,7 +499,6 @@ public class TransferActivity extends Activity {
 
         private final InputStream mmInStream;
 
-        @TargetApi(Build.VERSION_CODES.ECLAIR)
         RecieveThread(BluetoothSocket socket) {
             InputStream tmpIn = null;
             // Get the input and output streams, using temp objects because
@@ -550,16 +538,16 @@ public class TransferActivity extends Activity {
     Handler handler = new Handler() {
         //处理消息队列的Handler对象
         @Override
-        public void handleMessage(Message msg) {
+        public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
             //处理消息
             if (msg.what == READ) {
                 String str = (String) msg.obj;
                 // 类型转化
-                Intent ss = new Intent(TransferActivity.this, SaveDataService.class);
-                Intent rs = new Intent(TransferActivity.this, ReceiverService.class);
+                Intent ss = new Intent(CommitActivity.this, SaveDataService.class);
+                Intent rs = new Intent(CommitActivity.this, ReceiverService.class);
                 android.os.Bundle ble = new android.os.Bundle();
-                ble.putString("temp", "" + str);
+                ble.putString("temp", str);
                 rs.putExtras(ble);
                 ss.putExtras(ble);
                 sendBroadcast(rs);
@@ -567,26 +555,24 @@ public class TransferActivity extends Activity {
                 startService(rs);
                 startService(ss);
             } else if (!h)
-                Toast.makeText(TransferActivity.this, "接收不成功：" + s + ".", Toast.LENGTH_SHORT).show();
+                Toast.makeText(CommitActivity.this, "接收不成功：" + s + ".", Toast.LENGTH_SHORT).show();
         }
     };
 
-    private BluetoothSocket createBluetoothSocket(BluetoothDevice device) throws IOException {
+    private BluetoothSocket createBluetoothSocket(BluetoothDevice device) throws IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         try{
             final Method m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class);
             return (BluetoothSocket)m.invoke(device, MY_UUID);
         } catch (Exception e) {
             Log.e(TAG, "Could not create Insecure RFComm Connection", e);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT);// TODO: Consider calling
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                final int requestCode = 0;
+                ActivityCompat.requestPermissions(CommitActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+            }
+            return (BluetoothSocket) device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class).invoke(device, MY_UUID);
         }
-//    ActivityCompat#requestPermissions
-// here to request the missing permissions, and then overriding
-//   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-//                                          int[] grantResults)
-// to handle the case where the user grants the permission. See the documentation
-// for ActivityCompat#requestPermissions for more details.
         return device.createRfcommSocketToServiceRecord(MY_UUID);
     }
 
@@ -604,13 +590,10 @@ public class TransferActivity extends Activity {
                 // Prompt user to turn on Bluetooth
                 Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
-                    // here to request the missing permissions, and then overriding
-                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                    //                                          int[] grantResults)
-                    // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        final int requestCode = 0;
+                        ActivityCompat.requestPermissions(CommitActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+                    }
                     return;
                 }
                 startActivityForResult(enableBtIntent, 1);
@@ -639,13 +622,10 @@ public class TransferActivity extends Activity {
 
         } catch (IOException e) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    final int requestCode = 0;
+                    ActivityCompat.requestPermissions(CommitActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+                }
                 return;
             }
             this.btAdapter.disable();

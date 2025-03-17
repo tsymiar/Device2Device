@@ -52,15 +52,15 @@ public class ReceiverService extends Service {
                 .setContentTitle(getText(R.string.edit_text))
                 .setContentText(getText(R.string.back))
                 .setContentIntent(pendingIntent)
-                .setSmallIcon(R.drawable.ooopic)
+                .setSmallIcon(R.drawable.none)
                 .setWhen(System.currentTimeMillis())
                 .build();
         if (nm != null) {
             nm.notify(1, notification);
         }
         startForeground(1, notification);
-        view = LayoutInflater.from(this).inflate(R.layout.text_float, null);
-        myview = (TextView) view.findViewById(R.id.notification);
+        view = LayoutInflater.from(this).inflate(R.layout.float_text, null);
+        myview = (TextView) view.findViewById(R.id.text);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class ReceiverService extends Service {
         public void handleMessage(Message msg) {
 
             if (msg.what == 0) {
-                myview.setText(temp + "");
+                myview.setText(temp);
             }
             super.handleMessage(msg);
         }
@@ -129,6 +129,7 @@ public class ReceiverService extends Service {
         }
         view.setOnTouchListener(new View.OnTouchListener() {
 
+            @SuppressLint("ClickableViewAccessibility")
             public boolean onTouch(View v, MotionEvent event) {
 
                 x = event.getRawX();

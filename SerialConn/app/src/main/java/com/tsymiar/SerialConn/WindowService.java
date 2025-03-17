@@ -24,13 +24,13 @@ public class WindowService extends Service {
 
     WindowManager.LayoutParams wmParams = null;
 
-    View view;
+    View dialog;
     boolean set = false;
 
     private String temp = null;
     private float mTouchStartX;
     private float mTouchStartY;
-    private TextView myview = null;
+    private TextView textView = null;
     private float x;
     private float y;
     private long mLastTime, mCurTime;
@@ -40,8 +40,8 @@ public class WindowService extends Service {
     public void onCreate() {
 
         super.onCreate();
-        view = LayoutInflater.from(this).inflate(R.layout.text_float, null);
-        myview = (TextView) view.findViewById(R.id.text);
+        dialog = LayoutInflater.from(this).inflate(R.layout.float_text, null);
+        textView = dialog.findViewById(R.id.text);
     }
 
     @Override
@@ -63,7 +63,7 @@ public class WindowService extends Service {
             }
         }.start();
         final Vibrator vibrator = (Vibrator) this.getSystemService(VIBRATOR_SERVICE);
-        myview.setOnClickListener(new View.OnClickListener() {
+        textView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 mLastTime = mCurTime;
@@ -72,7 +72,7 @@ public class WindowService extends Service {
                     vibrator.vibrate(50);
                 }
                 if (mCurTime - mLastTime < 300) {
-                    wm.removeView(view);
+                    wm.removeView(dialog);
                     set = false;
                 }
             }
@@ -83,7 +83,7 @@ public class WindowService extends Service {
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == 0) {
-                myview.setText(temp + "");
+                textView.setText(temp + "");
             }
             super.handleMessage(msg);
         }
@@ -104,13 +104,14 @@ public class WindowService extends Service {
         wmParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
         wmParams.format = PixelFormat.RGBA_8888;
         if (set) {
-            wm.updateViewLayout(view, wmParams);
+            wm.updateViewLayout(dialog, wmParams);
         } else {
-            wm.addView(view, wmParams);
+            wm.addView(dialog, wmParams);
             set = true;
         }
-        view.setOnTouchListener(new View.OnTouchListener() {
+        dialog.setOnTouchListener(new View.OnTouchListener() {
 
+            @SuppressLint("ClickableViewAccessibility")
             public boolean onTouch(View v, MotionEvent event) {
 
                 x = event.getRawX();
@@ -120,14 +121,14 @@ public class WindowService extends Service {
 
                     case MotionEvent.ACTION_DOWN:
                         mTouchStartX = event.getX();
-                        mTouchStartY = event.getY() + view.getHeight() / 2.f;
+                        mTouchStartY = event.getY() + dialog.getHeight() / 2.f;
                         break;
                     case MotionEvent.ACTION_MOVE:
-                        myview.setTextColor(Color.rgb(184, 134, 11));
+                        textView.setTextColor(Color.rgb(184, 134, 11));
                         updateViewPosition();
                         break;
                     case MotionEvent.ACTION_UP:
-                        myview.setTextColor(getResources().getColor(R.color.white));
+                        textView.setTextColor(getResources().getColor(R.color.white));
                         updateViewPosition();
                         mTouchStartX = mTouchStartY = 0;
                         break;
@@ -141,7 +142,7 @@ public class WindowService extends Service {
     private void updateViewPosition() {
         wmParams.x = (int) (x - mTouchStartX);
         wmParams.y = (int) (y - mTouchStartY);
-        wm.updateViewLayout(view, wmParams);
+        wm.updateViewLayout(dialog, wmParams);
     }
 
     @Override
@@ -152,7 +153,7 @@ public class WindowService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        wm.removeView(view);
+        wm.removeView(dialog);
         stopSelf();
     }
 }

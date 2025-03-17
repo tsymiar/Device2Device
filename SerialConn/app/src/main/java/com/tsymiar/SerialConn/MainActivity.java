@@ -1,9 +1,11 @@
 package com.tsymiar.SerialConn;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,9 +20,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-
-import com.tsymiar.SerialConn.Sensor.SensorActivity;
-import com.tsymiar.SerialConn.Sensor.SensorListActivity;
 
 public class MainActivity extends Activity {
 
@@ -44,17 +43,14 @@ public class MainActivity extends Activity {
         ViewGroup vg = findViewById(R.id.anim);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    final int requestCode = 0;
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.BLUETOOTH}, requestCode);
+                }
                 return;
             }
             startActivity(new Intent(MainActivity.this, ConnectActivity.class));
-        }, 2000);
+        }, 1000);
 
         assert vg != null;
         vg.setOnClickListener(new View.OnClickListener() {
@@ -102,20 +98,14 @@ public class MainActivity extends Activity {
         Intent intent;
         // Handle item selection
         int itemId = item.getItemId();
-        if (itemId == R.id.sensor) {
-            intent = new Intent(activity, SensorListActivity.class);
-            activity.startActivity(intent);
-        } else if (itemId == R.id.chart) {
-            intent = new Intent(activity, SensorActivity.class);
-            activity.startActivity(intent);
-        } else if (itemId == R.id.feedback) {
+        if (itemId == R.id.feedback) {
             intent = new Intent(activity, BuggerActivity.class);
             activity.startActivity(intent);
         } else if (itemId == R.id.url) {
-            intent = new Intent(activity, MyGitActivity.class);
+            intent = new Intent(activity, ViewGitActivity.class);
             activity.startActivity(intent);
         } else if (itemId == R.id.more) {
-            intent = new Intent(activity, ThankActivity.class);
+            intent = new Intent(activity, ThanksActivity.class);
             activity.startActivity(intent);
         } else if (itemId == R.id.exit) {
             this.exit(activity);
@@ -147,7 +137,7 @@ public class MainActivity extends Activity {
                 ExitApplication.getInstance().exit();
                 return true;
             } else if (mCurTime - mLastTime >= 800) {
-                Toast.makeText(MainActivity.this, R.string.exitapp, Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, R.string.exit_app, Toast.LENGTH_SHORT).show();
                 return true;
             }
 

@@ -1,5 +1,6 @@
 package com.tsymiar.SerialConn;
 
+import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -7,6 +8,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -22,6 +25,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.app.ActivityCompat;
+
 import java.util.Set;
 
 
@@ -33,7 +38,7 @@ public class DeviceListActivity extends Activity {
     // Member fields
     private BluetoothAdapter mBtAdapter;
     private ArrayAdapter<String> mNewDevicesArrayAdapter;
-    private MainActivity mainActivity = new MainActivity();
+    private final MainActivity mainActivity = new MainActivity();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,16 +52,14 @@ public class DeviceListActivity extends Activity {
         setResult(Activity.RESULT_CANCELED);
 
         // Initialize the button to perform device discovery
-        ImageView scanImageView = (ImageView) findViewById(R.id.imageView1);
+        ImageView scanImageView = findViewById(R.id.img_search);
         assert scanImageView != null;
-        scanImageView.setOnClickListener(new OnClickListener() {
-            public void onClick(View v) {
-                doDiscovery();
-                findViewById(R.id.imageView1).setVisibility(View.GONE);
-                findViewById(R.id.scan).setVisibility(View.GONE);
-                findViewById(R.id.btn1).setVisibility(View.GONE);
-                v.setVisibility(View.GONE);
-            }
+        scanImageView.setOnClickListener(v -> {
+            doDiscovery();
+            findViewById(R.id.img_search).setVisibility(View.GONE);
+            findViewById(R.id.scan).setVisibility(View.GONE);
+            findViewById(R.id.btn1).setVisibility(View.GONE);
+            v.setVisibility(View.GONE);
         });
 
         // Initialize array adapters. One for already paired devices and
@@ -88,12 +91,26 @@ public class DeviceListActivity extends Activity {
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
         // Get a set of currently paired devices
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                final int requestCode = 0;
+                ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+            }
+            return;
+        }
         Set<BluetoothDevice> pairedDevices = mBtAdapter.getBondedDevices();
 
         // If there are paired devices, add each one to the ArrayAdapter
-        if (pairedDevices.size() > 0) {
-            findViewById(R.id.devlist_title_devices).setVisibility(View.VISIBLE);
+        if (!pairedDevices.isEmpty()) {
+            findViewById(R.id.list_title_dev).setVisibility(View.VISIBLE);
             for (BluetoothDevice device : pairedDevices) {
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        final int requestCode = 0;
+                        ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+                    }
+                    return;
+                }
                 mPairedDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
             }
         } else {
@@ -123,6 +140,13 @@ public class DeviceListActivity extends Activity {
 
         // Make sure we're not doing discovery anymore
         if (mBtAdapter != null) {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    final int requestCode = 0;
+                    ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, requestCode);
+                }
+                return;
+            }
             mBtAdapter.cancelDiscovery();
         }
 
@@ -144,6 +168,13 @@ public class DeviceListActivity extends Activity {
         findViewById(R.id.devlist_title_new_devices).setVisibility(View.VISIBLE);
 
         // If we're already discovering, stop it
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                final int requestCode = 0;
+                ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, requestCode);
+            }
+            return;
+        }
         if (mBtAdapter.isDiscovering()) {
             mBtAdapter.cancelDiscovery();
         }
@@ -153,15 +184,22 @@ public class DeviceListActivity extends Activity {
     }
 
     // The on-click listener for all devices in the ListViews
-    private OnItemClickListener mDeviceClickListener = new OnItemClickListener() {
+    private final OnItemClickListener mDeviceClickListener = new OnItemClickListener() {
         public void onItemClick(AdapterView<?> av, View v, int arg2, long arg3) {
             // Cancel discovery because it's costly and we're about to connect
+            if (ActivityCompat.checkSelfPermission(getBaseContext(), android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    final int requestCode = 0;
+                    ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_SCAN}, requestCode);
+                }
+                return;
+            }
             mBtAdapter.cancelDiscovery();
             // Get the device MAC address, which is the last 17 chars in the View
             String info = ((TextView) v).getText().toString();
             String address = info.substring(info.length() - 17);
             // Create the result Intent and include the MAC address
-            Intent intent = new Intent(DeviceListActivity.this, TransferActivity.class);
+            Intent intent = new Intent(DeviceListActivity.this, CommitActivity.class);
             //传送数据的代码,bundle和intent顺序不能错。
             Bundle bundle = new Bundle();
             bundle.putString("address", address);
@@ -181,9 +219,17 @@ public class DeviceListActivity extends Activity {
             // When discovery finds a device
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 // Get the BluetoothDevice object from the Intent
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                BluetoothDevice device = null;
+                device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 // If it's already paired, skip it, because it's been listed already
-                if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+                if (ActivityCompat.checkSelfPermission(getBaseContext(), android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        final int requestCode = 0;
+                        ActivityCompat.requestPermissions(DeviceListActivity.this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
+                    }
+                    return;
+                }
+                if (device != null && device.getBondState() != BluetoothDevice.BOND_BONDED) {
                     mNewDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
                 }
                 // When discovery is finished, change the Activity title
