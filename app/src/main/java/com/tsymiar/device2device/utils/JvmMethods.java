@@ -4,7 +4,7 @@ import android.util.Log;
 import android.widget.TextView;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.activity.EntryActivity;
+import com.tsymiar.device2device.activity.SelectActivity;
 
 public class JvmMethods {
 
@@ -20,6 +20,6 @@ public class JvmMethods {
 
     public static void SetTextView(String string)
     {
-        ((TextView) EntryActivity.getInstance().findViewById(R.id.txt_status)).setText(string);
+        ((TextView) SelectActivity.getInstance().findViewById(R.id.txt_status)).setText(string);
     }
 }

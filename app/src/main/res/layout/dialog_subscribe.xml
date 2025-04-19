@@ -6,7 +6,8 @@
     android:layout_height="wrap_content"
     android:background="@android:color/white"
     android:visibility="visible"
-    tools:visibility="visible">
+    tools:visibility="visible"
+    tools:ignore="MissingClass">
 
     <EditText
         android:id="@+id/edit_addr"

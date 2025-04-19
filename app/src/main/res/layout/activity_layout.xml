@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".activity.MainActivity">
+    tools:context=".activity.MainActivity"
+    tools:ignore="MissingClass">
 
     <TextView
         android:id="@+id/sample_text"
@@ -23,7 +24,7 @@
         android:id="@+id/btn_texture"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
+        android:layout_marginStart="48sp"
         android:layout_marginTop="32dp"
         android:text="@string/texture"
         app:layout_constraintStart_toStartOf="parent"
@@ -54,8 +55,8 @@
         android:id="@+id/txt_server"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="48dp"
+        android:layout_marginStart="8sp"
+        android:layout_marginTop="48sp"
         android:text="@string/dftHint"
         app:layout_constraintLeft_toRightOf="@id/btn_server"
         app:layout_constraintTop_toBottomOf="@id/btn_wave" />
@@ -188,5 +189,16 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btn_time"
         tools:ignore="MissingConstraints,RtlHardcoded" />
+
+    <Button
+        android:id="@+id/btn_chat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="32dp"
+        android:text="@string/chat"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txt_status"
+        tools:ignore="MissingConstraints" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

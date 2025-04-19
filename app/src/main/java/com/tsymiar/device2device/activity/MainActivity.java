@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
 
         ViewGroup vg = findViewById(R.id.anim);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            startActivity(new Intent(MainActivity.this, EntryActivity.class));
+            startActivity(new Intent(MainActivity.this, SelectActivity.class));
         }, 1000);
 
         assert vg != null;

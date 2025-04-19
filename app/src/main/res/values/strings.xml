@@ -64,5 +64,9 @@
     <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
     <string name="developing">感谢</string>
     <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
-    <string name="exitapp">双击完全退出应用</string>
+    <string name="exitapp">再次双击退出应用</string>
+    <string name="msg">输入消息</string>
+    <string name="pkg">📎</string>
+    <string name="commit">发送</string>
+    <string name="chat">chat</string>
 </resources>

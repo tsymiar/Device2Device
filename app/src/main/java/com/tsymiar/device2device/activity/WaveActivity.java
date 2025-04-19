@@ -1,6 +1,6 @@
 package com.tsymiar.device2device.activity;
 
-import static com.tsymiar.device2device.activity.EntryActivity.RequestAudio;
+import static com.tsymiar.device2device.activity.SelectActivity.RequestAudio;
 
 import android.Manifest;
 import android.annotation.SuppressLint;

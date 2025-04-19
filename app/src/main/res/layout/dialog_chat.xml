@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- 顶部下拉选择 (高度固定) -->
+    <Spinner
+        android:id="@+id/spinner_options"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="4dp"/>
+
+    <!-- 消息显示区域 (占据剩余空间) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_messages"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="vertical"/>
+
+    <!-- 底部操作区域 (高度自适应内容) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:paddingVertical="4dp">
+
+        <EditText
+            android:id="@+id/et_message"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:hint="@string/msg"
+            android:maxLines="3"/>
+
+        <Button
+            android:id="@+id/btn_attach"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/pkg"
+            android:layout_marginStart="8dp"/>
+
+        <Button
+            android:id="@+id/btn_send"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/commit"
+            android:layout_marginStart="8dp"/>
+
+    </LinearLayout>
+</LinearLayout>

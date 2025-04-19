@@ -1,5 +1,7 @@
 package com.tsymiar.device2device.activity;
 
+import static com.tsymiar.device2device.dialog.ChatDialog.CHAT_FILE_REQUEST;
+
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -26,6 +28,7 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.dialog.ChatDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
@@ -41,13 +44,13 @@ import com.tsymiar.device2device.wrapper.TimeWrapper;
 
 import java.util.Arrays;
 
-public class EntryActivity extends AppCompatActivity implements EventHandle {
-    private static final String TAG = EntryActivity.class.getCanonicalName();
+public class SelectActivity extends AppCompatActivity implements EventHandle {
+    private static final String TAG = SelectActivity.class.getCanonicalName();
     public static final int RequestStorage = 10001;
     public static final int RequestFloat = 10002;
     public static final int RequestAudio = 10003;
     @SuppressLint("StaticFieldLeak")
-    static EntryActivity mainActivity;
+    static SelectActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
     private ServiceConnection mServiceConnection = null;
     FloatingService mFloatService;
@@ -56,8 +59,11 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
     Intent subscribeIntent;
     Button mKcpBtn;
     private long mCurTime;
+    ChatDialog mChatDialog;
 
-    public static EntryActivity getInstance() {
+    private static boolean mKcpStart = false;
+
+    public static SelectActivity getInstance() {
         return mainActivity;
     }
 
@@ -150,8 +156,8 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
             }
         });
 
-        subscribeIntent = new Intent(EntryActivity.this, FloatingService.class);
-        publisherIntent = new Intent(EntryActivity.this, PublishDialog.class);
+        subscribeIntent = new Intent(SelectActivity.this, FloatingService.class);
+        publisherIntent = new Intent(SelectActivity.this, PublishDialog.class);
 
         new Thread(() -> {
             do {
@@ -173,11 +179,11 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
         }).start();
 
         findViewById(R.id.btn_texture)
-                .setOnClickListener(v -> startActivity(new Intent(EntryActivity.this, TextureActivity.class)));
+                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, TextureActivity.class)));
         findViewById(R.id.btn_wave)
-                .setOnClickListener(v -> startActivity(new Intent(EntryActivity.this, WaveActivity.class)));
+                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, WaveActivity.class)));
         findViewById(R.id.btn_chart)
-                .setOnClickListener(v -> startActivity(new Intent(EntryActivity.this, GraphActivity.class)));
+                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, GraphActivity.class)));
         findViewById(R.id.btn_time).setOnClickListener(v -> {
             TextView tv = findViewById(R.id.txt_time);
             time.x = (int)tv.getX();
@@ -233,8 +239,21 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_tcp).setOnClickListener(v -> NetWrapper.startTcpServer(8700));
         mKcpBtn = findViewById(R.id.btn_ikcp);
         mKcpBtn.setOnClickListener(v -> {
-            NetWrapper.startKcpServer(8090);
-            NetWrapper.startKcpClient("127.0.0.1", 8090);
+            if (!mKcpStart) {
+                NetWrapper.startKcpServer(8090);
+                NetWrapper.startKcpClient("127.0.0.1", 8090);
+                mKcpStart = true;
+            } else {
+                Message msg = new Message();
+                msg.obj = getString(R.string.kcprun);
+                msg.what = Receiver.UPDATE_VIEW;
+                handler.sendMessage(msg);
+            }
+        });
+        findViewById(R.id.btn_chat).setOnClickListener(v ->
+        {
+            mChatDialog = new ChatDialog(SelectActivity.this);
+            mChatDialog.show();
         });
     }
 
@@ -255,7 +274,7 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
                     if (ret < 0) {
                         tv.setText("Subscribe beginning!");
                     } else {
-                        Toast.makeText(EntryActivity.this, "Success", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(SelectActivity.this, "Success", Toast.LENGTH_SHORT).show();
                     }
                 } else {
                     Log.i(TAG, "Subscribe with " + subscribe);
@@ -267,7 +286,7 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
                         Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting);
                     }
                     if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
-                        Toast.makeText(EntryActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(SelectActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
                     } else {
                         CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
                     }
@@ -278,7 +297,7 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
 
     @Override
     public void onDestroy() {
-        EntryActivity.this.unregisterReceiver(mBroadcastReceiverClass);
+        SelectActivity.this.unregisterReceiver(mBroadcastReceiverClass);
         stopService(subscribeIntent);
         stopService(publisherIntent);
         if (mFloatService != null) {
@@ -295,7 +314,15 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show();
             } else {
-                startService(new Intent(EntryActivity.this, FloatingService.class));
+                startService(new Intent(SelectActivity.this, FloatingService.class));
+            }
+        }
+        if (requestCode == CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
+            if (data != null) {
+                Uri uri = data.getData();
+                if (mChatDialog != null) {
+                    mChatDialog.handleFileResult(uri);
+                }
             }
         }
     }
@@ -306,7 +333,7 @@ public class EntryActivity extends AppCompatActivity implements EventHandle {
         long mLastTime = mCurTime;
         mCurTime = System.currentTimeMillis();
         if ((keyCode == KeyEvent.KEYCODE_BACK) && (mCurTime - mLastTime >= 800)) {
-            Toast.makeText(EntryActivity.this, R.string.exitapp, Toast.LENGTH_SHORT).show();
+            Toast.makeText(SelectActivity.this, R.string.exitapp, Toast.LENGTH_SHORT).show();
             return true;
         }
         return super.onKeyDown(keyCode, event);
