@@ -1,7 +1,5 @@
 package com.tsymiar.device2device.activity;
 
-import static com.tsymiar.device2device.dialog.ChatDialog.CHAT_FILE_REQUEST;
-
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -250,6 +248,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 handler.sendMessage(msg);
             }
         });
+        if (savedInstanceState != null && mChatDialog != null) {
+            mChatDialog.restoreState(savedInstanceState);
+        }
         findViewById(R.id.btn_chat).setOnClickListener(v ->
         {
             mChatDialog = new ChatDialog(SelectActivity.this);
@@ -317,7 +318,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startService(new Intent(SelectActivity.this, FloatingService.class));
             }
         }
-        if (requestCode == CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
+        if (requestCode == ChatDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
             if (data != null) {
                 Uri uri = data.getData();
                 if (mChatDialog != null) {
@@ -326,7 +327,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             }
         }
     }
-
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mChatDialog != null) {
+            mChatDialog.saveState(outState);
+        }
+    }
     @Override
     public boolean onKeyDown(int keyCode, @NonNull KeyEvent event) {
         /* Called when the activity is first created. */

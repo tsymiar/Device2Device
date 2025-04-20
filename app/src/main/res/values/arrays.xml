@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="chat_options">
-        <item>文字消息</item>
-        <item>文件消息</item>
-        <item>混合模式</item>
+        <item>DeepSeek</item>
+        <item>ChatGPT</item>
+        <item>…</item>
     </string-array>
 </resources>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -28,28 +29,56 @@
         android:orientation="horizontal"
         android:layout_marginTop="8dp"
         android:paddingVertical="4dp">
-
         <EditText
             android:id="@+id/et_message"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="@string/msg"
-            android:maxLines="3"/>
+            android:maxLines="3"
+            android:inputType="textMultiLine"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="12sp"
+            android:autoSizeMaxTextSize="18sp"
+            android:autoSizeStepGranularity="1sp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:paddingVertical="4dp">
+
+        <CheckBox
+            android:id="@+id/check_dpsk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/check_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/r1"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
 
         <Button
             android:id="@+id/btn_attach"
-            android:layout_width="wrap_content"
+            android:layout_width="48dp"
             android:layout_height="48dp"
-            android:text="@string/pkg"
-            android:layout_marginStart="8dp"/>
+            android:text="@string/pkg"/>
 
         <Button
             android:id="@+id/btn_send"
-            android:layout_width="wrap_content"
+            android:layout_width="64dp"
             android:layout_height="48dp"
-            android:text="@string/commit"
-            android:layout_marginStart="8dp"/>
+            android:text="@string/commit"/>
 
     </LinearLayout>
 </LinearLayout>

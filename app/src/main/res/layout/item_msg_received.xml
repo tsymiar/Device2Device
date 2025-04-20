@@ -28,5 +28,19 @@
             android:layout_gravity="end"
             android:textColor="#80000000"/>
 
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:indeterminateTint="@android:color/white"
+            android:visibility="gone"/>
     </LinearLayout>
+
+    <View
+        android:id="@+id/mask_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80FFFFFF"
+        android:visibility="gone"/>
 </LinearLayout>
