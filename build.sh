@@ -8,7 +8,26 @@ fi
 
 build_tools=~/build-tools
 
-yum install java-1.8.0-openjdk-devel
+if [ "$os" = "Linux" ]; then
+    if command -v apt-get >/dev/null 2>&1 || [ -f /etc/debian_version ]; then
+        echo "Detected Debian/Ubuntu - using apt"
+        sudo apt-get update
+        sudo apt-get install -y openjdk-8-jdk wget unzip zip git curl ca-certificates
+    elif command -v yum >/dev/null 2>&1; then
+        echo "Detected RHEL/CentOS - using yum"
+        yum clean all
+        yum install java-1.8.0-openjdk-devel wget unzip zip git curl ca-certificates -y
+    else
+        echo "Unsupported Linux distribution" >&2
+        exit 1
+    fi
+fi
+
+if command -v javac >/dev/null 2>&1; then
+    export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+    export PATH="${JAVA_HOME}/bin:${PATH}"
+fi
+
 if [ ! -d "${build_tools}" ]; then mkdir ${build_tools}; fi;
 cd ${build_tools} || exit
 
