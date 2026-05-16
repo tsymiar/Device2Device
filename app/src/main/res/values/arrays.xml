@@ -2,7 +2,8 @@
 <resources>
     <string-array name="chat_options">
         <item>DeepSeek</item>
-        <item>ChatGPT</item>
+        <item>Ollama</item>
+        <item>OpenRouter</item>
         <item>…</item>
     </string-array>
 </resources>

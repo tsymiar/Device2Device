@@ -449,13 +449,14 @@ public class SensorFragment extends Fragment implements SensorEventListener {
 
             final float alpha = 0.8f;
 
-            gravity[0] = alpha * gravity[SensorManager.DATA_X] + (1 - alpha) * arg.values[SensorManager.DATA_X];
-            gravity[1] = alpha * gravity[SensorManager.DATA_Y] + (1 - alpha) * arg.values[SensorManager.DATA_Y];
-            gravity[2] = alpha * gravity[SensorManager.DATA_Z] + (1 - alpha) * arg.values[SensorManager.DATA_Z];
+            // Use values[0/1/2] instead of deprecated DATA_X/Y/Z
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * arg.values[0];
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * arg.values[1];
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * arg.values[2];
 
-            linear_acceleration[0] = arg.values[SensorManager.DATA_X] - gravity[SensorManager.DATA_X];
-            linear_acceleration[1] = arg.values[SensorManager.DATA_Y] - gravity[SensorManager.DATA_Y];
-            linear_acceleration[2] = arg.values[SensorManager.DATA_Z] - gravity[SensorManager.DATA_Z];
+            linear_acceleration[0] = arg.values[0] - gravity[0];
+            linear_acceleration[1] = arg.values[1] - gravity[1];
+            linear_acceleration[2] = arg.values[2] - gravity[2];
 
             //Toast.makeText(SensorChart.this,""+arg.values[0],Toast.LENGTH_SHORT).show();
         }

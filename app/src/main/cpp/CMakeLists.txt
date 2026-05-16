@@ -3,7 +3,7 @@
 
 # Sets the minimum version of CMake required to build the native library.
 
-cmake_minimum_required(VERSION 2.8...3.16)
+cmake_minimum_required(VERSION 2.8...3.22)
 PROJECT(Device2Device CXX C)
 
 set(CMAKE_BUILD_TYPE "Debug")
@@ -22,7 +22,7 @@ if(${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
 set(BUILD_SUB 1)
-set(build_list time bitmap convert socket callback display)
+set(build_list time bitmap convert socket callback display test)
 foreach(item IN LISTS build_list)
     if(EXISTS "${CMAKE_SOURCE_DIR}/${item}/CMakeLists.txt")
         if (${BUILD_SUB} EQUAL 1)

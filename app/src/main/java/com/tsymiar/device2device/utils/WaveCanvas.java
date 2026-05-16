@@ -17,7 +17,7 @@ import android.view.SurfaceView;
 import android.view.View;
 
 import com.tsymiar.device2device.view.WaveSurface;
-import com.tsymiar.device2device.wrapper.FileWrapper;
+import com.tsymiar.device2device.wrapper.MediaWrapper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -325,7 +325,7 @@ public class WaveCanvas {
                     }
                 }
                 //将pcm格式转换成wav一个44字节的头信息
-                FileWrapper.convertAudioFiles(savePcmPath, saveWavPath);
+                MediaWrapper.convertAudioFiles(savePcmPath, saveWavPath);
             } catch (Throwable t) {
                 Log.e(TAG, t.toString());
             } finally {

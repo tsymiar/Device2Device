@@ -134,29 +134,28 @@ int UdpSocket::SendBySlice(const char *sliceBuffer, size_t length)
     protocol.size = length;
     uint64_t offset = 0;
     uint64_t slice = SLICE_LEN;
-    uint64_t remain = length;
+    protocol.remain = length;
 
     while (protocol.remain > 0) {
         uint32_t size = slice + m_proSize;
-        auto *message = new(std::nothrow) uint8_t[size];
+        auto* message = new(std::nothrow) uint8_t[size];
         memset(message, 0, size);
 
         protocol.slice = slice;
         protocol.s_size = size;
         protocol.offset = offset;
-        protocol.remain = remain;
 
         memcpy(message, &protocol, m_proSize);
-        memcpy(message + m_proSize, sliceBuffer + offset, slice);
+        memcpy(message + m_proSize, sliceBuffer + offset, std::min(slice, protocol.remain));
 
-        iRet = sendto(m_socket, message, size, 0, (struct sockaddr *) &m_peer, m_addLen);
+        iRet = sendto(m_socket, message, size, 0, (struct sockaddr*)&m_peer, m_addLen);
         delete[] message;
 
-        remain = length - slice;
-        if (offset + slice <= length)
-            offset += slice;
-        else
-            offset = slice = length - offset;
+        offset += slice;
+        protocol.remain -= slice;
+        if (protocol.remain < slice) {
+            slice = protocol.remain;
+        }
         protocol.s_idx++;
     }
     return iRet;

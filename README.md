@@ -37,8 +37,9 @@ app/src/main/
 │   │   ├── WaveActivity      # Audio recording & waveform
 │   │   └── GraphActivity     # Sensor chart display
 │   ├── service/              # Background services
-│   │   ├── FloatingService   # Floating window
-│   │   └── PublishDialog     # Message publishing
+│   │   ├── SubscribeService  # Floating window
+│   │   └── PublishDialog
+ # Message publishing
 │   ├── acceleration/         # Sensor & Voice modules
 │   │   ├── Sensor/           # Sensor data collection
 │   │   └── Voice/            # Voice processing

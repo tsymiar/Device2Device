@@ -1,6 +1,6 @@
 package com.tsymiar.device2device.service;
 
-import static com.tsymiar.device2device.service.FloatingService.BROADCAST_ACTION;
+import static com.tsymiar.device2device.service.SubscribeService.BROADCAST_ACTION;
 
 import android.annotation.SuppressLint;
 import android.app.Service;
@@ -10,6 +10,7 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -23,7 +24,7 @@ import androidx.annotation.RequiresApi;
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.entity.PubSubSetting;
 
-public class PublishDialog extends Service {
+public class PublishService extends Service {
 
     private WindowManager windowManager;
     private LayoutInflater layoutInflater;
@@ -55,14 +56,19 @@ public class PublishDialog extends Service {
         layoutParams.format = PixelFormat.RGBA_8888;
         layoutParams.gravity = Gravity.RIGHT | Gravity.CENTER;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON;
-        Display display = windowManager.getDefaultDisplay();
-        layoutParams.width = (int)(display.getWidth() * 0.5);
-        layoutParams.height = (int)(display.getHeight() * 0.33);
+
+        // Use getSize() instead of deprecated getWidth()/getHeight()
+        DisplayMetrics metrics = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getMetrics(metrics);
+        int screenWidth = metrics.widthPixels;
+        int screenHeight = metrics.heightPixels;
+        layoutParams.width = (int)(screenWidth * 0.5);
+        layoutParams.height = (int)(screenHeight * 0.33);
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;
         floatView.setFocusableInTouchMode(true);
-        floatView.setOnTouchListener(new FloatingService.FloatingOnTouchListener(windowManager, layoutParams, false));
+        floatView.setOnTouchListener(new SubscribeService.FloatingOnTouchListener(windowManager, layoutParams, false));
         if (Settings.canDrawOverlays(this)) {
             windowManager.addView(floatView, layoutParams);
             windowManager.getDefaultDisplay();

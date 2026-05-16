@@ -65,11 +65,12 @@ int TcpSocket::Start(unsigned short port)
     auto listenLen = static_cast<socklen_t>(sizeof(lstnaddr));
     getsockname(init_sock, reinterpret_cast<struct sockaddr *>(&lstnaddr), &listenLen);
     LOGI("localhost listening [%s:%d].", inet_ntoa(lstnaddr.sin_addr), port);
-    m_running = true;
+    m_running.store(true);
 
-    while (m_running) {
+    while (m_running.load()) {
         struct sockaddr_in sin{};
         auto len = static_cast<socklen_t>(sizeof(sin));
+        std::lock_guard<std::mutex> lock(m_acceptMutex);
         int rcv_sock = m_recvSock = ::accept(init_sock, reinterpret_cast<struct sockaddr *>(&sin), &len);
         if ((int) rcv_sock < 0) {
             LOGE("Socket accept (%s).",

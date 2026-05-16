@@ -10,10 +10,10 @@
 #define Time_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_TimeWrapper_##func
 #define CPP_FUNC_TIME(func) JNICALL Time_WRAPPER(func)
 
-#define File_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_FileWrapper_##func
+#define File_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_MediaWrapper_##func
 #define CPP_FUNC_FILE(func) JNICALL File_WRAPPER(func)
 
-#define Network_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_NetWrapper_##func
+#define Network_WRAPPER(func) Java_com_tsymiar_device2device_wrapper_NetworkWrapper_##func
 #define CPP_FUNC_NETWORK(func) JNICALL Network_WRAPPER(func)
 
 #include <jni.h>
@@ -63,6 +63,16 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *, jclass, jstring t
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv* , jclass, jint);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* , jclass, jstring, jint);
+
+// 文件传输 JNI 方法
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jint port);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv*, jclass, jstring ip, jint port);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendFile)(JNIEnv*, jclass, jstring filePath);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv*, jclass, jstring ip, jint port, jstring fileName);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv*, jclass, jstring path);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass);
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass);
 #ifdef __cplusplus
 }
 #endif

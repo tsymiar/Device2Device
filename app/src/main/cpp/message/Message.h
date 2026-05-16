@@ -17,7 +17,8 @@ enum MASSAGER {
     UDP_CLIENT,
     SUBSCRIBER,
     PUBLISHER,
-    UPDATE_VIEW
+    UPDATE_VIEW,
+    FILE_PROGRESS
 };
 
 struct Messaging {

@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -26,7 +29,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".activity.SelectActivity"
-            android:exported="true">
+            android:exported="true" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.CONNECTION" />
             </intent-filter>
@@ -36,9 +39,9 @@
         <activity android:name=".activity.GraphActivity" />
         <activity android:name=".acceleration.Sensor.SensorListActivity" />
         <service
-            android:name=".service.PublishDialog"
+            android:name=".service.PublishService"
             android:theme="@android:style/Theme.Holo.Dialog" />
-        <service android:name=".service.FloatingService" />
+        <service android:name=".service.SubscribeService" />
         <service android:name=".acceleration.Sensor.SensorIntentService" />
         <service android:name=".acceleration.Sensor.SensorService" />
         <service android:name=".acceleration.Voice.Voice"

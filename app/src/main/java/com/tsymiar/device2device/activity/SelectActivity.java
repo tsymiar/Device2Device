@@ -26,18 +26,19 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.dialog.ChatDialog;
+import com.tsymiar.device2device.dialog.ChatBoxDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
 import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
-import com.tsymiar.device2device.service.FloatingService;
-import com.tsymiar.device2device.service.PublishDialog;
+import com.tsymiar.device2device.service.SubscribeService;
+import com.tsymiar.device2device.service.PublishService;
+import com.tsymiar.device2device.dialog.FileMsgDialog;
 import com.tsymiar.device2device.utils.JvmMethods;
 import com.tsymiar.device2device.utils.Utils;
 import com.tsymiar.device2device.wrapper.CallbackWrapper;
-import com.tsymiar.device2device.wrapper.NetWrapper;
+import com.tsymiar.device2device.wrapper.NetworkWrapper;
 import com.tsymiar.device2device.wrapper.TimeWrapper;
 
 import java.util.Arrays;
@@ -51,13 +52,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     static SelectActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
     private ServiceConnection mServiceConnection = null;
-    FloatingService mFloatService;
+    SubscribeService mFloatService;
     private int gValue = 1;
     Intent publisherIntent;
     Intent subscribeIntent;
     Button mKcpBtn;
     private long mCurTime;
-    ChatDialog mChatDialog;
+    ChatBoxDialog mChatBoxDialog;
+    FileMsgDialog mFileMsgDialog;
 
     private static boolean mKcpStart = false;
 
@@ -90,6 +92,19 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     tv = findViewById(R.id.txt_status);
                     tv.setText(msg.obj.toString());
                     break;
+                case Receiver.FILE_PROGRESS: {
+                    // 格式: "status|current|total" → 路由到文件传输对话框
+                    String data = msg.obj.toString();
+                    if (mFileMsgDialog != null) {
+                        String[] parts = data.split("\\|", 3);
+                        if (parts.length == 3) {
+                            long current = Long.parseLong(parts[1]);
+                            long total = Long.parseLong(parts[2]);
+                            mFileMsgDialog.updateProgress(current, total, parts[0]);
+                        }
+                    }
+                    break;
+                }
                 case Receiver.UDP_SERVER:
                     tv = findViewById(R.id.txt_server);
                     tv.setText(msg.obj.toString());
@@ -133,13 +148,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         TimeWrapper.getBootTimestamp();
 
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(FloatingService.BROADCAST_ACTION);
+        intentFilter.addAction(SubscribeService.BROADCAST_ACTION);
         this.registerReceiver(mBroadcastReceiverClass, intentFilter);
 
         setServiceConnection(new ServiceConnection() {
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
-                FloatingService.Binder binder = (FloatingService.Binder)service;
+                SubscribeService.Binder binder = (SubscribeService.Binder)service;
                 mFloatService = binder.getService();
                 mFloatService.setCallback(data -> {
                     Message msg = new Message();
@@ -154,8 +169,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             }
         });
 
-        subscribeIntent = new Intent(SelectActivity.this, FloatingService.class);
-        publisherIntent = new Intent(SelectActivity.this, PublishDialog.class);
+        subscribeIntent = new Intent(SelectActivity.this, SubscribeService.class);
+        publisherIntent = new Intent(SelectActivity.this, PublishService.class);
 
         new Thread(() -> {
             do {
@@ -169,7 +184,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     handler.sendMessage(msg);
                 }
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(50);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -204,11 +219,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         WifiManager.MulticastLock wifiLock = manager.createMulticastLock("localWifi");
         findViewById(R.id.btn_server).setOnClickListener(v -> {
             wifiLock.acquire();
-            NetWrapper.startUdpServer(8899);
+            NetworkWrapper.startUdpServer(8899);
         });
         findViewById(R.id.btn_client).setOnClickListener(v -> {
             String text = Utils.MD5(gValue + "").substring(0, 6);
-            NetWrapper.sendUdpData(text, text.length());
+            NetworkWrapper.sendUdpData(text, text.length());
             gValue++;
             if (wifiLock.isHeld()) {
                 wifiLock.release();
@@ -234,12 +249,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startService(publisherIntent);
             }
         });
-        findViewById(R.id.btn_tcp).setOnClickListener(v -> NetWrapper.startTcpServer(8700));
+        findViewById(R.id.btn_tcp).setOnClickListener(v -> NetworkWrapper.startTcpServer(8700));
         mKcpBtn = findViewById(R.id.btn_ikcp);
         mKcpBtn.setOnClickListener(v -> {
             if (!mKcpStart) {
-                NetWrapper.startKcpServer(8090);
-                NetWrapper.startKcpClient("127.0.0.1", 8090);
+                NetworkWrapper.startKcpServer(8090);
+                NetworkWrapper.startKcpClient("127.0.0.1", 8090);
                 mKcpStart = true;
             } else {
                 Message msg = new Message();
@@ -248,13 +263,18 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 handler.sendMessage(msg);
             }
         });
-        if (savedInstanceState != null && mChatDialog != null) {
-            mChatDialog.restoreState(savedInstanceState);
+        if (savedInstanceState != null && mChatBoxDialog != null) {
+            mChatBoxDialog.restoreState(savedInstanceState);
         }
         findViewById(R.id.btn_chat).setOnClickListener(v ->
         {
-            mChatDialog = new ChatDialog(SelectActivity.this);
-            mChatDialog.show();
+            mChatBoxDialog = new ChatBoxDialog(SelectActivity.this);
+            mChatBoxDialog.show();
+        });
+        findViewById(R.id.btn_file_trans).setOnClickListener(v ->
+        {
+            mFileMsgDialog = FileMsgDialog.newInstance();
+            mFileMsgDialog.show(getSupportFragmentManager(), "file_trans");
         });
     }
 
@@ -262,36 +282,42 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         @SuppressLint("SetTextI18n")
         @Override
         public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action != null && action.equals(FloatingService.BROADCAST_ACTION)) {
-                String subscribe = intent.getStringExtra("Subscribe");
-                System.out.println("Subscribe status ==> " + subscribe);
-                TextView tv = findViewById(R.id.txt_status);
-                tv.setText("");
-                if (subscribe != null && subscribe.equals("SUCCESS")) {
-                    Log.i(TAG, PubSubSetting.getSetting().toString());
-                    int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(), PubSubSetting.getPort(),
-                            PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
-                    if (ret < 0) {
-                        tv.setText("Subscribe beginning!");
-                    } else {
-                        Toast.makeText(SelectActivity.this, "Success", Toast.LENGTH_SHORT).show();
-                    }
+            if (!SubscribeService.BROADCAST_ACTION.equals(intent.getAction())) {
+                return;
+            }
+            TextView tvStatus = findViewById(R.id.txt_status);
+            String subscribe = intent.getStringExtra("Subscribe");
+            System.out.println("Subscribe status ==> " + subscribe);
+            if ("SUCCESS".equals(subscribe)) {
+                PubSubSetting setting = PubSubSetting.getSetting();
+                if (setting != null) {
+                    Log.i(TAG, setting.toString());
+                }
+                int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(), PubSubSetting.getPort(),
+                        PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
+                if (ret < 0) {
+                    tvStatus.setText("Subscribe failed!");
+                    Log.e(TAG, "Subscribe failed with error code: " + ret);
                 } else {
-                    Log.i(TAG, "Subscribe with " + subscribe);
+                    Toast.makeText(SelectActivity.this, "Success", Toast.LENGTH_SHORT).show();
                 }
-                String publish = intent.getStringExtra("Publish");
-                if (publish != null && publish.equals("SUCCESS")) {
-                    PubSubSetting setting = PubSubSetting.getSetting();
-                    if (setting != null) {
-                        Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting);
-                    }
-                    if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
-                        Toast.makeText(SelectActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
-                    } else {
-                        CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
-                    }
+            } else if (subscribe != null) {
+                Log.i(TAG, "Subscribe with " + subscribe);
+                tvStatus.setText("Subscribe: " + subscribe);
+            }
+            String publish = intent.getStringExtra("Publish");
+            if ("SUCCESS".equals(publish)) {
+                PubSubSetting setting = PubSubSetting.getSetting();
+                if (setting != null) {
+                    Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting);
                 }
+                if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
+                    Toast.makeText(SelectActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
+                } else {
+                    CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
+                }
+            } else if (publish != null) {
+                Log.i(TAG, "Publish status: " + publish);
             }
         }
     }
@@ -315,14 +341,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show();
             } else {
-                startService(new Intent(SelectActivity.this, FloatingService.class));
+                startService(new Intent(SelectActivity.this, SubscribeService.class));
             }
         }
-        if (requestCode == ChatDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
+        if (requestCode == ChatBoxDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
             if (data != null) {
                 Uri uri = data.getData();
-                if (mChatDialog != null) {
-                    mChatDialog.handleFileResult(uri);
+                if (mChatBoxDialog != null) {
+                    mChatBoxDialog.handleFileResult(uri);
                 }
             }
         }
@@ -330,8 +356,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        if (mChatDialog != null) {
-            mChatDialog.saveState(outState);
+        if (mChatBoxDialog != null) {
+            mChatBoxDialog.saveState(outState);
         }
     }
     @Override

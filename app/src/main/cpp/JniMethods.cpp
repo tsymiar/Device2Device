@@ -1,6 +1,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <chrono>
 #include <queue>
 #include <future>
 #ifndef LOG_TAG
@@ -12,6 +13,7 @@
 #include <common/Scadup.h>
 #include <message/Message.h>
 #include <socket/KcpSocket.h>
+#include <socket/FileMsgSocket.h>
 #include <display/gles/EglShader.h>
 #include <display/gles/EglTexture.h>
 #include <display/gles/EglGpuRender.h>
@@ -22,7 +24,7 @@
 #include "callback/JavaFuncCalls.h"
 #include "utils/statics.h"
 
-extern JavaVM * g_jniJVM;
+extern JavaVM* g_jniJVM;
 extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv* env, jstring jstr);
 extern void SetTextView(JNIEnv* env, jclass thiz, const std::string& viewId, const std::string& text);
@@ -32,20 +34,20 @@ namespace {
     int g_width = -1;
     std::string g_filename;
 }
+static std::atomic<int> g_subStatus{ -1 };
+static std::thread g_subThread;
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv* env, jclass, jstring class_name)
 {
     int state = env->GetJavaVM(&g_jniJVM);
     g_className =
-            // Jstring2Cstring(env, getPackageName(env))
-            // + "." +
-            Jstring2Cstring(env, class_name);
+        Jstring2Cstring(env, class_name);
     LOGI("class_name = %s, state = %d.", g_className.c_str(), state);
 }
 
 JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
-        JNIEnv* env,
-        jobject /* this */)
+    JNIEnv* env,
+    jobject /* this */)
 {
     std::string hello = "C++ string of JNI!";
     char text[16] = {
@@ -69,7 +71,7 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv* env, jobject, jobject clazz)
             env->SetObjectField(clazz, value, msg);
             env->SetIntField(clazz, key, (int)receiving.massager);
             LOGI("message pop type=%d, value=%s", receiving.massager,
-                 receiving.message.c_str());
+                receiving.message.c_str());
             env->DeleteLocalRef(msg);
         }
         return clazz;
@@ -81,22 +83,22 @@ JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv* env, jobject, jobject clazz)
 JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv* env, jobject, jbyteArray time, jint len)
 {
     auto* byte = (unsigned char*)env->GetByteArrayElements(time, nullptr);
-    unsigned char stamp[len * 3 + 1]; // 修正数组大小
+    unsigned char stamp[len * 3 + 1];
     for (size_t i = 0; i < len; i++) {
         sprintf(reinterpret_cast<char*>(stamp + i * 3), "%02x ", byte[i]);
     }
     LOGI("time hex = %s", stamp);
-    uint64_t val =
-            (byte[8] & 0xff)
-            | (byte[9] << 8 & 0xff00)
-            | (byte[10] << 16 & 0xff0000)
-            | (byte[11] << 24 & 0xff000000)
-            | ((uint64_t)byte[12] << 32 & 0xff00000000)
-            | ((uint64_t)byte[13] << 40 & 0xff0000000000)
-            | ((uint64_t)byte[14] << 48 & 0xff000000000000)
-            | ((uint64_t)byte[15] << 56 & 0xff00000000000000);
-    env->ReleaseByteArrayElements(time, reinterpret_cast<jbyte*>(byte), 0); // 释放资源
-    return val;
+    uint64_t value =
+        (byte[8] & 0xff)
+        | (byte[9] << 8 & 0xff00)
+        | (byte[10] << 16 & 0xff0000)
+        | (byte[11] << 24 & 0xff000000)
+        | ((uint64_t)byte[12] << 32 & 0xff00000000)
+        | ((uint64_t)byte[13] << 40 & 0xff0000000000)
+        | ((uint64_t)byte[14] << 48 & 0xff000000000000)
+        | ((uint64_t)byte[15] << 56 & 0xff00000000000000);
+    env->ReleaseByteArrayElements(time, reinterpret_cast<jbyte*>(byte), 0);
+    return value;
 }
 
 struct PubSubParam {
@@ -115,10 +117,9 @@ void RecvHook(const Scadup::Message& msg)
     std::stringstream ss;
     ss << std::hex << msg.head.topic;
     std::string message = "Topic:\t[0x" + ss.str()
-                          + "]\nPayload:\t[" + msg.payload.status
-                          + "]\t[" + msg.payload.content + "].";
+        + "]\nPayload:\t[" + msg.payload.status
+        + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
-    // SetActivityViewText(&g_pubSubParam.env, g_pubSubParam.id, msg.payload.content);
 }
 
 JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass clz, jstring addr, jint port, jstring topic, jstring viewId, jint id)
@@ -135,21 +136,18 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass clz, jstring ad
     const std::string view = Jstring2Cstring(env, viewId);
     g_pubSubParam.view = view;
     g_pubSubParam.id = id;
-    std::thread th(
-            [&status](const PubSubParam& param) -> void {
-                Scadup::Subscriber sub;
-                sub.setup(param.addr.c_str(), param.port);
-                status = sub.subscribe(param.topic, param.hook);
-                char content[256];
-                memset(content, 0, 256);
-                sprintf(content, "message of %s:%d, topic: '0x%04x', hook = %p, status = %d",
-                        param.addr.c_str(), param.port, param.topic, param.hook, status);
-                Message::instance().setMessage(content, SUBSCRIBER);
-                // SetTextView(&param.env, param.clz, param.view, content);
-            }, std::ref(g_pubSubParam)); // 使用 std::ref 捕获 g_pubSubParam
-    if (th.joinable())
-        th.detach();
-    return status;
+    std::thread task([&status](const PubSubParam& param) -> void {
+        Scadup::Subscriber sub;
+        sub.setup(param.addr.c_str(), param.port);
+        status = sub.subscribe(param.topic, param.hook);
+        char content[256];
+        memset(content, 0, 256);
+        sprintf(content, "message of %s:%d, topic: '0x%04x', hook = %p, status = %d",
+            param.addr.c_str(), param.port, param.topic, param.hook, status);
+        Message::instance().setMessage(content, SUBSCRIBER);
+        }, std::ref(g_pubSubParam));
+    task.detach();
+    return g_subStatus.load();
 }
 
 JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
@@ -177,9 +175,9 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstrin
     if (stat < 0) {
         Message::instance().setMessage("Message Publisher failed!", TOAST);
     }
-    LOGI("Publish(%ld) to [%s:%d]: [topic=0x%04x] message: [%s].", stat,
-         g_pubSubParam.addr.c_str(), g_pubSubParam.port,
-         iTopic, payloadParam.c_str());
+    LOGI("Publish(%zd) to [%s:%d]: [topic=0x%04x] message: [%s].", stat,
+        g_pubSubParam.addr.c_str(), g_pubSubParam.port,
+        iTopic, payloadParam.c_str());
 }
 
 int callback(const char* c, int i)
@@ -188,21 +186,18 @@ int callback(const char* c, int i)
     return i;
 }
 
-JNIEXPORT void
-CPP_FUNC_CALL(callJavaMethod)(JNIEnv* env, jclass, jstring method, jint action, jstring content,
-                              jboolean statics)
+JNIEXPORT void CPP_FUNC_CALL(callJavaMethod)(JNIEnv* env, jclass, jstring method, jint action, jstring content, jboolean statics)
 {
     JavaFuncCalls::GetInstance().CallBack(Jstring2Cstring(env, method),
-                                          static_cast<int>(action),
-                                          Jstring2Cstring(env, content).c_str(),
-                                          statics);
+        static_cast<int>(action),
+        Jstring2Cstring(env, content).c_str(),
+        statics);
     JavaFuncCalls::CALLBACK call = callback;
     int val = JavaFuncCalls::GetInstance().Register(const_cast<char*>("aaa"), call);
     LOGI("callback = %p, val = %d.", call, val);
 }
 
-JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv* env, jclass, jobject texture)
+JNIEXPORT void JNICALL CPP_FUNC_VIEW(setupSurfaceView)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
         LOGI("load Surface fail");
@@ -215,31 +210,27 @@ JNIEXPORT void JNICALL CPP_FUNC_VIEW(unloadSurfaceView)(JNIEnv* env, jclass)
     CpuRenderView::releaseSurfaceView(env);
 }
 
-JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setRenderSize)(JNIEnv*, jclass, jint height, jint width)
+JNIEXPORT void JNICALL CPP_FUNC_VIEW(setRenderSize)(JNIEnv*, jclass, jint height, jint width)
 {
     g_height = height;
     g_width = width;
     EglGpuRender::SetWindowSize(height, width);
 }
 
-JNIEXPORT void JNICALL
-CPP_FUNC_VIEW(setLocalFile)(JNIEnv* env, jclass, jstring file)
+JNIEXPORT void JNICALL CPP_FUNC_VIEW(setLocalFile)(JNIEnv* env, jclass, jstring file)
 {
     const char* filename = env->GetStringUTFChars(file, JNI_FALSE);
     g_filename = filename;
     env->ReleaseStringUTFChars(file, filename);
 }
 
-JNIEXPORT jint JNICALL
-CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
+JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGI("loaded Surface class");
     }
     ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
-        // EglGpuRender::MakeGLTexture();
         GLuint program = EglShader::GetShaderProgram();
         EglTexture::SetTextureBuffers(program);
         extern EGL2 EGL2;
@@ -253,8 +244,7 @@ CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
     }
 }
 
-JNIEXPORT jint JNICALL
-CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
+JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGI("loaded Surface class");
@@ -271,63 +261,60 @@ CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
     }
 }
 
-JNIEXPORT jint JNICALL
-CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
+JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobject texture, jint item)
 {
     switch (item) {
-        case 0:
-            LOGD("No-implementation");
-            return -1;
-        case 3: {
-            if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
-                LOGI("loaded Surface class");
-            }
-            long size = 0;
-            unsigned char* content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
-            LOGD("CPU rendering initialized [%d]", size);
-            if (content != nullptr) {
-                BITMAPINFO* info;
-                uint8_t* data = LoadDIBitmap(g_filename.c_str(), &info);
-                if (info == nullptr) {
-                    LOGE("LoadDIBitmap failed");
-                    return -2;
-
-                }
-                CpuRenderView::setDisplaySize((int)info->bmiHeader.biHeight,
-                                              (int)info->bmiHeader.biWidth);
-                CpuRenderView::drawSurface(data);
-            } else {
-                static constexpr uint32_t colors[] = {
-                        0x00000000,
-                        0x0055aaff,
-                        0x5500aaff,
-                        0xaaff0055,
-                        0xff55aa00,
-                        0xaa0055ff,
-                        0xffffffff
-                };
-                static int iteration = 0;
-                CpuRenderView::drawRGBColor(
-                        colors[iteration++ % (sizeof(colors) / sizeof(*colors))], g_filename.c_str());
-            }
-            CpuRenderView::releaseSurfaceView(env);
-            delete[] content;
-            break;
+    case 0:
+        LOGD("No-implementation");
+        return -1;
+    case 3: {
+        if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
+            LOGI("loaded Surface class");
         }
-        case 5:
-            LOGD("Disconnect");
-            EglGpuRender::CloseGLSurface();
-            CpuRenderView::releaseSurfaceView(env);
-            break;
-        default:
-            Message::instance().setMessage("CpuRender initialize fail", TOAST);
-            return -3;
+        long size = 0;
+        unsigned char* content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
+        LOGD("CPU rendering initialized [%ld]", size);
+        if (content != nullptr) {
+            BITMAPINFO* info = nullptr;
+            uint8_t* data = LoadDIBitmap(g_filename.c_str(), &info);
+            if (info == nullptr || data == nullptr) {
+                LOGE("LoadDIBitmap failed: info=%p, data=%p", info, data);
+                return -2;
+            }
+            CpuRenderView::setDisplaySize((int)info->bmiHeader.biHeight,
+                (int)info->bmiHeader.biWidth);
+            CpuRenderView::drawSurface(data);
+        } else {
+            static constexpr uint32_t colors[] = {
+                    0x00000000,
+                    0x0055aaff,
+                    0x5500aaff,
+                    0xaaff0055,
+                    0xff55aa00,
+                    0xaa0055ff,
+                    0xffffffff
+            };
+            static int iteration = 0;
+            CpuRenderView::drawRGBColor(
+                colors[iteration++ % (sizeof(colors) / sizeof(*colors))], g_filename.c_str());
+        }
+        CpuRenderView::releaseSurfaceView(env);
+        delete[] content;
+        break;
+    }
+    case 5:
+        LOGD("Disconnect");
+        EglGpuRender::CloseGLSurface();
+        CpuRenderView::releaseSurfaceView(env);
+        break;
+    default:
+        Message::instance().setMessage("CpuRender initialize fail", TOAST);
+        return -3;
     }
     return 0;
 }
 
-JNIEXPORT jint JNICALL
-CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv* env, jclass, jobject texture)
+JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv* env, jclass, jobject texture)
 {
     if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
         LOGD("OpenGL rendering initialized(%d, %d)", g_height, g_width);
@@ -355,14 +342,15 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv*, jclass)
 #include <convert/Pcm2Wav.h>
 #include <socket/UdpSocket.h>
 #include <socket/TcpSocket.h>
-// #include <template/Clazz1.h>
-// #include <template/Clazz2.h>
 
 static int g_msgLen = 6;
 static int g_udpPort = 8899;
 
-JNIEXPORT jint JNICALL
-CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save)
+// 文件传输
+static FileMsgSocket* g_fileMsg = nullptr;
+static std::mutex g_fileTransMutex;
+
+JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save)
 {
     std::string source = Jstring2Cstring(env, from);
     std::string target = Jstring2Cstring(env, save);
@@ -373,8 +361,7 @@ CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save
     return stat;
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass,
-                                                     jstring text, jint len)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass, jstring text, jint len)
 {
     std::string txt = Jstring2Cstring(env, text);
     const char* tx = txt.c_str();
@@ -386,12 +373,6 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass,
     auto* sock = new UdpSocket("127.0.0.1", g_udpPort);
     sock->Sender(tx, (unsigned int)len + 1);
     delete sock;
-    /*
-        auto *clz1 = new Clazz1();
-        clz1->setBase<Clazz1>("AAA", 3);
-        auto *clz2 = new Clazz2();
-        clz2->setBase<Clazz2>("22", 2);
-    */
     return 0;
 }
 
@@ -405,20 +386,20 @@ void callback(char* data)
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv*, jclass, jint port)
 {
     std::thread th(
-            [&]() -> void {
-                int total = g_msgLen + (int)sizeof(NetProtocol);
-                char msg[total];
-                auto* sock = new UdpSocket(port);
-                g_udpPort = port;
-                int size;
-                do {
-                    std::string message = "udp receiver starts";
-                    Message::instance().setMessage(message, UDP_SERVER);
-                    size = sock->Receiver(msg, total, callback);
-                    usleep(10000);
-                } while (size != 0);
-                delete sock;
-            }
+        [&]() -> void {
+            int total = g_msgLen + (int)sizeof(NetProtocol);
+            char msg[total];
+            auto* sock = new UdpSocket(port);
+            g_udpPort = port;
+            int size;
+            do {
+                std::string message = "udp receiver starts";
+                Message::instance().setMessage(message, UDP_SERVER);
+                size = sock->Receiver(msg, total, callback);
+                usleep(10000);
+            } while (size != 0);
+            delete sock;
+        }
     );
     if (th.joinable())
         th.detach();
@@ -438,7 +419,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint po
         tcp.RegisterCallback(tcp_callback);
         tcp.Start(port);
         tcp.Finish();
-    }, port);
+        }, port);
     if (th.joinable())
         th.detach();
     return 0;
@@ -451,7 +432,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv*, jclass, jint po
         kcpSocket.init(port, false);
         Message::instance().setMessage("Kcp server " + std::to_string(port), UPDATE_VIEW);
         kcpSocket.startServer();
-    }, port);
+        }, port);
     if (th.joinable())
         th.detach();
     return 0;
@@ -460,7 +441,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv*, jclass, jint po
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* env, jclass, jstring ipstr, jint port)
 {
     std::string addr = Jstring2Cstring(env, ipstr);
-    auto* ipaddr = new unsigned char[addr.size() +1];
+    auto* ipaddr = new unsigned char[addr.size() + 1];
     memset(ipaddr, 0, addr.size() + 1);
     memcpy(ipaddr, addr.c_str(), addr.size());
     std::thread th([](int port, unsigned char* ip) -> void {
@@ -471,8 +452,139 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* env, jclass, jst
         Message::instance().setMessage(hint, TOAST);
         kcpSocket.startClient();
         delete ip;
-    }, port, ipaddr);
+        }, port, ipaddr);
     if (th.joinable())
         th.detach();
     return 0;
+}
+
+// ============ 文件传输 JNI 实现 ============
+
+void FileMsgProgressCallback(uint64_t current, uint64_t total, const std::string& status)
+{
+    // 限频：最多每 100ms 推送一次进度，避免刷爆消息队列
+    static auto lastTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count();
+
+    // 传输完成/开始等状态消息立即推送
+    bool isStatusMsg = (current == 0 || current >= total);
+
+    if (!isStatusMsg && elapsed < 100) {
+        return;
+    }
+    lastTime = now;
+
+    // 进度数据：format "status|current|total" 方便 Java 侧解析
+    std::string msg = status + "|" + std::to_string(current) + "|" + std::to_string(total);
+    Message::instance().setMessage(msg, FILE_PROGRESS);
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jint port)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        LOGW("FileMsg server already running");
+        return 0;
+    }
+    g_fileMsg = new FileMsgSocket();
+    g_fileMsg->setProgressCallback(FileMsgProgressCallback);
+    int ret = g_fileMsg->startServer((unsigned short)port);
+    if (ret < 0) {
+        delete g_fileMsg;
+        g_fileMsg = nullptr;
+        return ret;
+    }
+    Message::instance().setMessage("FileMsg server started on port " + std::to_string(port), MESSAGE);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv* env, jclass, jstring ip, jint port)
+{
+    std::string address = Jstring2Cstring(env, ip);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->disconnect();
+        delete g_fileMsg;
+    }
+    g_fileMsg = new FileMsgSocket();
+    g_fileMsg->setProgressCallback(FileMsgProgressCallback);
+    int ret = g_fileMsg->connectToServer(address, (unsigned short)port);
+    if (ret < 0) {
+        delete g_fileMsg;
+        g_fileMsg = nullptr;
+        return ret;
+    }
+    Message::instance().setMessage("Connected to FileMsg server " + address + ":" + std::to_string(port), MESSAGE);
+    return 0;
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->disconnect();
+        delete g_fileMsg;
+        g_fileMsg = nullptr;
+        Message::instance().setMessage("FileMsg disconnected", MESSAGE);
+    }
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendFile)(JNIEnv* env, jclass, jstring filePath)
+{
+    std::string path = Jstring2Cstring(env, filePath);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg == nullptr || !g_fileMsg->isConnected()) {
+        LOGE("FileMsg not connected");
+        return -1;
+    }
+    int ret = g_fileMsg->sendFile(path);
+    if (ret < 0) {
+        Message::instance().setMessage("File send failed", MESSAGE);
+        return ret;
+    }
+    Message::instance().setMessage("File send complete: " + path, MESSAGE);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv* env, jclass, jstring ip, jint port, jstring fileName)
+{
+    std::string address = Jstring2Cstring(env, ip);
+    std::string name = Jstring2Cstring(env, fileName);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg == nullptr || !g_fileMsg->isConnected()) {
+        LOGE("FileMsg not connected");
+        return -1;
+    }
+    return g_fileMsg->requestFile(address, (unsigned short)port, name);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv* env, jclass, jstring path)
+{
+    std::string savePath = Jstring2Cstring(env, path);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->setSavePath(savePath);
+        LOGI("FileMsg save path set to: %s", savePath.c_str());
+    }
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->stopServer();
+        delete g_fileMsg;
+        g_fileMsg = nullptr;
+        Message::instance().setMessage("FileMsg server exit", MESSAGE);
+    }
+}
+
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        return g_fileMsg->isConnected() ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
 }

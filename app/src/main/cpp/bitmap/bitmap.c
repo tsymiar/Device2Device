@@ -593,7 +593,7 @@ BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba)
 
     size_t len;
     if ((len = fread(*pRgba, 1, prop.blSize, fpBmp)) != prop.blSize) {
-        LOGE("bmp size not match: [%d][%d]", len, prop.blSize);
+        LOGE("bmp size not match: [%zu][%ld]", len, prop.blSize);
     }
 
     *pRgba = channelChange(3, *pRgba, prop.biWidth, prop.biHeight);

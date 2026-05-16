@@ -8,6 +8,7 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -23,9 +24,9 @@ import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.wrapper.CallbackWrapper;
 
-public class FloatingService extends Service {
+public class SubscribeService extends Service {
 
-    private static final String TAG = FloatingService.class.getCanonicalName();
+    private static final String TAG = SubscribeService.class.getCanonicalName();
     public static final String BROADCAST_ACTION = "com.tsymiar.device2device.broadcast";
 
     @Nullable
@@ -35,8 +36,8 @@ public class FloatingService extends Service {
     }
 
     public class Binder extends android.os.Binder {
-        public FloatingService getService() {
-            return FloatingService.this;
+        public SubscribeService getService() {
+            return SubscribeService.this;
         }
     }
 
@@ -140,9 +141,14 @@ public class FloatingService extends Service {
         layoutParams.format = PixelFormat.RGBA_8888;
         layoutParams.gravity = Gravity.LEFT | Gravity.TOP;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON; // | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        Display display = windowManager.getDefaultDisplay();
-        layoutParams.width = (int)(display.getWidth() * 0.5);
-        layoutParams.height = (int)(display.getHeight() * 0.44);
+
+        // Use getSize() instead of deprecated getWidth()/getHeight()
+        DisplayMetrics metrics = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getMetrics(metrics);
+        int screenWidth = metrics.widthPixels;
+        int screenHeight = metrics.heightPixels;
+        layoutParams.width = (int)(screenWidth * 0.5);
+        layoutParams.height = (int)(screenHeight * 0.44);
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;

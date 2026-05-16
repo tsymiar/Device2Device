@@ -1,5 +1,6 @@
 package com.tsymiar.device2device.dialog;
 // Android 基础组件
+
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.content.Context;
@@ -48,7 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class ChatDialog extends Dialog {
+public class ChatBoxDialog extends Dialog {
     public static final int CHAT_FILE_REQUEST = 1001;
     private EditText etMessage;
     private RecyclerView rvMessages;
@@ -73,9 +74,9 @@ public class ChatDialog extends Dialog {
     private ChatSpin currentSpinner = ChatSpin.MIXED;
     private ChatSpin currentChatter = ChatSpin.CHAT_DPSK;
 
-    public ChatDialog(@NonNull Context context) {
+    public ChatBoxDialog(@NonNull Context context) {
         super(context);
-        setContentView(R.layout.dialog_chat);
+        setContentView(R.layout.dialog_chat_box);
         setupViews();
         Window window = getWindow();
         if (window != null) {
@@ -196,8 +197,12 @@ public class ChatDialog extends Dialog {
                 checkBox.setVisibility(View.GONE);
                 chatHint.setVisibility(View.GONE);
             default:
-                Toast.makeText(getContext(), "已切换到：" + getContext().getResources()
-                        .getStringArray(R.array.chat_options)[position], Toast.LENGTH_SHORT).show();
+                String[] items = getContext().getResources()
+                        .getStringArray(R.array.chat_options);
+                String current = items[position];
+                if (!current.equals(items[items.length - 1])) {
+                    Toast.makeText(getContext(), "已切换：" + current, Toast.LENGTH_SHORT).show();
+                }
                 break;
         }
 
@@ -502,7 +507,7 @@ public class ChatDialog extends Dialog {
                         @Override
                         public void onSuccess(int responseCode, String response, Map<String, String> headers) {
                             message.what = State[0];
-                            String content;
+                            String content = "";
                             try {
                                 JSONObject jsonObject = new JSONObject(response);
                                 JSONArray choices = jsonObject.getJSONArray("choices");
@@ -510,7 +515,8 @@ public class ChatDialog extends Dialog {
                                 JSONObject message = firstChoice.getJSONObject("message");
                                 content = message.getString("content");
                             } catch (JSONException e) {
-                                throw new RuntimeException(e);
+                                content = response;
+                                // throw new RuntimeException(e);
                             }
                             message.obj = content;
                             mHeader.handler.sendMessage(message);

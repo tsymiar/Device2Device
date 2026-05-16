@@ -12,40 +12,40 @@
 	tools:context=".activity.GraphActivity">
 
 	<TextView
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/accelerator"
 		android:gravity="center_horizontal"/>
 
 	<TextView
 		android:id="@+id/t1"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/hello_world"
 		android:gravity="center_horizontal"/>
 
 	<TextView
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/ngravity"
 		android:gravity="center_horizontal"/>
 
 	<TextView
 		android:id="@+id/t2"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/hello_world"
 		android:gravity="center_horizontal"/>
 
 	<TextView
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/nliner_accelerator"
 		android:gravity="center_horizontal"/>
 
 	<TextView
 		android:id="@+id/t3"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:text="@string/hello_world"
 		android:gravity="center_horizontal"/>

@@ -10,9 +10,8 @@ captures
 app/src/main/jniLibs
 *.zip
 *.dylib
-gradle/wrapper/gradle-wrapper.properties
 jniLibs
 libs
 pic
 .vs*
-test
+*.log

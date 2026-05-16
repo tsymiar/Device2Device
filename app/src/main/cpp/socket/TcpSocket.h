@@ -6,6 +6,8 @@
 #define DEVICE2DEVICE_TCPSOCKET_H
 
 #include <cstdint>
+#include <atomic>
+#include <mutex>
 
 class TcpSocket;
 
@@ -30,7 +32,8 @@ private:
     const int m_recvSize;
     SOCKETHOOK m_callback = nullptr;
     int m_recvSock = 0;
-    volatile bool m_running = false;
+    std::atomic<bool> m_running{ false };
+    std::mutex m_acceptMutex;
 };
 
 #endif //DEVICE2DEVICE_TCPSOCKET_H

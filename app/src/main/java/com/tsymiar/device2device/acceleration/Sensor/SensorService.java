@@ -3,6 +3,7 @@ package com.tsymiar.device2device.acceleration.Sensor;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -46,6 +47,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
 
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.activity.GraphActivity;
@@ -115,24 +117,33 @@ public class SensorService extends Service {
         super.onCreate();
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = new Notification(R.drawable.you, getText(R.string.app_name), System.currentTimeMillis());
-        Notification.Builder builder = new Notification.Builder(SensorService.this);
+
+        // Create notification channel for Android O (API 26) and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "sensor_channel",
+                    getText(R.string.app_name),
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setShowBadge(false);
+            manager.createNotificationChannel(channel);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(SensorService.this, "sensor_channel");
         if (mBluetoothAdapter != null && mBluetoothAdapter.isEnabled()) {
             notificationIntent = new Intent(this, GraphActivity.class);
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this, 0, notificationIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             builder.setContentIntent(pendingIntent);
         }
         builder.setAutoCancel(false);
         builder.setSmallIcon(R.drawable.ic_notify);
-        builder.setContentTitle(R.string.app_name + " Notification");
+        builder.setContentTitle(getText(R.string.app_name) + " Notification");
         builder.setContentText("You have a new message");
         builder.setTicker("this is ticker text");
         builder.setSubText(getText(R.string.notify));
         builder.setNumber(100);
-        builder.build();
-        //API 8
-        //notification.setLatestEventInfo(this, getText(R.string.AppName),
-        //								getText(R.string.notif), pendingIntent);
+        Notification notification = builder.build();
         startForeground(1, notification);
         manager.notify(11, notification);
         view = LayoutInflater.from(this).inflate(R.layout.dialog_view_text, null);
@@ -705,13 +716,14 @@ public class SensorService extends Service {
 
             final float alpha = 0.8f;
 
-            gravity[0] = alpha * gravity[SensorManager.DATA_X] + (1 - alpha) * arg.values[SensorManager.DATA_X];
-            gravity[1] = alpha * gravity[SensorManager.DATA_Y] + (1 - alpha) * arg.values[SensorManager.DATA_Y];
-            gravity[2] = alpha * gravity[SensorManager.DATA_Z] + (1 - alpha) * arg.values[SensorManager.DATA_Z];
+            // Use values[0/1/2] instead of deprecated DATA_X/Y/Z
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * arg.values[0];
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * arg.values[1];
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * arg.values[2];
 
-            linear_acceleration[0] = arg.values[SensorManager.DATA_X] - gravity[SensorManager.DATA_X];
-            linear_acceleration[1] = arg.values[SensorManager.DATA_Y] - gravity[SensorManager.DATA_Y];
-            linear_acceleration[2] = arg.values[SensorManager.DATA_Z] - gravity[SensorManager.DATA_Z];
+            linear_acceleration[0] = arg.values[0] - gravity[0];
+            linear_acceleration[1] = arg.values[1] - gravity[1];
+            linear_acceleration[2] = arg.values[2] - gravity[2];
         }
     }
 }
