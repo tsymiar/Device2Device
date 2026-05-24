@@ -128,9 +128,9 @@ public class ChatBoxDialog extends Dialog {
         ArrayAdapter<CharSequence> spinnerAdapter = ArrayAdapter.createFromResource(
                 getContext(),
                 R.array.chat_options,
-                android.R.layout.simple_spinner_item
+                R.layout.spinner_selected_item
         );
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
         spinnerOptions.setAdapter(spinnerAdapter);
         spinnerOptions.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override

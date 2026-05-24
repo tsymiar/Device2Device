@@ -10,12 +10,12 @@
     </string-array>
 
     <string name="reload">Re-fresh</string>
-    <string name="texture">Texture</string>
-    <string name="wave">Wave</string>
+    <string name="texture">📺 Texture</string>
+    <string name="wave">〰️ Wave</string>
+    <string name="chart">📈 Chart</string>
     <string name="status">status</string>
     <string name="read">load</string>
     <string name="record">record</string>
-    <string name="chart">chart</string>
     <string name="viewGithub">View on GitHub</string>
     <string name="close">Close</string>
     <string name="dftHint">" "</string>
@@ -37,9 +37,7 @@
     <string name="tcp">TCP</string>
     <string name="kcprun">Kcp</string>
     <string name="speak">Speak</string>
-    <string name="file_trans">File Message</string>
-    <string name="http_server">HTTP Server</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="hello_world">Hello World!</string>
     <string name="ngravity">------------------------------\nGravity:</string>
     <string name="accelerator">Accelerator:</string>
     <string name="nliner_accelerator">------------------------------\nLiner-accelerator:</string>
@@ -70,6 +68,11 @@
     <string name="msg">请输入要发送的消息</string>
     <string name="pkg">📎</string>
     <string name="commit">发送</string>
-    <string name="chat">chat</string>
     <string name="r1">深度思考(R1)</string>
+    <string name="chat">💬 Chat Box</string>
+    <string name="file_trans">📁 File Transfer</string>
+    <string name="http_server">🌐 HTTP Server</string>
+    <string name="section_network">🌐 网络服务</string>
+    <string name="section_advanced">⚡ 高级通信</string>
+    <string name="section_files">💬 文件传输</string>
 </resources>
