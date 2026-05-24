@@ -5,98 +5,85 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@android:color/white"
-    android:visibility="visible"
-    tools:visibility="visible"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="8dp"
     tools:ignore="MissingClass">
 
+    <!-- 关闭按钮 -->
+    <Button
+        android:id="@+id/btn_close"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:text="@string/exit"
+        android:textColor="#FF5252"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 地址输入 -->
     <EditText
         android:id="@+id/edit_addr"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:ems="10"
-        android:inputType="textPersonName"
-        android:text="@string/address"
         android:hint="@string/hint_address"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints" />
+        android:inputType="text"
+        android:maxLines="1"
+        android:text="@string/address"
+        app:layout_constraintEnd_toStartOf="@id/btn_close"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/btn_close" />
 
+    <!-- 端口输入 -->
     <EditText
         android:id="@+id/edit_port"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="64dp"
-        android:ems="10"
-        android:inputType="textPersonName"
-        android:text="@string/sub_port"
+        android:layout_marginTop="8dp"
         android:hint="@string/hint_port"
-        app:layout_constraintTop_toTopOf="@id/edit_addr"
-        tools:ignore="MissingConstraints"
-        tools:layout_editor_absoluteX="0dp" />
+        android:inputType="number"
+        android:maxLines="1"
+        android:text="@string/sub_port"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/edit_addr" />
 
+    <!-- Topic 输入 -->
     <EditText
         android:id="@+id/edit_topic"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="64dp"
-        android:ems="10"
-        android:inputType="textPersonName"
-        android:text="@string/topic"
+        android:layout_marginTop="8dp"
         android:hint="@string/topic"
-        app:layout_constraintTop_toTopOf="@id/edit_port"
-        tools:ignore="MissingConstraints"
-        tools:layout_editor_absoluteX="0dp" />
+        android:inputType="text"
+        android:maxLines="1"
+        android:text="@string/topic"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/edit_port" />
+
+    <!-- 按钮栏 -->
+    <Button
+        android:id="@+id/btn_minimum"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="8dp"
+        android:text="@string/minimum"
+        app:layout_constraintEnd_toStartOf="@id/btn_confirm"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/edit_topic" />
 
     <Button
         android:id="@+id/btn_confirm"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="64dp"
         android:text="@string/confirm"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@id/edit_topic"
-        tools:ignore="MissingConstraints" />
-
-    <ImageView
-        android:id="@+id/img_close"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:adjustViewBounds="true"
-        android:baselineAlignBottom="true"
-        android:clickable="true"
-        android:cropToPadding="true"
-        android:importantForAccessibility="no"
-        android:visibility="visible"
-        app:layout_constraintBottom_toTopOf="@id/edit_addr"
-        app:layout_constraintEnd_toEndOf="@id/edit_addr"
-        app:layout_constraintHorizontal_bias="1.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@android:drawable/ic_menu_close_clear_cancel"
-        tools:ignore="MissingConstraints,ImageContrastCheck"
-        tools:visibility="visible"
-        android:focusable="true" />
-
-    <Button
-        android:background="#00000000"
-        android:id="@+id/btn_close"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:text="@string/exit"
-        tools:ignore="MissingConstraints"
-        tools:layout_editor_absoluteX="170dp"
-        tools:layout_editor_absoluteY="-8dp" />
-
-    <Button
-        android:id="@+id/btn_minium"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginTop="24dp"
-        android:text="@string/minimum"
-        app:layout_constraintStart_toEndOf="@+id/btn_confirm"
-        app:layout_constraintTop_toBottomOf="@+id/edit_topic"
-        tools:ignore="MissingConstraints" />
+        app:layout_constraintBottom_toBottomOf="@id/btn_minimum"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/btn_minimum"
+        app:layout_constraintTop_toTopOf="@id/btn_minimum" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

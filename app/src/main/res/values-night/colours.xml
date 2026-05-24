@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 暗色模式颜色 -->
+    <color name="dialog_background">#1E1E1E</color>
+    <color name="dialog_text_primary">#E0E0E0</color>
+    <color name="dialog_text_secondary">#9E9E9E</color>
+    <color name="dialog_error">#FF5252</color>
+    <color name="dialog_button_text">#E0E0E0</color>
+</resources>

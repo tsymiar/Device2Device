@@ -21,7 +21,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.acceleration.Sensor.SensorListActivity;
 import com.tsymiar.device2device.acceleration.SensorFragment;
 
 public class GraphActivity extends AppCompatActivity {
@@ -146,7 +145,7 @@ public class GraphActivity extends AppCompatActivity {
         // Handle item selection
         int itemId = item.getItemId();
         if (itemId == R.id.sensor) {
-            intent = new Intent(activity, SensorListActivity.class);
+            intent = new Intent(activity, SensorActivity.class);
             activity.startActivity(intent);
         } else if (itemId == R.id.feedback) {
             intent = new Intent(activity, BuggerActivity.class);

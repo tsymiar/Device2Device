@@ -14,4 +14,10 @@
     <color name="waveform_unselected_overlay">#0a242d</color>
     <color name="menu_submenu">#ccffff</color>
     <color name="darkgrey">#888888</color>
+    <!-- 对话框颜色（浅色模式） -->
+    <color name="dialog_background">#FFFFFF</color>
+    <color name="dialog_text_primary">#212121</color>
+    <color name="dialog_text_secondary">#757575</color>
+    <color name="dialog_error">#B71C1C</color>
+    <color name="dialog_button_text">#212121</color>
 </resources>

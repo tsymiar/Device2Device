@@ -6,19 +6,19 @@
     android:layout_height="match_parent">
 
     <RelativeLayout
-        android:layout_width="300dp"
-        android:layout_height="300dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         tools:ignore="UselessParent">
 
         <SurfaceView
             android:id="@+id/show"
-            android:layout_width="300dp"
-            android:layout_height="300dp" />
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:id="@+id/toor"
-            android:layout_width="300dp"
-            android:layout_height="300dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:layout_gravity="top|center"
             android:orientation="vertical">
 
@@ -26,11 +26,10 @@
                 android:id="@+id/click"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="right"
+                android:layout_gravity="end"
                 android:text="@string/pull"
                 android:textColor="#FF8D00"
-                android:textSize="20sp"
-                tools:ignore="RtlHardcoded" />
+                android:textSize="20sp" />
         </LinearLayout>
 
         <Button
@@ -38,12 +37,9 @@
             style="?android:attr/buttonStyleSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
             android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:layout_gravity="bottom|right"
-            android:text="@string/pause"
-            tools:ignore="RtlHardcoded" />
+            android:text="@string/pause" />
 
         <Button
             android:id="@+id/out_bn"
@@ -51,10 +47,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:layout_gravity="bottom"
-            android:layout_toLeftOf="@id/pause_bn"
-            android:text="@string/hide"
-            tools:ignore="RtlHardcoded" />
+            android:layout_toStartOf="@id/pause_bn"
+            android:text="@string/hide" />
 
         <TextView
             android:id="@+id/notification"
@@ -63,29 +57,27 @@
             android:layout_alignParentStart="true"
             android:textColor="#ffffe9d5"
             android:typeface="monospace"
-            tools:ignore="RelativeOverlap,RtlCompat" />
+            tools:ignore="RelativeOverlap" />
 
         <ImageView
             android:id="@+id/imageView"
             android:layout_width="wrap_content"
             android:layout_height="50dp"
-            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
             android:layout_centerInParent="true"
             android:importantForAccessibility="no"
-            android:src="@drawable/minimize"
-            tools:ignore="RtlHardcoded" />
+            android:src="@drawable/minimize" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_above="@id/imageView"
-            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
             android:text="@string/min"
             android:textColor="#ffff0000"
             android:textSize="9sp"
-            tools:ignore="RtlHardcoded,SmallSp" />
+            tools:ignore="SmallSp" />
 
     </RelativeLayout>
 
 </FrameLayout>
-

@@ -5,62 +5,71 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/border"
-    tools:targetApi="s"
+    android:padding="16dp"
     tools:ignore="MissingClass">
 
+    <!-- 退出按钮 -->
     <Button
-        android:background="#00000000"
         android:id="@+id/btn_pub_finish"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginEnd="16dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@android:color/transparent"
         android:text="@string/exit"
-        android:textColor="#B71C1C"
+        android:textColor="@color/dialog_error"
+        android:textSize="14sp"
         app:layout_constraintStart_toStartOf="parent"
-        tools:layout_editor_absoluteY="0dp"
-        tools:ignore="MissingConstraints" />
+        app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Payload 输入 -->
     <EditText
         android:id="@+id/edit_payload"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
-        android:ems="10"
-        android:inputType="textPersonName"
+        android:layout_marginTop="12dp"
+        android:hint="@string/pub_payload"
+        android:inputType="text"
+        android:maxLines="1"
         android:minHeight="48dp"
         android:selectAllOnFocus="true"
         android:text="@string/pub_payload"
-        android:hint="@string/pub_payload"
+        android:textColor="@color/dialog_text_primary"
+        android:textColorHint="@color/dialog_text_secondary"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="LabelFor,MissingConstraints"
-        android:autofillHints="" />
+        app:layout_constraintTop_toBottomOf="@id/btn_pub_finish"
+        tools:ignore="LabelFor" />
 
+    <!-- Topic 输入 -->
     <EditText
         android:id="@+id/edit_pub_topic"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:ems="10"
-        android:inputType="textPersonName"
+        android:layout_marginTop="12dp"
+        android:hint="@string/topic"
+        android:inputType="text"
+        android:maxLines="1"
         android:minHeight="48dp"
         android:text="@string/topic"
-        android:hint="@string/topic"
+        android:textColor="@color/dialog_text_primary"
+        android:textColorHint="@color/dialog_text_secondary"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/edit_payload"
-        tools:ignore="LabelFor,MissingConstraints"
-        android:importantForAutofill="no" />
+        tools:ignore="LabelFor" />
 
+    <!-- 确认按钮 -->
     <Button
         android:id="@+id/btn_pub_confirm"
         style="?android:attr/buttonStyleSmall"
         android:layout_width="wrap_content"
-        android:layout_height="32dp"
-        android:layout_marginTop="20dp"
+        android:layout_height="36dp"
+        android:layout_marginTop="16dp"
         android:background="@drawable/border"
         android:text="@string/confirm"
+        android:textColor="@color/dialog_button_text"
         android:textSize="14sp"
-        app:layout_constraintTop_toBottomOf="@id/edit_pub_topic"
-        tools:ignore="MissingConstraints"
-        tools:layout_editor_absoluteX="64dp"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/edit_pub_topic" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

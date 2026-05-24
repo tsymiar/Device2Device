@@ -117,6 +117,24 @@ ANativeWindow *EglGpuRender::OpenGLSurface()
 
 void EglGpuRender::CloseGLSurface()
 {
+    // 释放 OpenGL 纹理资源（修复纹理泄漏）
+    if (EGL2.mTextureID != 0) {
+        glDeleteTextures(1, &EGL2.mTextureID);
+        EGL2.mTextureID = 0;
+    }
+    if (g_Texture2D[0] != 0 || g_Texture2D[1] != 0 || g_Texture2D[2] != 0) {
+        glDeleteTextures(3, g_Texture2D);
+        g_Texture2D[0] = g_Texture2D[1] = g_Texture2D[2] = 0;
+    }
+    if (g_vertexPosBuffer != 0) {
+        glDeleteBuffers(1, &g_vertexPosBuffer);
+        g_vertexPosBuffer = 0;
+    }
+    if (g_texturePosBuffer != 0) {
+        glDeleteBuffers(1, &g_texturePosBuffer);
+        g_texturePosBuffer = 0;
+    }
+
     EglShader::DeleteProgram(EGL2.glProgram);
     EGLBoolean success = eglReleaseThread();
     if (!success) {
@@ -128,11 +146,11 @@ void EglGpuRender::CloseGLSurface()
     }
     success = eglDestroyContext(EGL2.eglDisplay, EGL2.eglContext);
     if (!success) {
-        LOGE("eglDestroySurface failure.");
+        LOGE("eglDestroyContext failure.");
     }
     success = eglTerminate(EGL2.eglDisplay);
     if (!success) {
-        LOGE("eglDestroySurface failure.");
+        LOGE("eglTerminate failure.");
     }
     EGL2.eglSurface = nullptr;
     EGL2.eglContext = nullptr;
@@ -213,11 +231,11 @@ void pixelRender(unsigned char* pixel, size_t)
     // Order of coordinates: X, Y, S, T
     // Triangle Fan
     GLfloat vVertices[] = { 0.0f, 0.0f, 0.5f, 0.5f,
-                              -1.0f, -1.0f, 0.0f, 1.0f,
-                              1.0f, -1.0f, 1.0f, 1.0f,
-                              1.0f, 1.0f, 1.0f, 0.0f,
-                              -1.0f, 1.0f, 0.0f, 0.0f,
-                              -1.0f, -1.0f, 0.0f, 1.0f };
+                            -1.0f, -1.0f, 0.0f, 1.0f,
+                            1.0f, -1.0f, 1.0f, 1.0f,
+                            1.0f, 1.0f, 1.0f, 0.0f,
+                            -1.0f, 1.0f, 0.0f, 0.0f,
+                            -1.0f, -1.0f, 0.0f, 1.0f };
 
     glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT,
                           GL_FLOAT, false, STRIDE_NUMBER,
@@ -637,10 +655,6 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
 }
 
 #include "EglTexture.h"
-
-extern GLuint g_Texture2D[3];
-extern GLuint g_vertexPosBuffer;
-extern GLuint g_texturePosBuffer;
 
 void EglGpuRender::FrameRender(unsigned char* frameData, size_t)
 {

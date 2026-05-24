@@ -269,11 +269,19 @@ void CpuRenderView::drawSurface(uint8_t *data, size_t size)
     auto *pixes = (uint8_t *) data;
     auto *line = (uint8_t *) buffer.bits;
     if (size > 0) {
-        memcpy(line, data, size);
+        // 有明确数据大小时直接拷贝，按 stride 逐行复制避免宽度不一致
+        size_t copySize = static_cast<size_t>(buffer.width) * 4; // RGBA 每像素4字节
+        for (int y = 0; y < buffer.height && size > 0; y++) {
+            size_t rowBytes = (copySize < size) ? copySize : size;
+            memcpy(line + y * buffer.stride, pixes + y * copySize, rowBytes);
+        }
     } else {
+        // 无明确大小时，索引不得超过 data 原始缓冲区范围
+        int maxIdx = buffer.height * buffer.width;
         for (int y = 0; y < buffer.height; y++) {
             for (int x = 0; x < buffer.width; x++) {
-                line[x] = pixes[buffer.height * y + x]; // fixme crash
+                int idx = buffer.width * y + x;
+                line[x] = (idx < maxIdx) ? pixes[idx] : 0;
             }
             line += buffer.stride;
         }

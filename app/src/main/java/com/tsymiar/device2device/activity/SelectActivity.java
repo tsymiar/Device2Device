@@ -17,7 +17,9 @@ import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,15 +29,15 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.dialog.ChatBoxDialog;
+import com.tsymiar.device2device.dialog.FileMsgDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
 import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
-import com.tsymiar.device2device.service.SubscribeService;
-import com.tsymiar.device2device.service.PublishService;
 import com.tsymiar.device2device.service.HttpFileService;
-import com.tsymiar.device2device.dialog.FileMsgDialog;
+import com.tsymiar.device2device.service.PublishService;
+import com.tsymiar.device2device.service.SubscribeService;
 import com.tsymiar.device2device.utils.JvmMethods;
 import com.tsymiar.device2device.utils.Utils;
 import com.tsymiar.device2device.wrapper.CallbackWrapper;
@@ -124,7 +126,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 case Receiver.LOG_VIEW:
                     TextureActivity.log(msg.obj.toString());
                     break;
-                case Receiver.UPDATE_VIEW:
+                case Receiver.KCP_VIEW:
                     mKcpBtn.setText(msg.obj.toString());
                     break;
                 default:
@@ -262,7 +264,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             } else {
                 Message msg = new Message();
                 msg.obj = getString(R.string.kcprun);
-                msg.what = Receiver.UPDATE_VIEW;
+                msg.what = Receiver.KCP_VIEW;
                 handler.sendMessage(msg);
             }
         });
@@ -285,6 +287,19 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(intent, RequestHttpFolder);
+        });
+
+        // 网络服务区域折叠/展开
+        final LinearLayout networkContent = findViewById(R.id.network_content);
+        final TextView networkArrow = findViewById(R.id.network_arrow);
+        findViewById(R.id.network_header).setOnClickListener(v -> {
+            if (networkContent.getVisibility() == View.VISIBLE) {
+                networkContent.setVisibility(View.GONE);
+                networkArrow.setText("▼");
+            } else {
+                networkContent.setVisibility(View.VISIBLE);
+                networkArrow.setText("▲");
+            }
         });
     }
 
@@ -380,6 +395,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     /**
      * 从 DocumentTree URI 中提取实际文件路径
      */
+    @SuppressLint("SetTextI18n")
     private void startHttpServer(Uri treeUri) {
         final int HTTP_PORT = 8080;
 

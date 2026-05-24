@@ -37,13 +37,12 @@
         <activity android:name=".activity.TextureActivity" />
         <activity android:name=".activity.WaveActivity" />
         <activity android:name=".activity.GraphActivity" />
-        <activity android:name=".acceleration.Sensor.SensorListActivity" />
+        <activity android:name=".activity.SensorActivity" />
         <service
             android:name=".service.PublishService"
             android:theme="@android:style/Theme.Holo.Dialog" />
         <service android:name=".service.SubscribeService" />
-        <service android:name=".acceleration.Sensor.SensorIntentService" />
-        <service android:name=".acceleration.Sensor.SensorService" />
+        <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"
             tools:ignore="MissingClass" />
         <activity android:name=".activity.BuggerActivity" android:exported="true">

@@ -417,8 +417,13 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint po
     std::thread th([](int port) -> void {
         TcpSocket tcp;
         tcp.RegisterCallback(tcp_callback);
-        tcp.Start(port);
-        tcp.Finish();
+        int ret = tcp.Start(port);
+        if (ret != 0) {
+            Message::instance().setMessage("TCP Start(" + std::to_string(ret) + "): " + std::string(strerror(errno)), MESSAGE);
+            tcp.Finish();
+        } else {
+            Message::instance().setMessage("TCP server " + std::to_string(port), MESSAGE);
+        }
         }, port);
     if (th.joinable())
         th.detach();
@@ -430,7 +435,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv*, jclass, jint po
     std::thread th([](int port) -> void {
         KcpSocket kcpSocket{};
         kcpSocket.init(port, false);
-        Message::instance().setMessage("Kcp server " + std::to_string(port), UPDATE_VIEW);
+        Message::instance().setMessage("Kcp server " + std::to_string(port), KCP_VIEW);
         kcpSocket.startServer();
         }, port);
     if (th.joinable())

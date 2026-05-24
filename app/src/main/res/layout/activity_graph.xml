@@ -5,65 +5,189 @@
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:orientation="vertical"
-	android:paddingBottom="@dimen/activity_vertical_margin"
-	android:paddingLeft="@dimen/activity_horizontal_margin"
-	android:paddingRight="@dimen/activity_horizontal_margin"
-	android:paddingTop="@dimen/activity_vertical_margin"
+	android:padding="10dp"
+	android:background="#EEEEEE"
 	tools:context=".activity.GraphActivity">
 
-	<TextView
+	<!-- 加速计 -->
+	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:text="@string/accelerator"
-		android:gravity="center_horizontal"/>
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical"
+		android:padding="12dp"
+		android:background="#F5F5F5"
+		android:elevation="2dp">
 
-	<TextView
-		android:id="@+id/t1"
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:gravity="center_vertical"
+			android:layout_marginBottom="6dp">
+
+			<View
+				android:layout_width="3dp"
+				android:layout_height="18dp"
+				android:layout_marginEnd="8dp"
+				android:background="@color/colorPrimary" />
+
+			<TextView
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:text="@string/accelerator"
+				android:textColor="@color/colorPrimary"
+				android:textSize="13sp"
+				android:textStyle="bold" />
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="m/s²"
+				android:textColor="#999999"
+				android:textSize="11sp" />
+		</LinearLayout>
+
+		<TextView
+			android:id="@+id/t1"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:text="@string/hello_world"
+			android:textColor="#37474F"
+			android:textSize="13sp"
+			android:fontFamily="monospace"
+			android:lineSpacingExtra="2dp"
+			android:padding="8dp"
+			android:background="#FAFAFA" />
+	</LinearLayout>
+
+	<!-- 重力 -->
+	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:text="@string/hello_world"
-		android:gravity="center_horizontal"/>
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical"
+		android:padding="12dp"
+		android:background="#F5F5F5"
+		android:elevation="2dp">
 
-	<TextView
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:gravity="center_vertical"
+			android:layout_marginBottom="6dp">
+
+			<View
+				android:layout_width="3dp"
+				android:layout_height="18dp"
+				android:layout_marginEnd="8dp"
+				android:background="@color/colorPrimary" />
+
+			<TextView
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:text="@string/ngravity"
+				android:textColor="@color/colorPrimary"
+				android:textSize="13sp"
+				android:textStyle="bold" />
+
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="m/s²"
+				android:textColor="#999999"
+				android:textSize="11sp" />
+		</LinearLayout>
+
+		<TextView
+			android:id="@+id/t2"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:text="@string/hello_world"
+			android:textColor="#37474F"
+			android:textSize="13sp"
+			android:fontFamily="monospace"
+			android:lineSpacingExtra="2dp"
+			android:padding="8dp"
+			android:background="#FAFAFA" />
+	</LinearLayout>
+
+	<!-- 线性加速度 -->
+	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:text="@string/ngravity"
-		android:gravity="center_horizontal"/>
+		android:layout_marginBottom="10dp"
+		android:orientation="vertical"
+		android:padding="12dp"
+		android:background="#F5F5F5"
+		android:elevation="2dp">
 
-	<TextView
-		android:id="@+id/t2"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:text="@string/hello_world"
-		android:gravity="center_horizontal"/>
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:gravity="center_vertical"
+			android:layout_marginBottom="6dp">
 
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:text="@string/nliner_accelerator"
-		android:gravity="center_horizontal"/>
+			<View
+				android:layout_width="3dp"
+				android:layout_height="18dp"
+				android:layout_marginEnd="8dp"
+				android:background="@color/colorPrimary" />
 
-	<TextView
-		android:id="@+id/t3"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:text="@string/hello_world"
-		android:gravity="center_horizontal"/>
+			<TextView
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:text="@string/nliner_accelerator"
+				android:textColor="@color/colorPrimary"
+				android:textSize="13sp"
+				android:textStyle="bold" />
 
+			<TextView
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="m/s²"
+				android:textColor="#999999"
+				android:textSize="11sp" />
+		</LinearLayout>
+
+		<TextView
+			android:id="@+id/t3"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:text="@string/hello_world"
+			android:textColor="#37474F"
+			android:textSize="13sp"
+			android:fontFamily="monospace"
+			android:lineSpacingExtra="2dp"
+			android:padding="8dp"
+			android:background="#FAFAFA" />
+	</LinearLayout>
+
+	<!-- 操作按钮 -->
 	<Button
-		android:layout_height="wrap_content"
-		style="?android:attr/buttonStyle"
-		android:text="@string/start_chart"
-		android:layout_width="wrap_content"
 		android:id="@+id/bt"
-		android:layout_gravity="center_vertical|center_horizontal"/>
+		android:layout_width="match_parent"
+		android:layout_height="48dp"
+		android:layout_marginBottom="10dp"
+		android:text="@string/start_chart"
+		android:textSize="14sp"
+		android:textColor="@android:color/white"
+		android:backgroundTint="@color/colorPrimary"
+		android:elevation="4dp"
+		android:stateListAnimator="@null" />
 
+	<!-- 图表容器 -->
 	<androidx.fragment.app.FragmentContainerView
 		android:id="@+id/fragment_container"
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
+		android:background="@android:color/white"
 		android:name="com.tsymiar.device2device.acceleration.DefaultFragment" />
 
 </LinearLayout>
-

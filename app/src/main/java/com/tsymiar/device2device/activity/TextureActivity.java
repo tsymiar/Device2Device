@@ -119,13 +119,13 @@ public class TextureActivity extends AppCompatActivity
 
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
-            @IntRange(from = 1) int height) {
+                                          @IntRange(from = 1) int height) {
         log(String.format(Locale.ROOT, "Texture created (%d×%d)", width, height));
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
-            @IntRange(from = 1) int height) {
+                                            @IntRange(from = 1) int height) {
         /*
          * The surface remains valid so no reinitialization is needed but its
          * dimensions have changed. You may want to recalculate OpenGL matrix or
@@ -160,34 +160,39 @@ public class TextureActivity extends AppCompatActivity
         int state = 0;
         String msg = "";
         switch (item) {
-        case EGL_TEXTURE_FILE:
-            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
-            state = ViewWrapper.updateEglTexture(texture);
-            msg = selValue[item];
-            break;
-        case EGL_SURFACE_FILE:
-            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
-            state = ViewWrapper.updateEglSurface(texture);
-            msg = selValue[item];
-            break;
-        case CPU_TEXTURE_FILE:
-            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
-            state = ViewWrapper.updateCpuTexture(texture, item);
-            msg = selValue[item];
-            break;
-        case CPU_SURFACE_FILE:
-            ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
-            state = ViewWrapper.updateCpuSurface(texture);
-            msg = selValue[item];
-            break;
-        case DISCONNECT_WINDOW:
-            mTextureView.setVisibility(View.GONE);
-            mTextureView.setVisibility(View.VISIBLE);
-            msg = selValue[item];
-            break;
-        default:
-            msg = "Not implement: " + item;
-            break;
+            case EGL_TEXTURE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.jpg");
+                state = ViewWrapper.updateEglTexture(texture);
+                msg = selValue[item];
+                break;
+            case EGL_SURFACE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.yuv");
+                state = ViewWrapper.updateEglSurface(texture);
+                msg = selValue[item];
+                break;
+            case CPU_TEXTURE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.bmp");
+                state = ViewWrapper.updateCpuTexture(texture, item);
+                msg = selValue[item];
+                break;
+            case CPU_SURFACE_FILE:
+                ViewWrapper.setLocalFile(DATA_DIRECTORY + "test.h264");
+                state = ViewWrapper.updateCpuSurface(texture);
+                msg = selValue[item];
+                break;
+            case DISCONNECT_WINDOW:
+                mTextureView.setVisibility(View.GONE);
+                mTextureView.setVisibility(View.VISIBLE);
+                msg = selValue[item];
+                break;
+            default:
+                // item==0 ("None") 及其它未实现项统一处理
+                if (item == 0) {
+                    msg = selValue[item];
+                } else {
+                    msg = "Not implement: " + item;
+                }
+                break;
         }
         log(String.format(Locale.ROOT, "(%s: item=%d stat=%d)", msg, item, state));
     }

@@ -1,18 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:padding="10dp">
 
-    <!-- 顶部下拉选择 (高度固定) -->
+    <!-- 顶部下拉选择 -->
     <Spinner
         android:id="@+id/spinner_options"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="4dp"/>
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/spinner_bkg"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="#212121"
+        android:textSize="14sp"
+        android:dropDownVerticalOffset="4dp"
+        android:dropDownWidth="match_parent"
+        android:popupBackground="@android:color/white"
+        android:popupElevation="4dp" />
 
     <!-- 消息显示区域 (占据剩余空间) -->
     <androidx.recyclerview.widget.RecyclerView
@@ -20,72 +29,98 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:scrollbars="vertical"/>
+        android:layout_marginBottom="10dp"
+        android:scrollbars="vertical" />
 
-    <!-- 底部操作区域 (高度自适应内容) -->
-    <LinearLayout
+    <!-- 底部输入卡片 -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        android:paddingVertical="4dp">
-        <EditText
-            android:id="@+id/et_message"
-            android:layout_width="0dp"
+        app:cardElevation="2dp"
+        app:cardCornerRadius="12dp"
+        app:contentPadding="10dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:strokeWidth="1dp"
+        app:strokeColor="#E8E8E8">
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="@string/msg"
-            android:maxLines="3"
-            android:inputType="textMultiLine"
-            android:autoSizeTextType="uniform"
-            android:autoSizeMinTextSize="12sp"
-            android:autoSizeMaxTextSize="18sp"
-            android:autoSizeStepGranularity="1sp"/>
-    </LinearLayout>
+            android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        android:paddingVertical="4dp">
+            <!-- 消息输入框 -->
+            <EditText
+                android:id="@+id/et_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/edit_bkg"
+                android:hint="@string/msg"
+                android:textColor="#212121"
+                android:textColorHint="#B0B0B0"
+                android:textSize="14sp"
+                android:maxLines="3"
+                android:inputType="textMultiLine"
+                android:autoSizeTextType="uniform"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeMaxTextSize="18sp"
+                android:autoSizeStepGranularity="1sp" />
 
-        <CheckBox
-            android:id="@+id/check_dpsk"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
+            <!-- 底部操作栏 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/check_hint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/r1"
-            android:visibility="gone" />
+                <CheckBox
+                    android:id="@+id/check_dpsk"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:buttonTint="@color/colorAccent"
+                    android:visibility="gone" />
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1"/>
+                <TextView
+                    android:id="@+id/check_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/r1"
+                    android:textColor="#666666"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
 
-        <Button
-            android:id="@+id/btn_attach"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:text="@string/pkg" />
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/textView2"
-            android:layout_width="16dp"
-            android:layout_height="match_parent"
-            android:text="" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_attach"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:minWidth="0dp"
+                    android:text="@string/pkg"
+                    app:cornerRadius="22dp"
+                    app:strokeColor="@color/colorAccent"
+                    app:strokeWidth="1.5dp" />
 
-        <Button
-            android:id="@+id/btn_send"
-            android:layout_width="64dp"
-            android:layout_height="48dp"
-            android:text="@string/commit"
-            app:layout_constraintLeft_toRightOf="@id/btn_attach"/>
+                <Space
+                    android:layout_width="12dp"
+                    android:layout_height="0dp" />
 
-    </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_send"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="68dp"
+                    android:layout_height="44dp"
+                    android:minWidth="0dp"
+                    android:text="@string/commit"
+                    android:textSize="14sp"
+                    app:backgroundTint="@color/colorPrimary"
+                    app:cornerRadius="22dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
 </LinearLayout>

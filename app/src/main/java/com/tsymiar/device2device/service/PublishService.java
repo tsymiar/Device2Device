@@ -11,7 +11,6 @@ import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
-import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -61,9 +60,8 @@ public class PublishService extends Service {
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
         int screenWidth = metrics.widthPixels;
-        int screenHeight = metrics.heightPixels;
         layoutParams.width = (int)(screenWidth * 0.5);
-        layoutParams.height = (int)(screenHeight * 0.33);
+        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;

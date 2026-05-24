@@ -10,12 +10,12 @@
     </string-array>
 
     <string name="reload">Re-fresh</string>
-    <string name="texture">Texture</string>
-    <string name="wave">Wave</string>
+    <string name="texture">📺 Texture</string>
+    <string name="wave">〰️ Wave</string>
+    <string name="chart">📈 Chart</string>
     <string name="status">status</string>
     <string name="read">load</string>
     <string name="record">record</string>
-    <string name="chart">chart</string>
     <string name="viewGithub">View on GitHub</string>
     <string name="close">Close</string>
     <string name="dftHint">" "</string>
@@ -26,9 +26,9 @@
     <string name="subscribe">Subscribe</string>
     <string name="publish">Publish</string>
     <string name="exit">❌</string>
-    <string name="confirm">Confirm</string>
+    <string name="confirm">✅</string>
     <string name="address">192.168.3.213</string>
-    <string name="minimum">－</string>
+    <string name="minimum">-</string>
     <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
     <string name="pub_payload">some message</string>
@@ -37,12 +37,10 @@
     <string name="tcp">TCP</string>
     <string name="kcprun">Kcp</string>
     <string name="speak">Speak</string>
-    <string name="file_trans">File Message</string>
-    <string name="http_server">HTTP Server</string>
-    <string name="hello_world">Hello world!</string>
-    <string name="ngravity">------------------------------\nGravity:</string>
+    <string name="hello_world">Hello World!</string>
+    <string name="ngravity">Gravity:</string>
     <string name="accelerator">Accelerator:</string>
-    <string name="nliner_accelerator">------------------------------\nLiner-accelerator:</string>
+    <string name="nliner_accelerator">Liner-accelerator:</string>
     <string name="start_chart">Start Chart</string>
     <string name="testing">测试测试</string>
     <string name="begin">开始</string>
@@ -66,10 +64,15 @@
     <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
     <string name="developing">感谢</string>
     <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
-    <string name="exitapp">再次双击退出应用</string>
+    <string name="exitapp">再次返回退出应用</string>
     <string name="msg">请输入要发送的消息</string>
     <string name="pkg">📎</string>
     <string name="commit">发送</string>
-    <string name="chat">chat</string>
     <string name="r1">深度思考(R1)</string>
+    <string name="chat">💬 Chat Box</string>
+    <string name="file_trans">📁 File Transfer</string>
+    <string name="http_server">🌐 HTTP Server</string>
+    <string name="section_network">🌐 网络服务</string>
+    <string name="section_advanced">⚡ 高级通信</string>
+    <string name="section_files">💬 文件传输</string>
 </resources>

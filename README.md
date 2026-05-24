@@ -3,7 +3,7 @@
 
 # Device2Device
 
-An Android application for peer-to-peer communication between devices.
+An Android application for peer-to-peer communication between devices, featuring multi-protocol networking, multimedia processing, sensor data collection, AI chat integration, and an HTTP file server.
 
 ---
 
@@ -17,12 +17,13 @@ An Android application for peer-to-peer communication between devices.
 
 | Category | Technologies |
 | :------ | :----------- |
-| Platform | Android (API 21+) |
-| Language | Java, Kotlin, C++ |
-| Native | JNI, CMake, OpenGL ES |
-| Network | UDP, TCP, KCP |
-| Media | Audio Recording, Video Encode/Decode |
-| Build | Gradle, CMake, NDK |
+| Platform | Android (API 21+, target 31) |
+| Language | Java, Kotlin, C++ (C++11) |
+| Native | JNI, CMake 3.18+, OpenGL ES 2.0, NDK 23 |
+| Network | UDP (Multicast), TCP, KCP (Reliable UDP), HTTP |
+| Media | AudioRecord, OpenGL ES, YUV↔RGB, PCM↔WAV |
+| UI | Material Design, ConstraintLayout, Custom Views |
+| Build | Gradle 7.x, CMake, NDK (NEON optimizations) |
 
 ---
 
@@ -31,34 +32,48 @@ An Android application for peer-to-peer communication between devices.
 ```
 app/src/main/
 ├── java/com/tsymiar/device2device/
-│   ├── activity/             # Activity components
-│   │   ├── MainActivity      # Main entry point
-│   │   ├── TextureActivity   # Image/Video encode/decode
-│   │   ├── WaveActivity      # Audio recording & waveform
-│   │   └── GraphActivity     # Sensor chart display
-│   ├── service/              # Background services
-│   │   ├── SubscribeService  # Floating window
-│   │   └── PublishDialog
- # Message publishing
-│   ├── acceleration/         # Sensor & Voice modules
-│   │   ├── Sensor/           # Sensor data collection
-│   │   └── Voice/            # Voice processing
-│   ├── dialog/               # UI dialogs
-│   ├── entity/               # Data entities
-│   ├── event/                # Event handling
-│   ├── utils/                # Utilities
-│   ├── view/                 # Custom views
-│   └── wrapper/              # Native bridge wrappers
-├── cpp/                      # Native C++ code
-│   ├── bitmap/               # Bitmap processing
-│   ├── callback/             # JNI callbacks
-│   ├── convert/              # PCM↔WAV, YUV↔RGB
-│   ├── display/              # Display rendering
-│   ├── message/              # Message queue
-│   ├── socket/               # UDP/TCP/KCP sockets
-│   ├── scadup/               # Message queue lib
-│   └── time/                 # Time utilities
-└── res/                      # Android resources
+│   ├── activity/                # Activity components (8)
+│   │   ├── MainActivity         # Splash screen → auto-navigate
+│   │   ├── SelectActivity       # Main control panel (network, sensor, chat, files)
+│   │   ├── TextureActivity      # Image/Video CPU/GPU rendering test
+│   │   ├── WaveActivity         # Audio recording & real-time waveform
+│   │   ├── GraphActivity        # Sensor real-time line chart
+│   │   ├── SensorActivity       # List all device sensors
+│   │   ├── BuggerActivity       # Bug report / email feedback
+│   │   └── ThanksActivity       # Acknowledgements page
+│   ├── service/                 # Background services (4)
+│   │   ├── SubscribeService     # MQTT-like floating subscribe window
+│   │   ├── PublishService       # MQTT-like floating publish window
+│   │   ├── HttpFileService      # Lightweight HTTP file server (File & SAF modes)
+│   │   └── ToastNotificationService  # Global floating toast notifications
+│   ├── acceleration/            # Sensor & Voice modules
+│   │   ├── SensorFragment       # Real-time accelerometer chart (dual-curve)
+│   │   ├── DefaultFragment      # Legacy sensor chart fragment
+│   │   └── Voice/               # Over-acceleration warning audio
+│   ├── dialog/                  # UI dialogs
+│   │   ├── ChatBoxDialog        # DeepSeek AI chat (multi-model, HTTPS)
+│   │   └── FileMsgDialog        # File transfer with progress display
+│   ├── entity/                  # Data entities (PubSubSetting, EventEntity, ChatInfo)
+│   ├── event/                   # Observer-pattern event system (EventHandle, EventNotify)
+│   ├── utils/                   # Utilities (Atom, Utils, HttpsRequest, SoundRecord, etc.)
+│   ├── view/                    # Custom views (WaveCanvas, NewChart, WaveformsView)
+│   └── wrapper/                 # JNI native bridge (Network, View, Callback, Config, Time)
+├── cpp/                         # Native C++ code (13 modules)
+│   ├── JniMethods.cpp/h         # All JNI entry points
+│   ├── bitmap/                  # BMP image processing
+│   ├── callback/                # Java↔C++ bidirectional callbacks
+│   ├── convert/                 # PCM↔WAV, YUV↔RGB format conversion
+│   ├── display/                 # GPU (EGL/GLES2) & CPU rendering
+│   ├── message/                 # Thread-safe message queue
+│   ├── socket/                  # UDP / TCP / KCP / FileMsg protocol implementations
+│   ├── scadup/                  # Message queue library
+│   ├── test/                    # Unit tests (FileMsgSocket)
+│   ├── time/                    # Timestamp utilities
+│   └── utils/                   # File utilities, logging, constants
+├── res/
+│   ├── layout/                  # 18 XML layouts (Material Design)
+│   ├── values/                  # Colors, strings, themes (light + night)
+│   └── ...
 ```
 
 ---
@@ -69,37 +84,51 @@ app/src/main/
 
 | Feature | Description |
 | :----- | :---------- |
-| TEXTURE | Image/Video encode/decode test with CPU/GPU rendering and OpenGL |
-| WAVE | Record audio and draw real-time waveforms |
-| CHART | Display sensor data in line charts |
+| TEXTURE | Image/Video encode/decode test with GPU (OpenGL ES) / CPU dual rendering paths |
+| WAVE | Record 16kHz PCM audio and draw real-time waveforms with WAV playback support |
+| CHART | Display real-time accelerometer data (linear + gravity) with Bézier-smoothed line charts |
 
 ### Network Communication
 
 | Feature | Description |
 | :----- | :---------- |
-| SERVER | Start a UDP server to receive data |
-| CLIENT | Start a UDP client to send data |
+| SERVER | Start a UDP multicast server to receive data |
+| CLIENT | Start a UDP multicast client to send data |
 | TCP | Start a TCP server to receive data |
-| KCP | Test KCP (Reliable UDP) protocol |
-| SUBSCRIBE | Subscribe to messages from broker via float window |
-| PUBLISH | Publish messages to subscribers via broker |
+| KCP | Test KCP (Reliable UDP) protocol for low-latency transmission |
+| SUBSCRIBE | Subscribe to Pub/Sub messages via floating dialog window |
+| PUBLISH | Publish messages to subscribers via floating dialog window |
+| FILE TRANSFER | Custom binary protocol with chunked transfer (64KB/chunk) and progress callback |
+| HTTP SERVER | Lightweight embedded HTTP server with HTML directory listing, supports SAF mode (Android 10+) |
+
+### Intelligent Features
+
+| Feature | Description |
+| :----- | :---------- |
+| AI CHAT | DeepSeek AI chat integration (Chat / Reasoner models) via HTTPS API |
+| SENSOR ALERT | Automatic warning audio when acceleration exceeds 7.0 m/s² |
 
 ### System Integration
 
 | Feature | Description |
 | :----- | :---------- |
-| EVENT | Update and broadcast event values |
-| TIME | Update and synchronize timestamps |
+| EVENT | Observer-pattern event broadcast system for inter-component communication |
+| TIME | Native timestamp acquisition and synchronization |
+| TOAST | Global floating toast notification service (3s auto-dismiss) |
 
 ---
 
 ## Build Requirements
 
-- Android SDK 31
-- Android NDK 23.0.7599858
-- Build Tools 30.0.3
-- Gradle 7.x
-- CMake 3.18+
+| Component | Version |
+| :-------- | :------ |
+| Android SDK | 31 (compileSdk) / 21+ (minSdk) |
+| Android NDK | 23.0.7599858 |
+| Build Tools | 30.0.3 |
+| Gradle | 7.x |
+| CMake | 3.18+ |
+| ABIs | arm64-v8a, armeabi-v7a, x86_64 |
+| C++ Standard | C++11 (NEON optimized) |
 
 ---
 
@@ -124,8 +153,6 @@ android.permission.HIGH_SAMPLING_RATE_SENSORS
 ## Building
 
 ```bash
-./gradlew assembleDebug
-# or
 ./build.sh
 ```
 

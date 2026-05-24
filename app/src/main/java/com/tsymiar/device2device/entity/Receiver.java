@@ -8,7 +8,7 @@ public class Receiver {
     public static final int UDP_CLIENT = 4;
     public static final int KAI_SUBSCRIBE = 5;
     public static final int KAI_PUBLISHER = 6;
-    public static final int UPDATE_VIEW = 7;
+    public static final int KCP_VIEW = 7;
     public static final int FILE_PROGRESS = 8;
     public int receiver;
     public String message;

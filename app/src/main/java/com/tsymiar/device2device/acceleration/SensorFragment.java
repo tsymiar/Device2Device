@@ -7,7 +7,6 @@ import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PathEffect;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.hardware.Sensor;
@@ -29,8 +28,8 @@ import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.acceleration.Sensor.SensorIntentService;
 import com.tsymiar.device2device.acceleration.Voice.Voice;
+import com.tsymiar.device2device.service.ToastNotificationService;
 
 import java.util.ArrayList;
 
@@ -42,11 +41,7 @@ public class SensorFragment extends Fragment implements SensorEventListener {
     private float upY;
     private float downX;
     private float downY;
-    private MotionEvent p;
-    private String s = "A";
-    // private PointF[] mPoints = new PointF[200]; // 声明一个对象，泛型是PointF，并实例化这个泛型对象
     Chart chart0;
-    ArrayList<Integer> xlist = new ArrayList<Integer>();
     // 传感器管理器
     private SensorManager sensorManager;
     // 两次检测的时间间隔
@@ -118,296 +113,323 @@ public class SensorFragment extends Fragment implements SensorEventListener {
 
         @Override
         public void run() {
-            mHandler.postDelayed(this, 300);
+            mHandler.postDelayed(this, 100);
             mView.invalidate();
         }
     }
 
     class NewChart extends View {
 
-        private int CHARTH = 800;// 画布高
-        private int CHARTW = 600;// 画布宽
-        private int OFFSET_LEFT = 70;// 距离左边70
-        private int OFFSET_TOP = 80;// 距离顶部80
-        private int TEXT_OFFSET = 30;// 文字距离中心位置30
-        private int X_INTERVAL = 30;
+        private int chartH, chartW;
+        private int offsetLeft, offsetTop;
+        private int textOffset;
+        private float mXStep;
+        private static final int MAX_POINTS = 30;
 
         private ArrayList<PointF> mPlist;
         private ArrayList<PointF> mPlist0;
+        private ArrayList<Float> mRawY;
+        private ArrayList<Float> mRawY0;
 
-        PointF mPoint;
-        Paint mPaint = new Paint();
-        SensorEvent arg4;
+        // Y轴自适应缩放
+        private float mYRange = 2.5f;
+        private float mTargetYRange = 2.5f;
+        private static final float Y_RANGE_MIN = 2.5f;
+        private static final float Y_LERP_SPEED = 0.12f;
+
+        // 复用Paint对象，避免每帧new
+        private Paint mLinePaint;
+        private Paint mLinePaint0;
+        private Paint mGridPaint;
+        private Paint mTextPaint;
+        private Paint mGrayPaint;
+        private Paint mBgPaint;
+        private Paint mBorderPaint;
+        private Paint mLegendPaint;
+        private Paint mLegendAccent;
+
+        // 复用Path对象
+        private Path mGridPath;
+        private Rect mChartRect;
+
+        // 曲线Path，用于贝塞尔平滑绘制
+        private Path mCurvePath;
+        private Path mCurvePath0;
+
         double M;
 
         public NewChart(Context context) {
             super(context);
-            // TODO Auto-generated constructor stub
             mPlist = new ArrayList<PointF>();
             mPlist0 = new ArrayList<PointF>();
+            mRawY = new ArrayList<Float>();
+            mRawY0 = new ArrayList<Float>();
+            initPaints();
+        }
+
+        private void initPaints() {
+            // 曲线1：黄色线性加速度
+            mLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mLinePaint.setColor(Color.YELLOW);
+            mLinePaint.setStyle(Paint.Style.STROKE);
+            mLinePaint.setStrokeWidth(3f);
+            mLinePaint.setStrokeCap(Paint.Cap.ROUND);
+            mLinePaint.setStrokeJoin(Paint.Join.ROUND);
+
+            // 曲线2：品红重力基准
+            mLinePaint0 = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mLinePaint0.setColor(Color.MAGENTA);
+            mLinePaint0.setStyle(Paint.Style.STROKE);
+            mLinePaint0.setStrokeWidth(3f);
+            mLinePaint0.setStrokeCap(Paint.Cap.ROUND);
+            mLinePaint0.setStrokeJoin(Paint.Join.ROUND);
+
+            // 网格虚线
+            mGridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mGridPaint.setColor(Color.DKGRAY);
+            mGridPaint.setStyle(Paint.Style.STROKE);
+            mGridPaint.setStrokeWidth(1.5f);
+            mGridPaint.setPathEffect(new DashPathEffect(new float[]{6, 4}, 0));
+
+            // 文字
+            mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mTextPaint.setColor(Color.WHITE);
+            mTextPaint.setStyle(Paint.Style.FILL);
+            mTextPaint.setTextSize(22f);
+
+            // 图例
+            mLegendPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mLegendPaint.setColor(Color.CYAN);
+            mLegendPaint.setStyle(Paint.Style.FILL);
+            mLegendPaint.setTextSize(18f);
+
+            mLegendAccent = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mLegendAccent.setColor(Color.GREEN);
+            mLegendAccent.setStyle(Paint.Style.FILL);
+            mLegendAccent.setTextSize(22f);
+
+            mGrayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mGrayPaint.setColor(Color.LTGRAY);
+            mGrayPaint.setTextSize(16f);
+
+            mBgPaint = new Paint();
+            mBgPaint.setColor(Color.argb(40, 255, 255, 255));
+            mBgPaint.setStyle(Paint.Style.FILL);
+
+            mBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            mBorderPaint.setColor(Color.WHITE);
+            mBorderPaint.setStyle(Paint.Style.STROKE);
+            mBorderPaint.setStrokeWidth(1.5f);
+
+            mGridPath = new Path();
+            mCurvePath = new Path();
+            mCurvePath0 = new Path();
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            // 根据实际View尺寸自适应
+            float density = getResources().getDisplayMetrics().density;
+            offsetLeft = (int)(60 * density);
+            offsetTop = (int)(60 * density);
+            textOffset = (int)(24 * density);
+            chartW = w - offsetLeft - (int)(16 * density);
+            chartH = h - offsetTop - (int)(80 * density);
+            mXStep = chartW / (float)(MAX_POINTS - 1);
+            mChartRect = new Rect(offsetLeft, offsetTop, offsetLeft + chartW, offsetTop + chartH);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
-
             super.onDraw(canvas);
+            // 先更新数据，再渲染
+            updateLineData();
+            updateLine0Data();
+            updateYRange();
 
             drawTable(canvas);
-            drawCurve(canvas);
-            Line();
-            drawCurve0(canvas);
-            Line0();
-            legend(canvas);
-            initPlist();
+            drawSmoothCurve(canvas, mPlist, mLinePaint);
+            drawSmoothCurve(canvas, mPlist0, mLinePaint0);
+            drawLegend(canvas);
         }
 
-        private void drawTable(Canvas canvas) {
-            // 画出外框
-            mPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-            mPaint.setStrokeWidth(2);
-            // 画出一个矩形图
-            mPaint.setColor(Color.TRANSPARENT);
-            Rect chartRec = new Rect(OFFSET_LEFT, OFFSET_TOP, CHARTW + OFFSET_LEFT, CHARTH + OFFSET_TOP);
-            canvas.drawRect(chartRec, mPaint);
-            mPaint.setColor(Color.WHITE);// 设置要画出图形的颜色
-            // 顶端的文字
-            Path textPaint = new Path();
-            mPaint.setStyle(Paint.Style.FILL);// 设置画笔的样式
-            textPaint.moveTo(250, 44);// 文字排版起始点
-            textPaint.lineTo(500, 44);// 结束点
-            mPaint.setTextSize(25);// 字号
-            mPaint.setAntiAlias(true);// 设置锯齿效果，true消除。
-            canvas.drawTextOnPath("传感器实时曲线", textPaint, 0, 0, mPaint);
-            // 左侧数字
-            for (int j = 5; j >= 1; j--) {
-                canvas.drawText("+" + 0.5 * j, OFFSET_LEFT - TEXT_OFFSET - 23, OFFSET_TOP + CHARTH / 10 * (5 - j), mPaint);
+        private void updateLineData() {
+            float rawY = (float) linear_acceleration[0] + 0.55f;
+            float py = offsetTop + chartH / 2f - rawY * chartH / (2f * mYRange);
+            PointF p = new PointF(offsetLeft + chartW, py);
+
+            mPlist.add(p);
+            mRawY.add(rawY);
+            // 左移旧数据点，步长由图表宽度动态计算，确保曲线填满整个坐标区
+            for (int i = 0; i < mPlist.size() - 1; i++) {
+                mPlist.get(i).x -= mXStep;
             }
-            Paint mpt = new Paint();
-            mpt.setColor(Color.LTGRAY);
-            mpt.setStrokeWidth(5);
-            canvas.drawText("9.8(m/s²)", CHARTW / 2, OFFSET_TOP + CHARTH / 2 - 60, mpt);
-            canvas.drawText("0", OFFSET_LEFT - TEXT_OFFSET - 20, OFFSET_TOP + CHARTH / 2 - 5, mPaint);
-            canvas.drawText("m/s²", OFFSET_LEFT - TEXT_OFFSET - 30, OFFSET_TOP + CHARTH / 2 + 30, mPaint);
-            for (int i = 1; i <= 5; i++) {
-                canvas.drawText("-" + 0.5 * i, OFFSET_LEFT - TEXT_OFFSET - 20, OFFSET_TOP + CHARTH / 10 * (i + 5), mPaint);
-            }
-            // 画表格中的虚线
-            Path mPath = new Path();
-            PathEffect effect = new DashPathEffect(new float[]{2, 2, 2, 2}, 1);
-            mpt.setColor(Color.DKGRAY);
-            mPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-            mPaint.setAntiAlias(true);
-            mPaint.setStrokeWidth(2);
-            mPaint.setPathEffect(effect);
-            for (int i = 1; i <= 9; i++) {
-                mPath.moveTo(OFFSET_LEFT, OFFSET_TOP + CHARTH / 10 * i);
-                mPath.lineTo(OFFSET_LEFT + CHARTW, OFFSET_TOP + CHARTH / 10 * i);
-                canvas.drawPath(mPath, mPaint);
-            }
-        }
-
-        private PointF[] getPoints(ArrayList<PointF> dlk, ArrayList<Integer> xlist) {
-            ///////////////////////
-            int widt = getWidth();
-            final float scale = SensorFragment.this.getResources().getDisplayMetrics().density;
-            int widh = (int)(50 * scale + 0.5f);
-            for (int i = 0; i < dlk.size(); i++) {
-                xlist.add(widh + (widt - widh) / dlk.size() * i);
-            }
-            PointF[] mPoints = new PointF[dlk.size()];
-            for (int i = 0; i < dlk.size(); i++) {
-                int ph = (int)(gravity[0] * 100);
-
-                mPoints[i] = new PointF(xlist.get(i), ph);
-
-                // mView.invalidate();
-            }
-            return mPoints;
-        }
-
-        private void drawscrollline(PointF[] ps, Canvas canvas, Paint paint) {
-            PointF startp = new PointF();
-            PointF endp = new PointF();
-            paint.setStyle(Paint.Style.FILL);
-            for (int i = 0; i < ps.length - 1; i++) {
-                startp = ps[i];
-                endp = ps[i + 1];
-                float wt = (startp.x + endp.x) / 2;
-                PointF p3 = new PointF();
-                PointF p4 = new PointF();
-                p3.y = startp.y;
-                p3.x = wt;
-                p4.y = endp.y;
-                p4.x = wt;
-                Path path = new Path();
-                path.moveTo(startp.x, startp.y);
-                // 贝塞尔三次曲线
-                path.cubicTo(p3.x, p3.y, p4.x, p4.y, endp.x, endp.y);
-                // 贝塞尔二次 path.quadTo();
-                canvas.drawPath(path, paint);
-            }
-        }
-
-        private void drawCurve(Canvas canvas) {
-
-            mPaint.setColor(Color.YELLOW);
-            mPaint.setStrokeWidth(3);
-            mPaint.setAntiAlias(true);
-
-            if (mPlist.size() >= 2) {
-                for (int i = 0; i < mPlist.size() - 1; i++) {
-                    // drawscrollline(getPoints(mPlist,xlist), canvas , mPaint);
-                    canvas.drawLine(mPlist.get(i).x, mPlist.get(i).y, mPlist.get(i + 1).x, mPlist.get(i + 1).y, mPaint);
-                }
-            }
-        }
-
-        private void drawCurve0(Canvas canvas) {
-
-            mPaint.setColor(Color.MAGENTA);
-            mPaint.setStrokeWidth(3);
-            mPaint.setAntiAlias(true);
-
-            if (mPlist0.size() >= 2) {
-                for (int i = 0; i < mPlist0.size() - 1; i++) {
-                    canvas.drawLine(mPlist0.get(i).x, mPlist0.get(i).y, mPlist0.get(i + 1).x, mPlist0.get(i + 1).y, mPaint);
-                }
-            }
-        }
-
-        // 拖动事件
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            Path mPath = new Path();
-            float currentX;
-            float currentY;
-            // 当前组件的currentX、currentY两个属性
-            currentX = event.getX();
-            currentY = event.getY();
-            // 返回true表明处理方法已经处理该事件
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_SCROLL:
-                    upX = event.getX();
-                    upY = event.getY();
-                    p = null;
-                    break;
-                case MotionEvent.ACTION_OUTSIDE:
-                    downX = event.getX();
-                    downY = event.getY();
-                    // canvas.drawText("", downX, downY, paint);
-                    mPath.moveTo(downX, downY);
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    upX = event.getX();
-                    upY = event.getY();
-                    mPath.quadTo(downX, downY, upX, upY);
-                    // m_canvas.drawPath(mPath, paint);
-                    downX = upX;
-                    downY = upY;
-                    /*
-                     * 拖动时坐标相对运动 (x0,y0)保存先前一次事件发生的坐标
-                     * 只要计算两个坐标的delta值，然后加到点上，即移动了点。
-                     * 然后调用invalidate()让系统调用onDraw()刷新以下屏幕。
-                     */
-                    invalidate();
-                    break;
-                case MotionEvent.ACTION_CANCEL:
-                    break;
-            }
-            // 通知改组件重绘
-            this.invalidate();
-            return true;
-        }
-
-        // 图例
-        private void legend(Canvas canvas) {
-
-            mPaint.setColor(Color.GREEN);
-            Path legPaint = new Path();
-            mPaint.setStyle(Paint.Style.FILL);
-            legPaint.moveTo(90, CHARTH + OFFSET_TOP * 2 - 20);
-            legPaint.lineTo(200, CHARTH + OFFSET_TOP * 2 - 20);
-            mPaint.setTextSize(25);
-            canvas.drawTextOnPath("图例：", legPaint, 0, 0, mPaint);
-            // 图线
-            mPaint.setColor(Color.YELLOW);
-            canvas.drawLine(80, CHARTH + OFFSET_TOP * 3 - 47, 200, CHARTH + OFFSET_TOP * 3 - 47, mPaint);
-            // 文字
-            mPaint.setColor(Color.CYAN);
-            Path accPath = new Path();
-            mPaint.setStyle(Paint.Style.FILL);
-            accPath.moveTo(220, CHARTH + OFFSET_TOP * 3 - 50);
-            accPath.lineTo(400, CHARTH + OFFSET_TOP * 3 - 50);
-            mPaint.setTextSize(20);
-            canvas.drawTextOnPath("Leaner-acceleration", accPath, 0, 0, mPaint);
-            /////
-            mPaint.setColor(Color.MAGENTA);
-            canvas.drawLine(80, CHARTH + OFFSET_TOP * 3 + 20, 200, CHARTH + OFFSET_TOP * 3 + 20, mPaint);
-            mPaint.setColor(Color.CYAN);
-            Path graPath = new Path();
-            mPaint.setStyle(Paint.Style.FILL);
-            graPath.moveTo(220, CHARTH + OFFSET_TOP * 3 + 25);
-            graPath.lineTo(400, CHARTH + OFFSET_TOP * 3 + 25);
-            mPaint.setTextSize(20);
-            canvas.drawTextOnPath("重力感应基准线", graPath, 0, 0, mPaint);
-            mPaint.setColor(Color.BLACK);
-        }
-
-        public void Line() {
-
-            float y = (float) linear_acceleration[0] + 0.55f;
-
-            float Py = OFFSET_TOP + (y * (CHARTH - OFFSET_TOP));
-
-            PointF p = new PointF((float) OFFSET_LEFT + CHARTW, Py);
-            if (mPlist.size() > 21) {
+            // 移除溢出左边缘的数据点
+            while (mPlist.size() > 1 && mPlist.get(0).x < offsetLeft) {
                 mPlist.remove(0);
-                for (int i = 0; i < 20; i++) {
-                    if (i == 0) mPlist.get(i).x -= (X_INTERVAL - 2);
-                    else mPlist.get(i).x -= X_INTERVAL;
-                }
-                mPlist.add(p);
-            } else {
-                for (int i = 0; i < mPlist.size(); i++) {
-                    mPlist.get(i).x -= X_INTERVAL;
-                }
-                mPlist.add(p);
+                mRawY.remove(0);
             }
 
             M = linear_acceleration[0];
             if (M >= 7.0f) {
                 Intent intent = new Intent(getActivity(), Voice.class);
                 requireActivity().startService(intent);
-                Intent i = null;
-                i = new Intent(getActivity(), SensorIntentService.class);
-                i.putExtra("s", s);
-                i.setAction("broadcast");
-                getActivity().sendBroadcast(i);
+
+                Intent toastIntent = new Intent(ToastNotificationService.TOAST_ACTION);
+                toastIntent.putExtra(ToastNotificationService.EXTRA_MESSAGE,
+                        "加速度过大: " + String.format("%.1f", M) + " m/s²");
+                requireActivity().sendBroadcast(toastIntent);
             }
         }
 
-        private void initPlist() {
-        }
+        private void updateLine0Data() {
+            float rawY0 = (float) (9.8f - gravity[2]) / 20;
+            float py0 = offsetTop + chartH / 2f - rawY0 * chartH / (2f * mYRange);
+            PointF p0 = new PointF(offsetLeft + chartW, py0);
 
-        public void Line0() {
-
-            float y0 = (float) (9.8f - gravity[2]) / 20;
-            float Py0 = OFFSET_TOP + (y0 * (CHARTH - OFFSET_TOP));
-
-            PointF p0 = new PointF((float) OFFSET_LEFT + CHARTW, Py0);
-            if (mPlist0.size() > 21) {
+            mPlist0.add(p0);
+            mRawY0.add(rawY0);
+            for (int i = 0; i < mPlist0.size() - 1; i++) {
+                mPlist0.get(i).x -= mXStep;
+            }
+            while (mPlist0.size() > 1 && mPlist0.get(0).x < offsetLeft) {
                 mPlist0.remove(0);
-                for (int i = 0; i < 20; i++) {
-                    if (i == 0) mPlist0.get(i).x -= (X_INTERVAL - 2);
-                    else mPlist0.get(i).x -= X_INTERVAL;
-                }
-                mPlist0.add(p0);
-            } else {
-                for (int i = 0; i < mPlist0.size(); i++) {
-                    mPlist0.get(i).x -= X_INTERVAL;
-                }
-                mPlist0.add(p0);
+                mRawY0.remove(0);
             }
+        }
+
+        // Y轴自适应缩放：追踪所有采样点纵坐标，超出范围时自动扩展刻度
+        private void updateYRange() {
+            float maxAbs = 0;
+            for (Float v : mRawY) {
+                maxAbs = Math.max(maxAbs, Math.abs(v));
+            }
+            for (Float v : mRawY0) {
+                maxAbs = Math.max(maxAbs, Math.abs(v));
+            }
+            // 超出当前范围85%时扩展，数据回落时收缩至默认值
+            if (maxAbs > mYRange * 0.85f) {
+                mTargetYRange = Math.max(maxAbs * 1.2f, Y_RANGE_MIN);
+            } else {
+                mTargetYRange = Y_RANGE_MIN;
+            }
+            mYRange += (mTargetYRange - mYRange) * Y_LERP_SPEED;
+
+            // 用新的刻度重新投影所有采样点
+            float scale = chartH / (2f * mYRange);
+            float midY = offsetTop + chartH / 2f;
+            for (int i = 0; i < mPlist.size(); i++) {
+                mPlist.get(i).y = midY - mRawY.get(i) * scale;
+            }
+            for (int i = 0; i < mPlist0.size(); i++) {
+                mPlist0.get(i).y = midY - mRawY0.get(i) * scale;
+            }
+        }
+
+        // 贝塞尔平滑曲线
+        private void drawSmoothCurve(Canvas canvas, ArrayList<PointF> points, Paint paint) {
+            if (points.size() < 2) return;
+
+            mCurvePath.rewind();
+            mCurvePath.moveTo(points.get(0).x, points.get(0).y);
+
+            if (points.size() == 2) {
+                mCurvePath.lineTo(points.get(1).x, points.get(1).y);
+            } else {
+                for (int i = 0; i < points.size() - 1; i++) {
+                    float x1 = points.get(i).x;
+                    float y1 = points.get(i).y;
+                    float x2 = points.get(i + 1).x;
+                    float y2 = points.get(i + 1).y;
+
+                    // 使用控制点平滑过渡
+                    float cx = (x1 + x2) / 2f;
+                    mCurvePath.quadTo(x1, y1, cx, (y1 + y2) / 2f);
+                }
+                mCurvePath.lineTo(points.get(points.size() - 1).x,
+                        points.get(points.size() - 1).y);
+            }
+            canvas.drawPath(mCurvePath, paint);
+        }
+
+        private void drawTable(Canvas canvas) {
+            if (mChartRect == null) return;
+
+            // 图表背景
+            canvas.drawRect(mChartRect, mBgPaint);
+
+            // 外框
+            canvas.drawRect(mChartRect, mBorderPaint);
+
+            // 标题
+            mTextPaint.setTextSize(22f);
+            mTextPaint.setColor(Color.WHITE);
+            canvas.drawText("传感器实时曲线", offsetLeft + chartW / 2f - 80, offsetTop - 16, mTextPaint);
+
+            // Y轴刻度（自适应缩放）
+            mTextPaint.setTextSize(18f);
+            float yRange = mYRange;
+            float yStep = yRange / 5f;
+
+            for (int j = 5; j >= -5; j--) {
+                float val = j * yStep;
+                int y = (int)(offsetTop + chartH / 2f - val / yRange * chartH / 2f);
+                String label = (val == 0) ? "0" : String.format("%+.1f", val);
+                canvas.drawText(label, offsetLeft - textOffset - 20, y + 5, mTextPaint);
+            }
+
+            // 单位标识
+            canvas.drawText(String.format("±%.1f", yRange), offsetLeft + chartW / 2f - 30,
+                    offsetTop + chartH / 2f - 50, mGrayPaint);
+            canvas.drawText("m/s²", offsetLeft - textOffset - 28, offsetTop + chartH / 2f + 30, mTextPaint);
+
+            // 水平网格虚线
+            mGridPath.rewind();
+            for (int i = 1; i < 10; i++) {
+                float y = offsetTop + chartH / 10f * i;
+                mGridPath.moveTo(offsetLeft, y);
+                mGridPath.lineTo(offsetLeft + chartW, y);
+            }
+            canvas.drawPath(mGridPath, mGridPaint);
+        }
+
+        private void drawLegend(Canvas canvas) {
+            float ly = offsetTop + chartH + 32;
+            // 标题
+            mLegendAccent.setColor(Color.GREEN);
+            canvas.drawText("图例：", offsetLeft, ly, mLegendAccent);
+
+            // 线性加速度
+            float lx1 = offsetLeft + 70;
+            float lx2 = lx1 + 50;
+            mLinePaint.setColor(Color.YELLOW);
+            canvas.drawLine(lx1, ly - 8, lx2, ly - 8, mLinePaint);
+            mLegendPaint.setColor(Color.CYAN);
+            canvas.drawText("Leaner-acceleration", lx2 + 10, ly - 2, mLegendPaint);
+
+            // 重力基准线
+            ly += 28;
+            mLinePaint0.setColor(Color.MAGENTA);
+            canvas.drawLine(lx1, ly - 8, lx2, ly - 8, mLinePaint0);
+            mLegendPaint.setColor(Color.CYAN);
+            canvas.drawText("重力感应基准线", lx2 + 10, ly - 2, mLegendPaint);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    upX = event.getX();
+                    upY = event.getY();
+                    invalidate();
+                    break;
+            }
+            return true;
         }
     }
 

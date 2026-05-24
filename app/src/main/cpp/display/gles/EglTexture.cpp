@@ -8,10 +8,6 @@
 #include <utils/logging.h>
 #include "EglTexture.h"
 
-GLuint g_Texture2D[3];
-GLuint g_vertexPosBuffer;
-GLuint g_texturePosBuffer;
-
 void EglTexture::SetTextureBuffers(GLuint glProgram)
 {
     GLuint vertexPosBuffer;

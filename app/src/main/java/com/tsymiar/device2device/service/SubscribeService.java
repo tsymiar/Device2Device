@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
-import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -146,9 +145,8 @@ public class SubscribeService extends Service {
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(metrics);
         int screenWidth = metrics.widthPixels;
-        int screenHeight = metrics.heightPixels;
         layoutParams.width = (int)(screenWidth * 0.5);
-        layoutParams.height = (int)(screenHeight * 0.44);
+        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
         layoutParams.alpha = 1.0f;
         layoutParams.x = 0;
         layoutParams.y = 0;
@@ -179,7 +177,7 @@ public class SubscribeService extends Service {
                     getApplicationContext().sendBroadcast(data);
                 }
         );
-        floatView.findViewById(R.id.btn_minium).setOnClickListener(
+        floatView.findViewById(R.id.btn_minimum).setOnClickListener(
                 v -> {
                     if (editAddr != null)
                         PubSubSetting.setAddr(editAddr.getText().toString());

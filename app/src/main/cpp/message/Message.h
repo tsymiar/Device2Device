@@ -17,7 +17,7 @@ enum MASSAGER {
     UDP_CLIENT,
     SUBSCRIBER,
     PUBLISHER,
-    UPDATE_VIEW,
+    KCP_VIEW,
     FILE_PROGRESS
 };
 
