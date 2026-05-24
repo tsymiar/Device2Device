@@ -38,6 +38,7 @@
     <string name="kcprun">Kcp</string>
     <string name="speak">Speak</string>
     <string name="file_trans">File Message</string>
+    <string name="http_server">HTTP Server</string>
     <string name="hello_world">Hello world!</string>
     <string name="ngravity">------------------------------\nGravity:</string>
     <string name="accelerator">Accelerator:</string>

@@ -34,6 +34,7 @@ import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
 import com.tsymiar.device2device.service.SubscribeService;
 import com.tsymiar.device2device.service.PublishService;
+import com.tsymiar.device2device.service.HttpFileService;
 import com.tsymiar.device2device.dialog.FileMsgDialog;
 import com.tsymiar.device2device.utils.JvmMethods;
 import com.tsymiar.device2device.utils.Utils;
@@ -48,6 +49,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     public static final int RequestStorage = 10001;
     public static final int RequestFloat = 10002;
     public static final int RequestAudio = 10003;
+    public static final int RequestHttpFolder = 10004;
     @SuppressLint("StaticFieldLeak")
     static SelectActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
@@ -60,6 +62,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
+    HttpFileService mHttpFileService;
 
     private static boolean mKcpStart = false;
 
@@ -276,6 +279,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             mFileMsgDialog = FileMsgDialog.newInstance();
             mFileMsgDialog.show(getSupportFragmentManager(), "file_trans");
         });
+        findViewById(R.id.btn_http_server).setOnClickListener(v ->
+        {
+            // 打开系统文件夹选择器
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(intent, RequestHttpFolder);
+        });
     }
 
     private class BroadcastReceiverClass extends BroadcastReceiver {
@@ -330,6 +340,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (mFloatService != null) {
             mFloatService.closeWindow();
         }
+        if (mHttpFileService != null) {
+            mHttpFileService.stop();
+        }
         super.onDestroy();
     }
 
@@ -344,6 +357,16 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startService(new Intent(SelectActivity.this, SubscribeService.class));
             }
         }
+        if (requestCode == RequestHttpFolder && resultCode == RESULT_OK) {
+            if (data != null && data.getData() != null) {
+                Uri treeUri = data.getData();
+                // 持久化读取权限
+                getContentResolver().takePersistableUriPermission(treeUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                startHttpServer(treeUri);
+            }
+        }
         if (requestCode == ChatBoxDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
             if (data != null) {
                 Uri uri = data.getData();
@@ -351,6 +374,41 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     mChatBoxDialog.handleFileResult(uri);
                 }
             }
+        }
+    }
+
+    /**
+     * 从 DocumentTree URI 中提取实际文件路径
+     */
+    private void startHttpServer(Uri treeUri) {
+        final int HTTP_PORT = 8080;
+
+        // 停止旧服务器
+        if (mHttpFileService != null) {
+            mHttpFileService.stop();
+        }
+
+        // 使用 SAF DocumentFile 模式（解决 Android 10+ Scoped Storage 空目录问题）
+        mHttpFileService = new HttpFileService(this, treeUri, HTTP_PORT);
+        mHttpFileService.setStatusCallback(message -> {
+            Message msg = new Message();
+            msg.what = Receiver.MESSAGE;
+            msg.obj = message;
+            handler.sendMessage(msg);
+        });
+
+        String localIp = Utils.getLocalWifiIp(this);
+        String accessUrl = "http://" + localIp + ":" + HTTP_PORT + "/";
+        mHttpFileService.setAccessUrl(accessUrl);
+
+        if (mHttpFileService.start()) {
+            String folderName = mHttpFileService.getRootDisplayName();
+            Toast.makeText(this, "HTTP 服务已启动\n访问地址: " + accessUrl, Toast.LENGTH_LONG).show();
+
+            TextView tv = findViewById(R.id.txt_status);
+            tv.setText("🌐 HTTP 文件服务\n访问地址: " + accessUrl + "\n共享目录: " + folderName);
+        } else {
+            Toast.makeText(this, "HTTP 服务启动失败", Toast.LENGTH_SHORT).show();
         }
     }
     @Override

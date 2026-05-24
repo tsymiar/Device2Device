@@ -18,15 +18,22 @@ package com.tsymiar.device2device.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
+import android.text.format.Formatter;
 
 import androidx.annotation.StringRes;
 
 import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 
 /**
  * Kitchen sink for small utility functions
@@ -234,5 +241,41 @@ public class Utils {
             md5code.insert(0, "0");
         }
         return md5code.toString();
+    }
+
+    /**
+     * 获取本机 WiFi IPv4 地址
+     */
+    public static String getLocalWifiIp(Context context) {
+        // 优先从 WiFi 获取
+        try {
+            WifiManager wifiManager = (WifiManager) context.getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager != null) {
+                WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+                int ip = wifiInfo.getIpAddress();
+                if (ip != 0) {
+                    return Formatter.formatIpAddress(ip);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 备选：遍历网络接口
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) continue;
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return "127.0.0.1";
     }
 }
