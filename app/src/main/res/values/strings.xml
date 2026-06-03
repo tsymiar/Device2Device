@@ -8,13 +8,29 @@
         <item>CPU-video</item>
         <item>Disconnect</item>
     </string-array>
+    <string-array name="types_gpu">
+        <item>None</item>
+        <item>GPU-OpenGL</item>
+        <item>GPU-surface</item>
+        <item>Disconnect</item>
+    </string-array>
+    <string-array name="types_cpu">
+        <item>None</item>
+        <item>CPU-image</item>
+        <item>CPU-video</item>
+        <item>Disconnect</item>
+    </string-array>
 
     <string name="reload">Re-fresh</string>
+    <string name="pick_file">pick</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_gpu">GPU</string>
+    <string name="mode_cpu">CPU</string>
     <string name="texture">📺 Texture</string>
     <string name="wave">〰️ Wave</string>
     <string name="chart">📈 Chart</string>
     <string name="status">status</string>
-    <string name="read">load</string>
+    <string name="read">local</string>
     <string name="record">record</string>
     <string name="viewGithub">View on GitHub</string>
     <string name="close">Close</string>
@@ -37,6 +53,14 @@
     <string name="tcp">TCP</string>
     <string name="kcprun">Kcp</string>
     <string name="speak">Speak</string>
+    <string name="recording_state">Recing</string>
+    <string name="speak_prompt">请开始讲话…</string>
+    <string name="speech_not_supported">设备不支持语音输入</string>
+    <string name="speech_error">语音识别错误: %s</string>
+    <string name="permission_audio_storage">是否跳转设置开启存储和录音权限？</string>
+    <string name="enable_storage_record_permission">请在设置中开启存储和录音权限</string>
+    <string name="permission_denied_record">权限被拒绝，无法录音</string>
+    <string name="speech_to_text">语音识别显示区域</string>
     <string name="hello_world">Hello World!</string>
     <string name="ngravity">Gravity:</string>
     <string name="accelerator">Accelerator:</string>
@@ -62,7 +86,7 @@
     <string name="illreply">请输入你要说的话,我应该会很快回复的。</string>
     <string name="email">mailto:909006258@qq.com</string>
     <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
-    <string name="developing">感谢</string>
+    <string name="developing">开发中</string>
     <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
     <string name="exitapp">再次返回退出应用</string>
     <string name="msg">请输入要发送的消息</string>
@@ -72,7 +96,7 @@
     <string name="chat">💬 Chat Box</string>
     <string name="file_trans">📁 File Transfer</string>
     <string name="http_server">🌐 HTTP Server</string>
-    <string name="section_network">🌐 网络服务</string>
-    <string name="section_advanced">⚡ 高级通信</string>
-    <string name="section_files">💬 文件传输</string>
+    <string name="section_network">🌐 Network</string>
+    <string name="section_advanced">⚡ MessageQueue</string>
+    <string name="section_files">💬 Services</string>
 </resources>

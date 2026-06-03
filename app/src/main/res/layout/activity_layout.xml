@@ -31,6 +31,7 @@
                 android:layout_marginEnd="8dp"
                 android:checkable="false"
                 android:clickable="true"
+                android:focusable="true"
                 android:text="@string/texture"
                 app:chipIconVisible="false"
                 app:rippleColor="@color/colorPrimary" />
@@ -43,6 +44,7 @@
                 android:layout_marginEnd="8dp"
                 android:checkable="false"
                 android:clickable="true"
+                android:focusable="true"
                 android:text="@string/wave"
                 app:chipIconVisible="false"
                 app:rippleColor="@color/colorPrimary" />
@@ -54,6 +56,7 @@
                 android:layout_height="wrap_content"
                 android:checkable="false"
                 android:clickable="true"
+                android:focusable="true"
                 android:text="@string/chart"
                 app:chipIconVisible="false"
                 app:rippleColor="@color/colorPrimary" />
@@ -416,8 +419,8 @@
             android:id="@+id/sample_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:gravity="center"
+            android:layout_marginBottom="16dp"
             android:text="@string/hello_world"
             android:textColor="#BDBDBD"
             android:textSize="12sp" />

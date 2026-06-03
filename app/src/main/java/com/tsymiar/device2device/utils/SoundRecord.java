@@ -217,6 +217,7 @@ public class SoundRecord {
         MediaExtractor extractor = new MediaExtractor();
         MediaFormat format = null;
 
+        mInputFile = inputFile;
         String[] components = inputFile.getPath().split("\\.");
         mFileType = components[components.length - 1];
         mFileSize = (int) inputFile.length();
@@ -230,7 +231,7 @@ public class SoundRecord {
         int i;
         for (i = 0; i < numTracks; i++) {
             format = extractor.getTrackFormat(i);
-            if (format.getString(MediaFormat.KEY_MIME).startsWith("decode/")) {
+            if (format.getString(MediaFormat.KEY_MIME).startsWith("audio/")) {
                 extractor.selectTrack(i);
                 break;
             }

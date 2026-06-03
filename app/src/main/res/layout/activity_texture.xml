@@ -11,68 +11,127 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="8dp">
 
-        <TextView
-            android:id="@+id/log0"
+        <!-- 渲染类型选择 -->
+        <Spinner
+            android:id="@+id/spinner"
             style="@style/Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:layout_marginBottom="15dp" />
+            android:layout_marginBottom="8dp"
+            android:background="@android:drawable/btn_dropdown"
+            android:popupBackground="#EEFFFFFF" />
 
-        <TextView
-            android:id="@+id/log1"
-            style="@style/Text"
+        <!-- 操作按钮 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_above="@id/log0"
-            android:layout_centerHorizontal="true"
-            android:alpha=".8" />
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/log2"
-            style="@style/Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_above="@id/log1"
-            android:layout_centerHorizontal="true"
-            android:alpha=".6" />
-
-        <!-- This grid layout is below the log text views so that it will draw over them -->
-        <GridLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:columnCount="3"
-            android:rowCount="3">
-
-            <Spinner
-                android:id="@+id/spinner"
-                style="@style/Text"
-                android:layout_width="match_parent"
+            <Button
+                android:id="@+id/pick"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="0"
-                android:layout_column="0"
-                android:layout_columnSpan="3"
-                android:layout_gravity="center" />
+                android:layout_marginEnd="5dp"
+                android:background="@color/colorPrimaryDark"
+                android:text="@string/pick_file"
+                android:textAllCaps="true"
+                android:textColor="@android:color/white" />
 
             <Button
                 android:id="@+id/reload"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="1"
-                android:layout_column="0"
-                android:layout_gravity="center"
-                android:layout_margin="5dp"
+                android:layout_marginStart="5dp"
                 android:background="@color/colorPrimaryDark"
                 android:text="@string/reload"
                 android:textAllCaps="true"
                 android:textColor="@android:color/white" />
+        </LinearLayout>
 
-        </GridLayout>
-    </RelativeLayout>
+        <!-- 渲染模式 -->
+        <RadioGroup
+            android:id="@+id/mode_group"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/mode_auto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/mode_auto"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/mode_gpu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_gpu"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/mode_cpu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_cpu"
+                android:textSize="12sp" />
+        </RadioGroup>
+
+        <!-- 选中文件路径 -->
+        <TextView
+            android:id="@+id/file_path"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="marquee"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:scrollHorizontally="true"
+            android:singleLine="true"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <!-- 日志区，底部层叠 -->
+    <TextView
+        android:id="@+id/log0"
+        style="@style/Text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="15dp" />
+
+    <TextView
+        android:id="@+id/log1"
+        style="@style/Text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="43dp"
+        android:alpha=".8" />
+
+    <TextView
+        android:id="@+id/log2"
+        style="@style/Text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="71dp"
+        android:alpha=".6" />
+
 </FrameLayout>

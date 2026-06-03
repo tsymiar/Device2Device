@@ -1,71 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal">
+    tools:context=".activity.WaveActivity">
 
+    <!-- 波形绘制区域 -->
     <com.tsymiar.device2device.view.WaveSurface
         android:id="@+id/wave_surface"
-        android:layout_width="match_parent"
-        android:layout_height="240dp" />
+        android:layout_width="0dp"
+        android:layout_height="240dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- 已录制波形回看（与 wave_surface 同区域，互斥显示） -->
     <com.tsymiar.device2device.view.WaveformsView
         android:id="@+id/wave_form"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="invisible" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="@id/wave_surface"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/wave_surface" />
 
-    <TextView
-        android:id="@+id/wave_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/wave_surface"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
-        android:text="@string/status" />
-
-    <Button
-        android:id="@+id/wave_read"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/wave_status"
-        android:text="@string/read"
-        android:layout_marginEnd="@android:dimen/thumbnail_width" />
-
-    <Button
-        android:id="@+id/wave_record"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/wave_status"
-        android:text="@string/record"
-        android:layout_marginStart="@android:dimen/thumbnail_width" />
-
+    <!-- 缩放控制 -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:layout_below="@+id/wave_record">
+        android:id="@+id/wave_zoom_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/wave_surface"
+        tools:visibility="visible">
 
-        <Button
-            android:id="@+id/btnSpeak"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/speak" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/wave_zoom_out"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="－"
+            android:textSize="16sp"
+            app:cornerRadius="18dp" />
 
         <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="match_parent"
+            android:id="@+id/wave_zoom_label"
+            android:layout_width="40dp"
             android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="1.0×"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/wave_zoom_in"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="＋"
             android:textSize="16sp"
-            android:textColor="#666"/>
+            app:cornerRadius="18dp" />
+    </LinearLayout>
+
+    <!-- 状态提示文字 -->
+    <TextView
+        android:id="@+id/wave_status"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="13sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/wave_zoom_bar" />
+
+    <!-- 操作按钮行 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/wave_read"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="8dp"
+        android:text="@string/read"
+        android:textSize="13sp"
+        app:cornerRadius="20dp"
+        app:layout_constraintEnd_toStartOf="@id/wave_record"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/wave_status"
+        app:strokeColor="@color/colorPrimary"
+        app:strokeWidth="1dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/wave_record"
+        style="@style/Widget.MaterialComponents.Button"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="8dp"
+        android:text="@string/record"
+        android:textSize="13sp"
+        app:backgroundTint="@color/colorPrimary"
+        app:cornerRadius="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/wave_read"
+        app:layout_constraintTop_toTopOf="@id/wave_read" />
+
+    <!-- 语音识别区域分隔线 -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:background="?android:attr/listDivider"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/wave_read" />
+
+    <!-- 语音识别入口按钮 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSpeak"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/speak"
+        android:textSize="13sp"
+        app:icon="@android:drawable/ic_btn_speak_now"
+        app:iconGravity="textStart"
+        app:iconPadding="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/divider" />
+
+    <!-- 语音识别结果 -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="1dp"
+        app:contentPadding="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnSpeak"
+        app:layout_constraintVertical_bias="0"
+        app:strokeColor="#E0E0E0"
+        app:strokeWidth="0.5dp">
 
         <TextView
             android:id="@+id/tvResult"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textSize="18sp"/>
-    </LinearLayout>
+            android:gravity="center"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="16sp"
+            tools:text="@string/speech_to_text" />
+    </com.google.android.material.card.MaterialCardView>
 
-</RelativeLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

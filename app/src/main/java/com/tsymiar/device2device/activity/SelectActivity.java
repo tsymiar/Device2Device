@@ -236,7 +236,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
         findViewById(R.id.btn_subscribe).setOnClickListener(v -> {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Please enable the PERMISSION", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Please select Device2Device to set MANAGE_OVERLAY_PERMISSION", Toast.LENGTH_SHORT).show();
                 startActivityForResult(
                         new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
                         RequestFloat);
@@ -246,7 +246,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
         findViewById(R.id.btn_publisher).setOnClickListener(v -> {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Please enable the PERMISSION", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Please select Device2Device to set MANAGE_OVERLAY_PERMISSION", Toast.LENGTH_SHORT).show();
                 startActivityForResult(
                         new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
                         RequestFloat);
@@ -367,7 +367,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == RequestFloat) {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
             } else {
                 startService(new Intent(SelectActivity.this, SubscribeService.class));
             }

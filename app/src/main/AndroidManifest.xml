@@ -35,7 +35,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".activity.TextureActivity" />
-        <activity android:name=".activity.WaveActivity" />
+        <activity android:name=".activity.WaveActivity" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
         <activity android:name=".activity.GraphActivity" />
         <activity android:name=".activity.SensorActivity" />
         <service

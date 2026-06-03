@@ -371,7 +371,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass, jstrin
     LOGI("%s", message.c_str());
     g_msgLen = len;
     auto* sock = new UdpSocket("127.0.0.1", g_udpPort);
-    sock->Sender(tx, (unsigned int)len + 1);
+    if (int ret = sock->Sender(tx, (unsigned int)len + 1) < 0) {
+        message = "Sender fail: " + std::to_string(ret);
+        Message::instance().setMessage(message, MESSAGE);
+    }
     delete sock;
     return 0;
 }

@@ -45,6 +45,11 @@ public class WaveCanvas {
     private final int marginRight = 30;//波形图绘制距离右边的距离
     private float divider = 0.2f;//为了节约绘画时间，每0.2个像素画一个数据
     private long c_time;//当前时间戳
+    private DecibelListener decibelListener;
+    private volatile double currentDbFS = -90.0;
+    private float mZoomY = 1.0f;// Y轴缩放倍率
+    private Paint paintDbBg;// 分贝文字背景
+    private Paint paintDbText;// 分贝文字
     private String savePcmPath;//保存pcm文件路径
     private String saveWavPath;//保存wav文件路径
     private Paint circlePaint;
@@ -100,6 +105,16 @@ public class WaveCanvas {
         mPaint.setAntiAlias(true);
         mPaint.setFilterBitmap(true);
         mPaint.setStyle(Paint.Style.FILL);
+
+        paintDbBg = new Paint();
+        paintDbBg.setColor(0xcc_000000);
+        paintDbBg.setAntiAlias(true);
+
+        paintDbText = new Paint();
+        paintDbText.setColor(Color.rgb(0, 255, 0));
+        paintDbText.setTextSize(36);
+        paintDbText.setAntiAlias(true);
+        paintDbText.setFakeBoldText(true);
     }
 
     /**
@@ -159,6 +174,21 @@ public class WaveCanvas {
                             inBuf.add(buffer[i]);
                         }
                     }
+                    // 在后台线程中基于原始 buffer 计算实时分贝
+                    if (readSize > 0) {
+                        double sum = 0;
+                        for (int i = 0; i < readSize; i++) {
+                            sum += (double) buffer[i] * buffer[i];
+                        }
+                        double rms = Math.sqrt(sum / readSize);
+                        if (rms <= 0) {
+                            currentDbFS = 0.0;
+                        } else {
+                            // 安静→接近0，响亮→接近-90
+                            currentDbFS = Math.max(-90.0,
+                                    Math.min(0.0, 20.0 * Math.log10(32768.0 / rms) - 90.0));
+                        }
+                    }
                     publishProgress();
                     if (AudioRecord.ERROR_INVALID_OPERATION != readSize) {
                         synchronized (write_data) {
@@ -202,7 +232,12 @@ public class WaveCanvas {
                         arrBuf = (ArrayList<Short>) object;// 缓存
                     }
                 }
-                SimpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
+                if (arrBuf != null) {
+                    if (decibelListener != null) {
+                        decibelListener.onDecibelChanged(currentDbFS);
+                    }
+                    SimpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
+                }
                 c_time = new Date().getTime();
             }
             super.onProgressUpdate(values);
@@ -231,7 +266,7 @@ public class WaveCanvas {
             if (!isRecording)
                 return;
             //  Y轴缩小的比例 默认为1
-            int rateY = (65535 / 2 / (sfv.getHeight() - line_off));
+            int rateY = (int) ((65535 / 2 / (sfv.getHeight() - line_off)) / mZoomY);
 
             for (int i = 0; i < buf.size(); i++) {
                 byte[] bus = getBytes(buf.get(i));
@@ -255,8 +290,8 @@ public class WaveCanvas {
             int height = sfv.getHeight() - line_off;
             canvas.drawLine(0, height * 0.5f + (line_off >> 1), sfv.getWidth(), height * 0.5f + (line_off >> 1), center);//中心线
 
-	         canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, paintLine);//第二根线
-	         canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, paintLine);//第3根线
+            canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, paintLine);//第二根线
+            canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, paintLine);//第3根线
             float y;
             for (int i = 0; i < buf.size(); i++) {
                 y = 1.f * buf.get(i) / rateY + baseLine;// 调节缩小比例，调节基准线
@@ -280,6 +315,16 @@ public class WaveCanvas {
                 }
                 canvas.drawLine(x, y, x, y1, mPaint);//中间出波形
             }
+            // 在画布右上角绘制实时分贝
+            String dbText = String.format("%.0f dB", currentDbFS);
+            float textW = paintDbText.measureText(dbText);
+            float textH = paintDbText.getTextSize();
+            float padX = 14, padY = 8;
+            canvas.drawRoundRect(
+                    sfv.getWidth() - textW - padX * 2 - 6, 6,
+                    sfv.getWidth() - 6, padY + textH + 8,
+                    6, 6, paintDbBg);
+            canvas.drawText(dbText, sfv.getWidth() - textW - padX - 6, padY + textH, paintDbText);
             sfv.getHolder().unlockCanvasAndPost(canvas);// 解锁画布，提交画好的图像
         }
 
@@ -350,4 +395,22 @@ public class WaveCanvas {
     public void setBaseLine(View view) {
         this.baseLine = view.getHeight() / 2;
     }
+
+    /**
+     * 实时分贝回调接口
+     */
+    public interface DecibelListener {
+        void onDecibelChanged(double dbFS);
+    }
+
+    public void setDecibelListener(DecibelListener listener) {
+        this.decibelListener = listener;
+    }
+
+    /** 波形 Y 轴缩放 */
+    public float getZoomY() { return mZoomY; }
+    public void zoomIn(float step) { mZoomY = Math.min(mZoomY + step, 3.0f); }
+    public void zoomOut(float step) { mZoomY = Math.max(mZoomY - step, 0.3f); }
+    public void resetZoom() { mZoomY = 1.0f; }
+
 }

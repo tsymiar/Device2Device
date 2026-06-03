@@ -104,6 +104,9 @@ public class SamplePlayer {
         if (isPlaying()) {
             return;
         }
+        if (mSamples == null) {
+            return;
+        }
 
         mKeepPlaying = true;
         mAudioTrack.flush();

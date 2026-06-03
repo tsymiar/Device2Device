@@ -160,7 +160,7 @@ android.permission.HIGH_SAMPLING_RATE_SENSORS
 
 ## Screenshot
 
-<img src="image/MainActivity.jpg" title="MainActivity" height="30%" width="30%">
+<img src="image/MainActivity.jpg" title="MainActivity" height="50%" width="50%">
 
 ---
 
