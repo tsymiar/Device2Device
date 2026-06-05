@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/grey"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Header: file path info, clickable to open saved data -->
+    <TextView
+        android:id="@+id/sendingTextView1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:autoLink="all"
+        android:gravity="center"
+        android:paddingVertical="8dp"
+        android:text="@string/sdcard_device2device"
+        android:textColor="@color/menu_menu"
+        android:textSize="13sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="8dp"
+        android:background="#44ffffff" />
+
+    <!-- Directional pad -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- Center switch icon -->
+        <ImageView
+            android:id="@+id/img_switch"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/ic_switch"
+            tools:ignore="ContentDescription" />
+
+        <!-- Up arrow: fills area above center -->
+        <ImageView
+            android:id="@+id/up"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_above="@id/img_switch"
+            android:layout_centerHorizontal="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/a_up"
+            tools:ignore="ContentDescription" />
+
+        <!-- Down arrow: fills area below center -->
+        <ImageView
+            android:id="@+id/down"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_below="@id/img_switch"
+            android:layout_centerHorizontal="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/a_down"
+            tools:ignore="ContentDescription" />
+
+        <!-- Left arrow: fills area left of center -->
+        <ImageView
+            android:id="@+id/left"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/img_switch"
+            android:scaleType="centerInside"
+            android:src="@drawable/a_left"
+            tools:ignore="ContentDescription" />
+
+        <!-- Right arrow: fills area right of center -->
+        <ImageView
+            android:id="@+id/right"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toEndOf="@id/img_switch"
+            android:scaleType="centerInside"
+            android:src="@drawable/a_right"
+            tools:ignore="ContentDescription" />
+    </RelativeLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="8dp"
+        android:background="#44ffffff" />
+
+    <!-- Send status text -->
+    <TextView
+        android:id="@+id/text_send"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textColor="@color/black" />
+
+    <!-- Bottom input bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/edit_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:autofillHints="true"
+            android:hint="@string/edit_text"
+            android:inputType="textCapCharacters"
+            android:maxLength="8"
+            android:minHeight="48dp"
+            android:textColor="@android:color/background_dark"
+            android:textColorHint="#779988"
+            android:textIsSelectable="false"
+            android:typeface="monospace"
+            tools:ignore="RelativeOverlap" />
+
+        <ImageView
+            android:id="@+id/img_submit"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="8dp"
+            android:src="@drawable/submit"
+            tools:ignore="ContentDescription" />
+
+        <Button
+            android:id="@+id/btn0"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:minWidth="0dp"
+            android:text="@string/is_0"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+</LinearLayout>

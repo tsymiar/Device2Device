@@ -9,7 +9,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:text="@string/thank_text"
-        android:textColor="@color/menu_submenu"
+        android:textColor="@color/menu_menu"
         android:textSize="15sp"
         android:textStyle="italic" />
 

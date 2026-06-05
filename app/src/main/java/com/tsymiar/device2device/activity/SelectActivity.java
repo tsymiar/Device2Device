@@ -202,6 +202,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, WaveActivity.class)));
         findViewById(R.id.btn_chart)
                 .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, GraphActivity.class)));
+        findViewById(R.id.btn_bluetooth)
+                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, ConnectActivity.class)));
         findViewById(R.id.btn_time).setOnClickListener(v -> {
             TextView tv = findViewById(R.id.txt_time);
             time.x = (int)tv.getX();
@@ -440,7 +442,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         long mLastTime = mCurTime;
         mCurTime = System.currentTimeMillis();
         if ((keyCode == KeyEvent.KEYCODE_BACK) && (mCurTime - mLastTime >= 800)) {
-            Toast.makeText(SelectActivity.this, R.string.exitapp, Toast.LENGTH_SHORT).show();
+            Toast.makeText(SelectActivity.this, R.string.exit_app, Toast.LENGTH_SHORT).show();
             return true;
         }
         return super.onKeyDown(keyCode, event);

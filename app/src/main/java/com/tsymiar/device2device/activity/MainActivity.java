@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         long mLastTime = mCurTime;
         mCurTime = System.currentTimeMillis();
         if ((keyCode == KeyEvent.KEYCODE_BACK) && (mCurTime - mLastTime >= 800)) {
-            Toast.makeText(MainActivity.this, R.string.exitapp, Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, R.string.exit_app, Toast.LENGTH_SHORT).show();
             return true;
         }
         return super.onKeyDown(keyCode, event);

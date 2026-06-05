@@ -88,7 +88,7 @@
     <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
     <string name="developing">开发中</string>
     <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
-    <string name="exitapp">再次返回退出应用</string>
+    <string name="exit_app">再次返回退出应用</string>
     <string name="msg">请输入要发送的消息</string>
     <string name="pkg">📎</string>
     <string name="commit">发送</string>
@@ -98,5 +98,40 @@
     <string name="http_server">🌐 HTTP Server</string>
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
+    <string name="bluetooth">🔵 Serial</string>
     <string name="section_files">💬 Services</string>
+
+    <string name="title">Bluetooth</string>
+    <string name="title_activity_e">搜索附近设备</string>
+    <string name="select_device">搜索结果</string>
+    <string name="available">可配对设备：</string>
+    <string name="scan">点击搜索</string>
+    <string name="none_found">附近设备:</string>
+    <string name="title_paired_devices">已与手机配对设备:</string>
+    <string name="none_paired">没有已配对设备</string>
+    <string name="scanning">正在搜索…</string>
+    <string name="edit_text">默认⑴。</string>
+    <string name="back">点击回到发送界面</string>
+
+    <string name="none_type">未输入</string>
+    <string name="window">数据发送窗口</string>
+    <string name="is_0">❨0❩</string>
+    <string name="cmd_0">A00</string>
+    <string name="cmd_hu">Q00</string>
+    <string name="cmd_hr">R00</string>
+    <string name="cmd_hl">L00</string>
+    <string name="cmd_hd">H00</string>
+    <string name="click2begin">点击按钮开始操作</string>
+    <string name="findable">可检测性</string>
+    <string name="entry">点击进入</string>
+    <string name="sdcard_device2device">数据将存于Device2Device目录下</string>
+    <string name="ill_reply">请输入你要说的话,我应该会很快回复的。</string>
+    <string name="can_be_find">可检测性已开启</string>
+    <string name="retry">请打开蓝牙后重试</string>
+    <string name="unsupported">设备不受支持</string>
+    <string name="open_bluetooth">请打开蓝牙</string>
+    <string name="double_click">双击退出界面</string>
+    <string name="saved">已保存。</string>
+    <string name="received">已接收数据</string>
+    <string name="file_local">/SerialConn/signal.dat</string>
 </resources>

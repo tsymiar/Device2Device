@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools" package="com.tsymiar.device2device">
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -21,7 +25,8 @@
 
     <application android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="@string/app_name" android:roundIcon="@drawable/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true" tools:ignore="AllowBackup,GoogleAppIndexingWarning">
 
-        <activity android:name=".activity.MainActivity" android:exported="true">
+        <activity android:name=".activity.MainActivity" android:exported="true"
+            tools:ignore="MissingClass">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -40,11 +45,38 @@
         <activity android:name=".activity.SensorActivity" />
         <service
             android:name=".service.PublishService"
-            android:theme="@android:style/Theme.Holo.Dialog" />
+            android:theme="@style/Theme.MaterialComponents.Light.Dialog" />
         <service android:name=".service.SubscribeService" />
         <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"
             tools:ignore="MissingClass" />
+        <service android:name=".service.WindowService" />
+        <service android:name=".service.ReceiverService" />
+        <service android:name=".service.SaveDataService" />
+        <activity
+            android:name=".activity.ConnectActivity"
+            android:exported="true"
+            android:label="@string/title"
+            android:theme="@style/BluetoothDialog" />
+        <activity
+            android:name=".activity.CommitActivity"
+            android:alwaysRetainTaskState="true"
+            android:exported="true"
+            android:label="@string/window"
+            android:theme="@android:style/Theme.Holo.Dialog"
+            tools:ignore="NewApi">
+            <intent-filter>
+                <action android:name="android.intent.action.NEW" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".activity.DevicesActivity"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/title_activity_e"
+            android:screenOrientation="fullSensor"
+            android:theme="@android:style/Theme.Holo.Dialog"
+            tools:ignore="NewApi" />
+
         <activity android:name=".activity.BuggerActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
