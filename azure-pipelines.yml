@@ -18,35 +18,47 @@ pool:
 steps:
 - checkout: Scadup
 - checkout: self
-- task: CopyFiles@1
+
+- task: CopyFiles@2
   inputs:
-    SourceFolder: 'scadup'
+    SourceFolder: 'Scadup'
     Contents: '**'
     TargetFolder: 'Device2Device/app/src/main/cpp/scadup'
     OverWrite: true
 
+- script: |
+    echo "Installing required Android SDK components..."
+    SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+    if [ ! -f "$SDKMANAGER" ]; then
+      SDKMANAGER="${ANDROID_HOME}/tools/bin/sdkmanager"
+    fi
+    yes | $SDKMANAGER --licenses 2>/dev/null || true
+    $SDKMANAGER "ndk;23.0.7599858" "build-tools;30.0.3" "platforms;android-31"
+  displayName: 'Install Android SDK components'
+
+- script: |
+    echo "##vso[task.setvariable variable=ANDROID_NDK_HOME]${ANDROID_HOME}/ndk/23.0.7599858"
+  displayName: 'Set NDK environment'
+
+- task: JavaToolInstaller@0
+  inputs:
+    versionSpec: '11'
+    jdkArchitectureOption: 'x64'
+    jdkSourceOption: 'PreInstalled'
+  displayName: 'Use JDK 11'
+
 - script: pwd && ls -al
   workingDirectory: 'Device2Device/app/src/main/cpp'
-  displayName: ProjectFiles
+  displayName: 'Verify project files'
 
-- task: Gradle@1
-  inputs:
-    workingDirectory: 'Device2Device'
-    gradleWrapperFile: 'Device2Device/gradlew'
-    gradleOptions: '-Xmx3072m'
-    javaHomeOption: 'JDKVersion'
-    jdkVersionOption: '1.8'
-    publishJUnitResults: false
-    testResultsFiles: '**/TEST-*.xml'
-    tasks: 'assembleDebug'
-    sonarQubeRunAnalysis: false
-    findBugsRunAnalysis: false
-    jdkArchitectureOption: 'x64'
-  displayName: gradlew assembleDebug test
-
-- task: DeleteFiles@1
-  inputs:
-    SourceFolder: 'scadup'
-    Contents: '**'
-    RemoveSourceFolder: true
-    RemoveDotFiles: true
+- script: |
+    GRADLE_VERSION=7.0.2
+    GRADLE_ZIP=gradle-${GRADLE_VERSION}-bin.zip
+    curl -sL https://services.gradle.org/distributions/${GRADLE_ZIP} -o ${GRADLE_ZIP}
+    unzip -qo ${GRADLE_ZIP}
+    export GRADLE_HOME=$(pwd)/gradle-${GRADLE_VERSION}
+    export PATH=${GRADLE_HOME}/bin:${PATH}
+    gradle --version
+    gradle assembleDebug --no-daemon --stacktrace
+  workingDirectory: 'Device2Device'
+  displayName: 'gradle assembleDebug'
