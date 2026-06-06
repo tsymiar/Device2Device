@@ -41,9 +41,9 @@ public class GraphActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_graph);
-        mT1 = (TextView)findViewById(R.id.mT1);
-        mT2 = (TextView)findViewById(R.id.mT2);
-        mT3 = (TextView)findViewById(R.id.mT3);
+        mT1 = (TextView)findViewById(R.id.t1);
+        mT2 = (TextView)findViewById(R.id.t2);
+        mT3 = (TextView)findViewById(R.id.t3);
         Button open = (Button)findViewById(R.id.bt);
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {

@@ -2,6 +2,7 @@ package com.tsymiar.device2device.dialog;
 // Android 基础组件
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
@@ -25,6 +26,8 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -51,12 +54,16 @@ import java.util.Objects;
 
 public class ChatBoxDialog extends Dialog {
     public static final int CHAT_FILE_REQUEST = 1001;
+    private final Activity mActivity;
     private EditText etMessage;
     private RecyclerView rvMessages;
     private MessageAdapter adapter;
     private Spinner spinnerOptions;
     private CheckBox checkBox;
     private TextView chatHint;
+    private LinearLayout filePreviewBar;
+    private TextView tvFileName;
+    private Uri pendingFileUri;
     private final List<Message> messageList = new ArrayList<>();
     Request.Header header = new Request.Header();
     Request request = new Request();
@@ -76,6 +83,7 @@ public class ChatBoxDialog extends Dialog {
 
     public ChatBoxDialog(@NonNull Context context) {
         super(context);
+        mActivity = (Activity) context;
         setContentView(R.layout.dialog_chat_box);
         setupViews();
         Window window = getWindow();
@@ -123,6 +131,9 @@ public class ChatBoxDialog extends Dialog {
         rvMessages = findViewById(R.id.rv_messages);
         checkBox = findViewById(R.id.check_dpsk);
         chatHint = findViewById(R.id.check_hint);
+        filePreviewBar = findViewById(R.id.file_preview_bar);
+        tvFileName = findViewById(R.id.tv_file_name);
+        ImageView ivClearFile = findViewById(R.id.iv_clear_file);
 
         // 设置下拉选项
         ArrayAdapter<CharSequence> spinnerAdapter = ArrayAdapter.createFromResource(
@@ -173,12 +184,23 @@ public class ChatBoxDialog extends Dialog {
         btnAttach.setVisibility(View.VISIBLE);
         etMessage.setVisibility(View.VISIBLE);
         etMessage.setHint(R.string.msg);
+
+        // 清除附件预览
+        if (ivClearFile != null) {
+            ivClearFile.setOnClickListener(v -> clearFilePreview());
+        }
+
         // 发送按钮点击
         btnSend.setOnClickListener(v -> {
             String message = etMessage.getText().toString();
             if (!message.isEmpty()) {
                 sendTextMessage(message);
                 etMessage.setText("");
+                clearFilePreview();
+            } else if (pendingFileUri != null) {
+                // 无文本但有附件：发送文件消息
+                sendFileMessage(tvFileName.getText().toString());
+                clearFilePreview();
             } else {
                 Toast.makeText(getContext(), R.string.msg, Toast.LENGTH_SHORT).show();
             }
@@ -208,6 +230,7 @@ public class ChatBoxDialog extends Dialog {
 
         // 清除当前输入内容
         etMessage.setText("");
+        clearFilePreview();
     }
     public void saveState(Bundle outState) {
         outState.putInt("chat_mode", currentSpinner.ordinal());
@@ -225,7 +248,7 @@ public class ChatBoxDialog extends Dialog {
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         Intent choose = Intent.createChooser(intent, "选择文件");
-        getContext().startActivity(choose);
+        mActivity.startActivityForResult(choose, CHAT_FILE_REQUEST);
     }
 
     // 处理文件选择结果
@@ -237,7 +260,22 @@ public class ChatBoxDialog extends Dialog {
 
         String fileName = getFileNameFromUri(fileUri);
         if (fileName != null) {
-            sendFileMessage(fileName);
+            pendingFileUri = fileUri;
+            showFilePreview(fileName);
+        }
+    }
+
+    private void showFilePreview(String fileName) {
+        if (filePreviewBar != null && tvFileName != null) {
+            filePreviewBar.setVisibility(View.VISIBLE);
+            tvFileName.setText(fileName);
+        }
+    }
+
+    private void clearFilePreview() {
+        pendingFileUri = null;
+        if (filePreviewBar != null) {
+            filePreviewBar.setVisibility(View.GONE);
         }
     }
 
@@ -273,7 +311,7 @@ public class ChatBoxDialog extends Dialog {
         // new Handler().postDelayed(this::receiveMockMessage, 1000);
     }
     private void sendFileMessage(String text) {
-        Message message = new Message(jia, currentSpinner == ChatSpin.MIXED ?
+        Message message = new Message(text, currentSpinner == ChatSpin.MIXED ?
                 Message.MessageType.SENT_FILE :
                 Message.MessageType.SENT_TEXT);
         messageList.add(message);

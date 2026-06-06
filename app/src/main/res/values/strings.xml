@@ -109,8 +109,8 @@
     <string name="title_paired_devices">已与手机配对设备:</string>
     <string name="none_paired">没有已配对设备</string>
     <string name="scanning">正在搜索…</string>
-    <string name="edit_text">默认⑴。</string>
-    <string name="back">点击回到发送界面</string>
+    <string name="edit_text">默认⑴</string>
+    <string name="back">点击返回发送界面</string>
 
     <string name="none_type">未输入</string>
     <string name="window">数据发送窗口</string>
@@ -130,7 +130,10 @@
     <string name="unsupported">设备不受支持</string>
     <string name="open_bluetooth">请打开蓝牙</string>
     <string name="double_click">双击退出界面</string>
-    <string name="saved">已保存。</string>
-    <string name="received">已接收数据</string>
+    <string name="received">显示接收数据</string>
     <string name="file_local">/SerialConn/signal.dat</string>
+    <string name="http_server_select_hint">请选择一个本地文件夹作为 HTTP 服务的根目录。</string>
+    <string name="permission_required">权限请求</string>
+    <string name="overlay_permission_hint">按以下步骤开启悬浮窗权限:\n\n1. 点击「设置」\n2. 从列表中选择「Device2Device」\n3. 开启「允许显示在其他应用上层」</string>
+    <string name="go_to_settings">设置</string>
 </resources>

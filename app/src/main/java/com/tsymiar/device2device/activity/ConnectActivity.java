@@ -35,6 +35,7 @@ public class ConnectActivity extends Activity {
     private int retryCount;
     private BroadcastReceiver exitReceiver;
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

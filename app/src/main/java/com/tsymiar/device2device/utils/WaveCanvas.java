@@ -70,7 +70,7 @@ public class WaveCanvas {
      * @param audioName   name
      */
     public void startRecording(AudioRecord audioRecord, int recBufSize, SurfaceView sfv, String audioName,
-                      String path, Callback callback) {
+                               String path, Callback callback) {
         mSavePcmPath = path + audioName + ".pcm";
         mSaveWavPath = path + audioName + ".wav";
         new Thread(new WriteRunnable()).start();//开线程写文件
@@ -236,7 +236,7 @@ public class WaveCanvas {
                     if (mDecibelListener != null) {
                         mDecibelListener.onDecibelChanged(mCurrentDbFS);
                     }
-                    SimpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
+                    simpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
                 }
                 mCurrentTime = new Date().getTime();
             }

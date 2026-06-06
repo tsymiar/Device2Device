@@ -2,9 +2,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="@color/grey"
     android:orientation="vertical"
+    app:cardCornerRadius="16dp"
     android:padding="16dp">
 
     <!-- Header: file path info, clickable to open saved data -->
@@ -48,7 +50,7 @@
             android:layout_above="@id/img_switch"
             android:layout_centerHorizontal="true"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_arrow_back"
+            android:src="@drawable/ic_arrow_forward"
             tools:ignore="ContentDescription" />
 
         <!-- Down arrow: fills area below center -->
@@ -59,7 +61,7 @@
             android:layout_below="@id/img_switch"
             android:layout_centerHorizontal="true"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_arrow_forward"
+            android:src="@drawable/ic_arrow_back"
             tools:ignore="ContentDescription" />
 
         <!-- Left arrow: fills area left of center -->

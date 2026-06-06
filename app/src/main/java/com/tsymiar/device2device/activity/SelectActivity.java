@@ -1,6 +1,7 @@
 package com.tsymiar.device2device.activity;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -238,20 +239,36 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
         findViewById(R.id.btn_subscribe).setOnClickListener(v -> {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Please select Device2Device to set MANAGE_OVERLAY_PERMISSION", Toast.LENGTH_SHORT).show();
-                startActivityForResult(
-                        new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
-                        RequestFloat);
+                String title = getString(R.string.subscribe) + " " + getString(R.string.permission_required);
+                new AlertDialog.Builder(this)
+                        .setTitle(title)
+                        .setMessage(R.string.overlay_permission_hint)
+                        .setPositiveButton(R.string.go_to_settings, (dialog, which) -> {
+                            dialog.dismiss();
+                            startActivityForResult(
+                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
+                                    RequestFloat);
+                        })
+                        .setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss())
+                        .show();
             } else {
                 startService(mSubscribeIntent);
             }
         });
         findViewById(R.id.btn_publisher).setOnClickListener(v -> {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Please select Device2Device to set MANAGE_OVERLAY_PERMISSION", Toast.LENGTH_SHORT).show();
-                startActivityForResult(
-                        new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
-                        RequestFloat);
+                String title = getString(R.string.publish) + " " + getString(R.string.permission_required);
+                new AlertDialog.Builder(this)
+                        .setTitle(title)
+                        .setMessage(R.string.overlay_permission_hint)
+                        .setPositiveButton(R.string.go_to_settings, (dialog, which) -> {
+                            dialog.dismiss();
+                            startActivityForResult(
+                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
+                                    RequestFloat);
+                        })
+                        .setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss())
+                        .show();
             } else {
                 startService(mPublisherIntent);
             }
@@ -285,6 +302,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
         findViewById(R.id.btn_http_server).setOnClickListener(v ->
         {
+            Toast.makeText(SelectActivity.this, R.string.http_server_select_hint, Toast.LENGTH_SHORT).show();
             // 打开系统文件夹选择器
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

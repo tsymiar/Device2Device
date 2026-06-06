@@ -141,7 +141,7 @@ public class HttpFileService {
             running.set(true);
 
             serverThread = new Thread(() -> {
-                log("HTTP url " + (accessUrl != null ? accessUrl : "N/A") + "\nserving: " + displayPath);
+                log("HTTP URL " + (accessUrl != null ? accessUrl : "N/A") + "\nserving: " + displayPath);
                 while (running.get()) {
                     try {
                         Socket client = serverSocket.accept();

@@ -24,6 +24,8 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
+import android.graphics.PorterDuff;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -64,6 +66,7 @@ public class CommitActivity extends Activity {
     private EditText mEditText;
 
     private final TouchHandler touchHandler = new TouchHandler(this);
+    private boolean mSwitchToggled = false;
 
     private BroadcastReceiver exitReceiver;
 
@@ -104,6 +107,13 @@ public class CommitActivity extends Activity {
                 if (imm != null) imm.showSoftInput(mEditText, 0);
             }
         }, 200);
+
+        // Shrink directional controls by 50% relative to their layout size
+        shrinkView(mSwitch0);
+        shrinkView(mUp);
+        shrinkView(mDown);
+        shrinkView(mLeft);
+        shrinkView(mRight);
     }
 
     @Override
@@ -148,6 +158,7 @@ public class CommitActivity extends Activity {
             }
             mBtAdapter.disable();
             Toast.makeText(getBaseContext(), "连接失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            finish();
             return;
         }
 
@@ -163,6 +174,7 @@ public class CommitActivity extends Activity {
                 mBtSocket.close();
             } catch (IOException ignored) {}
             Toast.makeText(getBaseContext(), "连接失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            finish();
             return;
         }
 
@@ -181,15 +193,36 @@ public class CommitActivity extends Activity {
         setupTouchListeners();
     }
 
+    private void shrinkView(View view) {
+        if (view != null) {
+            view.post(() -> {
+                int halfW = view.getWidth() * 4 / 5;
+                int halfH = view.getHeight() * 4 / 5;
+                if (halfW <= 0 || halfH <= 0) return;
+                ViewGroup.LayoutParams lp = view.getLayoutParams();
+                lp.width = halfW;
+                lp.height = halfH;
+                view.setLayoutParams(lp);
+            });
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private void setupTouchListeners() {
         // Center submit image sends current editText data
         if (mImg != null) {
             mImg.setOnTouchListener(createTouchListener(mImg, null));
         }
-        // Switch button
+        // Switch button: toggle color on each click, no ACTION_UP handling
         if (mSwitch0 != null) {
-            mSwitch0.setOnTouchListener(createTouchListener(mSwitch0, getString(R.string.cmd_0)));
+            mSwitch0.setOnClickListener(v -> {
+                mSwitchToggled = !mSwitchToggled;
+                if (mSwitchToggled) {
+                    mSwitch0.setColorFilter(getResources().getColor(R.color.switch_selected), PorterDuff.Mode.SRC_IN);
+                } else {
+                    mSwitch0.clearColorFilter();
+                }
+            });
         }
         // Directional controls
         if (mUp != null) {
@@ -248,7 +281,14 @@ public class CommitActivity extends Activity {
             @Override
             public void run() {
                 if (target.isPressed()) {
-                    sendData(cmd != null ? cmd : mData);
+                    String data;
+                    if (cmd != null) {
+                        data = cmd;
+                    } else {
+                        data = mEditText != null ? mEditText.getText().toString().trim() : "";
+                        mData = data;
+                    }
+                    sendData(data);
                     if (cmd != null) mText.setText(cmd);
                     touchHandler.postDelayed(this, 200);
                 }
@@ -322,8 +362,8 @@ public class CommitActivity extends Activity {
         try {
             mOutStream.write(msgBuffer);
             if (mBtAdapter.getState() != BluetoothAdapter.STATE_OFF) {
-                String display = message.isEmpty() ? "null" : message;
-                mToast = Toast.makeText(getBaseContext(), display + "\n已发送." + msgBuffer.length, Toast.LENGTH_SHORT);
+                String display = message.isEmpty() ? "NULL" : message;
+                mToast = Toast.makeText(getBaseContext(), "  " + display + "\n" + msgBuffer.length + " 字节已发送", Toast.LENGTH_SHORT);
                 mToast.setGravity(Gravity.RIGHT, 0, 10);
                 mToast.show();
             }

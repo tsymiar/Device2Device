@@ -170,7 +170,7 @@ public class WaveActivity extends AppCompatActivity {
         mRecordBtn.setOnClickListener(view -> {
             mWaveView.setVisibility(View.VISIBLE);
             mWaveform.setVisibility(View.VISIBLE);
-            if (mWaveCanvas != null && mWaveCanvas.isRecording()) {
+            if (mWaveCanvas != null && mWaveCanvas.mIsRecording()) {
                 mRecordBtn.setText(R.string.record);
                 mWaveCanvas.stopRecording();
                 mWaveCanvas = null;
@@ -189,7 +189,7 @@ public class WaveActivity extends AppCompatActivity {
 
     private void initVoiceInput() {
         Button btnSpeak = findViewById(R.id.btn_speak);
-        mTvResult = findViewById(R.id.mTvResult);
+        mTvResult = findViewById(R.id.tv_result);
 
         if (!isSpeechRecognizerAvailable()) {
             if (btnSpeak != null) {
@@ -474,7 +474,7 @@ public class WaveActivity extends AppCompatActivity {
         handler.removeCallbacksAndMessages(null);
 
         // 停止录音
-        if (mWaveCanvas != null && mWaveCanvas.isRecording()) {
+        if (mWaveCanvas != null && mWaveCanvas.mIsRecording()) {
             mWaveCanvas.stopRecording();
             mWaveCanvas = null;
         }
