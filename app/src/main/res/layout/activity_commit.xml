@@ -9,7 +9,7 @@
 
     <!-- Header: file path info, clickable to open saved data -->
     <TextView
-        android:id="@+id/sendingTextView1"
+        android:id="@+id/tv_sending"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:autoLink="all"
@@ -48,7 +48,7 @@
             android:layout_above="@id/img_switch"
             android:layout_centerHorizontal="true"
             android:scaleType="centerInside"
-            android:src="@drawable/a_up"
+            android:src="@drawable/ic_arrow_back"
             tools:ignore="ContentDescription" />
 
         <!-- Down arrow: fills area below center -->
@@ -59,7 +59,7 @@
             android:layout_below="@id/img_switch"
             android:layout_centerHorizontal="true"
             android:scaleType="centerInside"
-            android:src="@drawable/a_down"
+            android:src="@drawable/ic_arrow_forward"
             tools:ignore="ContentDescription" />
 
         <!-- Left arrow: fills area left of center -->
@@ -70,7 +70,7 @@
             android:layout_centerVertical="true"
             android:layout_toStartOf="@id/img_switch"
             android:scaleType="centerInside"
-            android:src="@drawable/a_left"
+            android:src="@drawable/ic_arrow_left"
             tools:ignore="ContentDescription" />
 
         <!-- Right arrow: fills area right of center -->
@@ -81,7 +81,7 @@
             android:layout_centerVertical="true"
             android:layout_toEndOf="@id/img_switch"
             android:scaleType="centerInside"
-            android:src="@drawable/a_right"
+            android:src="@drawable/ic_arrow_right"
             tools:ignore="ContentDescription" />
     </RelativeLayout>
 
@@ -132,7 +132,7 @@
             android:layout_marginStart="8dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:padding="8dp"
-            android:src="@drawable/submit"
+            android:src="@drawable/ic_submit"
             tools:ignore="ContentDescription" />
 
         <Button

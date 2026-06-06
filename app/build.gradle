@@ -73,7 +73,6 @@ dependencies {
         compile 'com.android.support:appcompat-v7:23.4.0'
     }
     implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar', '*.so'], exclude: [])
-    implementation files('3rd/achartengine-1.1.0.jar')
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.annotation:annotation:1.2.0'

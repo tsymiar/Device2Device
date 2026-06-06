@@ -65,17 +65,17 @@ public class WaveActivity extends AppCompatActivity {
     private static final int MSG_UPDATE_WAV = 100;
     private static final int MSG_UPDATE_STATUS = 101;
 
-    private WaveSurface waveView;
-    private WaveformsView waveform;
-    private TextView statView;
-    private TextView tvResult;
-    private MaterialButton recordBtn;
-    private LinearLayout zoomBar;
-    private TextView zoomLabel;
-    private MaterialButton zoomInBtn;
-    private MaterialButton zoomOutBtn;
+    private WaveSurface mWaveView;
+    private WaveformsView mWaveform;
+    private TextView mStatView;
+    private TextView mTvResult;
+    private MaterialButton mRecordBtn;
+    private LinearLayout mZoomBar;
+    private TextView mZoomLabel;
+    private MaterialButton mZoomInBtn;
+    private MaterialButton mZoomOutBtn;
 
-    private WaveCanvas waveCanvas;
+    private WaveCanvas mWaveCanvas;
     private File mFile;
     private Thread mLoadSoundFileThread;
     private SoundRecord mSoundRecord;
@@ -105,7 +105,7 @@ public class WaveActivity extends AppCompatActivity {
             switch (msg.what) {
                 case MSG_UPDATE_STATUS:
                     if (msg.obj != null) {
-                        activity.statView.setText(String.valueOf(msg.obj));
+                        activity.mStatView.setText(String.valueOf(msg.obj));
                     }
                     break;
                 case MSG_UPDATE_WAV:
@@ -127,33 +127,33 @@ public class WaveActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        waveView = findViewById(R.id.wave_surface);
-        if (waveView != null) {
-            waveView.setLine_off(42);
-            waveView.setZOrderOnTop(true);
-            waveView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+        mWaveView = findViewById(R.id.wave_surface);
+        if (mWaveView != null) {
+            mWaveView.setLineOff(42);
+            mWaveView.setZOrderOnTop(true);
+            mWaveView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
         }
 
-        waveform = findViewById(R.id.wave_form);
-        waveform.setLine_offset(42);
+        mWaveform = findViewById(R.id.wave_form);
+        mWaveform.setLineOffset(42);
 
-        statView = findViewById(R.id.wave_status);
-        zoomBar = findViewById(R.id.wave_zoom_bar);
-        zoomLabel = findViewById(R.id.wave_zoom_label);
-        zoomInBtn = findViewById(R.id.wave_zoom_in);
-        zoomOutBtn = findViewById(R.id.wave_zoom_out);
+        mStatView = findViewById(R.id.wave_status);
+        mZoomBar = findViewById(R.id.wave_zoom_bar);
+        mZoomLabel = findViewById(R.id.wave_zoom_label);
+        mZoomInBtn = findViewById(R.id.wave_zoom_in);
+        mZoomOutBtn = findViewById(R.id.wave_zoom_out);
 
         // 缩放按钮
-        zoomInBtn.setOnClickListener(v -> {
-            if (waveCanvas != null) {
-                waveCanvas.zoomIn(0.25f);
-                zoomLabel.setText(String.format("%.1f×", waveCanvas.getZoomY()));
+        mZoomInBtn.setOnClickListener(v -> {
+            if (mWaveCanvas != null) {
+                mWaveCanvas.zoomIn(0.25f);
+                mZoomLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomY()));
             }
         });
-        zoomOutBtn.setOnClickListener(v -> {
-            if (waveCanvas != null) {
-                waveCanvas.zoomOut(0.25f);
-                zoomLabel.setText(String.format("%.1f×", waveCanvas.getZoomY()));
+        mZoomOutBtn.setOnClickListener(v -> {
+            if (mWaveCanvas != null) {
+                mWaveCanvas.zoomOut(0.25f);
+                mZoomLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomY()));
             }
         });
 
@@ -166,21 +166,21 @@ public class WaveActivity extends AppCompatActivity {
         });
 
         // 录制按钮
-        recordBtn = findViewById(R.id.wave_record);
-        recordBtn.setOnClickListener(view -> {
-            waveView.setVisibility(View.VISIBLE);
-            waveform.setVisibility(View.VISIBLE);
-            if (waveCanvas != null && waveCanvas.isRecording()) {
-                recordBtn.setText(R.string.record);
-                waveCanvas.Stop();
-                waveCanvas = null;
-                statView.setVisibility(View.VISIBLE);
-                statView.setText("");
-                zoomBar.setVisibility(View.GONE);
+        mRecordBtn = findViewById(R.id.wave_record);
+        mRecordBtn.setOnClickListener(view -> {
+            mWaveView.setVisibility(View.VISIBLE);
+            mWaveform.setVisibility(View.VISIBLE);
+            if (mWaveCanvas != null && mWaveCanvas.isRecording()) {
+                mRecordBtn.setText(R.string.record);
+                mWaveCanvas.stopRecording();
+                mWaveCanvas = null;
+                mStatView.setVisibility(View.VISIBLE);
+                mStatView.setText("");
+                mZoomBar.setVisibility(View.GONE);
             } else {
                 if (checkAudioPermissions()) {
-                    statView.setVisibility(View.GONE);
-                    zoomBar.setVisibility(View.VISIBLE);
+                    mStatView.setVisibility(View.GONE);
+                    mZoomBar.setVisibility(View.VISIBLE);
                     startDrawWave();
                 }
             }
@@ -188,8 +188,8 @@ public class WaveActivity extends AppCompatActivity {
     }
 
     private void initVoiceInput() {
-        Button btnSpeak = findViewById(R.id.btnSpeak);
-        tvResult = findViewById(R.id.tvResult);
+        Button btnSpeak = findViewById(R.id.btn_speak);
+        mTvResult = findViewById(R.id.mTvResult);
 
         if (!isSpeechRecognizerAvailable()) {
             if (btnSpeak != null) {
@@ -259,13 +259,13 @@ public class WaveActivity extends AppCompatActivity {
 
             if (mLoadingKeepGoing) {
                 runOnUiThread(() -> {
-                    waveform.setSoundFile(mSoundRecord);
+                    mWaveform.setSoundFile(mSoundRecord);
                     DisplayMetrics metrics = new DisplayMetrics();
                     getWindowManager().getDefaultDisplay().getMetrics(metrics);
                     mDensity = metrics.density;
-                    waveform.recomputeHeights(mDensity);
-                    waveView.setVisibility(View.INVISIBLE);
-                    waveform.setVisibility(View.VISIBLE);
+                    mWaveform.recomputeHeights(mDensity);
+                    mWaveView.setVisibility(View.INVISIBLE);
+                    mWaveform.setVisibility(View.VISIBLE);
                     // 加载完成后自动播放
                     playWaveAudio(0);
                 });
@@ -344,11 +344,11 @@ public class WaveActivity extends AppCompatActivity {
             mPlayer.pause();
             handler.removeMessages(MSG_UPDATE_WAV);
         }
-        mPlayFullMillis = waveform.pixelsToMillisecsTotal();
-        int playStartMillis = waveform.pixelsToMillisecs(startPosition);
+        mPlayFullMillis = mWaveform.pixelsToMillisecsTotal();
+        int playStartMillis = mWaveform.pixelsToMillisecs(startPosition);
 
         mPlayer.setOnCompletionListener(() -> {
-            waveform.setPlayback(-1);
+            mWaveform.setPlayback(-1);
             updatePlaybackProgress();
             handler.removeMessages(MSG_UPDATE_WAV);
         });
@@ -359,17 +359,17 @@ public class WaveActivity extends AppCompatActivity {
 
     private void updatePlaybackProgress() {
         int current = mPlayer.getCurrentPosition();
-        int frames = waveform.millisecsToPixels(current);
-        waveform.setPlayback(frames);
+        int frames = mWaveform.millisecsToPixels(current);
+        mWaveform.setPlayback(frames);
         if (current >= mPlayFullMillis) {
-            waveform.setPlayFinish(1);
+            mWaveform.setPlayFinish(1);
             if (mPlayer.isPlaying()) {
                 mPlayer.pause();
                 handler.removeMessages(MSG_UPDATE_WAV);
             }
         } else {
-            waveform.setPlayFinish(0);
-            waveView.invalidate();
+            mWaveform.setPlayFinish(0);
+            mWaveView.invalidate();
         }
     }
 
@@ -400,15 +400,15 @@ public class WaveActivity extends AppCompatActivity {
                 CHANNEL_CONFIGURATION, AUDIO_ENCODING, bufSize);
 
         LocalFile.createDirectory(DATA_DIRECTORY);
-        waveCanvas = new WaveCanvas();
-        waveCanvas.setBaseLine(waveView);
+        mWaveCanvas = new WaveCanvas();
+        mWaveCanvas.setBaseLine(mWaveView);
         // bufSize 为字节数，PCM_16BIT 下需转为 short 数量
-        waveCanvas.Start(audioRecord, bufSize / 2, waveView, FILE_NAME, DATA_DIRECTORY,
+        mWaveCanvas.startRecording(audioRecord, bufSize / 2, mWaveView, FILE_NAME, DATA_DIRECTORY,
                 msg -> true);
 
-        recordBtn.setText(getString(R.string.recording_state));
-        waveCanvas.resetZoom();
-        zoomLabel.setText("1.0×");
+        mRecordBtn.setText(getString(R.string.recording_state));
+        mWaveCanvas.resetZoom();
+        mZoomLabel.setText("1.0×");
     }
 
     // ---------- ActivityResult ----------
@@ -425,10 +425,10 @@ public class WaveActivity extends AppCompatActivity {
             if (uri != null) {
                 String path = copyUriToFile(uri);
                 if (path != null) {
-                    waveView.setVisibility(View.VISIBLE);
-                    waveform.setVisibility(View.INVISIBLE);
-                    statView.setVisibility(View.VISIBLE);
-                    zoomBar.setVisibility(View.GONE);
+                    mWaveView.setVisibility(View.VISIBLE);
+                    mWaveform.setVisibility(View.INVISIBLE);
+                    mStatView.setVisibility(View.VISIBLE);
+                    mZoomBar.setVisibility(View.GONE);
                     handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, ""));
                     loadWaveFile(path);
                 } else {
@@ -439,7 +439,7 @@ public class WaveActivity extends AppCompatActivity {
         if (requestCode == REQUEST_CODE_SPEECH_INPUT && resultCode == RESULT_OK && data != null) {
             ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
             if (result != null && !result.isEmpty()) {
-                tvResult.setText(result.get(0));
+                mTvResult.setText(result.get(0));
             }
         }
     }
@@ -474,9 +474,9 @@ public class WaveActivity extends AppCompatActivity {
         handler.removeCallbacksAndMessages(null);
 
         // 停止录音
-        if (waveCanvas != null && waveCanvas.isRecording()) {
-            waveCanvas.Stop();
-            waveCanvas = null;
+        if (mWaveCanvas != null && mWaveCanvas.isRecording()) {
+            mWaveCanvas.stopRecording();
+            mWaveCanvas = null;
         }
 
         // 中断文件加载线程

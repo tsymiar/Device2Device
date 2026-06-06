@@ -57,9 +57,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
     private ServiceConnection mServiceConnection = null;
     SubscribeService mFloatService;
-    private int gValue = 1;
-    Intent publisherIntent;
-    Intent subscribeIntent;
+    private int mGValue = 1;
+    Intent mPublisherIntent;
+    Intent mSubscribeIntent;
     Button mKcpBtn;
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
@@ -140,7 +140,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_layout);
+        setContentView(R.layout.activity_select);
         // a call to a native method
         TextView textView = findViewById(R.id.sample_text);
         textView.setText((new CallbackWrapper()).stringGetJNI());
@@ -174,8 +174,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             }
         });
 
-        subscribeIntent = new Intent(SelectActivity.this, SubscribeService.class);
-        publisherIntent = new Intent(SelectActivity.this, PublishService.class);
+        mSubscribeIntent = new Intent(SelectActivity.this, SubscribeService.class);
+        mPublisherIntent = new Intent(SelectActivity.this, PublishService.class);
 
         new Thread(() -> {
             do {
@@ -215,11 +215,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             EventNotify notify = new EventNotify();
             notify.register(this);
             EventEntity event = new EventEntity();
-            event.setEvent("event: " + gValue);
+            event.setEvent("event: " + mGValue);
             notify.notifyListeners(event);
-            gValue++;
+            mGValue++;
             TextView tv = findViewById(R.id.txt_event);
-            tv.setText(event.getEvent().toString() + ", value = " + gValue);
+            tv.setText(event.getEvent().toString() + ", value = " + mGValue);
         });
         WifiManager manager = (WifiManager)this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         assert manager != null;
@@ -229,9 +229,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             NetworkWrapper.startUdpServer(8899);
         });
         findViewById(R.id.btn_client).setOnClickListener(v -> {
-            String text = Utils.MD5(gValue + "").substring(0, 6);
+            String text = Utils.MD5(mGValue + "").substring(0, 6);
             NetworkWrapper.sendUdpData(text, text.length());
-            gValue++;
+            mGValue++;
             if (wifiLock.isHeld()) {
                 wifiLock.release();
             }
@@ -243,7 +243,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
                         RequestFloat);
             } else {
-                startService(subscribeIntent);
+                startService(mSubscribeIntent);
             }
         });
         findViewById(R.id.btn_publisher).setOnClickListener(v -> {
@@ -253,7 +253,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
                         RequestFloat);
             } else {
-                startService(publisherIntent);
+                startService(mPublisherIntent);
             }
         });
         findViewById(R.id.btn_tcp).setOnClickListener(v -> NetworkWrapper.startTcpServer(8700));
@@ -352,8 +352,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     public void onDestroy() {
         SelectActivity.this.unregisterReceiver(mBroadcastReceiverClass);
-        stopService(subscribeIntent);
-        stopService(publisherIntent);
+        stopService(mSubscribeIntent);
+        stopService(mPublisherIntent);
         if (mFloatService != null) {
             mFloatService.closeWindow();
         }

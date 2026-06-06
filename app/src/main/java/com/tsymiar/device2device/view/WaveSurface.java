@@ -15,14 +15,14 @@ import android.view.SurfaceView;
  * @author cokus
  */
 public class WaveSurface extends SurfaceView implements SurfaceHolder.Callback {
-    private int line_off;//上下边距距离
+    private int mLineOff;//上下边距距离
 
-    public int getLine_off() {
-        return line_off;
+    public int getLineOff() {
+        return mLineOff;
     }
 
-    public void setLine_off(int line_off) {
-        this.line_off = line_off;
+    public void setLineOff(int lineOff) {
+        this.mLineOff = lineOff;
     }
 
     public WaveSurface(Context context, AttributeSet attrs) {
@@ -44,24 +44,24 @@ public class WaveSurface extends SurfaceView implements SurfaceHolder.Callback {
                 canvas.drawColor(Color.rgb(241, 241, 241));// 清除背景
                 canvas.drawARGB(255, 239, 239, 239);
 
-                int height = sfv.getHeight() - line_off;
+                int height = sfv.getHeight() - mLineOff;
                 Paint paintLine = new Paint();
                 Paint centerLine = new Paint();
                 Paint circlePaint = new Paint();
                 circlePaint.setColor(Color.rgb(246, 131, 126));
                 circlePaint.setAntiAlias(true);
 
-                canvas.drawCircle(0, line_off >> 2, line_off >> 2, circlePaint);// 上面小圆
-                canvas.drawCircle(0, sfv.getHeight() - (line_off >> 2), line_off >> 2, circlePaint);// 下面小圆
+                canvas.drawCircle(0, mLineOff >> 2, mLineOff >> 2, circlePaint);// 上面小圆
+                canvas.drawCircle(0, sfv.getHeight() - (mLineOff >> 2), mLineOff >> 2, circlePaint);// 下面小圆
                 canvas.drawLine(0, 0, 0, sfv.getHeight(), circlePaint);// 垂直的线
                 paintLine.setColor(Color.rgb(169, 169, 169));
                 centerLine.setColor(Color.rgb(39, 199, 175));
-                canvas.drawLine(0, line_off >> 1, sfv.getWidth(), line_off >> 1, paintLine);// 最上面的那根线
-                canvas.drawLine(0, sfv.getHeight() - (line_off >> 1) - 1, sfv.getWidth(),
-                        sfv.getHeight() - (line_off >> 1) - 1, paintLine);// 最下面线
+                canvas.drawLine(0, mLineOff >> 1, sfv.getWidth(), mLineOff >> 1, paintLine);// 最上面的那根线
+                canvas.drawLine(0, sfv.getHeight() - (mLineOff >> 1) - 1, sfv.getWidth(),
+                        sfv.getHeight() - (mLineOff >> 1) - 1, paintLine);// 最下面线
                 canvas.drawLine(0, height * 0.25f + 20, sfv.getWidth(), height * 0.25f + 20, paintLine);// 第二根线
                 canvas.drawLine(0, height * 0.75f + 20, sfv.getWidth(), height * 0.75f + 20, paintLine);// 第3根线
-                canvas.drawLine(0, height * 0.5f + (line_off >> 1), sfv.getWidth(), height * 0.5f + (line_off >> 1),
+                canvas.drawLine(0, height * 0.5f + (mLineOff >> 1), sfv.getWidth(), height * 0.5f + (mLineOff >> 1),
                         centerLine);// 中心线
                 sfv.getHolder().unlockCanvasAndPost(canvas);// 解锁画布，提交画好的图像
             }

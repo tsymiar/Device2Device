@@ -20,7 +20,6 @@ public class SaveDataService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand");
         if (intent != null && intent.getExtras() != null) {
             String temp = intent.getExtras().getString("temp");
             if (temp != null && !"stop".equals(temp)) {

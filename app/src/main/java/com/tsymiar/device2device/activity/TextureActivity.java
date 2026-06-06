@@ -30,7 +30,6 @@ import java.util.Locale;
 
 public class TextureActivity extends AppCompatActivity
         implements AdapterView.OnItemSelectedListener, TextureView.SurfaceTextureListener {
-    private static final String TAG = TextureActivity.class.getCanonicalName();
     private static final int REQUEST_CODE_PICK_FILE = 200;
 
     /** 渲染模式 */
@@ -73,17 +72,17 @@ public class TextureActivity extends AppCompatActivity
     private int mDisplayHeight = 0;
     private int mDisplayWidth = 0;
 
-    public String DATA_DIRECTORY = null;
+    public String mDataDirectory = null;
 
-    /** 确保 DATA_DIRECTORY 存在 */
+    /** 确保 mDataDirectory 存在 */
     private boolean ensureDataDir() {
-        if (DATA_DIRECTORY == null) {
+        if (mDataDirectory == null) {
             File cacheDir = getExternalFilesDir("cache");
             if (cacheDir == null) return false;
             if (!cacheDir.exists() && !cacheDir.mkdirs()) return false;
-            DATA_DIRECTORY = cacheDir.getAbsolutePath() + "/";
+            mDataDirectory = cacheDir.getAbsolutePath() + "/";
         }
-        return new File(DATA_DIRECTORY).exists() || new File(DATA_DIRECTORY).mkdirs();
+        return new File(mDataDirectory).exists() || new File(mDataDirectory).mkdirs();
     }
 
     @Override
@@ -91,10 +90,10 @@ public class TextureActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_texture);
         ensureDataDir();
-        InitViews();
+        initViews();
     }
 
-    protected void InitViews() {
+    protected void initViews() {
         mAdapterAuto = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item);
         mAdapterAuto.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mAdapterGpu  = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item);
@@ -113,7 +112,7 @@ public class TextureActivity extends AppCompatActivity
 
         Button reload = findViewById(R.id.reload);
         if (reload != null) {
-            reload.setOnClickListener(this::ReLoad);
+            reload.setOnClickListener(this::reload);
         }
 
         Button pick = findViewById(R.id.pick);
@@ -285,7 +284,7 @@ public class TextureActivity extends AppCompatActivity
                 log("copyUri: openInputStream returned null");
                 return null;
             }
-            File outFile = new File(DATA_DIRECTORY, name);
+            File outFile = new File(mDataDirectory, name);
             try (FileOutputStream fos = new FileOutputStream(outFile)) {
                 byte[] buf = new byte[8192];
                 int len;
@@ -401,7 +400,7 @@ public class TextureActivity extends AppCompatActivity
             return mPickedPath;
         }
         if (defaultName != null) {
-            String def = DATA_DIRECTORY + defaultName;
+            String def = mDataDirectory + defaultName;
             if (new File(def).exists()) return def;
         }
         return null;
@@ -486,10 +485,10 @@ public class TextureActivity extends AppCompatActivity
         if (mPickedPath != null && new File(mPickedPath).exists()) {
             return mPickedPath;
         }
-        return DATA_DIRECTORY + defaultName;
+        return mDataDirectory + defaultName;
     }
 
-    public void ReLoad(@NonNull View view) {
+    public void reload(@NonNull View view) {
         renderWithMode();
     }
 
@@ -521,7 +520,7 @@ public class TextureActivity extends AppCompatActivity
             int[] pixels = new int[w * h];
             bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
 
-            mBmpPath = DATA_DIRECTORY + "cpu_render.bmp";
+            mBmpPath = mDataDirectory + "cpu_render.bmp";
             try (FileOutputStream fos = new FileOutputStream(mBmpPath)) {
                 // BMP 文件头 (14 bytes) + 信息头 (40 bytes) + 像素数据
                 int rowBytes = (w * 3 + 3) & ~3;  // 每行对齐到 4 字节

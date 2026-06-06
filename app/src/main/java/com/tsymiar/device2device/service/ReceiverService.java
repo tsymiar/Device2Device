@@ -21,6 +21,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
 
@@ -37,7 +38,7 @@ public class ReceiverService extends Service {
     private boolean added;
 
     private float mTouchStartX, mTouchStartY;
-    private TextView myview;
+    private TextView mMyView;
     private float x, y;
     private long mLastTime, mCurTime;
 
@@ -49,8 +50,10 @@ public class ReceiverService extends Service {
         super.onCreate();
         createNotificationChannel();
         startForegroundService();
-        view = LayoutInflater.from(this).inflate(R.layout.float_text, null);
-        myview = view.findViewById(R.id.text);
+        view = LayoutInflater.from(this).inflate(R.layout.dialog_view_text, null);
+        int heightPx = (int) (70 * getResources().getDisplayMetrics().density);
+        view.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, heightPx));
+        mMyView = view.findViewById(R.id.text);
     }
 
     private void createNotificationChannel() {
@@ -85,7 +88,7 @@ public class ReceiverService extends Service {
                 .setContentTitle(getText(R.string.edit_text))
                 .setContentText(getText(R.string.back))
                 .setContentIntent(pendingIntent)
-                .setSmallIcon(R.drawable.none)
+                .setSmallIcon(R.drawable.ic_none)
                 .setWhen(System.currentTimeMillis())
                 .build();
 
@@ -102,8 +105,8 @@ public class ReceiverService extends Service {
                 handler.obtainMessage(0, temp).sendToTarget();
             }
         }
-        if (myview != null) {
-            myview.setOnClickListener(v -> {
+        if (mMyView != null) {
+            mMyView.setOnClickListener(v -> {
                 mLastTime = mCurTime;
                 mCurTime = System.currentTimeMillis();
                 if (mCurTime - mLastTime < 300 && wm != null) {
@@ -156,11 +159,11 @@ public class ReceiverService extends Service {
                     mTouchStartY = event.getY() + view.getHeight() / 2f;
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    myview.setTextColor(Color.rgb(0, 255, 0));
+                    mMyView.setTextColor(Color.rgb(0, 255, 0));
                     updateViewPosition();
                     break;
                 case MotionEvent.ACTION_UP:
-                    myview.setTextColor(Color.rgb(255, 255, 255));
+                    mMyView.setTextColor(Color.rgb(255, 255, 255));
                     updateViewPosition();
                     mTouchStartX = mTouchStartY = 0;
                     break;
@@ -204,9 +207,9 @@ public class ReceiverService extends Service {
         @Override
         public void handleMessage(Message msg) {
             ReceiverService service = ref.get();
-            if (service == null || service.myview == null) return;
+            if (service == null || service.mMyView == null) return;
             if (msg.what == 0 && msg.obj instanceof String) {
-                service.myview.setText((String) msg.obj);
+                service.mMyView.setText((String) msg.obj);
             }
         }
     }

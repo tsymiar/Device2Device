@@ -16,6 +16,7 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
 
@@ -78,8 +79,10 @@ public class ToastNotificationService extends Service {
             hideToast();
         }
 
-        // 使用 dialog_view_text 布局（圆角背景 + 文字阴影）
+        // 使用 dialog_view_text 布局（圆角背景 + 文字阴影），高度动态设置
         floatView = LayoutInflater.from(this).inflate(R.layout.dialog_view_text, null);
+        int heightPx = (int) (70 * getResources().getDisplayMetrics().density);
+        floatView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, heightPx));
         TextView textView = floatView.findViewById(R.id.text);
         textView.setText(message);
 

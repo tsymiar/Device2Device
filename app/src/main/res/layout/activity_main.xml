@@ -11,16 +11,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription=""
-        android:src="@drawable/auth_ic"
+        android:src="@drawable/ic_auth"
         tools:ignore="ContentDescription" />
 
     <ImageView
-        android:id="@+id/ofofof"
+        android:id="@+id/iv_auth_anim"
         android:layout_width="30sp"
         android:layout_height="30sp"
         android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
         android:contentDescription=""
-        android:src="@drawable/ofofof"
+        android:src="@drawable/ic_auth_anim"
         tools:ignore="ContentDescription" />
 </RelativeLayout>

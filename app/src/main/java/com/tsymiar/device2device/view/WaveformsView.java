@@ -29,8 +29,8 @@ public class WaveformsView extends View {
     private final Paint mTimeValuePaint;
     private final Paint circlePaint;
     Paint paintLine;
-    private int line_offset;
-    private int playFinish;
+    private int mLineOffset;
+    private int mPlayFinish;
 
     private SoundRecord mSoundRecord;
     private int[] mLenByZoomLevel;
@@ -51,11 +51,11 @@ public class WaveformsView extends View {
     private int state = 0;
 
     public int getPlayFinish() {
-        return playFinish;
+        return mPlayFinish;
     }
 
     public void setPlayFinish(int playFinish) {
-        this.playFinish = playFinish;
+        this.mPlayFinish = playFinish;
     }
 
     public int getState() {
@@ -66,12 +66,12 @@ public class WaveformsView extends View {
         this.state = state;
     }
 
-    public int getLine_offset() {
-        return line_offset;
+    public int getLineOffset() {
+        return mLineOffset;
     }
 
-    public void setLine_offset(int line_offset) {
-        this.line_offset = line_offset;
+    public void setLineOffset(int lineOffset) {
+        this.mLineOffset = lineOffset;
     }
 
     public WaveformsView(Context context, AttributeSet attrs) {
@@ -262,22 +262,22 @@ public class WaveformsView extends View {
         super.onDraw(canvas);
         int measuredWidth = getMeasuredWidth();
         int measuredHeight = getMeasuredHeight();
-        int height = measuredHeight - line_offset;
+        int height = measuredHeight - mLineOffset;
 
         canvas.drawARGB(255, 239, 239, 239);
 
         Paint centerLine = new Paint();
         centerLine.setColor(Color.rgb(39, 199, 175));
-        canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2, centerLine);// 中心线
+        canvas.drawLine(0, height * 0.5f + mLineOffset / 2, measuredWidth, height * 0.5f + mLineOffset / 2, centerLine);// 中心线
 
         paintLine = new Paint();
         paintLine.setColor(Color.rgb(169, 169, 169));
-        canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);// 最上面的那根线
+        canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
         // canvas.drawLine(0, height*0.25f+20, measuredWidth, height*0.25f+20,
         // paintLine);//第二根线
         // canvas.drawLine(0, height*0.75f+20, measuredWidth, height*0.75f+20,
         // paintLine);//第3根线
-        canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth, measuredHeight - line_offset / 2 - 1,
+        canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth, measuredHeight - mLineOffset / 2 - 1,
                 paintLine);// 最下面的那根线
         // }
         if (state == 1) {
@@ -287,20 +287,20 @@ public class WaveformsView extends View {
         }
 
         if (mSoundRecord == null) {
-            height = measuredHeight - line_offset;
+            height = measuredHeight - mLineOffset;
             centerLine = new Paint();
             centerLine.setColor(Color.rgb(39, 199, 175));
-            canvas.drawLine(0, height * 0.5f + line_offset / 2, measuredWidth, height * 0.5f + line_offset / 2,
+            canvas.drawLine(0, height * 0.5f + mLineOffset / 2, measuredWidth, height * 0.5f + mLineOffset / 2,
                     centerLine);// 中心线
             paintLine = new Paint();
             paintLine.setColor(Color.rgb(169, 169, 169));
-            canvas.drawLine(0, line_offset / 2, measuredWidth, line_offset / 2, paintLine);// 最上面的那根线
+            canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
             // canvas.drawLine(0, height*0.25f+20, measuredWidth,
             // height*0.25f+20, paintLine);//第二根线
             // canvas.drawLine(0, height*0.75f+20, measuredWidth,
             // height*0.75f+20, paintLine);//第3根线
-            canvas.drawLine(0, measuredHeight - line_offset / 2 - 1, measuredWidth,
-                    measuredHeight - line_offset / 2 - 1, paintLine);// 最下面的那根线
+            canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth,
+                    measuredHeight - mLineOffset / 2 - 1, paintLine);// 最下面的那根线
             return;
         }
         if (mHeightsAtThisZoomLevel == null)
@@ -342,10 +342,10 @@ public class WaveformsView extends View {
             drawWaveformLine(canvas, i, (ctr - mHeightsAtThisZoomLevel[start + i]),
                     (ctr + 1 + mHeightsAtThisZoomLevel[start + i]), paint);
 
-            if (i + start == mPlaybackPos && playFinish != 1) {
-                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), line_offset / 4, line_offset / 4, circlePaint);// 上圆
-                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), getMeasuredHeight() - line_offset / 4,
-                        line_offset / 4, circlePaint);// 下圆
+            if (i + start == mPlaybackPos && mPlayFinish != 1) {
+                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), mLineOffset / 4, mLineOffset / 4, circlePaint);// 上圆
+                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), getMeasuredHeight() - mLineOffset / 4,
+                        mLineOffset / 4, circlePaint);// 下圆
                 canvas.drawLine(i * getMeasuredWidth() / maxPos(), 0, i * getMeasuredWidth() / maxPos(),
                         getMeasuredHeight(), circlePaint);// 垂直的线
                 // 画正在播放的线

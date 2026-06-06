@@ -25,25 +25,25 @@ import com.tsymiar.device2device.acceleration.SensorFragment;
 
 public class GraphActivity extends AppCompatActivity {
 
-    TextView t1, t2, t3;
+    TextView mT1, mT2, mT3;
 
     // 两次检测的时间间隔
     private static final int UPDATE_INTERVAL_TIME = 200;
 
     // 传感器管理器
-    private SensorManager sensorManager;
+    private SensorManager mSensorManager;
 
     // private Sensor accelerometerSensor, gravitySensor,
     // linearAccelerationSensor;
-    SensorAction SensorAction1, SensorAction2, SensorAction3;
+    SensorAction mSensorAction1, mSensorAction2, mSensorAction3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_graph);
-        t1 = (TextView)findViewById(R.id.t1);
-        t2 = (TextView)findViewById(R.id.t2);
-        t3 = (TextView)findViewById(R.id.t3);
+        mT1 = (TextView)findViewById(R.id.mT1);
+        mT2 = (TextView)findViewById(R.id.mT2);
+        mT3 = (TextView)findViewById(R.id.mT3);
         Button open = (Button)findViewById(R.id.bt);
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
@@ -54,11 +54,11 @@ public class GraphActivity extends AppCompatActivity {
             }
         });
 
-        sensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+        mSensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
 
-        SensorAction1 = new SensorAction(sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), t1);
-        SensorAction2 = new SensorAction(sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY), t2);
-        SensorAction3 = new SensorAction(sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION), t3);
+        mSensorAction1 = new SensorAction(mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), mT1);
+        mSensorAction2 = new SensorAction(mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY), mT2);
+        mSensorAction3 = new SensorAction(mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION), mT3);
     }
 
     @Override
@@ -73,17 +73,17 @@ public class GraphActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        SensorAction1.register();
-        SensorAction2.register();
-        SensorAction3.register();
+        mSensorAction1.register();
+        mSensorAction2.register();
+        mSensorAction3.register();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        SensorAction1.unregister();
-        SensorAction2.unregister();
-        SensorAction3.unregister();
+        mSensorAction1.unregister();
+        mSensorAction2.unregister();
+        mSensorAction3.unregister();
     }
 
     class SensorAction implements SensorEventListener {
@@ -100,11 +100,11 @@ public class GraphActivity extends AppCompatActivity {
         }
 
         public void register() {
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
+            mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
         }
 
         public void unregister() {
-            sensorManager.unregisterListener(this);
+            mSensorManager.unregisterListener(this);
         }
 
         @Override
@@ -131,16 +131,16 @@ public class GraphActivity extends AppCompatActivity {
 
     public boolean onCreateOptionsMenu(Menu menu) {
         // getMenuInflater().inflate(R.menu.menu_main,menu);
-        getMenuInflater().inflate(R.menu.menu_item, menu);
+        getMenuInflater().inflate(R.menu.options, menu);
         return true;
     }
 
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        return ItemSelected(item, GraphActivity.this);
+        return itemSelected(item, GraphActivity.this);
     }
 
     @SuppressLint("NonConstantResourceId")
-    public boolean ItemSelected(MenuItem item, Activity activity) {
+    public boolean itemSelected(MenuItem item, Activity activity) {
         Intent intent;
         // Handle item selection
         int itemId = item.getItemId();

@@ -17,6 +17,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
 
@@ -41,7 +42,9 @@ public class WindowService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        dialog = LayoutInflater.from(this).inflate(R.layout.float_text, null);
+        dialog = LayoutInflater.from(this).inflate(R.layout.dialog_view_text, null);
+        int heightPx = (int) (70 * getResources().getDisplayMetrics().density);
+        dialog.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, heightPx));
         textView = dialog.findViewById(R.id.text);
     }
 

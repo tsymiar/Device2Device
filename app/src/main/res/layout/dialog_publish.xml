@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/border"
+    android:background="@drawable/bg_border"
     android:padding="16dp"
     tools:ignore="MissingClass">
 
@@ -64,7 +64,7 @@
         android:layout_width="wrap_content"
         android:layout_height="36dp"
         android:layout_marginTop="16dp"
-        android:background="@drawable/border"
+        android:background="@drawable/bg_border"
         android:text="@string/confirm"
         android:textColor="@color/dialog_button_text"
         android:textSize="14sp"

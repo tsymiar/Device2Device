@@ -9,7 +9,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@drawable/msg_sent"
+        android:background="@drawable/bg_msg_sent"
         android:padding="12dp"
         tools:ignore="UselessParent">
 

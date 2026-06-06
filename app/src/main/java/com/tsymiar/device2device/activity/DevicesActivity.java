@@ -57,8 +57,8 @@ public class DevicesActivity extends Activity {
             v.setVisibility(View.GONE);
         });
 
-        ArrayAdapter<String> pairedAdapter = new ArrayAdapter<>(this, R.layout.activity_devices);
-        mNewDevicesArrayAdapter = new ArrayAdapter<>(this, R.layout.activity_devices);
+        ArrayAdapter<String> pairedAdapter = new ArrayAdapter<>(this, R.layout.item_device);
+        mNewDevicesArrayAdapter = new ArrayAdapter<>(this, R.layout.item_device);
 
         ListView pairedList = findViewById(R.id.devlist_paired_devices);
         assert pairedList != null;

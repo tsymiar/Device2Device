@@ -27,7 +27,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         findMyImg();
-        Animation(R.anim.animation);
+        Animation(R.anim.auth);
     }
 
     @Override
@@ -47,7 +47,7 @@ public class MainActivity extends Activity {
     }
 
     private void findMyImg() {
-        toTestAnimation = findViewById(R.id.ofofof);
+        toTestAnimation = findViewById(R.id.iv_auth_anim);
     }
 
     private void Animation(int i) {

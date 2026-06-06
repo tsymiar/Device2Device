@@ -273,7 +273,7 @@ public class ChatBoxDialog extends Dialog {
         // new Handler().postDelayed(this::receiveMockMessage, 1000);
     }
     private void sendFileMessage(String text) {
-        Message message = new Message(text, currentSpinner == ChatSpin.MIXED ?
+        Message message = new Message(jia, currentSpinner == ChatSpin.MIXED ?
                 Message.MessageType.SENT_FILE :
                 Message.MessageType.SENT_TEXT);
         messageList.add(message);
@@ -284,13 +284,7 @@ public class ChatBoxDialog extends Dialog {
         });
     }
 
-    // 接收模拟消息
-    private void receiveMockMessage() {
-        Message message = new Message("这是一条模拟回复", Message.MessageType.RECEIVED_TEXT);
-        messageList.add(message);
-        adapter.notifyItemInserted(messageList.size() - 1);
-        scrollToBottom();
-    }
+
     private void receiveTextMessage(String content) {
         Message message = new Message(content, Message.MessageType.RECEIVED_TEXT);
         message.setStatus(Message.MessageStatus.RECEIVED);
@@ -383,8 +377,8 @@ public class ChatBoxDialog extends Dialog {
         private void setAnimation(View view, int position) {
             Animation animation = AnimationUtils.loadAnimation(view.getContext(),
                     shouldAnimateFromLeft(position) ?
-                            R.anim.slide_in_sent :
-                            R.anim.slide_in_recv);
+                            R.anim.slide_in_left :
+                            R.anim.slide_in_right);
 
             view.startAnimation(animation);
         }

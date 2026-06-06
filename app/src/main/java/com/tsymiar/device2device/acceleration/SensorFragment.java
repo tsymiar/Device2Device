@@ -41,13 +41,13 @@ public class SensorFragment extends Fragment implements SensorEventListener {
     private float upY;
     private float downX;
     private float downY;
-    Chart chart0;
+    Chart mChart0;
     // 传感器管理器
-    private SensorManager sensorManager;
+    private SensorManager mSensorManager;
     // 两次检测的时间间隔
     private static final int UPDATE_INTERVAL_TIME = 200;
     private long lastUpdateTime;
-    public double[] linear_acceleration = new double[3];
+    public double[] linearAcceleration = new double[3];
     public double[] gravity = new double[3];
 
     @Override
@@ -55,8 +55,8 @@ public class SensorFragment extends Fragment implements SensorEventListener {
                              @Nullable Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.dialog_view_chart, container, false);
 
-        sensorManager = (SensorManager)requireActivity().getSystemService(Context.SENSOR_SERVICE);
-        chart0 = new Chart(sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION));
+        mSensorManager = (SensorManager)requireActivity().getSystemService(Context.SENSOR_SERVICE);
+        mChart0 = new Chart(mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION));
 
         mView = new NewChart(requireActivity());
         LinearLayout mLayout = rootView.findViewById(R.id.toor);
@@ -71,15 +71,15 @@ public class SensorFragment extends Fragment implements SensorEventListener {
     @Override
     public void onResume() {
         super.onResume();
-        chart0.register();
-        sensorManager.registerListener(this, chart0.sensor, SensorManager.SENSOR_DELAY_GAME);
+        mChart0.register();
+        mSensorManager.registerListener(this, mChart0.sensor, SensorManager.SENSOR_DELAY_GAME);
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        chart0.unregister();
-        sensorManager.unregisterListener(this);
+        mChart0.unregister();
+        mSensorManager.unregisterListener(this);
         mHandler.removeCallbacksAndMessages(null);
     }
 
@@ -99,9 +99,9 @@ public class SensorFragment extends Fragment implements SensorEventListener {
         gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
         gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
 
-        linear_acceleration[0] = event.values[0] - gravity[0];
-        linear_acceleration[1] = event.values[1] - gravity[1];
-        linear_acceleration[2] = event.values[2] - gravity[2];
+        linearAcceleration[0] = event.values[0] - gravity[0];
+        linearAcceleration[1] = event.values[1] - gravity[1];
+        linearAcceleration[2] = event.values[2] - gravity[2];
     }
 
     @Override
@@ -156,7 +156,7 @@ public class SensorFragment extends Fragment implements SensorEventListener {
         private Path mCurvePath;
         private Path mCurvePath0;
 
-        double M;
+        double mAccelValue;
 
         public NewChart(Context context) {
             super(context);
@@ -255,7 +255,7 @@ public class SensorFragment extends Fragment implements SensorEventListener {
         }
 
         private void updateLineData() {
-            float rawY = (float) linear_acceleration[0] + 0.55f;
+            float rawY = (float) linearAcceleration[0] + 0.55f;
             float py = offsetTop + chartH / 2f - rawY * chartH / (2f * mYRange);
             PointF p = new PointF(offsetLeft + chartW, py);
 
@@ -271,14 +271,14 @@ public class SensorFragment extends Fragment implements SensorEventListener {
                 mRawY.remove(0);
             }
 
-            M = linear_acceleration[0];
-            if (M >= 7.0f) {
+            mAccelValue = linearAcceleration[0];
+            if (mAccelValue >= 7.0f) {
                 Intent intent = new Intent(getActivity(), Voice.class);
                 requireActivity().startService(intent);
 
                 Intent toastIntent = new Intent(ToastNotificationService.TOAST_ACTION);
                 toastIntent.putExtra(ToastNotificationService.EXTRA_MESSAGE,
-                        "加速度过大: " + String.format("%.1f", M) + " m/s²");
+                        "加速度过大: " + String.format("%.1f", mAccelValue) + " m/s²");
                 requireActivity().sendBroadcast(toastIntent);
             }
         }
@@ -444,11 +444,11 @@ public class SensorFragment extends Fragment implements SensorEventListener {
         }
 
         public void register() {
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME);
+            mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME);
         }
 
         public void unregister() {
-            sensorManager.unregisterListener(this);
+            mSensorManager.unregisterListener(this);
         }
 
         @Override
@@ -476,9 +476,9 @@ public class SensorFragment extends Fragment implements SensorEventListener {
             gravity[1] = alpha * gravity[1] + (1 - alpha) * arg.values[1];
             gravity[2] = alpha * gravity[2] + (1 - alpha) * arg.values[2];
 
-            linear_acceleration[0] = arg.values[0] - gravity[0];
-            linear_acceleration[1] = arg.values[1] - gravity[1];
-            linear_acceleration[2] = arg.values[2] - gravity[2];
+            linearAcceleration[0] = arg.values[0] - gravity[0];
+            linearAcceleration[1] = arg.values[1] - gravity[1];
+            linearAcceleration[2] = arg.values[2] - gravity[2];
 
             //Toast.makeText(SensorChart.this,""+arg.values[0],Toast.LENGTH_SHORT).show();
         }

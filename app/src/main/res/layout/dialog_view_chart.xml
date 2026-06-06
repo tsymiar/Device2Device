@@ -60,18 +60,18 @@
             tools:ignore="RelativeOverlap" />
 
         <ImageView
-            android:id="@+id/imageView"
+            android:id="@+id/image_view"
             android:layout_width="wrap_content"
             android:layout_height="50dp"
             android:layout_alignParentEnd="true"
             android:layout_centerInParent="true"
             android:importantForAccessibility="no"
-            android:src="@drawable/minimize" />
+            android:src="@drawable/ic_minimize" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_above="@id/imageView"
+            android:layout_above="@id/image_view"
             android:layout_alignParentEnd="true"
             android:text="@string/min"
             android:textColor="#ffff0000"

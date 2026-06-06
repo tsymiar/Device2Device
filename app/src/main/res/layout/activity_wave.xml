@@ -135,7 +135,7 @@
 
     <!-- 语音识别入口按钮 -->
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnSpeak"
+        android:id="@+id/btn_speak"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -162,13 +162,13 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnSpeak"
+        app:layout_constraintTop_toBottomOf="@id/btn_speak"
         app:layout_constraintVertical_bias="0"
         app:strokeColor="#E0E0E0"
         app:strokeWidth="0.5dp">
 
         <TextView
-            android:id="@+id/tvResult"
+            android:id="@+id/tv_result"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
