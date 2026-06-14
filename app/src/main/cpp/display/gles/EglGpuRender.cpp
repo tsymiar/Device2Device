@@ -104,7 +104,7 @@ ANativeWindow *EglGpuRender::OpenGLSurface()
                                                  ::g_nativeWindow,
                                                  nullptr);
         if (EGL2.eglSurface == nullptr) {
-            Message::instance().setMessage("ERROR creating OpenGL Window surface!", LOG_VIEW);
+            Message::instance().setMessage("ERROR creating OpenGL Window surface!", TEXTURE);
             return nullptr;
         }
     }
@@ -642,7 +642,7 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
         if (stat == EGL_FALSE) {
             LOGE("Draws %08x status EGL_FALSE", *pixel[i]);
         } else {
-            LOGD("Draws %08x, remain = %d, using OpenGL [%d, %d]", pixel[i], pictureSize - i, EGL2.height, EGL2.width);
+            LOGD("Draws %08x, remain = %ld, using OpenGL [%d, %d]", pixel[i], pictureSize - i, EGL2.height, EGL2.width);
         }
         usleep(100);
     }

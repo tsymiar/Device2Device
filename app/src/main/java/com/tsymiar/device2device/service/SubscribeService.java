@@ -167,8 +167,13 @@ public class SubscribeService extends Service {
                 v -> {
                     if (editAddr != null)
                         PubSubSetting.setAddr(editAddr.getText().toString());
-                    if (editPort != null)
-                        PubSubSetting.setPort(Integer.parseInt(editPort.getText().toString()));
+                    if (editPort != null) {
+                        try {
+                            PubSubSetting.setPort(Integer.parseInt(editPort.getText().toString()));
+                        } catch (NumberFormatException e) {
+                            PubSubSetting.setPort(9999);
+                        }
+                    }
                     if (editTopic != null)
                         PubSubSetting.setTopic(editTopic.getText().toString());
                     Intent data = new Intent();
@@ -181,8 +186,13 @@ public class SubscribeService extends Service {
                 v -> {
                     if (editAddr != null)
                         PubSubSetting.setAddr(editAddr.getText().toString());
-                    if (editPort != null)
-                        PubSubSetting.setPort(Integer.parseInt(editPort.getText().toString()));
+                    if (editPort != null) {
+                        try {
+                            PubSubSetting.setPort(Integer.parseInt(editPort.getText().toString()));
+                        } catch (NumberFormatException e) {
+                            PubSubSetting.setPort(9999);
+                        }
+                    }
                     if (windowManager != null) {
                         windowManager.removeView(floatView);
                     }

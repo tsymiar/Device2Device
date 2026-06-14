@@ -124,11 +124,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 case Receiver.KAI_PUBLISHER:
                     Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
                     break;
-                case Receiver.LOG_VIEW:
+                case Receiver.TEXTURE:
                     TextureActivity.log(msg.obj.toString());
                     break;
                 case Receiver.KCP_VIEW:
                     mKcpBtn.setText(msg.obj.toString());
+                    break;
+                case Receiver.MSG_HINT:
+                    tv = findViewById(R.id.txt_hint);
+                    tv.setText(msg.obj.toString());
                     break;
                 default:
                     break;
@@ -359,7 +363,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
                     Toast.makeText(SelectActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
                 } else {
-                    CallbackWrapper.Publish(PubSubSetting.getTopic(), PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
+                    String topic = PubSubSetting.getTopic();
+                    if (topic == null || topic.isEmpty()) {
+                        Toast.makeText(SelectActivity.this, "publish topic is empty", Toast.LENGTH_SHORT).show();
+                    } else {
+                        CallbackWrapper.Publish(topic, PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
+                    }
                 }
             } else if (publish != null) {
                 Log.i(TAG, "Publish status: " + publish);

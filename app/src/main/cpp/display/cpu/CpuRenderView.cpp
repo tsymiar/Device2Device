@@ -260,7 +260,7 @@ void CpuRenderView::drawSurface(uint8_t *data, size_t size)
 
     ANativeWindow_Buffer buffer;
     if (ANativeWindow_lock(g_nativeWindow, &buffer, nullptr) < 0) {
-        Message::instance().setMessage("ERROR locking native window fail!", LOG_VIEW);
+        Message::instance().setMessage("ERROR locking native window fail!", TEXTURE);
         ANativeWindow_release(g_nativeWindow);
         g_nativeWindow = nullptr;
         return;

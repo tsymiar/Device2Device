@@ -255,7 +255,7 @@ void FileMsgSocket::stopServer()
         m_serverThread.join();
     }
 
-    LOGI("FileMsgSocket server exit");
+    LOGI("FileMsgSocket Server Exit");
 }
 
 int FileMsgSocket::connectToServer(const std::string& ip, unsigned short port)

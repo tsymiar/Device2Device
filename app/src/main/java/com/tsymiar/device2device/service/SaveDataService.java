@@ -21,9 +21,9 @@ public class SaveDataService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getExtras() != null) {
-            String temp = intent.getExtras().getString("temp");
-            if (temp != null && !"stop".equals(temp)) {
-                saveData(temp);
+            String cmd = intent.getExtras().getString("cmd");
+            if (cmd != null && !"stop".equals(cmd)) {
+                saveData(cmd);
             } else {
                 stopSelf();
             }
@@ -31,7 +31,7 @@ public class SaveDataService extends Service {
         return START_NOT_STICKY;
     }
 
-    private void saveData(String temp) {
+    private void saveData(String cmd) {
         new Thread(() -> {
             try {
                 File dir = new File(android.os.Environment.getExternalStorageDirectory()
@@ -47,7 +47,7 @@ public class SaveDataService extends Service {
                 }
                 OutputStreamWriter writer = new OutputStreamWriter(
                         new java.io.FileOutputStream(file, true));
-                writer.write(temp + "\t");
+                writer.write(cmd + "\t");
                 writer.flush();
                 writer.close();
             } catch (Exception e) {

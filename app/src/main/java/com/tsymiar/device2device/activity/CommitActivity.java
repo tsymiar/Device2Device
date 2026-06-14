@@ -129,7 +129,7 @@ public class CommitActivity extends Activity {
 
         Intent hint = new Intent(this, ReceiverService.class);
         Bundle ble = new Bundle();
-        ble.putString("temp", getString(R.string.received));
+        ble.putString("cmd", getString(R.string.received));
         hint.putExtras(ble);
         sendBroadcast(hint);
         startService(hint);
@@ -389,11 +389,11 @@ public class CommitActivity extends Activity {
         private final InputStream mmInStream;
 
         ReceiveThread(BluetoothSocket socket) {
-            InputStream tmp = null;
+            InputStream instr = null;
             try {
-                tmp = socket.getInputStream();
+                instr = socket.getInputStream();
             } catch (IOException ignored) {}
-            mmInStream = tmp;
+            mmInStream = instr;
         }
 
         @Override

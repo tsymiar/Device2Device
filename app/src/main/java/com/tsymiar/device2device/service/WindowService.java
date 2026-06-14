@@ -53,9 +53,9 @@ public class WindowService extends Service {
         setView();
         if (intent != null) {
             Bundle bundle = intent.getExtras();
-            String temp = bundle != null ? bundle.getString("t") : null;
-            if (temp != null) {
-                handler.obtainMessage(0, temp).sendToTarget();
+            String cmd = bundle != null ? bundle.getString("cmd") : null;
+            if (cmd != null) {
+                handler.obtainMessage(0, cmd).sendToTarget();
             }
         }
         Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);

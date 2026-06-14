@@ -1,9 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ===== App ===== -->
     <string name="app_name">Device2Device</string>
+    <string name="hello_world">Hello World!</string>
+    <string name="developing">开发中</string>
+
+    <!-- ===== Render Mode Arrays ===== -->
     <string-array name="types">
         <item>None</item>
         <item>GPU-OpenGL</item>
-        <item>GPU-surface</item>
+        <item>GPU-Surface</item>
         <item>CPU-image</item>
         <item>CPU-video</item>
         <item>Disconnect</item>
@@ -11,7 +17,7 @@
     <string-array name="types_gpu">
         <item>None</item>
         <item>GPU-OpenGL</item>
-        <item>GPU-surface</item>
+        <item>GPU-Surface</item>
         <item>Disconnect</item>
     </string-array>
     <string-array name="types_cpu">
@@ -21,85 +27,41 @@
         <item>Disconnect</item>
     </string-array>
 
-    <string name="reload">Re-fresh</string>
-    <string name="pick_file">pick</string>
-    <string name="mode_auto">Auto</string>
-    <string name="mode_gpu">GPU</string>
-    <string name="mode_cpu">CPU</string>
+    <!-- ===== Main Navigation ===== -->
     <string name="texture">📺 Texture</string>
     <string name="wave">〰️ Wave</string>
     <string name="chart">📈 Chart</string>
-    <string name="status">status</string>
-    <string name="read">local</string>
-    <string name="record">record</string>
-    <string name="viewGithub">View on GitHub</string>
-    <string name="close">Close</string>
-    <string name="dftHint">" "</string>
-    <string name="server">server</string>
-    <string name="client">client</string>
-    <string name="event">event</string>
-    <string name="time">time</string>
-    <string name="subscribe">Subscribe</string>
-    <string name="publish">Publish</string>
-    <string name="exit">❌</string>
-    <string name="confirm">✅</string>
-    <string name="address">192.168.3.213</string>
-    <string name="minimum">-</string>
-    <string name="topic">0x1234</string>
-    <string name="sub_port">9999</string>
-    <string name="pub_payload">some message</string>
-    <string name="hint_address">address</string>
-    <string name="hint_port">port</string>
-    <string name="tcp">TCP</string>
-    <string name="kcprun">Kcp</string>
-    <string name="speak">Speak</string>
-    <string name="recording_state">Recing</string>
-    <string name="speak_prompt">请开始讲话…</string>
-    <string name="speech_not_supported">设备不支持语音输入</string>
-    <string name="speech_error">语音识别错误: %s</string>
-    <string name="permission_audio_storage">是否跳转设置开启存储和录音权限？</string>
-    <string name="enable_storage_record_permission">请在设置中开启存储和录音权限</string>
-    <string name="permission_denied_record">权限被拒绝，无法录音</string>
-    <string name="speech_to_text">语音识别显示区域</string>
-    <string name="hello_world">Hello World!</string>
-    <string name="ngravity">Gravity:</string>
-    <string name="accelerator">Accelerator:</string>
-    <string name="nliner_accelerator">Liner-accelerator:</string>
-    <string name="start_chart">Start Chart</string>
-    <string name="testing">测试测试</string>
-    <string name="begin">开始</string>
-    <string name="pause">暂停</string>
-    <string name="hide">隐藏</string>
-    <string name="range">幅度</string>
-    <string name="legend">图例：</string>
-    <string name="arrows">⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂</string>
-    <string name="pull">拖动</string>
-    <string name="min">最小化</string>
-    <string name="notify">返回</string>
-    <string name="CH0">CH0</string>
-    <string name="CH1">CH1</string>
-    <string name="item" tools:ignore="ExtraTranslation" />
-    <string name="sensor">传感器</string>
-    <string name="url">源码</string>
-    <string name="feed">反馈</string>
-    <string name="thank">鸣谢</string>
-    <string name="email">mailto:909006258@qq.com</string>
-    <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
-    <string name="developing">开发中</string>
-    <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
-    <string name="exit_app">再次返回退出应用</string>
-    <string name="msg">请输入要发送的消息</string>
-    <string name="pkg">📎</string>
-    <string name="commit">发送</string>
-    <string name="r1">深度思考(R1)</string>
+    <string name="bluetooth">🔵 Serial</string>
     <string name="chat">💬 Chat Box</string>
     <string name="file_trans">📁 File Transfer</string>
     <string name="http_server">🌐 HTTP Server</string>
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
-    <string name="bluetooth">🔵 Serial</string>
     <string name="section_files">💬 Services</string>
+    <string name="sensor">传感器</string>
+    <string name="url">源码</string>
+    <string name="feed">反馈</string>
+    <string name="thank">鸣谢</string>
+    <string name="r1">深度思考(R1)</string>
 
+    <!-- ===== Render Controls ===== -->
+    <string name="mode_auto">Auto</string>
+    <string name="mode_gpu">GPU</string>
+    <string name="mode_cpu">CPU</string>
+    <string name="reload">Re-fresh</string>
+    <string name="pick_file">pick</string>
+    <string name="read">local</string>
+    <string name="record">record</string>
+    <string name="status">status</string>
+    <string name="close">Close</string>
+
+    <!-- ===== About / Feedback ===== -->
+    <string name="viewGithub">View on GitHub</string>
+    <string name="email">mailto:909006258@qq.com</string>
+    <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
+    <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
+
+    <!-- ===== Bluetooth ===== -->
     <string name="title">Bluetooth</string>
     <string name="title_activity_e">搜索附近设备</string>
     <string name="select_device">搜索结果</string>
@@ -109,31 +71,97 @@
     <string name="title_paired_devices">已与手机配对设备:</string>
     <string name="none_paired">没有已配对设备</string>
     <string name="scanning">正在搜索…</string>
+    <string name="findable">可检测性</string>
+    <string name="can_be_find">可检测性已开启</string>
+    <string name="open_bluetooth">请打开蓝牙</string>
+    <string name="retry">请打开蓝牙后重试</string>
+    <string name="unsupported">设备不受支持</string>
+
+    <!-- ===== Serial Connection ===== -->
     <string name="edit_text">默认⑴</string>
     <string name="back">点击返回发送界面</string>
-
     <string name="none_type">未输入</string>
     <string name="window">数据发送窗口</string>
+    <string name="received">显示接收数据</string>
+    <string name="click2begin">点击按钮开始操作</string>
+    <string name="entry">点击进入</string>
+    <string name="double_click">双击退出界面</string>
+    <string name="file_local">/SerialConn/signal.dat</string>
+    <string name="sdcard_device2device">数据将存于Device2Device目录下</string>
+    <string name="ill_reply">请输入你要说的话,我应该会很快回复的。</string>
+    <string name="msg">请输入要发送的消息</string>
+    <string name="pkg">📎</string>
+    <string name="commit">发送</string>
+
+    <!-- ===== Serial Command Buttons ===== -->
     <string name="is_0">❨0❩</string>
     <string name="cmd_0">A00</string>
     <string name="cmd_hu">Q00</string>
     <string name="cmd_hr">R00</string>
     <string name="cmd_hl">L00</string>
     <string name="cmd_hd">H00</string>
-    <string name="click2begin">点击按钮开始操作</string>
-    <string name="findable">可检测性</string>
-    <string name="entry">点击进入</string>
-    <string name="sdcard_device2device">数据将存于Device2Device目录下</string>
-    <string name="ill_reply">请输入你要说的话,我应该会很快回复的。</string>
-    <string name="can_be_find">可检测性已开启</string>
-    <string name="retry">请打开蓝牙后重试</string>
-    <string name="unsupported">设备不受支持</string>
-    <string name="open_bluetooth">请打开蓝牙</string>
-    <string name="double_click">双击退出界面</string>
-    <string name="received">显示接收数据</string>
-    <string name="file_local">/SerialConn/signal.dat</string>
-    <string name="http_server_select_hint">请选择一个本地文件夹作为 HTTP 服务的根目录。</string>
+
+    <!-- ===== Network / MQTT ===== -->
+    <string name="server">server</string>
+    <string name="client">client</string>
+    <string name="event">event</string>
+    <string name="time">time</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="publish">Publish</string>
+    <string name="tcp">TCP</string>
+    <string name="kcprun">Kcp</string>
+    <string name="address">192.168.0.1</string>
+    <string name="topic">0x1234</string>
+    <string name="sub_port">9999</string>
+    <string name="pub_payload">some message</string>
+    <string name="hint_address">address</string>
+    <string name="hint_port">port</string>
+    <string name="minimum">-</string>
+    <string name="exit">❌</string>
+    <string name="confirm">✅</string>
+
+    <!-- ===== Chart / Wave / Sensor ===== -->
+    <string name="start_chart">Start Chart</string>
+    <string name="testing">测试测试</string>
+    <string name="begin">开始</string>
+    <string name="pause">暂停</string>
+    <string name="hide">隐藏</string>
+    <string name="range">幅度</string>
+    <string name="legend">图例：</string>
+    <string name="pull">拖动</string>
+    <string name="min">最小化</string>
+    <string name="notify">返回</string>
+    <string name="CH0">CH0</string>
+    <string name="CH1">CH1</string>
+    <string name="arrows">⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂</string>
+    <string name="ngravity">Gravity:</string>
+    <string name="accelerator">Accelerator:</string>
+    <string name="nliner_accelerator">Liner-accelerator:</string>
+
+    <!-- ===== Speech / Voice ===== -->
+    <string name="speak">Speak</string>
+    <string name="recording_state">Recing</string>
+    <string name="speak_prompt">请开始讲话…</string>
+    <string name="speech_not_supported">设备不支持语音输入</string>
+    <string name="speech_error">语音识别错误: %s</string>
+    <string name="speech_to_text">语音识别显示区域</string>
+
+    <!-- ===== Permissions ===== -->
     <string name="permission_required">权限请求</string>
+    <string name="permission_audio_storage">是否跳转设置开启存储和录音权限？</string>
+    <string name="enable_storage_record_permission">请在设置中开启存储和录音权限</string>
+    <string name="permission_denied_record">权限被拒绝，无法录音</string>
     <string name="overlay_permission_hint">按以下步骤开启悬浮窗权限:\n\n1. 点击「设置」\n2. 从列表中选择「Device2Device」\n3. 开启「允许显示在其他应用上层」</string>
     <string name="go_to_settings">设置</string>
+
+    <!-- ===== HTTP Server ===== -->
+    <string name="http_server_select_hint">请选择一个本地文件夹作为 HTTP 服务的根目录。</string>
+
+    <!-- ===== Exit ===== -->
+    <string name="exit_app">再次返回退出应用</string>
+
+    <!-- ===== Misc ===== -->
+    <string name="item" tools:ignore="ExtraTranslation" />
+    <string name="dftHint">" "</string>
+
 </resources>

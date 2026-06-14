@@ -12,13 +12,14 @@
 enum MASSAGER {
     MESSAGE,
     TOAST,
-    LOG_VIEW,
+    TEXTURE,
     UDP_SERVER,
     UDP_CLIENT,
     SUBSCRIBER,
     PUBLISHER,
     KCP_VIEW,
-    FILE_PROGRESS
+    FILE_PROGRESS,
+    MSG_HINT
 };
 
 struct Messaging {

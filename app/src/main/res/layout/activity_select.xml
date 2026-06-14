@@ -1,442 +1,481 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:scrollbars="none"
-    tools:context=".activity.MainActivity"
-    tools:ignore="MissingClass">
+    android:orientation="vertical">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <!-- 顶部快捷入口 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/btn_texture"
-                style="@style/Widget.MaterialComponents.Chip.Action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:checkable="false"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="@string/texture"
-                app:chipIconVisible="false"
-                app:rippleColor="@color/colorPrimary" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/btn_wave"
-                style="@style/Widget.MaterialComponents.Chip.Action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:checkable="false"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="@string/wave"
-                app:chipIconVisible="false"
-                app:rippleColor="@color/colorPrimary" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/btn_chart"
-                style="@style/Widget.MaterialComponents.Chip.Action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:checkable="false"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="@string/chart"
-                app:chipIconVisible="false"
-                app:rippleColor="@color/colorPrimary" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/btn_bluetooth"
-                style="@style/Widget.MaterialComponents.Chip.Action"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checkable="false"
-                android:clickable="true"
-                android:focusable="true"
-                android:text="@string/bluetooth"
-                app:chipIconVisible="false"
-                app:rippleColor="@color/colorAccent" />
-        </LinearLayout>
-
-        <!-- 分割线 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginBottom="12dp"
-            android:background="#E0E0E0" />
-
-        <!-- ================ 网络服务区域（可折叠） ================ -->
-        <LinearLayout
-            android:id="@+id/network_header"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?android:attr/selectableItemBackground"
-            android:paddingVertical="8dp"
-            android:paddingHorizontal="4dp">
-
-            <View
-                android:layout_width="4dp"
-                android:layout_height="18dp"
-                android:layout_marginEnd="8dp"
-                android:background="@color/colorPrimary" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/section_network"
-                android:textColor="@color/colorPrimary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/network_arrow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="▲"
-                android:textColor="@color/colorPrimary"
-                android:textSize="12sp" />
-        </LinearLayout>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        tools:context=".activity.MainActivity"
+        tools:ignore="MissingClass">
 
         <LinearLayout
-            android:id="@+id/network_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginBottom="8dp">
+            android:padding="16dp">
 
-            <!-- 第一行：Server + Client -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_server"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:text="@string/server"
-                    android:textSize="12sp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    app:cornerRadius="18dp"
-                    app:strokeColor="@color/colorPrimary"
-                    app:strokeWidth="1dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_client"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:text="@string/client"
-                    android:textSize="12sp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    app:cornerRadius="18dp"
-                    app:strokeColor="@color/colorPrimary"
-                    app:strokeWidth="1dp" />
-            </LinearLayout>
-
-            <!-- Server / Client 状态文字行 -->
+            <!-- 顶部快捷入口 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/txt_server"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="@string/dftHint"
-                    android:textColor="#9E9E9E"
-                    android:textSize="10sp" />
-
-                <TextView
-                    android:id="@+id/txt_client"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="@string/dftHint"
-                    android:textColor="#9E9E9E"
-                    android:textSize="10sp" />
-            </LinearLayout>
-
-            <!-- 第二行：Event + Time -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_event"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:text="@string/event"
-                    android:textSize="12sp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    app:cornerRadius="18dp"
-                    app:strokeColor="@color/colorPrimary"
-                    app:strokeWidth="1dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_time"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:text="@string/time"
-                    android:textSize="12sp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    app:cornerRadius="18dp"
-                    app:strokeColor="@color/colorPrimary"
-                    app:strokeWidth="1dp" />
-            </LinearLayout>
-
-            <!-- Event / Time 状态文字行 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/txt_event"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="@string/dftHint"
-                    android:textColor="#9E9E9E"
-                    android:textSize="10sp" />
-
-                <TextView
-                    android:id="@+id/txt_time"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text="@string/dftHint"
-                    android:textColor="#9E9E9E"
-                    android:textSize="10sp" />
-            </LinearLayout>
-
-            <!-- 第三行：TCP + KCP -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_tcp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:text="@string/tcp"
-                    android:textSize="13sp"
-                    app:cornerRadius="20dp"
-                    app:strokeColor="@color/colorPrimary"
-                    app:strokeWidth="1dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_ikcp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="38dp"
-                    android:layout_weight="1"
-                    android:text="@string/kcprun"
-                    android:textSize="13sp"
-                    app:cornerRadius="20dp"
-                    app:strokeColor="#FF9800"
-                    app:strokeWidth="1dp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- 分割线 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="12dp"
-            android:background="#E0E0E0" />
-
-        <!-- ================ 高级功能区域 ================ -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/section_advanced"
-            android:textColor="@color/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <!-- 订阅 & 发布 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_subscribe"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:text="@string/subscribe"
-                app:backgroundTint="@color/colorPrimary"
-                app:cornerRadius="20dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_publisher"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/publish"
-                app:backgroundTint="@color/colorAccent"
-                app:cornerRadius="20dp" />
-        </LinearLayout>
-
-        <!-- 分割线 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="12dp"
-            android:background="#E0E0E0" />
-
-        <!-- 文件与聊天区域 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/section_files"
-            android:textColor="@color/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_chat"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:text="@string/chat"
-                app:cornerRadius="20dp"
-                app:strokeColor="#4CAF50" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_file_trans"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:text="@string/file_trans"
-                app:cornerRadius="20dp"
-                app:strokeColor="#2196F3" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_http_server"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/http_server"
-                app:backgroundTint="#FF5722"
-                app:cornerRadius="20dp" />
-        </LinearLayout>
-
-        <!-- 状态信息卡片 -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardElevation="2dp"
-            app:cardCornerRadius="12dp"
-            app:contentPadding="16dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/colorPrimary">
-
-            <TextView
-                android:id="@+id/txt_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:gravity="center"
-                android:lineSpacingExtra="4dp"
-                android:text="@string/dftHint"
-                android:textColor="#37474F"
-                android:textSize="14sp"
-                tools:ignore="RtlHardcoded" />
-        </com.google.android.material.card.MaterialCardView>
+                android:orientation="horizontal">
 
-        <!-- 底部 JNI 信息 -->
-        <TextView
-            android:id="@+id/sample_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:layout_marginBottom="16dp"
-            android:text="@string/hello_world"
-            android:textColor="#BDBDBD"
-            android:textSize="12sp" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_texture"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:checkable="false"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/texture"
+                    app:chipIconVisible="false"
+                    app:rippleColor="@color/colorPrimary" />
 
-    </LinearLayout>
-</ScrollView>
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_wave"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:checkable="false"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/wave"
+                    app:chipIconVisible="false"
+                    app:rippleColor="@color/colorPrimary" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_chart"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:checkable="false"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/chart"
+                    app:chipIconVisible="false"
+                    app:rippleColor="@color/colorPrimary" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_bluetooth"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checkable="false"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/bluetooth"
+                    app:chipIconVisible="false"
+                    app:rippleColor="@color/colorAccent" />
+            </LinearLayout>
+
+            <!-- 分割线 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="12dp"
+                android:background="#E0E0E0" />
+
+            <!-- ================ 网络服务区域（可折叠） ================ -->
+            <LinearLayout
+                android:id="@+id/network_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="4dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="18dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@color/colorPrimary" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/section_network"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/network_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="▲"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/network_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="8dp">
+
+                <!-- 第一行：Server + Client -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_server"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/server"
+                        android:textSize="12sp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:cornerRadius="18dp"
+                        app:strokeColor="@color/colorPrimary"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_client"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="@string/client"
+                        android:textSize="12sp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:cornerRadius="18dp"
+                        app:strokeColor="@color/colorPrimary"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+
+                <!-- Server / Client 状态文字行 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/txt_server"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:text="@string/dftHint"
+                        android:textColor="#9E9E9E"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/txt_client"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:text="@string/dftHint"
+                        android:textColor="#9E9E9E"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <!-- 第二行：Event + Time -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_event"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/event"
+                        android:textSize="12sp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:cornerRadius="18dp"
+                        app:strokeColor="@color/colorPrimary"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_time"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:text="@string/time"
+                        android:textSize="12sp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        app:cornerRadius="18dp"
+                        app:strokeColor="@color/colorPrimary"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+
+                <!-- Event / Time 状态文字行 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/txt_event"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:text="@string/dftHint"
+                        android:textColor="#9E9E9E"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/txt_time"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:text="@string/dftHint"
+                        android:textColor="#9E9E9E"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <!-- 第三行：TCP + KCP -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_tcp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/tcp"
+                        android:textSize="13sp"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="@color/colorPrimary"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ikcp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:text="@string/kcprun"
+                        android:textSize="13sp"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="#FF9800"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 分割线 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:background="#E0E0E0" />
+
+            <!-- ================ 高级功能区域 ================ -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/section_advanced"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- 订阅 & 发布 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_subscribe"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/subscribe"
+                    app:backgroundTint="@color/colorPrimary"
+                    app:cornerRadius="20dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_publisher"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/publish"
+                    app:backgroundTint="@color/colorAccent"
+                    app:cornerRadius="20dp" />
+            </LinearLayout>
+
+            <!-- 分割线 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:background="#E0E0E0" />
+
+            <!-- 文件与聊天区域 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/section_files"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_chat"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/chat"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="#4CAF50" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_file_trans"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/file_trans"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="#2196F3" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_http_server"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/http_server"
+                    app:backgroundTint="#FF5722"
+                    app:cornerRadius="20dp" />
+            </LinearLayout>
+
+            <!-- 状态信息卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardElevation="2dp"
+                app:cardCornerRadius="12dp"
+                app:contentPadding="16dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/colorPrimary">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/txt_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:lineSpacingExtra="2dp"
+                        android:paddingBottom="8dp"
+                        android:text="@string/dftHint"
+                        android:textColor="#9E9E9E"
+                        android:textSize="12sp"
+                        android:textStyle="italic"
+                        tools:ignore="RtlHardcoded" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="4dp"
+                        android:background="#E0E0E0" />
+
+                    <TextView
+                        android:id="@+id/txt_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:layout_marginTop="4dp"
+                        android:lineSpacingExtra="4dp"
+                        android:text="@string/dftHint"
+                        android:textColor="#37474F"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        tools:ignore="RtlHardcoded" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- 底部 JNI 信息（页脚，固定底部） -->
+    <TextView
+        android:id="@+id/sample_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="@string/hello_world"
+        android:textColor="#BDBDBD"
+        android:textSize="12sp" />
+
+</LinearLayout>

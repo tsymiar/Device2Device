@@ -100,9 +100,9 @@ public class ReceiverService extends Service {
         createView();
         if (intent != null) {
             Bundle bundle = intent.getExtras();
-            String temp = bundle != null ? bundle.getString("temp") : null;
-            if (temp != null) {
-                handler.obtainMessage(0, temp).sendToTarget();
+            String cmd = bundle != null ? bundle.getString("cmd") : null;
+            if (cmd != null) {
+                handler.obtainMessage(0, cmd).sendToTarget();
             }
         }
         if (mMyView != null) {

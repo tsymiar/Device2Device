@@ -34,8 +34,6 @@ namespace {
     int g_width = -1;
     std::string g_filename;
 }
-static std::atomic<int> g_subStatus{ -1 };
-static std::thread g_subThread;
 
 JNIEXPORT void CPP_FUNC_CALL(initJvmEnv)(JNIEnv* env, jclass, jstring class_name)
 {
@@ -106,48 +104,68 @@ struct PubSubParam {
     int port{};
     uint32_t topic;
     Scadup::RECV_CALLBACK hook{};
-    JNIEnv env{};
-    jclass clz{};
-    std::string view;
-    int id{};
 } g_pubSubParam;
+
+static std::mutex g_paramMutex;
 
 void RecvHook(const Scadup::Message& msg)
 {
     std::stringstream ss;
     ss << std::hex << msg.head.topic;
-    std::string message = "Topic:\t[0x" + ss.str()
-        + "]\nPayload:\t[" + msg.payload.status
+    std::string message = "Recv topic:\t[0x" + ss.str()
+        + "]\tsize=" + std::to_string(msg.head.size) + "\nPayload:\t[" + msg.payload.status
         + "]\t[" + msg.payload.content + "].";
     Message::instance().setMessage(message, MESSAGE);
 }
 
-JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass clz, jstring addr, jint port, jstring topic, jstring viewId, jint id)
+JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, jint port, jstring topic, jstring, jint)
 {
-    jint status = -1;
     std::string address = Jstring2Cstring(env, addr);
-    g_pubSubParam.addr = address;
-    const std::string msg = Jstring2Cstring(env, topic);
-    g_pubSubParam.topic = strtol(msg.c_str(), nullptr, 16);
-    g_pubSubParam.port = port;
-    g_pubSubParam.hook = RecvHook;
-    g_pubSubParam.env = *env;
-    g_pubSubParam.clz = clz;
-    const std::string view = Jstring2Cstring(env, viewId);
-    g_pubSubParam.view = view;
-    g_pubSubParam.id = id;
-    std::thread task([&status](const PubSubParam& param) -> void {
+    const std::string topicHex = Jstring2Cstring(env, topic);
+    uint32_t iTopic = strtol(topicHex.c_str(), nullptr, 16);
+
+    if (address.empty() || port <= 0) {
+        Message::instance().setMessage("Subscribe failed: invalid address or port", TOAST);
+        return -1;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_paramMutex);
+        g_pubSubParam.addr = address;
+        g_pubSubParam.topic = iTopic;
+        g_pubSubParam.port = port;
+        g_pubSubParam.hook = RecvHook;
+    }
+
+    std::thread task([addr = std::move(address), port, topic = iTopic, hook = RecvHook]() {
         Scadup::Subscriber sub;
-        sub.setup(param.addr.c_str(), param.port);
-        status = sub.subscribe(param.topic, param.hook);
-        char content[256];
-        memset(content, 0, 256);
-        sprintf(content, "message of %s:%d, topic: '0x%04x', hook = %p, status = %d",
-            param.addr.c_str(), param.port, param.topic, param.hook, status);
-        Message::instance().setMessage(content, SUBSCRIBER);
-        }, std::ref(g_pubSubParam));
+        int ret = sub.setup(addr.c_str(), static_cast<unsigned short>(port));
+        if (ret < 0) {
+            char content[128];
+            snprintf(content, sizeof(content), "Subscribe connect fail: %s:%d",
+                addr.c_str(), port);
+            Message::instance().setMessage(content, TOAST);
+            return;
+        }
+
+        {
+            char content[128];
+            snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x",
+                addr.c_str(), port, topic);
+            Message::instance().setMessage(content, TOAST);
+        }
+
+        ret = static_cast<int>(sub.subscribe(topic, hook));
+
+        {
+            char content[256];
+            snprintf(content, sizeof(content), "Subscribe ended: %s:%d topic 0x%04x status=%d",
+                addr.c_str(), port, topic, ret);
+            Message::instance().setMessage(content, SUBSCRIBER);
+        }
+        });
     task.detach();
-    return g_subStatus.load();
+    return 0;
 }
 
 JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
@@ -157,27 +175,55 @@ JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
 
 JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring message, jstring addr, jint port)
 {
-    if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
-        std::string csip = Jstring2Cstring(env, addr);
-        if (!csip.empty() && port > 0) {
-            g_pubSubParam.addr = csip;
-            g_pubSubParam.port = port;
+    std::string topicHex = Jstring2Cstring(env, topic);
+    std::string payload = Jstring2Cstring(env, message);
+
+    if (topicHex.empty()) {
+        Message::instance().setMessage("Publish failed: topic is empty", TOAST);
+        return;
+    }
+
+    std::string pubAddr;
+    int pubPort;
+    {
+        std::lock_guard<std::mutex> lock(g_paramMutex);
+        if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
+            std::string ip = Jstring2Cstring(env, addr);
+            if (!ip.empty() && port > 0) {
+                g_pubSubParam.addr = ip;
+                g_pubSubParam.port = port;
+                pubAddr = std::move(ip);
+                pubPort = port;
+            } else {
+                Message::instance().setMessage("Publish failed: no address or port", TOAST);
+                return;
+            }
         } else {
-            LOGI("g_pubSubParam: addr is null or port == 0.");
-            return;
+            pubAddr = g_pubSubParam.addr;
+            pubPort = g_pubSubParam.port;
         }
     }
-    uint32_t iTopic = strtol(Jstring2Cstring(env, topic).c_str(), nullptr, 16);
-    std::string payloadParam = Jstring2Cstring(env, message);
-    Scadup::Publisher pub{};
-    pub.setup(g_pubSubParam.addr.c_str(), g_pubSubParam.port);
-    ssize_t stat = pub.publish(iTopic, payloadParam);
-    if (stat < 0) {
-        Message::instance().setMessage("Message Publisher failed!", TOAST);
-    }
-    LOGI("Publish(%zd) to [%s:%d]: [topic=0x%04x] message: [%s].", stat,
-        g_pubSubParam.addr.c_str(), g_pubSubParam.port,
-        iTopic, payloadParam.c_str());
+
+    uint32_t iTopic = strtol(topicHex.c_str(), nullptr, 16);
+
+    std::thread task([pubAddr = std::move(pubAddr), pubPort, iTopic, payload = std::move(payload)]() {
+        Scadup::Publisher pub{};
+        int ret = pub.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
+        if (ret < 0) {
+            Message::instance().setMessage(
+                "Publish connect failed: " + pubAddr + ":" + std::to_string(pubPort), TOAST);
+            return;
+        }
+        ssize_t stat = pub.publish(iTopic, payload);
+        if (stat < 0) {
+            Message::instance().setMessage("Publish send failed!", TOAST);
+        } else {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "Published to 0x%x (%zd bytes)", iTopic, stat);
+            Message::instance().setMessage(buf, MSG_HINT);
+        }
+        });
+    task.detach();
 }
 
 int callback(const char* c, int i)
@@ -422,10 +468,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint po
         tcp.RegisterCallback(tcp_callback);
         int ret = tcp.Start(port);
         if (ret != 0) {
-            Message::instance().setMessage("TCP Start(" + std::to_string(ret) + "): " + std::string(strerror(errno)), MESSAGE);
+            Message::instance().setMessage("TCP Start(" + std::to_string(ret) + "): " + std::string(strerror(errno)), TOAST);
             tcp.Finish();
         } else {
-            Message::instance().setMessage("TCP server " + std::to_string(port), MESSAGE);
+            Message::instance().setMessage("TCP listening port: " + std::to_string(port), MESSAGE);
         }
         }, port);
     if (th.joinable())
@@ -503,7 +549,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jin
         g_fileMsg = nullptr;
         return ret;
     }
-    Message::instance().setMessage("FileMsg server started on port " + std::to_string(port), MESSAGE);
+    Message::instance().setMessage("FileMsg Server Started on Port " + std::to_string(port), MESSAGE);
     return 0;
 }
 
@@ -584,7 +630,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass)
         g_fileMsg->stopServer();
         delete g_fileMsg;
         g_fileMsg = nullptr;
-        Message::instance().setMessage("FileMsg server exit", MESSAGE);
+        Message::instance().setMessage("FileMsg Server Exit", MESSAGE);
     }
 }
 

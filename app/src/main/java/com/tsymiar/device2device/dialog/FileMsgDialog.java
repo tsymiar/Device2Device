@@ -137,14 +137,13 @@ public class FileMsgDialog extends DialogFragment {
                 if (ret >= 0) {
                     isServerStarted = true;
                     tvStatus.setText("Server started on port " + port);
-                    Toast.makeText(getContext(), "server bind port " + port, Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(getContext(), "Server start failed: " + ret, Toast.LENGTH_SHORT).show();
                 }
             } else {
                 NetworkWrapper.stopFileMsgServer();
                 isServerStarted = false;
-                tvStatus.setText("Server exit");
+                tvStatus.setText("FileMsgDialog Server Exit");
             }
             updateUI();
         });
