@@ -3,7 +3,17 @@
 
 # Device2Device
 
-An Android application for peer-to-peer communication and multimedia processing between devices, featuring Bluetooth serial communication, multi-protocol networking (TCP/UDP/KCP), Pub/Sub messaging, GPU/CPU rendering, audio recording & analysis, sensor data collection, AI chat integration (DeepSeek), and an embedded HTTP file server.
+A feature-rich Android application for **peer-to-peer communication** and **multimedia processing** between devices.
+
+**Core capabilities:**
+- 🔵 Bluetooth RFCOMM serial communication with device discovery and data logging
+- 🌐 Multi-protocol networking: TCP, UDP (multicast), KCP (reliable UDP)
+- 📨 Pub/Sub messaging via scadup message queue library
+- 🎨 GPU (OpenGL ES) and CPU image/video rendering
+- 🎤 Audio recording (16kHz PCM) with real-time waveform visualization and speech recognition
+- 📊 Real-time sensor monitoring (accelerometer, gravity, linear acceleration)
+- 🤖 AI chat powered by DeepSeek API (Chat + Deep Think models)
+- 📁 Embedded HTTP file server with directory browsing
 
 ---
 
@@ -102,20 +112,39 @@ app/src/main/
 | UDP Client  | Start a UDP multicast client to send data                        |
 | TCP Server  | Start a TCP server to receive data                               |
 | KCP         | KCP (Reliable UDP) protocol for low-latency transmission         |
-| Pub/Sub     | Subscribe & Publish messages via floating dialog windows         |
+| Pub/Sub     | Subscribe & Publish messages via floating dialog windows; async connection with real-time status feedback |
 | File Transfer | Custom binary protocol with chunked transfer (64KB/chunk) and progress callback |
 | HTTP Server | Embedded HTTP server with HTML directory listing; supports SAF mode (Android 10+) |
 
+### Message System (C++ ↔ Java)
+
+The app uses a thread-safe message queue (`Message.h`) to bridge C++ native code with Java UI. Messages are dispatched via the `MASSAGER` enum:
+
+| Type          | Direction | Description                               |
+| :------------ | :-------: | :---------------------------------------- |
+| `MESSAGE`     | C++ → Java | General toast notifications               |
+| `TOAST`       | C++ → Java | Status text update (`txt_status`)         |
+| `MSG_HINT`    | C++ → Java | Hint text update (`txt_hint`)             |
+| `SUBSCRIBER`  | C++ → Java | Subscribe service feedback                |
+| `PUBLISHER`   | C++ → Java | Publish service feedback                  |
+| `FILE_PROGRESS` | C++ → Java | File transfer progress update             |
+| `TEXTURE`     | C++ → Java | Texture rendering callback                |
+| `UDP_SERVER`  | C++ → Java | UDP server status                         |
+| `UDP_CLIENT`  | C++ → Java | UDP client status                         |
+| `KCP_VIEW`    | C++ → Java | KCP connection status                     |
+
+The SelectActivity UI features a dual-status display: `txt_hint` (italic, light gray) for supplementary hints and `txt_status` (bold, dark) for primary status, separated by a divider line.
+
 ### Multimedia Processing
 
-| Feature        | Description                                                      |
-| :------------- | :---------------------------------------------------------------- |
-| GPU Rendering  | Image/Video rendering via OpenGL ES (EGL/GLESv2)                  |
-| CPU Rendering  | Software-based image/video decoding and display                   |
-| Audio Recording | 16kHz PCM recording with real-time waveform visualization        |
-| Audio Playback  | Play WAV/MP4/OGG/MP3/AAC/AMR files with waveform analysis       |
-| Speech to Text  | Built-in speech recognition (STT) integration                   |
-| Sensor Monitor  | Real-time accelerometer/gravity/linear acceleration data display |
+| Feature        | Description                                                            |
+| :------------- | :--------------------------------------------------------------------- |
+| GPU Rendering  | Image/video rendering via OpenGL ES 2.0 (EGL/GLESv2)                  |
+| CPU Rendering  | Software-based image/video decoding and display                        |
+| Audio Recording | 16kHz PCM recording with real-time waveform visualization              |
+| Audio Playback  | Play WAV/MP4/OGG/MP3/AAC/AMR files with waveform analysis              |
+| Speech to Text  | Built-in speech recognition (STT) integration                          |
+| Sensor Monitor  | Real-time accelerometer, gravity, and linear acceleration data display |
 
 ### Intelligent Features
 
@@ -131,7 +160,7 @@ app/src/main/
 | Event System  | Observer-pattern event broadcast for inter-component communication |
 | Time Sync     | Native timestamp acquisition and synchronization                |
 | Global Toast  | Floating toast notification service (3s auto-dismiss)            |
-| One-Key Exit  | Global exit manager to terminate all activities and services     |
+| One-Tap Exit | Global exit manager to terminate all activities and services     |
 
 ---
 
@@ -195,12 +224,25 @@ This project uses Azure Pipelines for continuous integration on `macos-latest`. 
 
 ---
 
-## Screenshot
+## Screenshots
 
-<img src="image/MainActivity.jpg" title="MainActivity" height="50%" width="50%">
+<img src="image/MainActivity.jpg" title="MainActivity" height="30%" width="30%">
 
 ---
 
 ## License
 
 MIT License
+
+---
+
+## Recent Changes
+
+### 2026-06
+
+- **MSG_HINT Message Type**: Added `MSG_HINT = 9` to `MASSAGER` enum for displaying auxiliary hint text in `SelectActivity`. C++ can now send hints via `Message::instance().setMessage(msg, MSG_HINT)`.
+- **UI Layout Improvements**: `sample_text` moved to fixed footer (outside `ScrollView`). `txt_hint` added above `txt_status` with visual differentiation: italic 12sp gray hint vs. bold 14sp dark status, separated by a divider line.
+- **Pub/Sub Async Overhaul** (`JniMethods.cpp`): `StartSubscribe` now returns immediately (non-blocking), connection results sent asynchronously via Message system. `Publish` moved to detached thread to prevent UI thread blocking (ANR). Added real-time feedback (Toast) for both Subscribe and Publish operations.
+- **Publish/Subscribe Topic Isolation** (`PubSubSetting.java`): Separate `topic` (subscribe) and `pubTopic` (publish) fields to prevent cross-contamination between services.
+- **Subscriber Use-After-Free Fix** (`Subscriber.cpp`): Fixed random trailing characters in received messages. Root cause: `body` buffer was freed immediately after enqueuing callback to thread pool, but the callback's `content` pointer still referenced freed memory. Fixed by using `shared_ptr<vector<char>>` to manage buffer lifecycle, ensuring it persists until callback completion.
+- **Port Parsing Protection** (`SubscribeService.java`): Added `try-catch` around `Integer.parseInt()` calls for port input, falling back to default port 9999 on invalid input.

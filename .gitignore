@@ -10,6 +10,7 @@ captures
 app/src/main/jniLibs
 *.zip
 *.dylib
+.codebuddy
 jniLibs
 libs
 pic
