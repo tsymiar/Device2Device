@@ -57,6 +57,7 @@ JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv *, jclass, jstring, jstring);
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv* , jclass, jint);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopTcpServer)(JNIEnv* , jclass);
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass, jint);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *, jclass, jstring text, jint len);
@@ -68,7 +69,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* , jclass, jstrin
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jint port);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv*, jclass, jstring ip, jint port);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass);
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendFile)(JNIEnv*, jclass, jstring filePath);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLocalFile)(JNIEnv*, jclass, jstring filePath);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv*, jclass, jstring ip, jint port, jstring fileName);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv*, jclass, jstring path);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass);

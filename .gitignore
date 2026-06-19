@@ -11,6 +11,7 @@ app/src/main/jniLibs
 *.zip
 *.dylib
 .codebuddy
+received
 jniLibs
 libs
 pic

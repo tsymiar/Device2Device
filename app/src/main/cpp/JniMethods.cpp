@@ -4,6 +4,10 @@
 #include <chrono>
 #include <queue>
 #include <future>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #ifndef LOG_TAG
 #define LOG_TAG "jniComm"
 #endif
@@ -13,6 +17,7 @@
 #include <common/Scadup.h>
 #include <message/Message.h>
 #include <socket/KcpSocket.h>
+#include <socket/TcpSocket.h>
 #include <socket/FileMsgSocket.h>
 #include <display/gles/EglShader.h>
 #include <display/gles/EglTexture.h>
@@ -461,21 +466,81 @@ int tcp_callback(uint8_t* data, size_t size)
     return 0;
 }
 
+// TCP server control state
+static std::atomic<TcpSocket*> g_tcpServer{nullptr};
+static std::thread*            g_tcpThread = nullptr;
+static std::mutex               g_tcpMutex;
+
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint port)
 {
-    std::thread th([](int port) -> void {
-        TcpSocket tcp;
-        tcp.RegisterCallback(tcp_callback);
-        int ret = tcp.Start(port);
+    std::lock_guard<std::mutex> lock(g_tcpMutex);
+
+    // Clean up previous thread handle if server exited naturally
+    if (g_tcpThread != nullptr && !g_tcpThread->joinable()) {
+        delete g_tcpThread;
+        g_tcpThread = nullptr;
+    }
+
+    if (g_tcpServer.load() != nullptr) {
+        Message::instance().setMessage("TCP server already running", MESSAGE);
+        return -1;
+    }
+
+    auto* tcp = new TcpSocket();
+    tcp->RegisterCallback(tcp_callback);
+    g_tcpServer.store(tcp);
+
+    g_tcpThread = new std::thread([port]() -> void {
+        auto* tcp = g_tcpServer.load();
+        int ret = tcp->Start(port);
         if (ret != 0) {
-            Message::instance().setMessage("TCP Start(" + std::to_string(ret) + "): " + std::string(strerror(errno)), TOAST);
-            tcp.Finish();
-        } else {
-            Message::instance().setMessage("TCP listening port: " + std::to_string(port), MESSAGE);
+            Message::instance().setMessage("TCP Start(" + std::to_string(ret)
+                + "): " + std::string(strerror(errno)), TOAST);
         }
-        }, port);
-    if (th.joinable())
-        th.detach();
+        delete tcp;
+        g_tcpServer.store(nullptr);
+    });
+
+    Message::instance().setMessage(
+        "TCP listening port: " + std::to_string(port), MESSAGE);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopTcpServer)(JNIEnv*, jclass)
+{
+    TcpSocket* tcp = g_tcpServer.load();
+    if (tcp == nullptr) {
+        Message::instance().setMessage("TCP server not running", MESSAGE);
+        return -1;
+    }
+
+    // Signal the accept() loop to exit
+    tcp->Finish();
+
+    // Self-connect to unblock accept()
+    int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (fd >= 0) {
+        struct sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        addr.sin_port = htons(static_cast<uint16_t>(8700));
+        ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+        ::close(fd);
+    }
+
+    // Wait for the server thread to finish
+    {
+        std::unique_lock<std::mutex> lock(g_tcpMutex);
+        if (g_tcpThread != nullptr && g_tcpThread->joinable()) {
+            lock.unlock();
+            g_tcpThread->join();
+            lock.lock();
+        }
+        delete g_tcpThread;
+        g_tcpThread = nullptr;
+    }
+
+    Message::instance().setMessage("TCP server stopped", MESSAGE);
     return 0;
 }
 
@@ -584,7 +649,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass)
     }
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendFile)(JNIEnv* env, jclass, jstring filePath)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLocalFile)(JNIEnv* env, jclass, jstring filePath)
 {
     std::string path = Jstring2Cstring(env, filePath);
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
@@ -592,7 +657,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendFile)(JNIEnv* env, jclass, jstring f
         LOGE("FileMsg not connected");
         return -1;
     }
-    int ret = g_fileMsg->sendFile(path);
+    int ret = g_fileMsg->sendLocalFile(path);
     if (ret < 0) {
         Message::instance().setMessage("File send failed", MESSAGE);
         return ret;

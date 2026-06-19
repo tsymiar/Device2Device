@@ -601,16 +601,16 @@ int FileMsgSocket::sendFileData(int sock, const std::string& filePath, uint64_t 
     return 0;
 }
 
-int FileMsgSocket::sendFile(const std::string& filePath)
+int FileMsgSocket::sendLocalFile(const std::string& filePath)
 {
     if (!m_connected.load()) {
-        LOGE("sendFile: not connected");
+        LOGE("server not connected");
         return -1;
     }
 
     struct stat st {};
     if (stat(filePath.c_str(), &st) != 0) {
-        LOGE("sendFile: stat() failed (%s)", strerror(errno));
+        LOGE("stat(%s) failed (%s)", filePath.c_str(), strerror(errno));
         return -2;
     }
 
@@ -619,7 +619,7 @@ int FileMsgSocket::sendFile(const std::string& filePath)
     // 提取文件名
     size_t pos = filePath.find_last_of("/\\");
     std::string fileName = (pos != std::string::npos) ? filePath.substr(pos + 1) : filePath;
-    LOGI("sendFile: [%s] size=%llu bytes", fileName.c_str(), (unsigned long long)fileSize);
+    LOGI("sending file: [%s] size=%llu bytes", fileName.c_str(), (unsigned long long)fileSize);
 
     // 发送请求头
     FileHeader header{};
@@ -638,7 +638,7 @@ int FileMsgSocket::sendFile(const std::string& filePath)
     // 等待响应
     FileHeader response{};
     if (recvHeader(m_clientSock, response) < 0 || response.cmd != CMD_RESPONSE) {
-        LOGE("sendFile: no response from server");
+        LOGE("recvHeader: no response from server");
         return -3;
     }
 

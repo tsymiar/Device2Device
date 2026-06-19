@@ -1,4 +1,4 @@
-#include "FileMsgSocketTest.h"
+#include "FileMsgSocketServer.h"
 #include "../socket/FileMsgSocket.h"
 #include <iostream>
 #include <fstream>
@@ -22,7 +22,7 @@
 static std::atomic<bool> g_serverReady(false);
 static std::atomic<bool> g_transferComplete(false);
 
-std::string FileMsgSocketTest::createTestFile(const std::string& path, size_t size)
+std::string FileMsgSocketServer::createTestFile(const std::string& path, size_t size)
 {
     std::ofstream file(path, std::ios::binary);
     if (!file.is_open()) {
@@ -51,7 +51,7 @@ std::string FileMsgSocketTest::createTestFile(const std::string& path, size_t si
     return path;
 }
 
-bool FileMsgSocketTest::compareFiles(const std::string& file1, const std::string& file2)
+bool FileMsgSocketServer::compareFiles(const std::string& file1, const std::string& file2)
 {
     std::ifstream f1(file1, std::ios::binary);
     std::ifstream f2(file2, std::ios::binary);
@@ -91,7 +91,7 @@ bool FileMsgSocketTest::compareFiles(const std::string& file1, const std::string
     return true;
 }
 
-void FileMsgSocketTest::runServerTest(unsigned short port)
+void FileMsgSocketServer::runServerTest(unsigned short port)
 {
     FileMsgSocket server;
     server.setSavePath("./received");
@@ -134,7 +134,7 @@ void FileMsgSocketTest::runServerTest(unsigned short port)
     std::cout << "Server test completed." << std::endl;
 }
 
-void FileMsgSocketTest::runClientTest(const std::string& ip, unsigned short port, const std::string& filePath)
+void FileMsgSocketServer::runClientTest(const std::string& ip, unsigned short port, const std::string& filePath)
 {
     // 等待服务器准备就绪
     int waitCount = 0;
@@ -170,7 +170,7 @@ void FileMsgSocketTest::runClientTest(const std::string& ip, unsigned short port
     }
 
     std::cout << "Connected, sending file: " << filePath << std::endl;
-    ret = client.sendFile(filePath);
+    ret = client.sendLocalFile(filePath);
     if (ret < 0) {
         std::cerr << "Send file failed: " << ret << std::endl;
     } else {
@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
 
     // 如果是客户端模式，先创建测试文件
     if (clientMode || (!serverMode && !clientMode)) {
-        FileMsgSocketTest::createTestFile(testFilePath, testFileSize);
+        FileMsgSocketServer::createTestFile(testFilePath, testFileSize);
     }
 
     // 如果没有指定模式，默认运行完整测试（先server后client）
@@ -265,12 +265,12 @@ int main(int argc, char* argv[])
 
         if (pid == 0) {
             // 子进程 - 运行服务器
-            FileMsgSocketTest::runServerTest(port);
+            FileMsgSocketServer::runServerTest(port);
             exit(0);
         } else {
             // 父进程 - 等待服务器启动，然后运行客户端
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            FileMsgSocketTest::runClientTest(ip, port, testFilePath);
+            FileMsgSocketServer::runClientTest(ip, port, testFilePath);
 
             // 等待子进程结束
             int status;
@@ -281,7 +281,7 @@ int main(int argc, char* argv[])
             struct stat s;
             if (stat(receivedPath.c_str(), &s) == 0) {
                 std::cout << "\n=== File verification ===" << std::endl;
-                bool match = FileMsgSocketTest::compareFiles(testFilePath, receivedPath);
+                bool match = FileMsgSocketServer::compareFiles(testFilePath, receivedPath);
                 if (match) {
                     std::cout << "TEST PASSED: Files match!" << std::endl;
                 } else {
@@ -295,9 +295,9 @@ int main(int argc, char* argv[])
         }
 #endif
     } else if (serverMode) {
-        FileMsgSocketTest::runServerTest(port);
+        FileMsgSocketServer::runServerTest(port);
     } else if (clientMode) {
-        FileMsgSocketTest::runClientTest(ip, port, testFilePath);
+        FileMsgSocketServer::runClientTest(ip, port, testFilePath);
     }
 
     return 0;

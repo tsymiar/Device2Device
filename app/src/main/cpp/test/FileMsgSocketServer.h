@@ -4,7 +4,7 @@
 #include <atomic>
 #include <string>
 
-class FileMsgSocketTest {
+class FileMsgSocketServer {
 public:
     static void runServerTest(unsigned short port = 8800);
     static void runClientTest(const std::string& ip, unsigned short port, const std::string& filePath);

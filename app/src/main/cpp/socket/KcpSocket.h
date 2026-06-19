@@ -20,6 +20,7 @@ public:
     int init(int port, bool client = false, const char* ip = nullptr);
     void startClient() const;
     void startServer() const;
+    void stop();
     void destroy();
 private:
     bool m_running;

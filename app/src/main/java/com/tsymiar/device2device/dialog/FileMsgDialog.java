@@ -181,7 +181,7 @@ public class FileMsgDialog extends DialogFragment {
                 return;
             }
             new Thread(() -> {
-                int ret = NetworkWrapper.sendFile(selectedFilePath);
+                int ret = NetworkWrapper.sendLocalFile(selectedFilePath);
                 if (ret >= 0) {
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {

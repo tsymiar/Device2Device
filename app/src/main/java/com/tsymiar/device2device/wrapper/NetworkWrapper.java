@@ -7,6 +7,7 @@ public class NetworkWrapper {
 
     // TCP
     public static native int startTcpServer(int port);
+    public static native int stopTcpServer();
 
     // UDP
     public static native int startUdpServer(int port);
@@ -26,7 +27,7 @@ public class NetworkWrapper {
     public static native void disconnectFileMsg();
 
     // 发送文件
-    public static native int sendFile(String filePath);
+    public static native int sendLocalFile(String filePath);
 
     // 请求文件
     public static native int requestFile(String ip, int port, String fileName);

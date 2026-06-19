@@ -6,6 +6,7 @@
 #ifndef LOG_TAG
 #define LOG_TAG "KcpSocket"
 #endif
+#include <cerrno>
 #include <utils/logging.h>
 
 #define KCP_CONV_VAL 0x123
@@ -15,7 +16,8 @@ int udpOutput(const char* buff, int len, ikcpcb* kcp, void* user) {
     if (user == nullptr)
         return -1;
     auto* msg = (stKcpMsg*)user;
-    ssize_t n = ::sendto(msg->sockfd, buff, len, 0, (struct sockaddr*)&msg->addr, sizeof(struct sockaddr_in));
+    struct sockaddr_in* dst = msg->isClient ? &msg->addr : &msg->clientAddr;
+    ssize_t n = ::sendto(msg->sockfd, buff, len, 0, (struct sockaddr*)dst, sizeof(struct sockaddr_in));
     if (n >= 0) {
         if (!msg->isClient)
             LOGI("udpOutPut-sendto: %zd bytes [%08x]\n", n, buff); //24字节的KCP头部
@@ -92,12 +94,15 @@ void KcpSocket::startClient() const
     int seq = 0;
     int state;
     char buffer[KCP_MSG_LEN + 24] = { 0 };
-    socklen_t len = sizeof(struct sockaddr_in);
+    const int bufferCap = (int)sizeof(buffer);
+    struct sockaddr_in fromAddr = {};
+    socklen_t len = sizeof(fromAddr);
     while (m_running) {
         isleep(1);
         //ikcp_update(ikcp_flush，ikcp_flush) send data by UDP
         ikcp_update(m_kcpMsg.pkcp, iclock());
 
+#ifdef _KCP_TEST_
         if (seq < 500) {
             char test[KCP_MSG_LEN] = { 0 }; // first time
             memset(test, 97, sizeof(test));
@@ -105,8 +110,9 @@ void KcpSocket::startClient() const
             seq++;
             LOGI("ikcp_send request len=%d seq=%d stat=%d: content[%s]\n", (int)sizeof(test), seq, state, test);
         }
+#endif
 
-        ssize_t n = ::recvfrom(m_kcpMsg.sockfd, buffer, (KCP_MSG_LEN + 24), MSG_DONTWAIT, (struct sockaddr*)&m_kcpMsg.addr, &len);
+        ssize_t n = ::recvfrom(m_kcpMsg.sockfd, buffer, bufferCap, MSG_DONTWAIT, (struct sockaddr*)&fromAddr, &len);
         if (n < 0) {
             continue;
         }
@@ -123,13 +129,13 @@ void KcpSocket::startClient() const
 
         while (m_running) {
             // kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-            state = ikcp_recv(m_kcpMsg.pkcp, buffer, n);
+            state = ikcp_recv(m_kcpMsg.pkcp, buffer, bufferCap);
             if (state < 0) {
                 // printf("ikcp_recv state = %d\n", state);
                 break;
             }
         }
-        LOGI("receive from %s:%d\n", inet_ntoa(m_kcpMsg.addr.sin_addr), ntohs(m_kcpMsg.addr.sin_port));
+        LOGI("receive from %s:%d\n", inet_ntoa(fromAddr.sin_addr), ntohs(fromAddr.sin_port));
 
 #ifdef _KCP_TEST_
         if (strcmp(buffer, "Conn-OK") == 0) {
@@ -186,13 +192,12 @@ void KcpSocket::startServer() const
             continue;
         }
 
-        // while(1)
-        // {
-        //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
-        state = ikcp_recv(m_kcpMsg.pkcp, buffer, n);//从 buf中 提取真正数据，返回提取到的数据大小
-        //	if(state < 0)//检测ikcp_recv提取到的数据
-        //		break;
-        // }
+        while (1) {
+            //kcp将接收到的kcp数据包还原成之前kcp发送的buffer数据
+            state = ikcp_recv(m_kcpMsg.pkcp, buffer, bufSize);//从 buf中 提取真正数据，返回提取到的数据大小
+            if (state < 0)//检测ikcp_recv提取到的数据
+                break;
+        }
         rcvd++;
         LOGI("KCP交互 from %s:%d rcvd=%d stat=%d, head=0x%08x, content[%s]\n", inet_ntoa(m_kcpMsg.clientAddr.sin_addr), ntohs(m_kcpMsg.clientAddr.sin_port), rcvd, state, buffer, buffer + 24);
 #ifdef _KCP_TEST_
@@ -226,15 +231,20 @@ void KcpSocket::startServer() const
     }
 }
 
-void KcpSocket::destroy()
+void KcpSocket::stop()
 {
     m_running = false;
-    usleep(1000);
+}
+
+void KcpSocket::destroy()
+{
     if (m_kcpMsg.sockfd != 0) {
         close(m_kcpMsg.sockfd);
+        m_kcpMsg.sockfd = 0;
     }
     if (m_kcpMsg.pkcp != nullptr) {
         ikcp_release(m_kcpMsg.pkcp);
+        m_kcpMsg.pkcp = nullptr;
     }
 }
 

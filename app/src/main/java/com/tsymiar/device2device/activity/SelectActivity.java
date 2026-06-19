@@ -62,12 +62,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     Intent mPublisherIntent;
     Intent mSubscribeIntent;
     Button mKcpBtn;
+    Button mTcpBtn;
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
     HttpFileService mHttpFileService;
 
     private static boolean mKcpStart = false;
+    private static boolean mTcpStart  = false;
 
     public static SelectActivity getInstance() {
         return mainActivity;
@@ -277,7 +279,18 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startService(mPublisherIntent);
             }
         });
-        findViewById(R.id.btn_tcp).setOnClickListener(v -> NetworkWrapper.startTcpServer(8700));
+        mTcpBtn = findViewById(R.id.btn_tcp);
+        mTcpBtn.setOnClickListener(v -> {
+            if (!mTcpStart) {
+                NetworkWrapper.startTcpServer(8700);
+                mTcpBtn.setText(R.string.tcp_stop);
+                mTcpStart = true;
+            } else {
+                NetworkWrapper.stopTcpServer();
+                mTcpBtn.setText(R.string.tcp);
+                mTcpStart = false;
+            }
+        });
         mKcpBtn = findViewById(R.id.btn_ikcp);
         mKcpBtn.setOnClickListener(v -> {
             if (!mKcpStart) {
