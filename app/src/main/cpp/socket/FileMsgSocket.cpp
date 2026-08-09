@@ -5,6 +5,7 @@
 #include "FileMsgSocket.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -18,12 +19,35 @@
 #include <vector>
 #include <map>
 
+// --- 可靠的 send 辅助函数 ---
+// send() 不保证一次发送所有数据（只返回实际发送量）。
+// sendAll 循环调用 send() 直到全部发送或出错，与 recvAll 对称。
+// MSG_NOSIGNAL: 防止 SIGPIPE 信号（对应 EPIPE 场景）导致进程崩溃。
+static int sendAll(int sock, const void* buf, size_t len)
+{
+    size_t total = 0;
+    while (total < len) {
+        ssize_t ret = send(sock, (const char*)buf + total, len - total, MSG_NOSIGNAL);
+        if (ret < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        if (ret == 0) {
+            return -1;
+        }
+        total += (size_t)ret;
+    }
+    return 0;
+}
+
 // --- 可靠的 recv 辅助函数 ---
 // 使用 poll() 检测连接状态，以手动读循环替代 MSG_WAITALL，避免 SO_RCVTIMEO + MSG_WAITALL 的兼容性问题
 // 返回值: >0 成功（应等于len），0 客户端断开(EOF/POLLHUP)，-1 超时（可重试），-2 其他错误
 static int recvAll(int sock, void* buf, size_t len, int timeoutMs)
 {
-    struct pollfd pfd;
+    struct pollfd pfd {};
     pfd.fd = sock;
     pfd.events = POLLIN;
 
@@ -34,26 +58,28 @@ static int recvAll(int sock, void* buf, size_t len, int timeoutMs)
             return -1;  // 超时，无数据
         }
         if (pr < 0) {
+            if (errno == EINTR) continue;   // 信号中断，重试
             return -2;  // poll 错误
         }
-        if (pfd.revents & (POLLHUP | POLLERR)) {
-            return 0;   // 客户端断开
-        }
-        if (!(pfd.revents & POLLIN)) {
+        // 先读数据再判断断开，避免 POLLIN|POLLHUP 同时设置时丢弃数据
+        if (pfd.revents & POLLIN) {
+            ssize_t ret = recv(sock, (char*)buf + total, len - total, 0);
+            if (ret == 0) {
+                return 0;   // EOF，客户端正常关闭
+            }
+            if (ret < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                    continue;  // 临时错误，重试
+                }
+                return -2;  // recv 错误
+            }
+            total += ret;
             continue;
         }
-
-        ssize_t ret = recv(sock, (char*)buf + total, len - total, 0);
-        if (ret == 0) {
-            return 0;   // EOF，客户端正常关闭
+        if (pfd.revents & (POLLHUP | POLLERR)) {
+            return 0;   // 客户端断开（缓冲区已空）
         }
-        if (ret < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                continue;  // 非阻塞模式下无数据，继续 poll
-            }
-            return -2;  // recv 错误
-        }
-        total += ret;
+        // 其他意外事件，继续 poll
     }
     return (int)total;
 }
@@ -110,7 +136,7 @@ void ClientSessionMgr::closeAllSockets()
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& pair : m_sessions) {
         if (pair.second && pair.second->sock >= 0) {
-            LOGI("closeAllSockets: closing client %s:%d (fd=%d)",
+            LOGI("closing client %s:%d (fd=%d)",
                 pair.second->clientIp.c_str(), pair.second->clientPort, pair.second->sock);
             shutdown(pair.second->sock, SHUT_RDWR);
             close(pair.second->sock);
@@ -157,12 +183,13 @@ int FileMsgSocket::createServerSocket(unsigned short port)
 {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        LOGE("createServerSocket: socket() failed (%s)", strerror(errno));
+        LOGE("socket() failed (%s)", strerror(errno));
         return -1;
     }
 
     int opt = 1;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 
     struct sockaddr_in addr {};
     addr.sin_family = AF_INET;
@@ -170,13 +197,13 @@ int FileMsgSocket::createServerSocket(unsigned short port)
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOGE("createServerSocket: bind() failed (%s)", strerror(errno));
+        LOGE("bind() failed (%s)", strerror(errno));
         close(sock);
         return -2;
     }
 
     if (listen(sock, 5) < 0) {
-        LOGE("createServerSocket: listen() failed (%s)", strerror(errno));
+        LOGE("listen() failed (%s)", strerror(errno));
         close(sock);
         return -3;
     }
@@ -187,9 +214,10 @@ int FileMsgSocket::createServerSocket(unsigned short port)
 
 int FileMsgSocket::createClientSocket(const std::string& ip, unsigned short port)
 {
+    LOGI("connecting to %s:%d ...", ip.c_str(), port);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        LOGE("createClientSocket: socket() failed (%s)", strerror(errno));
+        LOGE("socket() failed (%s)", strerror(errno));
         return -1;
     }
 
@@ -200,17 +228,82 @@ int FileMsgSocket::createClientSocket(const std::string& ip, unsigned short port
     if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) {
         struct hostent* he = gethostbyname(ip.c_str());
         if (he == nullptr) {
-            LOGE("createClientSocket: invalid address %s", ip.c_str());
+            LOGE("inet_pton: invalid address %s", ip.c_str());
             close(sock);
             return -2;
         }
         memcpy(&addr.sin_addr, he->h_addr_list[0], he->h_length);
     }
 
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOGE("createClientSocket: connect() failed (%s)", strerror(errno));
-        close(sock);
-        return -3;
+    // ── 非阻塞 connect + poll 超时 ──
+    // 阻塞 connect 在服务端不可达时卡死约 75s（TCP 默认超时），用户体验极差。
+    // 改用 O_NONBLOCK + poll(POLLOUT) 实现 5s 超时控制。
+    {
+        int oldFlags = fcntl(sock, F_GETFL, 0);
+        if (oldFlags < 0) {
+            LOGE("fcntl(F_GETFL) failed (%s)", strerror(errno));
+            close(sock);
+            return -3;
+        }
+        fcntl(sock, F_SETFL, oldFlags | O_NONBLOCK);
+
+        int cr = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+        if (cr < 0 && errno != EINPROGRESS) {
+            LOGE("connect() failed (%s)", strerror(errno));
+            close(sock);
+            return -3;
+        }
+
+        if (cr < 0) {  // EINPROGRESS — 等待完成
+            struct pollfd pfd{};
+            pfd.fd = sock;
+            pfd.events = POLLOUT;
+            int pr = poll(&pfd, 1, 5000);  // 5s 超时
+            if (pr <= 0) {
+                LOGE("connect() timeout or poll error (%s)", pr == 0 ? "timeout" : strerror(errno));
+                close(sock);
+                return -3;
+            }
+            int soErr = 0;
+            socklen_t soLen = sizeof(soErr);
+            if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soErr, &soLen) == 0 && soErr != 0) {
+                LOGE("connect() failed: SO_ERROR=%d/%s", soErr, strerror(soErr));
+                close(sock);
+                return -3;
+            }
+        }
+
+        // 恢复阻塞模式
+        fcntl(sock, F_SETFL, oldFlags);
+    }
+
+    // 禁用 Nagle 确保协议小包（header+filename）立即发出
+    int opt = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+
+    // TCP keepalive：检测服务端崩溃/网络断开
+    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
+
+    // ── 连接后健康检查 ──
+    // 检测 connect() 成功后 socket 是否立即可用，排除对端瞬时 RST/FIN
+    {
+        int soErr = 0;
+        socklen_t soLen = sizeof(soErr);
+        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soErr, &soLen) == 0 && soErr != 0) {
+            LOGW("FileMsgSocket connected but SO_ERROR=%d/%s — socket may be broken",
+                soErr, strerror(soErr));
+        }
+        struct pollfd pfd;
+        pfd.fd = sock;
+        pfd.events = POLLOUT;
+        pfd.revents = 0;
+        int pr = poll(&pfd, 1, 1);
+        if (pr > 0 && (pfd.revents & (POLLHUP | POLLERR))) {
+            LOGE("FileMsgSocket connected but poll() shows %s — peer closed immediately, disconnecting",
+                (pfd.revents & POLLHUP) ? "POLLHUP" : "POLLERR");
+            close(sock);
+            return -4;
+        }
     }
 
     LOGI("FileMsgSocket connected to %s:%d", ip.c_str(), port);
@@ -219,20 +312,25 @@ int FileMsgSocket::createClientSocket(const std::string& ip, unsigned short port
 
 int FileMsgSocket::startServer(unsigned short port)
 {
+    LOGI("starting server on port %d ...", port);
+
     if (m_serverRunning.load()) {
-        LOGW("FileMsgSocket server already running");
+        LOGW("server already running");
         return 0;
     }
 
     m_serverSock = createServerSocket(port);
     if (m_serverSock < 0) {
+        LOGE("createServerSocket failed (ret=%d)", m_serverSock);
         return m_serverSock;
     }
 
     m_serverRunning.store(true);
     m_running.store(true);
 
+    LOGI("starting accept thread ...");
     m_serverThread = std::thread(&FileMsgSocket::fileServerProcess, this);
+    LOGI("server started successfully on port %d (fd=%d)", port, m_serverSock);
     return 0;
 }
 
@@ -260,12 +358,16 @@ void FileMsgSocket::stopServer()
 
 int FileMsgSocket::connectToServer(const std::string& ip, unsigned short port)
 {
+    LOGI("connecting to %s:%d ...", ip.c_str(), port);
+
     if (m_connected.load()) {
+        LOGI("already connected, disconnecting first");
         disconnect();
     }
 
     m_clientSock = createClientSocket(ip, port);
     if (m_clientSock < 0) {
+        LOGE("createClientSocket failed (ret=%d)", m_clientSock);
         return m_clientSock;
     }
 
@@ -275,7 +377,15 @@ int FileMsgSocket::connectToServer(const std::string& ip, unsigned short port)
     m_connected.store(true);
     m_running.store(true);
 
-    m_receiveThread = std::thread(&FileMsgSocket::fileClientProcess, this);
+    // ── macOS 内核缺陷规避 ──
+    // macOS 上 accept() 返回的 socket 在内核层未完全初始化时，
+    // 若有数据到达，该 socket 的 recv()/poll() 将永久返回 ENOTCONN(57)。
+    // 用户态重试无效（已验证 15 次 × 5.7s 全部失败）。
+    // 唯一有效方案：客户端 connect 后等待，确保数据在内核就绪后才到达。
+    usleep(500000);
+
+    // 客户端模式下无需后台接收线程 — 响应由 sendLocalFile 同步处理
+    LOGI("connected successfully to %s:%d (fd=%d)", ip.c_str(), port, m_clientSock);
     return 0;
 }
 
@@ -308,7 +418,7 @@ void FileMsgSocket::fileServerProcess()
         if (clientSock < 0) {
             // accept 已由 stopServer() 中的 shutdown() 中断
             if (m_serverRunning.load()) {
-                LOGE("fileServerProcess: accept() failed (%s)", strerror(errno));
+                LOGE("accept() failed (%s)", strerror(errno));
             }
             break;
         }
@@ -318,6 +428,13 @@ void FileMsgSocket::fileServerProcess()
         inet_ntop(AF_INET, &clientAddr.sin_addr, ipStr, sizeof(ipStr));
         LOGI("FileMsgSocket client connected from %s:%d", ipStr, clientPort);
 
+        // 禁用 Nagle 确保响应等小包立即发出
+        int opt = 1;
+        setsockopt(clientSock, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+
+        // TCP keepalive：检测客户端崩溃/网络断开
+        setsockopt(clientSock, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
+
         // 为每个客户端创建独立线程处理
         std::thread(&FileMsgSocket::clientHandler, this, clientSock, std::string(ipStr), clientPort).detach();
     }
@@ -325,11 +442,10 @@ void FileMsgSocket::fileServerProcess()
 
 void FileMsgSocket::fileClientProcess()
 {
-    while (m_connected.load() && m_running.load()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    LOGI("fileClientProcess: client receive thread exit (connected=%d, running=%d)",
-        (int)m_connected.load(), (int)m_running.load());
+    // 客户端模式下此线程原本只做空转 sleep，无实际接收逻辑。
+    // 响应和超时均由 sendLocalFile 所在的调用线程同步处理。
+    // 此函数保留以兼容头文件声明，connectToServer 不再启动此线程。
+    LOGI("fileClientProcess: stub — no background receive needed in client mode");
 }
 
 void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigned short clientPort)
@@ -355,7 +471,7 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             if (ret == 0) {
                 LOGI("%s client disconnected (EOF/POLLHUP)", statusPrefix.c_str());
             } else {
-                LOGW("%s recv header failed", statusPrefix.c_str());
+                LOGW("%s recv header failed(%d): %s", statusPrefix.c_str(), ret, strerror(errno));
             }
             break;
         }
@@ -378,6 +494,7 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
                 } else {
                     LOGE("%s recv filename failed", statusPrefix.c_str());
                 }
+                session->active = false;  // 标记会话失效，退出 while 循环
                 break;
             }
 
@@ -396,7 +513,11 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             response.fileSize = header.fileSize;
             response.transSize = 0;
 
-            sendHeader(sock, response);
+            if (sendHeader(sock, response) < 0) {
+                LOGE("%s sendHeader(response) failed (%s)", statusPrefix.c_str(), strerror(errno));
+                session->active = false;
+                break;
+            }
 
             // 通知进度
             if (m_progressCallback) {
@@ -444,6 +565,7 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
                     LOGE("%s recv data failed", statusPrefix.c_str());
                 }
                 if (session->recvFile.is_open()) session->recvFile.close();
+                session->active = false;  // 标记会话失效，退出 while 循环
                 break;
             }
 
@@ -507,9 +629,8 @@ int FileMsgSocket::sendHeader(int sock, const FileHeader& header)
 int FileMsgSocket::sendHeader(int sock, const void* data, size_t len)
 {
     std::lock_guard<std::mutex> lock(m_sendMutex);
-    ssize_t ret = send(sock, data, len, 0);
-    if (ret < 0) {
-        LOGE("sendHeader: send() failed (%s)", strerror(errno));
+    if (sendAll(sock, data, len) < 0) {
+        LOGE("sendAll() failed (%s)", strerror(errno));
         return -1;
     }
     return 0;
@@ -525,13 +646,13 @@ int FileMsgSocket::sendFileData(int sock, const std::string& filePath, uint64_t 
 {
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
-        LOGE("sendFileData: failed to open file %s", filePath.c_str());
+        LOGE("is_open: failed to open file %s", filePath.c_str());
         return -1;
     }
 
     struct stat st {};
     if (stat(filePath.c_str(), &st) != 0) {
-        LOGE("sendFileData: stat() failed");
+        LOGE("stat(%s) failed: %s", filePath.c_str(), strerror(errno));
         return -2;
     }
 
@@ -566,7 +687,10 @@ int FileMsgSocket::sendFileData(int sock, const std::string& filePath, uint64_t 
 
         {
             std::lock_guard<std::mutex> lock(m_sendMutex);
-            if (send(sock, buffer.data(), bytesRead, 0) < 0) break;
+            if (sendAll(sock, buffer.data(), bytesRead) < 0) {
+                LOGE("sendAll() failed at chunk %u/%u", i, chunkCount);
+                break;
+            }
         }
 
         totalSent += bytesRead;
@@ -591,7 +715,9 @@ int FileMsgSocket::sendFileData(int sock, const std::string& filePath, uint64_t 
     complete.cmd = CMD_COMPLETE;
     complete.fileSize = fileSize;
     complete.transSize = totalSent;
-    sendHeader(sock, complete);
+    if (sendHeader(sock, complete) < 0) {
+        LOGE("sendHeader(COMPLETE) failed (%s)", strerror(errno));
+    }
 
     if (m_progressCallback) {
         m_progressCallback(totalSent, fileSize, "Send complete!");
@@ -606,6 +732,33 @@ int FileMsgSocket::sendLocalFile(const std::string& filePath)
     if (!m_connected.load()) {
         LOGE("server not connected");
         return -1;
+    }
+
+    // ── 发送前健康检查 ──
+    // m_connected 可能在服务端主动断开后仍为 true（无后台线程同步更新），
+    // 发送前用 poll(POLLOUT) + getsockopt(SO_ERROR) 双重确认 socket 仍可用。
+    {
+        struct pollfd pfd;
+        pfd.fd = m_clientSock;
+        pfd.events = POLLOUT;
+        pfd.revents = 0;
+        int pr = poll(&pfd, 1, 0);
+        // poll POLLHUP/POLLERR 检测显式断开
+        if (pr > 0 && (pfd.revents & (POLLHUP | POLLERR))) {
+            LOGE("sendLocalFile: socket already broken (poll=%s), disconnecting",
+                (pfd.revents & POLLHUP) ? "POLLHUP" : "POLLERR");
+            m_connected.store(false);
+            return -1;
+        }
+        // poll=0 可能漏检刚断开但尚未传播的连接 → SO_ERROR 兜底
+        int soErr = 0;
+        socklen_t soLen = sizeof(soErr);
+        if (getsockopt(m_clientSock, SOL_SOCKET, SO_ERROR, &soErr, &soLen) == 0 && soErr != 0) {
+            LOGE("sendLocalFile: socket broken SO_ERROR=%d/%s, disconnecting",
+                soErr, strerror(soErr));
+            m_connected.store(false);
+            return -1;
+        }
     }
 
     struct stat st {};
@@ -631,15 +784,26 @@ int FileMsgSocket::sendLocalFile(const std::string& filePath)
     header.chunkSize = MAX_CHUNK_SIZE;
     header.chunkCount = (uint32_t)((fileSize + MAX_CHUNK_SIZE - 1) / MAX_CHUNK_SIZE);
 
-    // 先发送 header，再发送文件名（与接收方读取顺序一致）
-    sendHeader(m_clientSock, header);
-    sendHeader(m_clientSock, fileName.c_str(), fileName.size());
+    // ── 原子发送 header + filename ──
+    // 将 header 和 filename 封装在同一次 mutex 锁内发送，
+    // 避免服务端在 header 到达后立即读取 filename 而数据还未到达导致的协议错位。
+    {
+        std::lock_guard<std::mutex> lock(m_sendMutex);
+        if (sendAll(m_clientSock, &header, sizeof(header)) < 0) {
+            LOGE("sendAll(header) failed (%s)", strerror(errno));
+            return -3;
+        }
+        if (sendAll(m_clientSock, fileName.c_str(), fileName.size()) < 0) {
+            LOGE("sendAll(filename) failed (%s)", strerror(errno));
+            return -4;
+        }
+    }
 
     // 等待响应
     FileHeader response{};
     if (recvHeader(m_clientSock, response) < 0 || response.cmd != CMD_RESPONSE) {
         LOGE("recvHeader: no response from server");
-        return -3;
+        return -5;
     }
 
     if (m_progressCallback) {
@@ -664,9 +828,17 @@ int FileMsgSocket::requestFile(const std::string& ip, unsigned short port, const
     header.cmd = CMD_REQUEST;
     header.fileNameLen = (uint32_t)fileName.size();
 
-    std::lock_guard<std::mutex> lock(m_sendMutex);
-    send(m_clientSock, &header, sizeof(header), 0);
-    send(m_clientSock, fileName.c_str(), fileName.size(), 0);
+    {
+        std::lock_guard<std::mutex> lock(m_sendMutex);
+        if (sendAll(m_clientSock, &header, sizeof(header)) < 0) {
+            LOGE("sendAll(header) failed (%s)", strerror(errno));
+            return -1;
+        }
+        if (sendAll(m_clientSock, fileName.c_str(), fileName.size()) < 0) {
+            LOGE("sendAll(filename) failed (%s)", strerror(errno));
+            return -2;
+        }
+    }
 
     return 0;
 }

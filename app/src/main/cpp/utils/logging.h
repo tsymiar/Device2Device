@@ -11,15 +11,29 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
-#endif
-
+// 自定义阈值常量（用于 LOG_LEVEL 过滤比较）
+#define _LOG_THRESH_DEBUG 0
+#define _LOG_THRESH_INFO  1
+#define _LOG_THRESH_WARN  2
+#define _LOG_THRESH_ERROR 3
+// 映射到 Android 实际优先级（__android_log_print 需要）
+#define _LOG_LEVEL_DEBUG ANDROID_LOG_DEBUG
+#define _LOG_LEVEL_INFO  ANDROID_LOG_INFO
+#define _LOG_LEVEL_WARN  ANDROID_LOG_WARN
+#define _LOG_LEVEL_ERROR ANDROID_LOG_ERROR
+#else
 #define _LOG_LEVEL_DEBUG 0
 #define _LOG_LEVEL_INFO  1
 #define _LOG_LEVEL_WARN  2
 #define _LOG_LEVEL_ERROR 3
+#endif
 
 #ifndef LOG_LEVEL
 #define LOG_LEVEL _LOG_LEVEL_INFO
+#endif
+
+#ifndef LOG_TAG
+#define LOG_TAG "native"
 #endif
 
 static inline void getCurrentTime(char* buf, size_t len)
@@ -67,9 +81,9 @@ static inline void getCurrentTime(char* buf, size_t len)
 } while(0)
 #endif
 
-#define LOGD(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_DEBUG, "D", fmt, ##__VA_ARGS__)
-#define LOGI(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_INFO,  "I", fmt, ##__VA_ARGS__)
-#define LOGW(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_WARN,  "W", fmt, ##__VA_ARGS__)
-#define LOGE(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_ERROR, "E", fmt, ##__VA_ARGS__)
+#define LOGD(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_DEBUG, LOG_TAG, fmt, ##__VA_ARGS__)
+#define LOGI(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_INFO,  LOG_TAG, fmt, ##__VA_ARGS__)
+#define LOGW(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_WARN,  LOG_TAG, fmt, ##__VA_ARGS__)
+#define LOGE(fmt, ...) _LOG_PRINT_(_LOG_LEVEL_ERROR, LOG_TAG, fmt, ##__VA_ARGS__)
 
 #endif //DEVICE2DEVICE_LOGGING_H

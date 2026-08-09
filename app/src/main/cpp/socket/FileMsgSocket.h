@@ -79,7 +79,7 @@ public:
 
     static constexpr uint32_t MAX_CHUNK_SIZE = 64 * 1024;  // 64KB per chunk
     static constexpr uint16_t DEFAULT_PORT = 8800;
-    static constexpr int RECV_POLL_TIMEOUT_MS = 200;    // 服务端 poll 超时（快速响应停止）
+    static constexpr int RECV_POLL_TIMEOUT_MS = 5000;  // 服务端 poll 超时（避免 Nagle/RTT 导致文件名读取超时）
     static constexpr int RECV_RESP_TIMEOUT_MS = 5000;   // 客户端等待响应超时
 
     FileMsgSocket();

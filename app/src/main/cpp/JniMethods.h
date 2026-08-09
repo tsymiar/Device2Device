@@ -50,6 +50,8 @@ JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv *env, jclass, jobject , jint);
 JNIEXPORT jint JNICALL
 CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv *env, jclass, jobject texture);
+JNIEXPORT void JNICALL
+CPP_FUNC_VIEW(nativeRender)(JNIEnv* env, jobject thiz, jobject surface, jobject texture, jstring filePath);
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv *, jclass);
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getBootTimestamp)(JNIEnv *, jclass);

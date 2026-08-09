@@ -101,6 +101,9 @@ std::string Jstring2Cstring(JNIEnv *env, jstring jstr)
         cstr[len] = 0;
     }
     env->ReleaseByteArrayElements(barr, ba, 0);
+    env->DeleteLocalRef(barr);
+    env->DeleteLocalRef(encode);
+    env->DeleteLocalRef(clz);
     std::string sstr = cstr != nullptr ? cstr : "";
     if (cstr != nullptr) {
         free(cstr);
@@ -160,6 +163,9 @@ void CallBackJavaMethod(const std::string &method, int action, const char *conte
     LOGI("calling java class %s(%s), method: %s, action = %d, content = %s.",
          clzz, cname.c_str(), method.c_str(), action, content);
     jclass cls = env->FindClass(cname.c_str());
+    if (g_jniCls != nullptr) {
+        env->DeleteGlobalRef(g_jniCls);
+    }
     g_jniCls = (jclass) env->NewGlobalRef(cls);
     jstring msg = env->NewStringUTF(content);
     constexpr const char *mthTag = "(ILjava/lang/String;)V";
@@ -255,20 +261,22 @@ void SetActivityViewText(JNIEnv *env, int viewId, const char* text)
         LOGE("invalid viewId = %d", viewId);
         std::string main_activity = "com/tsymiar/device2device/activity/MainActivity";
         jclass activity = env->FindClass(main_activity.c_str());
-        auto cls = (jclass) env->NewGlobalRef(activity);
         jmethodID showText = env->GetMethodID(
-                cls,
+                activity,
                 "showText",
                 "(Ljava/lang/String;)V");
-        jobject alloc = env->AllocObject(cls);
+        jobject alloc = env->AllocObject(activity);
         env->CallVoidMethod(alloc, showText, msg);
+        env->DeleteLocalRef(alloc);
     } else {
         jmethodID setText = env->GetMethodID(g_jniCls, "SetTextView", "(Ljava/lang/String;)V");
         if (setText == nullptr) {
             LOGE("GetMethodID 'SetTextView' error");
             return;
         }
-        env->CallStaticVoidMethod(g_jniCls, setText, msg);
+        jobject obj = env->AllocObject(g_jniCls);
+        env->CallVoidMethod(obj, setText, msg);
+        env->DeleteLocalRef(obj);
     }
     env->DeleteLocalRef(msg);
     g_jniJVM->DetachCurrentThread();

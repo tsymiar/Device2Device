@@ -15,7 +15,8 @@ typedef int(*SOCKETHOOK)(uint8_t*, size_t);
 
 class TcpSocket {
 public:
-    TcpSocket() : m_recvSize(1024) {};
+    TcpSocket() : m_recvSize(1024), m_listenSock(-1) {};
+    ~TcpSocket();
 
     void RegisterCallback(SOCKETHOOK);
 
@@ -31,6 +32,7 @@ private:
     int Receiver(SOCKETHOOK callback) const;
     const int m_recvSize;
     SOCKETHOOK m_callback = nullptr;
+    int m_listenSock;
     int m_recvSock = 0;
     std::atomic<bool> m_running{ false };
     std::mutex m_acceptMutex;

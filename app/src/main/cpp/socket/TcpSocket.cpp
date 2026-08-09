@@ -35,35 +35,41 @@ int TcpSocket::Receiver(SOCKETHOOK callback) const
 
 int TcpSocket::Start(unsigned short port)
 {
-    int init_sock = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (init_sock < 0) {
+    m_listenSock = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (m_listenSock < 0) {
         LOGE("Generating socket (%s).",
-             (errno != 0 ? strerror(errno) : std::to_string(init_sock).c_str()));
+             (errno != 0 ? strerror(errno) : std::to_string(m_listenSock).c_str()));
         return -1;
     }
+
+    // 设置 SO_REUSEADDR，确保 stop 后端口能立即复用
+    int opt = 1;
+    setsockopt(m_listenSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     struct sockaddr_in local{};
     local.sin_port = htons(port);
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = INADDR_ANY;
-    if (::bind(init_sock, reinterpret_cast<struct sockaddr *>(&local), sizeof(local)) < 0) {
+    if (::bind(m_listenSock, reinterpret_cast<struct sockaddr *>(&local), sizeof(local)) < 0) {
         LOGE("Binding socket address (%s).",
-             (errno != 0 ? strerror(errno) : std::to_string(init_sock).c_str()));
-        close(init_sock);
+             (errno != 0 ? strerror(errno) : std::to_string(m_listenSock).c_str()));
+        close(m_listenSock);
+        m_listenSock = -1;
         return -2;
     }
 
     const int backlog = 50;
-    if (listen(init_sock, backlog) < 0) {
+    if (listen(m_listenSock, backlog) < 0) {
         LOGE("Socket listen (%s).",
-             (errno != 0 ? strerror(errno) : std::to_string(init_sock).c_str()));
-        close(init_sock);
+             (errno != 0 ? strerror(errno) : std::to_string(m_listenSock).c_str()));
+        close(m_listenSock);
+        m_listenSock = -1;
         return -3;
     }
 
     struct sockaddr_in lstnaddr{};
     auto listenLen = static_cast<socklen_t>(sizeof(lstnaddr));
-    getsockname(init_sock, reinterpret_cast<struct sockaddr *>(&lstnaddr), &listenLen);
+    getsockname(m_listenSock, reinterpret_cast<struct sockaddr *>(&lstnaddr), &listenLen);
     LOGI("localhost listening [%s:%d].", inet_ntoa(lstnaddr.sin_addr), port);
     m_running.store(true);
 
@@ -71,8 +77,10 @@ int TcpSocket::Start(unsigned short port)
         struct sockaddr_in sin{};
         auto len = static_cast<socklen_t>(sizeof(sin));
         std::lock_guard<std::mutex> lock(m_acceptMutex);
-        int rcv_sock = m_recvSock = ::accept(init_sock, reinterpret_cast<struct sockaddr *>(&sin), &len);
-        if ((int) rcv_sock < 0) {
+        int rcv_sock = m_recvSock = ::accept(m_listenSock, reinterpret_cast<struct sockaddr *>(&sin), &len);
+        if (rcv_sock < 0) {
+            // Finish() 关闭了 m_listenSock 时会触发此分支，属于正常停止流程
+            if (!m_running.load()) break;
             LOGE("Socket accept (%s).",
                  (errno != 0 ? strerror(errno) : std::to_string(rcv_sock).c_str()));
             return -4;
@@ -112,6 +120,13 @@ int TcpSocket::Start(unsigned short port)
         }
         usleep(100);
     }
+
+    // 正常退出时关闭监听 socket
+    if (m_listenSock >= 0) {
+        shutdown(m_listenSock, SHUT_RDWR);
+        close(m_listenSock);
+        m_listenSock = -1;
+    }
     return 0;
 }
 
@@ -133,4 +148,21 @@ int TcpSocket::GetSize() const
 void TcpSocket::Finish()
 {
     m_running = false;
+    // 关闭监听 socket 以立即释放端口，同时解除 accept() 阻塞
+    if (m_listenSock >= 0) {
+        shutdown(m_listenSock, SHUT_RDWR);
+        close(m_listenSock);
+        m_listenSock = -1;
+    }
+    // 关闭当前已接受的连接
+    if (m_recvSock > 0) {
+        shutdown(m_recvSock, SHUT_RDWR);
+        close(m_recvSock);
+        m_recvSock = 0;
+    }
+}
+
+TcpSocket::~TcpSocket()
+{
+    Finish();
 }

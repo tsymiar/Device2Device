@@ -684,7 +684,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv* env, jclass, js
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
     if (g_fileMsg != nullptr) {
         g_fileMsg->setSavePath(savePath);
-        LOGI("FileMsg save path set to: %s", savePath.c_str());
+        LOGI("FileMsg is saving to: %s", savePath.c_str());
     }
 }
 
