@@ -640,7 +640,7 @@ current_y = body2 + int(10*S)
 svc_items = [
     ("SubscribeService",     TEAL_700, ["Pub/Sub Subscribe",         "Floating Window"]),
     ("PublishService",       TEAL_700, ["Pub/Sub Publish",           "Async Thread"]),
-    ("HttpFileService",      TEAL_700, ["HTTP File Server",          "SAF + File Mode"]),
+    ("HttpBrowserService",      TEAL_700, ["HTTP File Server",          "SAF + File Mode"]),
     ("FileMsgDialog",        TEAL_800, ["File Transfer",             "Progress Callback"]),
     ("ReceiverService",      TEAL_800, ["BT Data Receive",           "Floating Overlay"]),
     ("ChatBoxDialog",        TEAL_800, ["DeepSeek AI Chat",          "Streaming Response"]),

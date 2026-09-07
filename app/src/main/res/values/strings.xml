@@ -38,6 +38,9 @@
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
     <string name="section_files">💬 Services</string>
+    <string name="section_game">🎮 Games</string>
+    <string name="echo_game">🔊 余音回响 · Echo Resonance</string>
+    <string name="deduction_board">🧩 声纹推演盘 · Deduction Board</string>
     <string name="sensor">传感器</string>
     <string name="url">源码</string>
     <string name="feed">反馈</string>
@@ -157,6 +160,9 @@
 
     <!-- ===== HTTP Server ===== -->
     <string name="http_server_select_hint">请选择一个本地文件夹作为 HTTP 服务的根目录。</string>
+    <string name="http_server_stop">⏹ 停止 HTTP</string>
+    <string name="http_server_copy">📋 复制访问地址</string>
+    <string name="http_copy_done">访问地址已复制：\n%1$s</string>
 
     <!-- ===== Exit ===== -->
     <string name="exit_app">再次返回退出应用</string>

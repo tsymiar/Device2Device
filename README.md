@@ -58,7 +58,7 @@ app/src/main/
 │   ├── service/                   # Background services (7)
 │   │   ├── SubscribeService       # Pub/Sub subscribe floating window
 │   │   ├── PublishService         # Pub/Sub publish floating window
-│   │   ├── HttpFileService        # Embedded HTTP file server (File & SAF modes)
+│   │   ├── HttpBrowserService        # Embedded HTTP file server (File & SAF modes)
 │   │   ├── ToastNotificationService  # Global floating toast notifications
 │   │   ├── ReceiverService        # Bluetooth data receive floating window
 │   │   ├── WindowService          # Generic text overlay floating window
@@ -114,7 +114,7 @@ app/src/main/
 | KCP         | KCP (Reliable UDP) protocol for low-latency transmission         |
 | Pub/Sub     | Subscribe & Publish messages via floating dialog windows; async connection with real-time status feedback |
 | File Transfer | Custom binary protocol with chunked transfer (64KB/chunk) and progress callback |
-| HTTP Server | Embedded HTTP server with HTML directory listing; supports SAF mode (Android 10+) |
+| HTTP Server | Embedded HTTP server (filesystem & SAF) with sortable/responsive HTML directory listing, in-page image viewer, and streaming transfers tuned for Wi-Fi LAN throughput |
 
 ### Message System (C++ ↔ Java)
 
@@ -237,6 +237,15 @@ MIT License
 ---
 
 ## Recent Changes
+
+### 2026-09
+
+- **Multi-Select ZIP Download** (`HttpBrowserService.java`): Every file/folder row now has a checkbox with a select-all toggle in the column header and a "下载" toolbar button. Selected items (folders packed recursively, hidden files skipped) are packed per-file over `?zip=<name>&zip=<name>…` — each selected file becomes its own independent ZIP entry streamed to the browser (HTTP/1.1 chunked, no temp file on disk), images/videos/audios and other already-compressed files skip re-deflating, and a single unreadable file is skipped instead of corrupting the whole archive.
+- **HTTP Server Sortable File List** (`HttpBrowserService.java`): Web directory listing gained clickable column headers (Name / Size / Modified). Click toggles ascending/descending, folders always stay on top, name column uses natural numeric ordering (`IMG_2 < IMG_10`), active sort shows ▲/▼.
+- **Responsive File List Layout**: File names now claim all remaining row width (`flex:1`). Below 760px the size/date columns shrink; below 580px the modified-date and its clickable sortable column header both move to a second line (date stays visible and time sorting stays available on phones); full file name shows as a tooltip (`title`) when truncated.
+- **Viewer Ordering Fix**: The in-page image viewer now resolves image indexes from the *current* DOM order on every open, so prev/next navigation stays in sync after re-sorting the list.
+- **HTTP Transfer Throughput Tuning**: Client connections now run on a cached thread pool; sockets enable `TCP_NODELAY` and a 512KB send buffer; files > 10MB stream with a 256KB buffer instead of 64KB (fewer syscalls and ContentProvider IPC round-trips) for better Wi-Fi LAN download speed.
+- **SAF Directory Detection Fix**: Directory entries are now detected via `Document.MIME_TYPE_DIR` instead of the non-existent `DocumentsContract.Document.FLAG_DIRECTORY` constant, fixing the compile error during batch directory queries.
 
 ### 2026-06
 

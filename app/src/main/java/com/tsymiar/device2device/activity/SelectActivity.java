@@ -3,6 +3,8 @@ package com.tsymiar.device2device.activity;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -11,6 +13,7 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.PowerManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -31,12 +34,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.dialog.ChatBoxDialog;
 import com.tsymiar.device2device.dialog.FileMsgDialog;
+import com.tsymiar.device2device.dialog.GameDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
 import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
-import com.tsymiar.device2device.service.HttpFileService;
+import com.tsymiar.device2device.service.HttpServerService;
 import com.tsymiar.device2device.service.PublishService;
 import com.tsymiar.device2device.service.SubscribeService;
 import com.tsymiar.device2device.utils.JvmMethods;
@@ -53,6 +57,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     public static final int RequestFloat = 10002;
     public static final int RequestAudio = 10003;
     public static final int RequestHttpFolder = 10004;
+    private static final int RequestBatteryOptimize = 10005;
+    /** 单进程内只引导一次“忽略电池优化”，避免每次启动 HTTP 都打扰 */
+    private static boolean sBatteryPromptShown = false;
     @SuppressLint("StaticFieldLeak")
     static SelectActivity mainActivity;
     BroadcastReceiverClass mBroadcastReceiverClass = new BroadcastReceiverClass();
@@ -66,7 +73,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
-    HttpFileService mHttpFileService;
 
     private static boolean mKcpStart = false;
     private static boolean mTcpStart  = false;
@@ -161,6 +167,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(SubscribeService.BROADCAST_ACTION);
+        intentFilter.addAction(HttpServerService.ACTION_STATE);
         this.registerReceiver(mBroadcastReceiverClass, intentFilter);
 
         setServiceConnection(new ServiceConnection() {
@@ -304,6 +311,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 handler.sendMessage(msg);
             }
         });
+        findViewById(R.id.btn_game).setOnClickListener(v ->
+                GameDialog.showEcho(SelectActivity.this));
+        findViewById(R.id.btn_deduction).setOnClickListener(v ->
+                GameDialog.showDeduction(SelectActivity.this));
+
         if (savedInstanceState != null && mChatBoxDialog != null) {
             mChatBoxDialog.restoreState(savedInstanceState);
         }
@@ -325,6 +337,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(intent, RequestHttpFolder);
         });
+        // HTTP 前台服务只在显式停止时关闭，退出页面不影响后台服务
+        findViewById(R.id.btn_http_stop).setOnClickListener(v ->
+                HttpServerService.stop(SelectActivity.this));
+        // 复制 HTTP 访问地址到剪贴板
+        findViewById(R.id.btn_http_copy).setOnClickListener(v -> copyHttpAccessUrl());
 
         // 网络服务区域折叠/展开
         final LinearLayout networkContent = findViewById(R.id.network_content);
@@ -338,13 +355,34 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 networkArrow.setText("▲");
             }
         });
+        // 页面恢复时同步 HTTP 前台服务运行状态（若已在后台运行）
+        showHttpState();
     }
 
     private class BroadcastReceiverClass extends BroadcastReceiver {
         @SuppressLint("SetTextI18n")
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (!SubscribeService.BROADCAST_ACTION.equals(intent.getAction())) {
+            String action = intent.getAction();
+            if (HttpServerService.ACTION_STATE.equals(action)) {
+                String state = intent.getStringExtra(HttpServerService.EXTRA_STATE);
+                TextView tvStatus = findViewById(R.id.txt_status);
+                if (HttpServerService.STATE_STARTED.equals(state)) {
+                    Toast.makeText(SelectActivity.this,
+                            "HTTP 服务已启动\n访问地址: " + HttpServerService.getAccessUrl(),
+                            Toast.LENGTH_LONG).show();
+                    showHttpState();
+                } else if (HttpServerService.STATE_FAILED.equals(state)) {
+                    tvStatus.setText("HTTP 服务启动失败");
+                    Toast.makeText(SelectActivity.this,
+                            "HTTP 服务启动失败：端口被占用或目录无权访问", Toast.LENGTH_SHORT).show();
+                } else if (HttpServerService.STATE_STOPPED.equals(state)) {
+                    tvStatus.setText("HTTP 文件服务已停止");
+                    showHttpState();
+                }
+                return;
+            }
+            if (!SubscribeService.BROADCAST_ACTION.equals(action)) {
                 return;
             }
             TextView tvStatus = findViewById(R.id.txt_status);
@@ -397,10 +435,25 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (mFloatService != null) {
             mFloatService.closeWindow();
         }
-        if (mHttpFileService != null) {
-            mHttpFileService.stop();
-        }
+        // HTTP 文件服务由前台服务托管：退出页面不停止，后台继续运行
         super.onDestroy();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        showHttpState();
+        // HTTP 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && HttpServerService.isRunning()) {
+            maybeRequestBatteryOptimization();
+        }
+        // START_STICKY 重建服务可能晚于页面恢复，稍后再同步一次
+        handler.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                showHttpState();
+            }
+        }, 400);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -424,6 +477,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startHttpServer(treeUri);
             }
         }
+        if (requestCode == RequestBatteryOptimize) {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                    && pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                Toast.makeText(this, "已允许忽略电池优化，锁屏保活已加强", Toast.LENGTH_SHORT).show();
+            }
+        }
         if (requestCode == ChatBoxDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
             if (data != null) {
                 Uri uri = data.getData();
@@ -435,38 +495,75 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     }
 
     /**
-     * 从 DocumentTree URI 中提取实际文件路径
+     * 启动前台服务承载的 HTTP 文件服务（进程回收后 START_STICKY 自动续跑）。
+     * 启动结果经由 HttpServerService.ACTION_STATE 广播回执刷新 UI。
      */
-    @SuppressLint("SetTextI18n")
     private void startHttpServer(Uri treeUri) {
-        final int HTTP_PORT = 8080;
+        HttpServerService.start(this, treeUri);
+    }
 
-        // 停止旧服务器
-        if (mHttpFileService != null) {
-            mHttpFileService.stop();
+    /**
+     * 保活引导：Doze/厂商后台限制会掐断息屏后的联网，导致“服务在跑但连不上”。
+     * 已处于“忽略电池优化”白名单或本次进程提示过则跳过，仅引导一次。
+     */
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    private void maybeRequestBatteryOptimization() {
+        if (sBatteryPromptShown) {
+            return;
         }
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            return;
+        }
+        sBatteryPromptShown = true;
+        new AlertDialog.Builder(this)
+                .setTitle("后台保活")
+                .setMessage("为保证锁屏/切后台后 HTTP 文件服务仍可被访问，建议允许本应用“忽略电池优化”，"
+                        + "系统将不会在息屏后限制本应用的联网。")
+                .setPositiveButton("去设置", (dialog, which) -> {
+                    dialog.dismiss();
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:" + getPackageName()));
+                    try {
+                        startActivityForResult(intent, RequestBatteryOptimize);
+                    } catch (Exception e) {
+                        startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                    }
+                })
+                .setNegativeButton("暂不", (dialog, which) -> dialog.dismiss())
+                .show();
+    }
 
-        // 使用 SAF DocumentFile 模式（解决 Android 10+ Scoped Storage 空目录问题）
-        mHttpFileService = new HttpFileService(this, treeUri, HTTP_PORT);
-        mHttpFileService.setStatusCallback(message -> {
-            Message msg = new Message();
-            msg.what = Receiver.MESSAGE;
-            msg.obj = message;
-            handler.sendMessage(msg);
-        });
+    /** 根据前台服务快照同步 HTTP 状态：地址卡片与复制/停止按钮可用性 */
+    @SuppressLint("SetTextI18n")
+    private void showHttpState() {
+        boolean running = HttpServerService.isRunning();
+        Button stopBtn = findViewById(R.id.btn_http_stop);
+        if (stopBtn != null) {
+            stopBtn.setEnabled(running);
+        }
+        Button copyBtn = findViewById(R.id.btn_http_copy);
+        if (copyBtn != null) {
+            copyBtn.setEnabled(running);
+        }
+        if (running) {
+            TextView tv = findViewById(R.id.txt_hint);
+            tv.setText("🌐 HTTP 文件服务\n访问地址: " + HttpServerService.getAccessUrl()
+                    + "\n共享目录: " + HttpServerService.getFolder());
+        }
+    }
 
-        String localIp = Utils.getLocalWifiIp(this);
-        String accessUrl = "http://" + localIp + ":" + HTTP_PORT + "/";
-        mHttpFileService.setAccessUrl(accessUrl);
-
-        if (mHttpFileService.start()) {
-            String folderName = mHttpFileService.getRootDisplayName();
-            Toast.makeText(this, "HTTP 服务已启动\n访问地址: " + accessUrl, Toast.LENGTH_LONG).show();
-
-            TextView tv = findViewById(R.id.txt_status);
-            tv.setText("🌐 HTTP 文件服务\n访问地址: " + accessUrl + "\n共享目录: " + folderName);
-        } else {
-            Toast.makeText(this, "HTTP 服务启动失败", Toast.LENGTH_SHORT).show();
+    /** 把当前 HTTP 访问地址复制到系统剪贴板 */
+    private void copyHttpAccessUrl() {
+        if (!HttpServerService.isRunning()) {
+            Toast.makeText(this, "HTTP 服务未运行，无法复制", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = HttpServerService.getAccessUrl();
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("Device2Device HTTP", url));
+            Toast.makeText(this, getString(R.string.http_copy_done, url), Toast.LENGTH_LONG).show();
         }
     }
     @Override

@@ -482,7 +482,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint po
     }
 
     if (g_tcpServer.load() != nullptr) {
-        Message::instance().setMessage("TCP server already running", MESSAGE);
+        Message::instance().setMessage("TCP server already running", TOAST);
         return -1;
     }
 
@@ -502,7 +502,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startTcpServer)(JNIEnv*, jclass, jint po
     });
 
     Message::instance().setMessage(
-        "TCP listening port: " + std::to_string(port), MESSAGE);
+        "TCP listening port: " + std::to_string(port), TOAST);
     return 0;
 }
 
@@ -510,7 +510,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopTcpServer)(JNIEnv*, jclass)
 {
     TcpSocket* tcp = g_tcpServer.load();
     if (tcp == nullptr) {
-        Message::instance().setMessage("TCP server not running", MESSAGE);
+        Message::instance().setMessage("TCP server not running", TOAST);
         return -1;
     }
 
@@ -540,7 +540,6 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopTcpServer)(JNIEnv*, jclass)
         g_tcpThread = nullptr;
     }
 
-    Message::instance().setMessage("TCP server stopped", MESSAGE);
     return 0;
 }
 

@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools" package="com.tsymiar.device2device">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
@@ -47,6 +49,9 @@
             android:name=".service.PublishService"
             android:theme="@style/Theme.MaterialComponents.Light.Dialog" />
         <service android:name=".service.SubscribeService" />
+        <service
+            android:name=".service.HttpServerService"
+            android:exported="false" />
         <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"
             tools:ignore="MissingClass" />
