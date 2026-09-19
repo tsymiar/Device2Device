@@ -6,4 +6,8 @@
     <color name="dialog_text_secondary">#9E9E9E</color>
     <color name="dialog_error">#FF5252</color>
     <color name="dialog_button_text">#E0E0E0</color>
+    <!-- 状态卡片（暗色模式）：同上三个角色，取高亮度版本保证暗底对比度 -->
+    <color name="hint_text">#90A4AE</color>
+    <color name="status_text">#80CBC4</color>
+    <color name="card_divider">#546E7A</color>
 </resources>

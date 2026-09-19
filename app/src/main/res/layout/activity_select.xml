@@ -121,15 +121,17 @@
                     android:id="@+id/network_arrow"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="▲"
+                    android:text="▼"
                     android:textColor="@color/colorPrimary"
                     android:textSize="12sp" />
             </LinearLayout>
 
+            <!-- 默认折叠，点标题栏展开 -->
             <LinearLayout
                 android:id="@+id/network_content"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 android:orientation="vertical"
                 android:layout_marginBottom="8dp">
 
@@ -441,6 +443,19 @@
                     app:strokeColor="#FF5722" />
             </LinearLayout>
 
+            <!-- 行情 K线（归入 Services 组） -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_market"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:text="@string/market_quote"
+                app:cornerRadius="20dp"
+                app:strokeColor="@color/colorAccent"
+                app:strokeWidth="1dp" />
+
             <!-- 游戏区域 -->
             <TextView
                 android:layout_width="wrap_content"
@@ -450,17 +465,6 @@
                 android:textColor="@color/colorAccent"
                 android:textSize="13sp"
                 android:textStyle="bold" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_game"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="@string/echo_game"
-                app:cornerRadius="20dp"
-                app:strokeColor="@color/colorAccent"
-                app:strokeWidth="1dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_deduction"
@@ -506,7 +510,7 @@
                         android:lineSpacingExtra="2dp"
                         android:paddingBottom="8dp"
                         android:text="@string/dftHint"
-                        android:textColor="#9E9E9E"
+                        android:textColor="@color/hint_text"
                         android:textSize="12sp"
                         android:textStyle="italic"
                         tools:ignore="RtlHardcoded" />
@@ -516,7 +520,7 @@
                         android:layout_height="1dp"
                         android:layout_marginTop="4dp"
                         android:layout_marginBottom="4dp"
-                        android:background="#E0E0E0" />
+                        android:background="@color/card_divider" />
 
                     <TextView
                         android:id="@+id/txt_status"
@@ -526,7 +530,7 @@
                         android:layout_marginTop="4dp"
                         android:lineSpacingExtra="4dp"
                         android:text="@string/dftHint"
-                        android:textColor="#37474F"
+                        android:textColor="@color/status_text"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         tools:ignore="RtlHardcoded" />

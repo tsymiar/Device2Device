@@ -39,7 +39,7 @@
     <string name="section_advanced">⚡ MessageQueue</string>
     <string name="section_files">💬 Services</string>
     <string name="section_game">🎮 Games</string>
-    <string name="echo_game">🔊 余音回响 · Echo Resonance</string>
+    <string name="market_quote">📈 行情 K线 · Market</string>
     <string name="deduction_board">🧩 声纹推演盘 · Deduction Board</string>
     <string name="sensor">传感器</string>
     <string name="url">源码</string>

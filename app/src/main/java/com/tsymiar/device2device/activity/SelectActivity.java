@@ -311,8 +311,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 handler.sendMessage(msg);
             }
         });
-        findViewById(R.id.btn_game).setOnClickListener(v ->
-                GameDialog.showEcho(SelectActivity.this));
+        findViewById(R.id.btn_market).setOnClickListener(v ->
+                startActivity(new Intent(SelectActivity.this, MarketActivity.class)));
         findViewById(R.id.btn_deduction).setOnClickListener(v ->
                 GameDialog.showDeduction(SelectActivity.this));
 

@@ -25,4 +25,8 @@
     <color name="black">#000000</color>
     <color name="white">#ffffff</color>
     <color name="dark_grey">#888888</color>
+    <!-- 状态卡片（浅色模式）：提示为次级蓝灰、状态为青绿，分割线比文字更淡一档 -->
+    <color name="hint_text">#546E7A</color>
+    <color name="status_text">#00796B</color>
+    <color name="card_divider">#B0BEC5</color>
 </resources>
