@@ -40,6 +40,13 @@
     <string name="section_files">💬 Services</string>
     <string name="section_game">🎮 Games</string>
     <string name="market_quote">📈 行情 K线 · Market</string>
+    <string name="market_widget_label">📈 行情</string>
+    <string name="market_widget_desc">一个部件可放多个自选标的的最新价与涨跌幅，每行小字标出市场代码，超出高度可上下滚动；点某一行看该标的，点右上角「刷新」立即取数</string>
+    <string name="market_widget_config">行情小部件设置</string>
+    <string name="market_widget_loading">加载中…</string>
+    <string name="market_widget_refresh">刷新</string>
+    <string name="market_widget_title">行情</string>
+    <string name="avatar_3d">🧍 人物 3D 模型 · Avatar</string>
     <string name="deduction_board">🧩 声纹推演盘 · Deduction Board</string>
     <string name="sensor">传感器</string>
     <string name="url">源码</string>

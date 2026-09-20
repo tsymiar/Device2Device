@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行情桌面小部件：一个部件里放多个标的
+     头部「行情 · N + 刷新」→ 中间是 ListView（标的数量超出可视高度时可上下滚动，
+     RemoteViews 里只有 AdapterView 系列能真正滚动，ScrollView 会被拒绝 inflate；
+     数据源是 MarketWidgetService，行布局见 widget_market_item.xml）→ 底部更新时间沉底；
+     列表用 0dp + weight 1 吃掉剩余空间，更新时间就贴在部件底部；
+     所有文字色都取 color 资源，日间 / 夜间自动切换（Provider 里还会按涨跌再覆盖一次） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_market_bg"
+    android:orientation="vertical"
+    android:padding="9dp">
+
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/market_widget_title"
+            android:textColor="@color/market_widget_text"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="6dp"
+            android:paddingEnd="2dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="@string/market_widget_refresh"
+            android:textColor="@color/market_widget_text_dim"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- 标的列表：可滚动。Provider 用 setRemoteAdapter 挂上 MarketWidgetService，
+         取数完成后 notifyAppWidgetViewDataChanged 让列表重新取数据 -->
+    <ListView
+        android:id="@+id/widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="2dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:fadingEdge="none"
+        android:listSelector="@android:color/transparent"
+        android:scrollbars="none" />
+
+    <!-- 列表为空时的占位（setEmptyView 挂在列表上） -->
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/market_widget_loading"
+        android:textColor="@color/market_widget_text_hint"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/market_widget_loading"
+        android:textColor="@color/market_widget_text_hint"
+        android:textSize="9sp" />
+
+</LinearLayout>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行情小部件配置：默认 2x2 格，可横向 / 纵向自由拉伸（标的多就拉高一点）。
+     标的行装在 ListView 里，超出可视高度可上下滚动，所以拉多高只影响一屏能看几行；
+     只放一个标的时那一行会自动撑大字号；reconfigurable 允许长按重新改标的列表。
+     minWidth/minHeight 是不支持 targetCell 的桌面的兜底尺寸 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.tsymiar.device2device.widget.MarketWidgetConfigActivity"
+    android:description="@string/market_widget_desc"
+    android:initialLayout="@layout/widget_market"
+    android:maxResizeHeight="420dp"
+    android:maxResizeWidth="420dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="80dp"
+    android:minResizeWidth="80dp"
+    android:minWidth="110dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -45,6 +46,38 @@
         <activity
             android:name=".activity.MarketActivity"
             android:label="@string/market_quote" />
+        <activity
+            android:name=".activity.AvatarActivity"
+            android:label="@string/avatar_3d" />
+
+        <!-- 行情桌面小部件：配置页由桌面在添加小部件时拉起 -->
+        <receiver
+            android:name=".widget.MarketWidgetProvider"
+            android:exported="true"
+            android:label="@string/market_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/market_widget_info" />
+        </receiver>
+        <activity
+            android:name=".widget.MarketWidgetConfigActivity"
+            android:exported="true"
+            android:label="@string/market_widget_config"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <!-- 行情小部件列表的数据源：标的行装在 ListView 里，超出高度可滚动。
+             BIND_REMOTEVIEWS 权限保证只有桌面能绑定它 -->
+        <service
+            android:name=".widget.MarketWidgetService"
+            android:exported="true"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <activity android:name=".activity.WaveActivity" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
         <activity android:name=".activity.GraphActivity" />
         <activity android:name=".activity.SensorActivity" />
@@ -113,6 +146,17 @@
             android:label="@string/thank"
             android:theme="@android:style/Theme.Material.Dialog.Alert"
             tools:ignore="NewApi" />
+
+        <!-- 拍照：把 app 私有目录的临时文件授权给系统相机应用写入 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.tsymiar.device2device.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

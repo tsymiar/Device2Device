@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.TextPaint;
@@ -13,6 +14,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import com.tsymiar.device2device.market.Indicators;
+import com.tsymiar.device2device.market.MarketPalette;
 import com.tsymiar.device2device.market.Quote;
 
 import java.text.SimpleDateFormat;
@@ -38,20 +40,26 @@ public class KLineView extends View {
         void onQuoteInfo(String text);
     }
 
-    private static final int COLOR_BG = 0xFF0E1116;
-    private static final int COLOR_GRID = 0xFF20262F;
-    private static final int COLOR_TEXT = 0xFFB7BDC7;
-    private static final int COLOR_TEXT_DIM = 0xFF6B7280;
-    // 配色与脚本 UP_COLOR/DOWN_COLOR/MA_COLORS 一致：红涨绿跌
-    private static final int COLOR_UP = 0xFFD62728;
-    private static final int COLOR_DOWN = 0xFF2CA02C;
-    private static final int COLOR_MA5 = 0xFFE8890C;
-    private static final int COLOR_MA10 = 0xFF2F6FD0;
-    private static final int COLOR_MA20 = 0xFF8A5CD6;
-    private static final int COLOR_CURSOR = 0xFF9AA4B2;
-    private static final int COLOR_DIF = 0xFFFFA726;
-    private static final int COLOR_DEA = 0xFF42A5F5;
-    private static final int COLOR_RSI = 0xFFAB47BC;
+    // 配色：默认是深色盘，外层用 setPalette(MarketPalette) 按日间 / 夜间整套切换
+    private int mBg = 0xFF0E1116;
+    private int mGrid = 0xFF20262F;
+    private int mText = 0xFFB7BDC7;
+    private int mTextDim = 0xFF6B7280;
+    // 红涨绿跌（与脚本 UP_COLOR/DOWN_COLOR/mMaColors 一致）
+    private int mUp = 0xFFD62728;
+    private int mDown = 0xFF2CA02C;
+    private int mMa5 = 0xFFE8890C;
+    private int mMa10 = 0xFF2F6FD0;
+    private int mMa20 = 0xFF8A5CD6;
+    private int mCursor = 0xFF9AA4B2;
+    private int mDif = 0xFFFFA726;
+    private int mDea = 0xFF42A5F5;
+    private int mRsi = 0xFFAB47BC;
+    private int mTooltipBg = 0xEE151A21;
+    private int mTooltipStroke = 0x664A5568;
+    /** 分时折线（1分钟等超短周期用折线代替蜡烛）：线色与下方半透明面积色 */
+    private int mTrend = 0xFF2F6FD0;
+    private int mTrendFill = 0x332F6FD0;
 
     /** 副图标题带指标参数（脚本 PANEL_LABEL_FMT） */
     private static final String[] PANEL_NAMES = {"成交量", "MACD(12,26,9)", "RSI(14)", "KDJ(9,3,3)"};
@@ -60,7 +68,7 @@ public class KLineView extends View {
     private static final int PANEL_RSI = 2;
     private static final int PANEL_KDJ = 3;
     private static final int[] MA_WINDOWS = {5, 10, 20};
-    private static final int[] MA_COLORS = {COLOR_MA5, COLOR_MA10, COLOR_MA20};
+    private int[] mMaColors = {mMa5, mMa10, mMa20};
 
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -70,6 +78,8 @@ public class KLineView extends View {
     private String mTitle = "";
     private String mName = "";      // 标的名称（股票名/商品中文名），显示在主图首行
     private int mPanelMode = PANEL_VOLUME;
+    /** true = 折线（分时）模式：1分钟这种超短周期蜡烛会糊成一片，改画收盘价折线 */
+    private boolean mLineMode = false;
     private QuoteInfoListener mListener;
 
     private float mDensity = 2f;
@@ -99,7 +109,7 @@ public class KLineView extends View {
         super(context, attrs);
         mDensity = getResources().getDisplayMetrics().density;
         mSlot = dp(8);
-        setBackgroundColor(COLOR_BG);
+        setBackgroundColor(mBg);
         mScaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
             public boolean onScaleBegin(ScaleGestureDetector detector) {
@@ -129,6 +139,38 @@ public class KLineView extends View {
     }
 
     /** 主图首行显示的标的名称（股票名/商品中文名）；传空串则只显示标题 */
+    /** 整套换色：日间 / 夜间由外层传入（见 MarketPalette），换完立即重绘 */
+    public void setPalette(MarketPalette p) {
+        if (p == null) return;
+        mBg = p.bg;
+        mGrid = p.grid;
+        mText = p.axis;
+        mTextDim = p.textDim;
+        mUp = p.up;
+        mDown = p.down;
+        mMa5 = p.ma5;
+        mMa10 = p.ma10;
+        mMa20 = p.ma20;
+        mMaColors = new int[]{mMa5, mMa10, mMa20};
+        mCursor = p.cursor;
+        mDif = p.dif;
+        mDea = p.dea;
+        mRsi = p.rsi;
+        mTooltipBg = p.tooltipBg;
+        mTooltipStroke = p.tooltipStroke;
+        mTrend = p.trend;
+        mTrendFill = (p.trend & 0x00FFFFFF) | 0x33000000;    // 同色 20% 透明做面积
+        setBackgroundColor(mBg);
+        invalidate();
+    }
+
+    /** true = 折线（分时）模式：1分钟这种超短周期蜡烛会糊成一片，改画收盘价折线 */
+    public void setLineMode(boolean lineMode) {
+        if (mLineMode == lineMode) return;
+        mLineMode = lineMode;
+        invalidate();
+    }
+
     public void setName(String name) {
         mName = name == null ? "" : name;
         invalidate();
@@ -254,7 +296,7 @@ public class KLineView extends View {
         float left = dp(10);
         // 第一行：标的名称（股票名 / 商品中文名），未解析到名称时退回标题
         String label = mName.isEmpty() ? mTitle : mName;
-        mTextPaint.setColor(COLOR_TEXT);
+        mTextPaint.setColor(mText);
         mTextPaint.setTextSize(sp(15));
         mTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
@@ -265,13 +307,13 @@ public class KLineView extends View {
         mTextPaint.setTextSize(sp(11));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         if (!mName.isEmpty()) {
-            mTextPaint.setColor(COLOR_TEXT_DIM);
+            mTextPaint.setColor(mTextDim);
             canvas.drawText(mTitle, left, sp(32), mTextPaint);
         }
         if (!mData.isEmpty()) {
             Quote last = mData.get(mData.size() - 1);
             float base = mData.size() > 1 ? mData.get(mData.size() - 2).close : last.open;
-            mTextPaint.setColor(last.isUp() ? COLOR_UP : COLOR_DOWN);
+            mTextPaint.setColor(last.isUp() ? mUp : mDown);
             mTextPaint.setTextAlign(Paint.Align.RIGHT);
             canvas.drawText(String.format(Locale.US, "%s  %+.2f%%", fmt(last.close), last.changePercent(base)),
                     getWidth() - dp(10), sp(32), mTextPaint);
@@ -279,7 +321,7 @@ public class KLineView extends View {
     }
 
     private void drawEmpty(Canvas canvas) {
-        mTextPaint.setColor(COLOR_TEXT_DIM);
+        mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(13));
         mTextPaint.setTextAlign(Paint.Align.CENTER);
         canvas.drawText("暂无行情数据", getWidth() / 2f, getHeight() / 2f, mTextPaint);
@@ -303,30 +345,34 @@ public class KLineView extends View {
     private void drawGrid(Canvas canvas, float[] range) {
         mLinePaint.setStyle(Paint.Style.STROKE);
         mLinePaint.setStrokeWidth(1f);
-        mLinePaint.setColor(COLOR_GRID);
+        mLinePaint.setColor(mGrid);
         mLinePaint.setPathEffect(null);
         if (!mPanelRect.isEmpty()) {
             canvas.drawLine(mMainRect.left, mMainRect.bottom, mMainRect.right, mMainRect.bottom, mLinePaint);
         }
         // 5 条水平线 + 右侧价格刻度
-        mTextPaint.setColor(COLOR_TEXT_DIM);
+        mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         for (int i = 0; i <= 4; i++) {
             float y = mMainRect.top + mMainRect.height() * i / 4f;
-            drawDashedLine(canvas, mMainRect.left, y, mMainRect.right, y, COLOR_GRID);
+            drawDashedLine(canvas, mMainRect.left, y, mMainRect.right, y, mGrid);
             canvas.drawText(fmt(priceAt(y, range)), mMainRect.right + dp(4), y + sp(3), mTextPaint);
         }
     }
 
     private void drawCandles(Canvas canvas, float[] range) {
+        if (mLineMode) {
+            drawTrendLine(canvas, range);
+            return;
+        }
         // 与脚本一致：K线越密实体越宽，避免整片糊在一起
         float body = mVisible <= 240 ? 0.62f : (mVisible <= 600 ? 0.76f : 0.9f);
         float halfWidth = Math.max(0.6f, mSlot * body / 2f);
         mPaint.setStyle(Paint.Style.FILL);
         for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
             Quote q = mData.get(i);
-            int color = q.isUp() ? COLOR_UP : COLOR_DOWN;
+            int color = q.isUp() ? mUp : mDown;
             float cx = xOf(i);
             // 影线
             mLinePaint.setColor(color);
@@ -341,11 +387,93 @@ public class KLineView extends View {
         }
     }
 
+    /**
+     * 折线（分时）模式：视窗内收盘价连成平滑曲线，下方填一层半透明面积，末端标出最新价。
+     *
+     * 曲线用单调三次插值（Fritsch–Carlson）而不是普通 Catmull-Rom：后者在拐点处会过冲，
+     * 画出数据里根本不存在的高点 / 低点，看着"平滑"了但读数是假的；
+     * 单调版本保证段内曲线不会越过相邻两点的值域，极值仍然落在真实数据点上。
+     */
+    private void drawTrendLine(Canvas canvas, float[] range) {
+        int first = Math.max(0, mStart);
+        int last = Math.min(mData.size() - 1, mStart + mVisible - 1);
+        if (last <= first) return;
+        int n = last - first + 1;
+        float[] xs = new float[n];
+        float[] ys = new float[n];
+        for (int i = 0; i < n; i++) {
+            xs[i] = xOf(first + i);
+            ys[i] = yOf(mData.get(first + i).close, range);
+        }
+        float[] tangents = monotoneTangents(xs, ys, n);
+
+        Path line = new Path();
+        Path area = new Path();
+        float baseY = mMainRect.bottom;
+        line.moveTo(xs[0], ys[0]);
+        area.moveTo(xs[0], baseY);
+        area.lineTo(xs[0], ys[0]);
+        for (int i = 0; i < n - 1; i++) {
+            float dx = xs[i + 1] - xs[i];
+            float c1x = xs[i] + dx / 3f;
+            float c1y = ys[i] + tangents[i] * dx / 3f;
+            float c2x = xs[i + 1] - dx / 3f;
+            float c2y = ys[i + 1] - tangents[i + 1] * dx / 3f;
+            line.cubicTo(c1x, c1y, c2x, c2y, xs[i + 1], ys[i + 1]);
+            area.cubicTo(c1x, c1y, c2x, c2y, xs[i + 1], ys[i + 1]);
+        }
+        area.lineTo(xs[n - 1], baseY);
+        area.close();
+        mPaint.setStyle(Paint.Style.FILL);
+        mPaint.setColor(mTrendFill);
+        canvas.drawPath(area, mPaint);
+
+        mLinePaint.setStyle(Paint.Style.STROKE);
+        mLinePaint.setStrokeWidth(dp(1.4f));
+        mLinePaint.setPathEffect(null);
+        mLinePaint.setColor(mTrend);
+        canvas.drawPath(line, mLinePaint);
+
+        mPaint.setColor(mTrend);
+        canvas.drawCircle(xs[n - 1], ys[n - 1], dp(2.2f), mPaint);
+    }
+
+    /**
+     * 单调三次插值的切线斜率（Fritsch–Carlson）：
+     * 相邻段异号（局部极值）时切线取 0，同号时取两侧斜率均值并限幅，
+     * 这样曲线一定落在相邻两点的值域内 —— 平滑了形状，但不会造出假的高点低点。
+     */
+    private static float[] monotoneTangents(float[] xs, float[] ys, int n) {
+        float[] m = new float[n];
+        if (n < 2) return m;
+        float[] d = new float[n - 1];
+        for (int i = 0; i < n - 1; i++) {
+            d[i] = (ys[i + 1] - ys[i]) / Math.max(1e-6f, xs[i + 1] - xs[i]);
+        }
+        if (n == 2) {
+            m[0] = d[0];
+            m[1] = d[0];
+            return m;
+        }
+        m[0] = d[0];
+        m[n - 1] = d[n - 2];
+        for (int i = 1; i < n - 1; i++) {
+            if (d[i - 1] * d[i] <= 0f) {
+                m[i] = 0f;                       // 局部极值：切线取平，曲线不会冲出值域
+            } else {
+                m[i] = (d[i - 1] + d[i]) * 0.5f;
+                float limit = 3f * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]));
+                if (Math.abs(m[i]) > limit) m[i] = limit * Math.signum(m[i]);
+            }
+        }
+        return m;
+    }
+
     private void drawMovingAverages(Canvas canvas, float[] range) {
         float[] closes = Indicators.closes(mData);
         for (int m = 0; m < MA_WINDOWS.length; m++) {
             float[] ma = Indicators.sma(closes, MA_WINDOWS[m]);
-            mLinePaint.setColor(MA_COLORS[m]);
+            mLinePaint.setColor(mMaColors[m]);
             mLinePaint.setStrokeWidth(dp(1));
             mLinePaint.setPathEffect(null);
             float lastX = 0f;
@@ -364,7 +492,7 @@ public class KLineView extends View {
             // 图例：MA5/10/20 最新值
             if (!mData.isEmpty()) {
                 float lastValue = ma[mData.size() - 1];
-                mTextPaint.setColor(MA_COLORS[m]);
+                mTextPaint.setColor(mMaColors[m]);
                 mTextPaint.setTextSize(sp(9));
                 mTextPaint.setTextAlign(Paint.Align.LEFT);
                 canvas.drawText("MA" + MA_WINDOWS[m] + " " + (Float.isNaN(lastValue) ? "-" : fmt(lastValue)),
@@ -378,11 +506,11 @@ public class KLineView extends View {
         float y = yOf(last.close, range);
         if (y < mMainRect.top || y > mMainRect.bottom) return;
         drawDashedLine(canvas, mMainRect.left, y, mMainRect.right, y,
-                last.isUp() ? COLOR_UP : COLOR_DOWN);
+                last.isUp() ? mUp : mDown);
         mPaint.setStyle(Paint.Style.FILL);
-        mPaint.setColor(last.isUp() ? COLOR_UP : COLOR_DOWN);
+        mPaint.setColor(last.isUp() ? mUp : mDown);
         canvas.drawRect(mMainRect.right + dp(2), y - sp(7), getWidth() - dp(2), y + sp(7), mPaint);
-        mTextPaint.setColor(0xFF101318);
+        mTextPaint.setColor(mBg);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         canvas.drawText(fmt(last.close), mMainRect.right + dp(4), y + sp(3), mTextPaint);
@@ -413,35 +541,35 @@ public class KLineView extends View {
             for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
                 float x = xOf(i);
                 float value = macd.hist[i];
-                mPaint.setColor(value >= 0 ? COLOR_UP : COLOR_DOWN);
+                mPaint.setColor(value >= 0 ? mUp : mDown);
                 float y0 = mid - value / max * half;
                 canvas.drawRect(x - barWidth, Math.min(y0, mid), x + barWidth, Math.max(y0, mid), mPaint);
             }
-            drawSeries(canvas, macd.dif, COLOR_DIF, max, true);
-            drawSeries(canvas, macd.dea, COLOR_DEA, max, true);
-            mLinePaint.setColor(COLOR_GRID);
+            drawSeries(canvas, macd.dif, mDif, max, true);
+            drawSeries(canvas, macd.dea, mDea, max, true);
+            mLinePaint.setColor(mGrid);
             mLinePaint.setPathEffect(null);
             mLinePaint.setStrokeWidth(1f);
             canvas.drawLine(left, mid, mPanelRect.right, mid, mLinePaint);
             drawPanelScale(canvas, String.format(Locale.US, "%.2f", max), top);
-            drawPanelLegend(canvas, new String[]{"DIF", "DEA"}, new int[]{COLOR_DIF, COLOR_DEA});
+            drawPanelLegend(canvas, new String[]{"DIF", "DEA"}, new int[]{mDif, mDea});
         } else if (mode == PANEL_RSI) {
             float[] rsi = Indicators.rsi(closes, 14);
             drawLevels(canvas, new float[]{30f, 50f, 70f});
-            drawSeries(canvas, rsi, COLOR_RSI, 100f, false);
+            drawSeries(canvas, rsi, mRsi, 100f, false);
             drawPanelScale(canvas, "100", top);
             drawPanelScale(canvas, "0", bottom);
         } else if (mode == PANEL_KDJ) {
             Indicators.Kdj kdj = Indicators.kdj(Indicators.highs(mData), Indicators.lows(mData),
                     closes, 9, 3, 3);
             drawLevelsScaled(canvas, new float[]{20f, 50f, 80f}, -20f, 120f);
-            drawSeriesScaled(canvas, kdj.k, COLOR_DEA, -20f, 120f);   // K
-            drawSeriesScaled(canvas, kdj.d, COLOR_DIF, -20f, 120f);   // D
-            drawSeriesScaled(canvas, kdj.j, COLOR_RSI, -20f, 120f);   // J
+            drawSeriesScaled(canvas, kdj.k, mDea, -20f, 120f);   // K
+            drawSeriesScaled(canvas, kdj.d, mDif, -20f, 120f);   // D
+            drawSeriesScaled(canvas, kdj.j, mRsi, -20f, 120f);   // J
             drawPanelScale(canvas, "100", panelY(100f, -20f, 120f));
             drawPanelScale(canvas, "0", panelY(0f, -20f, 120f));
             drawPanelLegend(canvas, new String[]{"K", "D", "J"},
-                    new int[]{COLOR_DEA, COLOR_DIF, COLOR_RSI});
+                    new int[]{mDea, mDif, mRsi});
         } else {
             float max = 0f;
             for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
@@ -449,7 +577,7 @@ public class KLineView extends View {
             }
             if (max <= 0f) {
                 max = 1f;
-                mTextPaint.setColor(COLOR_TEXT_DIM);
+                mTextPaint.setColor(mTextDim);
                 mTextPaint.setTextSize(sp(10));
                 mTextPaint.setTextAlign(Paint.Align.CENTER);
                 canvas.drawText("该数据源无成交量", (left + mPanelRect.right) / 2f,
@@ -461,13 +589,13 @@ public class KLineView extends View {
                 Quote q = mData.get(i);
                 float x = xOf(i);
                 float barTop = bottom - q.volume / (max * 1.15f) * mPanelRect.height();
-                mPaint.setColor(q.isUp() ? COLOR_UP : COLOR_DOWN);
+                mPaint.setColor(q.isUp() ? mUp : mDown);
                 canvas.drawRect(x - barWidth, barTop, x + barWidth, bottom, mPaint);
             }
             drawPanelScale(canvas, compact(max), top);
         }
 
-        mTextPaint.setColor(COLOR_TEXT_DIM);
+        mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         canvas.drawText(PANEL_NAMES[mode], left + dp(2), top + sp(10), mTextPaint);
@@ -479,7 +607,7 @@ public class KLineView extends View {
     }
 
     private void drawLevelsScaled(Canvas canvas, float[] levels, float min, float max) {
-        mLinePaint.setColor(COLOR_GRID);
+        mLinePaint.setColor(mGrid);
         mLinePaint.setStrokeWidth(1f);
         mLinePaint.setPathEffect(new DashPathEffect(new float[]{dp(3), dp(3)}, 0f));
         for (float level : levels) {
@@ -541,7 +669,7 @@ public class KLineView extends View {
     }
 
     private void drawLevels(Canvas canvas, float[] levels) {
-        mLinePaint.setColor(COLOR_GRID);
+        mLinePaint.setColor(mGrid);
         mLinePaint.setStrokeWidth(1f);
         mLinePaint.setPathEffect(new DashPathEffect(new float[]{dp(3), dp(3)}, 0f));
         for (float level : levels) {
@@ -564,7 +692,7 @@ public class KLineView extends View {
     }
 
     private void drawPanelScale(Canvas canvas, String text, float y) {
-        mTextPaint.setColor(COLOR_TEXT_DIM);
+        mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         canvas.drawText(text, mPanelRect.right + dp(4), Math.min(mPanelRect.bottom, y + sp(9)), mTextPaint);
@@ -572,7 +700,7 @@ public class KLineView extends View {
 
     private void drawTimeAxis(Canvas canvas) {
         float y = mAxisTop + sp(12);
-        mTextPaint.setColor(COLOR_TEXT_DIM);
+        mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.CENTER);
         int step = Math.max(1, mVisible / 6);
@@ -590,10 +718,10 @@ public class KLineView extends View {
         Quote q = mData.get(mSelected);
         float x = xOf(mSelected);
         drawDashedLine(canvas, x, mMainRect.top, x, mPanelRect.isEmpty() ? mMainRect.bottom : mPanelRect.bottom,
-                COLOR_CURSOR);
-        drawDashedLine(canvas, mMainRect.left, yOf(q.close, range), x, yOf(q.close, range), COLOR_CURSOR);
+                mCursor);
+        drawDashedLine(canvas, mMainRect.left, yOf(q.close, range), x, yOf(q.close, range), mCursor);
         mPaint.setStyle(Paint.Style.FILL);
-        mPaint.setColor(q.isUp() ? COLOR_UP : COLOR_DOWN);
+        mPaint.setColor(q.isUp() ? mUp : mDown);
         canvas.drawCircle(x, yOf(q.close, range), Math.max(2.5f, dp(2.5f)), mPaint);
     }
 
@@ -632,19 +760,19 @@ public class KLineView extends View {
                 mHeaderHeight, Math.max(mHeaderHeight, getHeight() - dp(4) - boxH));
 
         mPaint.setStyle(Paint.Style.FILL);
-        mPaint.setColor(0xEE151A21);
+        mPaint.setColor(mTooltipBg);
         canvas.drawRoundRect(new RectF(boxX, boxY, boxX + boxW, boxY + boxH), dp(6), dp(6), mPaint);
         mPaint.setStyle(Paint.Style.STROKE);
         mPaint.setStrokeWidth(1f);
-        mPaint.setColor(0x664A5568);
+        mPaint.setColor(mTooltipStroke);
         canvas.drawRoundRect(new RectF(boxX, boxY, boxX + boxW, boxY + boxH), dp(6), dp(6), mPaint);
 
         int save = canvas.save();
         canvas.clipRect(boxX, boxY, boxX + boxW, boxY + boxH);
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         for (int i = 0; i < lines.length; i++) {
-            mTextPaint.setColor(i == 0 ? COLOR_TEXT_DIM : (i == lines.length - 1
-                    ? (q.isUp() ? COLOR_UP : COLOR_DOWN) : COLOR_TEXT));
+            mTextPaint.setColor(i == 0 ? mTextDim : (i == lines.length - 1
+                    ? (q.isUp() ? mUp : mDown) : mText));
             canvas.drawText(lines[i], boxX + pad, boxY + pad + lineH * i + sp(11), mTextPaint);
         }
         canvas.restoreToCount(save);

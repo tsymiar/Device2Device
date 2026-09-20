@@ -26,7 +26,9 @@ import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.market.Quote;
 import com.tsymiar.device2device.market.QuoteSource;
 import com.tsymiar.device2device.market.QuoteSource.Symbol;
+import com.tsymiar.device2device.market.MarketPalette;
 import com.tsymiar.device2device.view.KLineView;
+import com.tsymiar.device2device.widget.MarketWidgetProvider;
 
 import java.util.Arrays;
 import java.util.List;
@@ -56,17 +58,26 @@ public class MarketActivity extends AppCompatActivity {
     private static final String K_SYMBOL = "symbol";
     private static final String K_AUTO = "auto_refresh";
 
-    // 配色（与项目 GameUi 主色一致）：背景全部由代码生成，不再新增 drawable XML
-    private static final int C_FIELD = 0xFF151A21;                 // 输入框 / 下拉底色
-    private static final int C_FIELD_STROKE = 0xFF3C4A66;          // 输入框 / 下拉描边
-    private static final int C_BTN = 0xFF151A21;                   // 次要按钮 常态
-    private static final int C_BTN_STROKE = 0xFF3C4A66;
-    private static final int C_BTN_PRESSED = 0xFF223040;           // 次要按钮 按下
-    private static final int C_BTN_PRESSED_STROKE = 0xFF4FC3F7;
-    private static final int C_PRIMARY = 0xFF00DCA0;               // 主按钮 查询
-    private static final int C_PRIMARY_PRESSED = 0xFF00B384;
-    private static final int C_ON = 0xFFFF964F;                    // 自动刷新 开
-    private static final int C_ON_PRESSED = 0xFFE07A38;
+    // 配色：日间 / 夜间两套，由 MarketPalette 从 color 资源（values / values-night）取，
+    // 随系统深浅模式自动切换；下面这些字段在 applyPalette() 里赋值
+    private MarketPalette mPalette;
+    private int C_BG;                    // 页面 / 图表底色
+    private int C_FIELD;                 // 输入框 / 下拉底色
+    private int C_FIELD_STROKE;          // 输入框 / 下拉描边
+    private int C_BTN;                   // 次要按钮 常态
+    private int C_BTN_STROKE;
+    private int C_BTN_PRESSED;           // 次要按钮 按下
+    private int C_BTN_PRESSED_STROKE;
+    private int C_PRIMARY;               // 主按钮 查询
+    private int C_PRIMARY_PRESSED;
+    private int C_ON_PRIMARY;            // 主按钮上的文字
+    private int C_ON;                    // 自动刷新 开
+    private int C_ON_PRESSED;
+    private int C_ON_TEXT;               // 橙底上的文字
+    private int C_TEXT;                  // 输入文本
+    private int C_TEXT_DIM;              // 状态文字
+    private int C_TEXT_HINT;             // 底部提示文字
+    private int C_EDIT_HINT;             // 输入框 hint
 
     private AppCompatSpinner mSourceSpinner;
     private AppCompatSpinner mIntervalSpinner;
@@ -96,12 +107,15 @@ public class MarketActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setTitle(R.string.market_quote);
-        getWindow().setBackgroundDrawable(new ColorDrawable(0xFF0E1116));
 
+        applyPalette();      // 配色先按当前深浅模式定下来，再搭界面
+        // 从小部件某一行跳进来时带着标的，下面 restorePrefs 会把它读成当前标的
+        MarketWidgetProvider.applyLaunchSymbol(this, getIntent());
         restorePrefs();      // 先恢复上次选择，再按它初始化下拉
+        getWindow().setBackgroundDrawable(new ColorDrawable(C_BG));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0E1116);
+        root.setBackgroundColor(C_BG);
         root.setPadding(dp(8), dp(8), dp(8), dp(8));
 
         root.addView(buildSelectRow());
@@ -159,9 +173,36 @@ public class MarketActivity extends AppCompatActivity {
                 .apply();
     }
 
+    /** 按当前日间 / 夜间模式取整套行情配色；深浅模式切换时 Activity 会重建，这里会重新走一遍 */
+    private void applyPalette() {
+        mPalette = MarketPalette.of(this);
+        C_BG = mPalette.bg;
+        C_FIELD = mPalette.panel;
+        C_FIELD_STROKE = mPalette.stroke;
+        C_BTN = mPalette.panel;
+        C_BTN_STROKE = mPalette.stroke;
+        C_BTN_PRESSED = mPalette.panelPressed;
+        C_BTN_PRESSED_STROKE = mPalette.strokePressed;
+        C_PRIMARY = mPalette.accent;
+        C_PRIMARY_PRESSED = mPalette.accentPressed;
+        C_ON_PRIMARY = mPalette.onAccent;
+        C_ON = mPalette.on;
+        C_ON_PRESSED = mPalette.onPressed;
+        C_ON_TEXT = mPalette.onText;
+        C_TEXT = mPalette.text;
+        C_TEXT_DIM = mPalette.textDim;
+        C_TEXT_HINT = mPalette.textHint;
+        C_EDIT_HINT = mPalette.textHint;
+    }
+
     // ------------------------------------------------------------------
     // 界面构建
     // ------------------------------------------------------------------
+
+    /** 1 分钟这种超短周期改画折线（分时）：同屏几百根蜡烛会糊成一片，折线更好读趋势 */
+    private boolean isMinuteInterval() {
+        return "1m".equals(mInterval);
+    }
 
     /** 第一行：数据源下拉 + 周期下拉 */
     private LinearLayout buildSelectRow() {
@@ -231,8 +272,8 @@ public class MarketActivity extends AppCompatActivity {
         mSymbolEdit.setBackground(rounded(C_FIELD, C_FIELD_STROKE));
         mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
         mSymbolEdit.setSingleLine();
-        mSymbolEdit.setTextColor(0xFFE8EAED);
-        mSymbolEdit.setHintTextColor(0xFF7A7A8A);
+        mSymbolEdit.setTextColor(C_TEXT);
+        mSymbolEdit.setHintTextColor(C_EDIT_HINT);
         mSymbolEdit.setTextSize(13);
         mSymbolEdit.setPadding(dp(8), dp(8), dp(8), dp(8));
         if (!TextUtils.isEmpty(mSymbol)) {
@@ -256,6 +297,8 @@ public class MarketActivity extends AppCompatActivity {
 
     private void buildChart(LinearLayout root) {
         mChart = new KLineView(this);
+        mChart.setPalette(mPalette);      // K线坐标/均线/涨跌一整套跟着日间或夜间走
+        mChart.setLineMode(isMinuteInterval());
         root.addView(mChart, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     }
@@ -264,11 +307,11 @@ public class MarketActivity extends AppCompatActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         mStatus = new TextView(this);
-        mStatus.setTextColor(0xFF9AA4B2);
+        mStatus.setTextColor(C_TEXT_DIM);
         mStatus.setTextSize(11);
         mStatus.setText("加载中…");
         mHint = new TextView(this);
-        mHint.setTextColor(0xFF6B7280);
+        mHint.setTextColor(C_TEXT_HINT);
         mHint.setTextSize(11);
         mHint.setText("可直接输入名称/拼音（茅台、gzmt）或代码 · 拖动查看历史 · 双指缩放 · 单击副图切换 成交量/MACD/RSI/KDJ");
         box.addView(mStatus);
@@ -279,7 +322,7 @@ public class MarketActivity extends AppCompatActivity {
     private AppCompatSpinner spinner(int items) {
         AppCompatSpinner spinner = new AppCompatSpinner(this);
         spinner.setBackground(rounded(C_FIELD, C_FIELD_STROKE));
-        spinner.setPopupBackgroundDrawable(new ColorDrawable(0xFF151A21));
+        spinner.setPopupBackgroundDrawable(new ColorDrawable(C_FIELD));
         return spinner;
     }
 
@@ -296,7 +339,7 @@ public class MarketActivity extends AppCompatActivity {
         TextView button = new TextView(this);
         button.setText(text);
         button.setGravity(Gravity.CENTER);
-        button.setTextColor(0xFF0A0A12);
+        button.setTextColor(C_ON_PRIMARY);
         button.setTextSize(13);
         button.setPadding(dp(14), 0, dp(14), 0);
         button.setBackground(buttonBg(C_PRIMARY, 0, C_PRIMARY_PRESSED, 0));
@@ -324,7 +367,7 @@ public class MarketActivity extends AppCompatActivity {
 
     private void applyRefreshStyle(TextView button) {
         button.setText(mAutoRefresh ? "自动刷新 开" : "自动刷新 关");
-        button.setTextColor(mAutoRefresh ? 0xFF0A0A12 : 0xFFE8EAED);
+        button.setTextColor(mAutoRefresh ? C_ON_TEXT : C_TEXT);
         button.setBackground(mAutoRefresh
                 ? buttonBg(C_ON, 0, C_ON_PRESSED, 0)
                 : buttonBg(C_BTN, C_BTN_STROKE, C_BTN_PRESSED, C_BTN_PRESSED_STROKE));
@@ -437,11 +480,14 @@ public class MarketActivity extends AppCompatActivity {
                     mSymbolEdit.setText(code);
                     mSymbolEdit.setSelection(code.length());
                 }
+                mChart.setLineMode(isMinuteInterval());
                 mChart.setData(code + "  ·  " + source + "  ·  " + mInterval, quotes);
                 resolveName(code);
                 mStatus.setText(source + "  symbol=" + code + "  interval=" + mInterval
                         + "  bars=" + quotes.size() + "  " + span(quotes));
                 savePrefs();
+                // 顺带刷新桌面上的行情小部件（未单独配置的实例跟随这里的标的）
+                MarketWidgetProvider.pushUpdate(MarketActivity.this);
             }
 
             @Override

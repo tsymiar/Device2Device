@@ -29,4 +29,44 @@
     <color name="hint_text">#546E7A</color>
     <color name="status_text">#00796B</color>
     <color name="card_divider">#B0BEC5</color>
+
+    <!-- ===== 行情配色（日间 / 浅色）：底色纯白，涨绿跌红中的绿调深以保证浅底对比度 ===== -->
+    <color name="market_bg">#FFFFFFFF</color>
+    <color name="market_panel">#FFFFFFFF</color>
+    <color name="market_panel_pressed">#FFE8EEF6</color>
+    <color name="market_stroke">#FFB9C3D1</color>
+    <color name="market_stroke_pressed">#FF0288D1</color>
+    <color name="market_text">#FF1F2937</color>
+    <color name="market_text_dim">#FF5B6675</color>
+    <color name="market_text_hint">#FF8A94A6</color>
+    <color name="market_accent">#FF00A97F</color>
+    <color name="market_accent_pressed">#FF008A66</color>
+    <color name="market_on_accent">#FFFFFFFF</color>
+    <color name="market_on">#FFF57C00</color>
+    <color name="market_on_pressed">#FFE06000</color>
+    <color name="market_on_text">#FFFFFFFF</color>
+    <!-- 红涨绿跌（与 matkline.py 一致），浅底上绿再压深一档 -->
+    <color name="market_up">#FFD62728</color>
+    <color name="market_down">#FF1E8E3E</color>
+    <color name="market_flat">#FF64748B</color>
+    <color name="market_grid">#FFE3E8EF</color>
+    <color name="market_axis">#FF6B7280</color>
+    <color name="market_ma5">#FFD2691E</color>
+    <color name="market_ma10">#FF1E5FA8</color>
+    <color name="market_ma20">#FF7B3FBF</color>
+    <color name="market_dif">#FFE0821E</color>
+    <color name="market_dea">#FF1E88E5</color>
+    <color name="market_rsi">#FF8E24AA</color>
+    <color name="market_cursor">#FF64748B</color>
+    <!-- 分时折线（1分钟）：蓝色，浅底上压深一档 -->
+    <color name="market_trend">#FF1E5FA8</color>
+    <color name="market_tooltip_bg">#EE1F2937</color>
+    <color name="market_tooltip_stroke">#66899BB3</color>
+
+    <!-- 行情桌面小部件（浅色）：白卡片 + 深色文字 -->
+    <color name="market_widget_bg">#FFFFFFFF</color>
+    <color name="market_widget_stroke">#FFCBD5E1</color>
+    <color name="market_widget_text">#FF111827</color>
+    <color name="market_widget_text_dim">#FF5B6675</color>
+    <color name="market_widget_text_hint">#FF8A94A6</color>
 </resources>

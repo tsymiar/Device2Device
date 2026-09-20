@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 行情页下拉：弹出列表项（深色底，白字，无箭头） -->
+<!-- 行情页下拉：弹出列表项（底色随下拉弹窗，文字色随日间 / 夜间） -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -10,5 +10,5 @@
     android:paddingTop="9dp"
     android:paddingBottom="9dp"
     android:singleLine="true"
-    android:textColor="#FFE8EAED"
+    android:textColor="@color/market_text"
     android:textSize="12sp" />

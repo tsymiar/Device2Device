@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行情小部件 ListView 的一行：左「名称 + 市场代码小字」，右「最新价 + 涨跌幅」
+     市场代码常显（sh600519 · 沪 / BTCUSDT · 加密货币），字号 9sp 不占高度；
+     只放一个标的时 Provider 会把价格字号撑大；整行可点，点击由
+     setPendingIntentTemplate + setOnClickFillInIntent 跳转到行情页对应标的 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_row_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="34dp"
+    android:orientation="horizontal"
+    android:paddingStart="1dp"
+    android:paddingEnd="1dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_row_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="--"
+            android:textColor="@color/market_widget_text"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_row_symbol"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="@color/market_widget_text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="6dp">
+
+        <TextView
+            android:id="@+id/widget_row_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:maxLines="1"
+            android:text="--"
+            android:textColor="@color/market_widget_text"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_row_change"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="@color/market_widget_text_dim"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+</LinearLayout>
