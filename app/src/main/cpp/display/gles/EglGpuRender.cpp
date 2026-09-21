@@ -642,7 +642,7 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
         if (stat == EGL_FALSE) {
             LOGE("Draws %08x status EGL_FALSE", *pixel[i]);
         } else {
-            LOGD("Draws %08x, remain = %ld, using OpenGL [%d, %d]", pixel[i], pictureSize - i, EGL2.height, EGL2.width);
+            LOGD("Draws %08x, remain = %ld, using OpenGL [%d, %d]", *pixel[i], pictureSize - i, EGL2.height, EGL2.width);
         }
         usleep(100);
     }

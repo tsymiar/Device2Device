@@ -19,6 +19,7 @@ import com.tsymiar.device2device.market.Quote;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -77,6 +78,10 @@ public class KLineView extends View {
     private List<Quote> mData = new ArrayList<>();
     private String mTitle = "";
     private String mName = "";      // 标的名称（股票名/商品中文名），显示在主图首行
+    /** 当前周期（1d/1w/1M/1Q/1Y…）：季线/年线的时间轴标签要按周期单独格式化 */
+    private String mInterval = "1d";
+    /** 底部时间轴高度（随字号缩放变大，保证标签始终完整落在画布内） */
+    private float mAxisHeight = 0f;
     private int mPanelMode = PANEL_VOLUME;
     /** true = 折线（分时）模式：1分钟这种超短周期蜡烛会糊成一片，改画收盘价折线 */
     private boolean mLineMode = false;
@@ -171,6 +176,11 @@ public class KLineView extends View {
         invalidate();
     }
 
+    /** 设置当前周期：季/年线的时间轴按周期出标签，避免长跨度下退化成年份刷屏 */
+    public void setInterval(String interval) {
+        mInterval = interval == null || interval.isEmpty() ? "1d" : interval;
+    }
+
     public void setName(String name) {
         mName = name == null ? "" : name;
         invalidate();
@@ -225,11 +235,13 @@ public class KLineView extends View {
         float padB = dp(4);
         float gap = dp(6);
         mHeaderHeight = dp(40);
-        float axisH = dp(18);
+        // 系统字体放大时 sp(9) 的标签会变高，时间轴跟着长高，免得文字贴着底边被裁掉
+        float axisH = Math.max(dp(18), sp(14));
+        mAxisHeight = axisH;
         float top = mHeaderHeight;
         float rest = h - top - axisH - gap - padB;
         if (rest < dp(60)) {
-            mMainRect.set(padL, top, w - padR, Math.max(top + dp(30), h - padB));
+            mMainRect.set(padL, top, w - padR, Math.max(top + dp(30), h - padB - axisH));
             mPanelRect.setEmpty();
             mAxisTop = mMainRect.bottom;
             return;
@@ -698,18 +710,37 @@ public class KLineView extends View {
         canvas.drawText(text, mPanelRect.right + dp(4), Math.min(mPanelRect.bottom, y + sp(9)), mTextPaint);
     }
 
+    /**
+     * 底部时间轴：先按间距抽稀，再逐个做「贴边内移 + 与前标签防重叠」。
+     * 刚上市的股票只有十几根K线时，屏幕宽度摊到每根上的空间很窄，
+     * 若只按根数抽稀（老逻辑）会出现 step=1 的密集标签，文字互相压在一起。
+     */
     private void drawTimeAxis(Canvas canvas) {
-        float y = mAxisTop + sp(12);
+        // 基线在时间轴高度里垂直居中（原来写死 sp(12)，字体放大后会顶出画布底部）
+        Paint.FontMetrics fm = mTextPaint.getFontMetrics();
+        float height = mAxisHeight > 0 ? mAxisHeight : sp(14);
+        float y = mAxisTop + height / 2f - (fm.ascent + fm.descent) / 2f;
         mTextPaint.setColor(mTextDim);
         mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.CENTER);
         int step = Math.max(1, mVisible / 6);
         SimpleDateFormat fmt = new SimpleDateFormat(timePattern(), Locale.US);
-        for (int i = mStart; i < mStart + mVisible && i < mData.size(); i += step) {
+        float minGap = dp(8);                       // 两个标签之间至少留这么多空隙
+        float left = dp(2);
+        float right = getWidth() - dp(4);
+        float lastRight = Float.NEGATIVE_INFINITY;  // 上一个已画标签的右边界
+        int end = Math.min(mData.size(), mStart + mVisible);
+        for (int i = mStart; i < end; i += step) {
             String label = formatTime(mData.get(i).time, fmt);
+            float half = mTextPaint.measureText(label) / 2f;
+            if (half <= 0f) continue;
             float x = xOf(i);
-            if (x < mMainRect.left || x > getWidth() - dp(4)) continue;
+            // 首尾两个标签贴边时向内收，保证整串文字都在画布内
+            x = Math.max(x, left + half);
+            x = Math.min(x, right - half);
+            if (x - half < lastRight + minGap) continue;   // 会和前一个标签叠上，跳过
             canvas.drawText(label, x, y, mTextPaint);
+            lastRight = x + half;
         }
     }
 
@@ -919,6 +950,9 @@ public class KLineView extends View {
 
     /** 时间轴格式（脚本 time_label_format）：日线按跨度降级，日内同日只显时分 */
     private String timePattern() {
+        // 长周期直接按周期定格式：否则跨几十年的季/年线会退化成一堆相同年份标签
+        if ("1Y".equals(mInterval)) return "yyyy";
+        if ("1Q".equals(mInterval) || "1M".equals(mInterval)) return "yyyy-MM";
         int end = Math.min(mData.size(), mStart + mVisible) - 1;
         if (end < mStart) return "MM-dd";
         Date first = parseStamp(mData.get(mStart).time);
@@ -941,6 +975,12 @@ public class KLineView extends View {
     private String formatTime(String time, SimpleDateFormat fmt) {
         Date stamp = parseStamp(time);
         if (stamp == null) return time == null ? "" : time.substring(0, Math.min(10, time.length()));
+        // 季线标签写成 2024Q1：SimpleDateFormat 的季度符各版本表现不一致，手拼最稳
+        if ("1Q".equals(mInterval)) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(stamp);
+            return calendar.get(Calendar.YEAR) + "Q" + (calendar.get(Calendar.MONTH) / 3 + 1);
+        }
         return fmt.format(stamp);
     }
 

@@ -140,6 +140,11 @@ public final class QuoteSource {
         INTERVAL_ALIAS.put("1min", "1m");
         INTERVAL_ALIAS.put("hour", "1h");
         INTERVAL_ALIAS.put("1hour", "1h");
+        INTERVAL_ALIAS.put("quarter", "1Q");
+        INTERVAL_ALIAS.put("season", "1Q");
+        INTERVAL_ALIAS.put("q", "1Q");
+        INTERVAL_ALIAS.put("year", "1Y");
+        INTERVAL_ALIAS.put("y", "1Y");
 
         MINUTE_STEP.put("1m", 1);
         MINUTE_STEP.put("5m", 5);
@@ -170,15 +175,17 @@ public final class QuoteSource {
 
         BINANCE_BAR.put("60m", "1h");
 
-        String[] cn = {"1m", "5m", "15m", "30m", "60m", "1h", "1d", "1w", "1M"};
+        // 1h 与 60m 同为 60 分钟，统一用 60m 表示「小时线」，避免下拉里出现重复项
+        // 1Q=季线，1Y=年线，两者没有现成接口，由月线（或日线）聚合出来
+        String[] cn = {"1m", "5m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
         // 新浪期货（国内/国际）只到日线；美元指数仅有东财分时，无免费日线
-        String[] futures = {"1m", "5m", "15m", "30m", "60m", "1h", "1d"};
+        String[] futures = {"1m", "5m", "30m", "60m", "1d"};
         // 美元指数：分钟线靠分时/快照聚合，日线及以上由汇率反算（已补齐日线支持）
-        String[] usdIndex = {"1m", "5m", "15m", "30m", "60m", "1h", "1d", "1w", "1M"};
+        String[] usdIndex = {"1m", "5m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
         SUPPORTED.put(TENCENT, cn);
         SUPPORTED.put(EAST, cn);
-        SUPPORTED.put(BINANCE, new String[]{"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h",
-                "6h", "8h", "12h", "1d", "3d", "1w", "1M"});
+        SUPPORTED.put(BINANCE, new String[]{"1m", "3m", "5m", "30m", "2h", "4h",
+                "6h", "8h", "12h", "1d", "3d", "1w", "1M", "1Q", "1Y"});
 
         SUPPORTED.put(GOLD, futures);
         SUPPORTED.put(XAU, futures);
@@ -416,6 +423,28 @@ public final class QuoteSource {
     public static String[] intervals(String source) {
         String[] list = SUPPORTED.get(source == null ? AUTO : source);
         return list == null ? SUPPORTED.get(AUTO) : list;
+    }
+
+    /** 下拉里给人看的周期名：季/年/月/周/日给中文，分钟线与小时线保持 5m / 1h 这类写法 */
+    public static String intervalLabel(String interval) {
+        if (interval == null) return "";
+        switch (interval) {
+            case "1Q":
+                return "季K";
+            case "60m":
+            case "1h":
+                return "1h";
+            case "1Y":
+                return "年K";
+            case "1M":
+                return "月K";
+            case "1w":
+                return "周K";
+            case "1d":
+                return "日K";
+            default:
+                return interval;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -692,8 +721,21 @@ public final class QuoteSource {
                 return;
             }
             List<String> urls = buildUrls(name, code, interval, limit);
+            // 季/年线：月线到手后按季度/年度合并成目标周期
+            final boolean composed = isComposedInterval(interval);
+            StepCallback sink = composed ? new StepCallback() {
+                @Override
+                public void onResult(List<Quote> quotes) {
+                    cb.onResult(resample(quotes, interval));
+                }
+
+                @Override
+                public void onError(String message) {
+                    cb.onError(message);
+                }
+            } : cb;
             fetchAny(new ArrayDeque<>(urls), headersFor(name),
-                    body -> parseKline(name, code, interval, body), cb);
+                    body -> parseKline(name, code, composed ? "1M" : interval, body), sink);
         } catch (Exception e) {
             cb.onError(String.valueOf(e.getMessage()));
         }
@@ -701,14 +743,28 @@ public final class QuoteSource {
 
     /** 沪金/沪银：日线 getDailyKLine；分钟线 getFewMinLine，均为真实OHLC */
     private static void loadSinaInner(String code, String interval, StepCallback cb) {
-        String method = "1d".equals(interval) ? "getDailyKLine" : "getFewMinLine";
+        // 新浪只有日线与分钟线：季/年线取日线回来自己合并
+        final boolean composed = isComposedInterval(interval);
+        boolean daily = "1d".equals(interval) || composed;
+        String method = daily ? "getDailyKLine" : "getFewMinLine";
         String url = SINA_INNER + code + "/InnerFuturesNewService." + method + "?symbol=" + code;
-        if (!"1d".equals(interval)) {
+        if (!daily) {
             Integer step = MINUTE_STEP.get(interval);
             url += "&type=" + (step == null ? 5 : step);
         }
+        StepCallback sink = composed ? new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+                cb.onResult(resample(quotes, interval));
+            }
+
+            @Override
+            public void onError(String message) {
+                cb.onError(message);
+            }
+        } : cb;
         fetchAny(new ArrayDeque<>(Collections.singletonList(url)), sinaHeaders(),
-                body -> parseSinaInner(new JSONArray(parseJsonp(body)), code), cb);
+                body -> parseSinaInner(new JSONArray(parseJsonp(body)), code), sink);
     }
 
     /** 新浪国际期货（黄金/原油/天然气）：日线真实OHLC；分钟线用当日分时线 + 实时快照聚合 */
@@ -787,21 +843,29 @@ public final class QuoteSource {
     }
 
     private static List<String> buildUrls(String name, String code, String interval, int limit) {
+        // 季线/年线：各源都没有现成接口，统一先取月线，再由 resample() 合并成季度/年度
+        boolean composed = isComposedInterval(interval);
+        String request = composed ? "1M" : interval;
         int rows = requestLimit(limit, name);
+        if (composed) {
+            Integer max = SINGLE_REQUEST_MAX.get(name);
+            int factor = "1Y".equals(interval) ? 12 : 3;   // 一年 12 个月，一季 3 个月
+            rows = Math.min(max == null ? 640 : max, Math.max(rows, 120) * factor);
+        }
         if (TENCENT.equals(name)) {
-            String minuteKey = TENCENT_MINUTE_KEY.get(interval);
+            String minuteKey = TENCENT_MINUTE_KEY.get(request);
             if (minuteKey != null) {
                 return Arrays.asList(
                         TENCENT_MINUTE + "?param=" + code + "," + minuteKey + ",," + rows,
                         TENCENT_MINUTE_MIRROR + "?param=" + code + "," + minuteKey + ",," + rows);
             }
-            String dailyKey = TENCENT_DAILY_KEY.get(interval);
+            String dailyKey = TENCENT_DAILY_KEY.get(request);
             if (dailyKey == null) dailyKey = "day";
             String param = "?param=" + code + "," + dailyKey + ",,," + rows + ",qfq";
             return Arrays.asList(TENCENT_KLINE + param, TENCENT_KLINE_MIRROR + param);
         }
         if (EAST.equals(name)) {
-            Integer klt = EAST_KLT.get(interval);
+            Integer klt = EAST_KLT.get(request);
             String query = "?secid=" + code
                     + "&fields1=f1,f2,f3,f4,f5,f6"
                     + "&fields2=f51,f52,f53,f54,f55,f56,f57"
@@ -809,10 +873,15 @@ public final class QuoteSource {
                     + "&fqt=1&beg=19900101&end=20500101&lmt=" + rows;
             return Collections.singletonList(EAST_KLINE + query);
         }
-        String bar = BINANCE_BAR.get(interval);
-        String query = "?symbol=" + code + "&interval=" + (bar == null ? interval : bar)
+        String bar = BINANCE_BAR.get(request);
+        String query = "?symbol=" + code + "&interval=" + (bar == null ? request : bar)
                 + "&limit=" + Math.min(rows, 1000);
         return Arrays.asList(BINANCE_KLINE + query, BINANCE_KLINE_MIRROR + query);
+    }
+
+    /** 季线/年线：没有原生接口，需要拿更细粒度的数据自己合并 */
+    private static boolean isComposedInterval(String interval) {
+        return "1Q".equals(interval) || "1Y".equals(interval);
     }
 
     private static HashMap<String, String> headersFor(String name) {
@@ -1113,14 +1182,25 @@ public final class QuoteSource {
         return (float) value;
     }
 
-    /** 日线 -> 周线/月线（汇率源只有日频，周月线自行合并） */
+    /**
+     * 由更细粒度的数据合并出周/月/季/年线：开取首根、收取末根、高低取区间极值。
+     * 汇率源只有日频，周/月线自行合并；季线/年线各源都没有现成接口，
+     * 腾讯/东财/币安走「月线 -> 季/年」，其余源走「日线 -> 季/年」。
+     */
     private static List<Quote> resample(List<Quote> quotes, String interval) {
-        if (!"1w".equals(interval) && !"1M".equals(interval)) return quotes;
+        boolean weekly = "1w".equals(interval);
         boolean monthly = "1M".equals(interval);
+        boolean quarterly = "1Q".equals(interval);
+        boolean yearly = "1Y".equals(interval);
+        if (!weekly && !monthly && !quarterly && !yearly) return quotes;
         LinkedHashMap<String, float[]> bars = new LinkedHashMap<>();
         LinkedHashMap<String, String> stamps = new LinkedHashMap<>();
         for (Quote quote : quotes) {
-            String key = monthly ? quote.time.substring(0, 7) : weekKey(quote.time);
+            String key;
+            if (monthly) key = quote.time.substring(0, Math.min(7, quote.time.length()));
+            else if (quarterly) key = quarterKey(quote.time);
+            else if (yearly) key = yearKey(quote.time);
+            else key = weekKey(quote.time);
             float[] bar = bars.get(key);
             if (bar == null) {
                 bars.put(key, new float[]{quote.open, quote.high, quote.low, quote.close});
@@ -1137,6 +1217,27 @@ public final class QuoteSource {
             out.add(new Quote(stamps.get(entry.getKey()), bar[0], bar[1], bar[2], bar[3], 0f, bar[3]));
         }
         return out;
+    }
+
+    /** 季线分组键：2024-Q1（按自然季度，1-3 月为 Q1） */
+    private static String quarterKey(String time) {
+        if (time == null || time.length() < 7) return time == null ? "" : time;
+        int year = toInt(time.substring(0, 4), 0);
+        int month = toInt(time.substring(5, 7), 1);
+        return year + "-Q" + ((Math.max(1, Math.min(12, month)) - 1) / 3 + 1);
+    }
+
+    /** 年线分组键：2024 */
+    private static String yearKey(String time) {
+        return time == null ? "" : time.substring(0, Math.min(4, time.length()));
+    }
+
+    private static int toInt(String text, int fallback) {
+        try {
+            return Integer.parseInt(text.trim());
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 
     private static String weekKey(String time) {
@@ -1250,7 +1351,12 @@ public final class QuoteSource {
         if (text.isEmpty()) return "1d";
         String alias = INTERVAL_ALIAS.get(text.toLowerCase(Locale.US));
         if (alias != null) return alias;
-        if (text.endsWith("M") && text.length() > 1) return text;
+        if (text.length() > 1) {   // 月/季/年的大写尾缀要保住（1M / 1Q / 1Y）
+            char last = text.charAt(text.length() - 1);
+            if (last == 'M' || last == 'Q' || last == 'Y') {
+                return text.substring(0, text.length() - 1) + last;
+            }
+        }
         return text.toLowerCase(Locale.US);
     }
 

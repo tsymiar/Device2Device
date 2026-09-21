@@ -443,6 +443,50 @@
                     app:strokeColor="#FF5722" />
             </LinearLayout>
 
+            <!-- SSH 服务：启动 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_ssh_server"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/ssh_server"
+                app:backgroundTint="#00897B"
+                app:cornerRadius="20dp" />
+
+            <!-- SSH 服务操作：复制连接信息 + 停止（默认折叠，启动成功后展开） -->
+            <LinearLayout
+                android:id="@+id/ssh_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_ssh_copy"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/ssh_server_copy"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="#00897B" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_ssh_stop"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/ssh_server_stop"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="#FF5722" />
+            </LinearLayout>
+
             <!-- 行情 K线（归入 Services 组） -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_market"

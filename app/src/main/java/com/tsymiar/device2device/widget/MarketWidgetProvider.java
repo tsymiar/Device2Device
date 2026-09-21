@@ -369,16 +369,23 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         sStamp.put(widgetId, System.currentTimeMillis());
     }
 
-    /** 行情页：若是从小部件某一行跳进来的，就把那个标的设成当前标的 */
-    public static void applyLaunchSymbol(Context context, Intent intent) {
-        if (context == null || intent == null) return;
+    /**
+     * 行情页：若是从小部件某一行跳进来的，就把那个标的设成当前标的。
+     * 走 SharedPreferences 中转是因为行情页的「上次选择」也读这份 prefs，
+     * 退出再进才会停在刚才看的标的上。
+     *
+     * @return true 表示这次 intent 里确实带了标的，调用方需要按它刷新界面
+     */
+    public static boolean applyLaunchSymbol(Context context, Intent intent) {
+        if (context == null || intent == null) return false;
         String symbol = intent.getStringExtra(EXTRA_SYMBOL);
-        if (TextUtils.isEmpty(symbol)) return;
+        if (TextUtils.isEmpty(symbol)) return false;
         String source = intent.getStringExtra(EXTRA_SOURCE);
         context.getSharedPreferences(PREF_APP, Context.MODE_PRIVATE).edit()
                 .putString(K_APP_SOURCE, TextUtils.isEmpty(source) ? QuoteSource.AUTO : source)
                 .putString(K_APP_SYMBOL, symbol)
                 .apply();
+        return true;
     }
 
     /** 行情页取数成功后调用：让小部件跟着刷新 */
@@ -592,7 +599,20 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     private static PendingIntent openMarket(Context context) {
         Intent intent = new Intent(context, MarketActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        return PendingIntent.getActivity(context, 0, intent, flags());
+        // 列表行的标的靠 fillInIntent 补进来：Android 12+ 只有可变的模板才会收下这些 extra，
+        // 模板若建成不可变，点哪一行都只会打开上次那个标的
+        return PendingIntent.getActivity(context, 0, intent, templateFlags());
+    }
+
+    /** fillInIntent 用可变模板；其余场景保持不可变 */
+    private static int templateFlags() {
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return flags;
     }
 
     private static PendingIntent refreshIntent(Context context, int widgetId) {

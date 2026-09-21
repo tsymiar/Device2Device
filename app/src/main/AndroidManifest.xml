@@ -25,6 +25,9 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"
         tools:ignore="HighSamplingRate" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="@string/app_name" android:roundIcon="@drawable/ic_launcher" android:supportsRtl="true" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true" tools:ignore="AllowBackup,GoogleAppIndexingWarning">
 
@@ -42,10 +45,12 @@
                 <action android:name="android.intent.action.CONNECTION" />
             </intent-filter>
         </activity>
-        <activity android:name=".activity.TextureActivity" />
+        <activity android:name=".activity.TextureActivity"
+            android:label="@string/title_texture" />
         <activity
             android:name=".activity.MarketActivity"
-            android:label="@string/market_quote" />
+            android:label="@string/market_quote"
+            android:launchMode="singleTop" />
         <activity
             android:name=".activity.AvatarActivity"
             android:label="@string/avatar_3d" />
@@ -78,8 +83,9 @@
             android:name=".widget.MarketWidgetService"
             android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
-        <activity android:name=".activity.WaveActivity" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
-        <activity android:name=".activity.GraphActivity" />
+        <activity android:name=".activity.WaveActivity" android:label="@string/title_wave" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
+        <activity android:name=".activity.GraphActivity"
+            android:label="@string/title_sensor_dashboard" />
         <activity android:name=".activity.SensorActivity" />
         <service
             android:name=".service.PublishService"
@@ -87,6 +93,9 @@
         <service android:name=".service.SubscribeService" />
         <service
             android:name=".service.HttpServerService"
+            android:exported="false" />
+        <service
+            android:name=".service.SshServerService"
             android:exported="false" />
         <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"

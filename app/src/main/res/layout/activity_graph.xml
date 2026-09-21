@@ -9,163 +9,276 @@
 	android:background="#EEEEEE"
 	tools:context=".activity.GraphActivity">
 
-	<!-- 加速计 -->
+	<!-- 指南针 + 水平仪 并排 -->
 	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:layout_marginBottom="8dp"
-		android:orientation="vertical"
-		android:padding="12dp"
-		android:background="#F5F5F5"
-		android:elevation="2dp">
+		android:orientation="horizontal"
+		android:layout_marginBottom="8dp">
 
+		<!-- 指南针（方向） -->
 		<LinearLayout
-			android:layout_width="match_parent"
+			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:orientation="horizontal"
-			android:gravity="center_vertical"
-			android:layout_marginBottom="6dp">
+			android:layout_weight="1"
+			android:layout_marginEnd="4dp"
+			android:orientation="vertical"
+			android:padding="10dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
 
-			<View
-				android:layout_width="3dp"
-				android:layout_height="18dp"
-				android:layout_marginEnd="8dp"
-				android:background="@color/colorPrimary" />
-
-			<TextView
-				android:layout_width="0dp"
+			<LinearLayout
+				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_weight="1"
-				android:text="@string/accelerator"
-				android:textColor="@color/colorPrimary"
-				android:textSize="13sp"
-				android:textStyle="bold" />
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
 
-			<TextView
-				android:layout_width="wrap_content"
-				android:layout_height="wrap_content"
-				android:text="m/s²"
-				android:textColor="#999999"
-				android:textSize="11sp" />
+				<View
+					android:layout_width="3dp"
+					android:layout_height="18dp"
+					android:layout_marginEnd="8dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="1"
+					android:text="@string/ncompass"
+					android:textColor="@color/colorPrimary"
+					android:textSize="13sp"
+					android:textStyle="bold" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="°"
+					android:textColor="#999999"
+					android:textSize="11sp" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.CompassView
+				android:id="@+id/compass_view"
+				android:layout_width="match_parent"
+				android:layout_height="150dp" />
 		</LinearLayout>
 
-		<TextView
-			android:id="@+id/t1"
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:text="@string/hello_world"
-			android:textColor="#37474F"
-			android:textSize="13sp"
-			android:fontFamily="monospace"
-			android:lineSpacingExtra="2dp"
-			android:padding="8dp"
-			android:background="#FAFAFA" />
-	</LinearLayout>
-
-	<!-- 重力 -->
-	<LinearLayout
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginBottom="8dp"
-		android:orientation="vertical"
-		android:padding="12dp"
-		android:background="#F5F5F5"
-		android:elevation="2dp">
-
+		<!-- 水平仪 -->
 		<LinearLayout
-			android:layout_width="match_parent"
+			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:orientation="horizontal"
-			android:gravity="center_vertical"
-			android:layout_marginBottom="6dp">
+			android:layout_weight="1"
+			android:layout_marginStart="4dp"
+			android:orientation="vertical"
+			android:padding="10dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
 
-			<View
-				android:layout_width="3dp"
-				android:layout_height="18dp"
-				android:layout_marginEnd="8dp"
-				android:background="@color/colorPrimary" />
-
-			<TextView
-				android:layout_width="0dp"
+			<LinearLayout
+				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_weight="1"
-				android:text="@string/ngravity"
-				android:textColor="@color/colorPrimary"
-				android:textSize="13sp"
-				android:textStyle="bold" />
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
 
-			<TextView
-				android:layout_width="wrap_content"
-				android:layout_height="wrap_content"
-				android:text="m/s²"
-				android:textColor="#999999"
-				android:textSize="11sp" />
+				<View
+					android:layout_width="3dp"
+					android:layout_height="18dp"
+					android:layout_marginEnd="8dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="1"
+					android:text="@string/nlevel"
+					android:textColor="@color/colorPrimary"
+					android:textSize="13sp"
+					android:textStyle="bold" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="°"
+					android:textColor="#999999"
+					android:textSize="11sp" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.BubbleLevelView
+				android:id="@+id/level_view"
+				android:layout_width="match_parent"
+				android:layout_height="150dp" />
 		</LinearLayout>
-
-		<TextView
-			android:id="@+id/t2"
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:text="@string/hello_world"
-			android:textColor="#37474F"
-			android:textSize="13sp"
-			android:fontFamily="monospace"
-			android:lineSpacingExtra="2dp"
-			android:padding="8dp"
-			android:background="#FAFAFA" />
 	</LinearLayout>
 
-	<!-- 线性加速度 -->
+	<!-- 磁场强度 / 海拔 / 步数 / 距离：四个并排一行，不额外占用竖向空间 -->
 	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:layout_marginBottom="10dp"
-		android:orientation="vertical"
-		android:padding="12dp"
-		android:background="#F5F5F5"
-		android:elevation="2dp">
+		android:orientation="horizontal">
 
+		<!-- 磁场强度 -->
 		<LinearLayout
-			android:layout_width="match_parent"
+			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:orientation="horizontal"
-			android:gravity="center_vertical"
-			android:layout_marginBottom="6dp">
+			android:layout_weight="1"
+			android:layout_marginEnd="3dp"
+			android:orientation="vertical"
+			android:padding="6dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
 
-			<View
-				android:layout_width="3dp"
-				android:layout_height="18dp"
-				android:layout_marginEnd="8dp"
-				android:background="@color/colorPrimary" />
-
-			<TextView
-				android:layout_width="0dp"
+			<LinearLayout
+				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_weight="1"
-				android:text="@string/nliner_accelerator"
-				android:textColor="@color/colorPrimary"
-				android:textSize="13sp"
-				android:textStyle="bold" />
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
 
-			<TextView
-				android:layout_width="wrap_content"
-				android:layout_height="wrap_content"
-				android:text="m/s²"
-				android:textColor="#999999"
-				android:textSize="11sp" />
+				<View
+					android:layout_width="3dp"
+					android:layout_height="16dp"
+					android:layout_marginEnd="6dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:maxLines="1"
+					android:text="@string/nmagnetic"
+					android:textColor="@color/colorPrimary"
+					android:textSize="11sp"
+					android:textStyle="bold" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.MagneticView
+				android:id="@+id/magnetic_view"
+				android:layout_width="match_parent"
+				android:layout_height="90dp" />
 		</LinearLayout>
 
-		<TextView
-			android:id="@+id/t3"
-			android:layout_width="match_parent"
+		<!-- 海拔 -->
+		<LinearLayout
+			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:text="@string/hello_world"
-			android:textColor="#37474F"
-			android:textSize="13sp"
-			android:fontFamily="monospace"
-			android:lineSpacingExtra="2dp"
-			android:padding="8dp"
-			android:background="#FAFAFA" />
+			android:layout_weight="1"
+			android:layout_marginStart="3dp"
+			android:layout_marginEnd="3dp"
+			android:orientation="vertical"
+			android:padding="6dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
+
+				<View
+					android:layout_width="3dp"
+					android:layout_height="16dp"
+					android:layout_marginEnd="6dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:maxLines="1"
+					android:text="@string/naltitude"
+					android:textColor="@color/colorPrimary"
+					android:textSize="11sp"
+					android:textStyle="bold" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.AltitudeView
+				android:id="@+id/altitude_view"
+				android:layout_width="match_parent"
+				android:layout_height="90dp" />
+		</LinearLayout>
+
+		<!-- 步数 -->
+		<LinearLayout
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:layout_marginStart="3dp"
+			android:layout_marginEnd="3dp"
+			android:orientation="vertical"
+			android:padding="6dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
+
+				<View
+					android:layout_width="3dp"
+					android:layout_height="16dp"
+					android:layout_marginEnd="6dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:maxLines="1"
+					android:text="@string/nsteps"
+					android:textColor="@color/colorPrimary"
+					android:textSize="11sp"
+					android:textStyle="bold" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.StepView
+				android:id="@+id/step_view"
+				android:layout_width="match_parent"
+				android:layout_height="90dp" />
+		</LinearLayout>
+
+		<!-- 距离 -->
+		<LinearLayout
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:layout_marginStart="3dp"
+			android:orientation="vertical"
+			android:padding="6dp"
+			android:background="#F5F5F5"
+			android:elevation="2dp">
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="horizontal"
+				android:gravity="center_vertical"
+				android:layout_marginBottom="4dp">
+
+				<View
+					android:layout_width="3dp"
+					android:layout_height="16dp"
+					android:layout_marginEnd="6dp"
+					android:background="@color/colorPrimary" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:maxLines="1"
+					android:text="@string/ndistance"
+					android:textColor="@color/colorPrimary"
+					android:textSize="11sp"
+					android:textStyle="bold" />
+			</LinearLayout>
+
+			<com.tsymiar.device2device.view.ProximityView
+				android:id="@+id/proximity_view"
+				android:layout_width="match_parent"
+				android:layout_height="90dp" />
+		</LinearLayout>
 	</LinearLayout>
 
 	<!-- 操作按钮 -->

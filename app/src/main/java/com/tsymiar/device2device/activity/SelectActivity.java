@@ -22,6 +22,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
+import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -42,6 +43,7 @@ import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
 import com.tsymiar.device2device.service.HttpServerService;
 import com.tsymiar.device2device.service.PublishService;
+import com.tsymiar.device2device.service.SshServerService;
 import com.tsymiar.device2device.service.SubscribeService;
 import com.tsymiar.device2device.utils.JvmMethods;
 import com.tsymiar.device2device.utils.Utils;
@@ -73,6 +75,21 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
+    /** SSH 正在启动（还没收到服务广播）：这段时间置灰启动按钮，避免连点 */
+    private boolean mSshStarting = false;
+    /** 最近一次 SSH 启动失败的原因：显示在状态卡片里，直到下次启动成功或手动再启动 */
+    private String mSshError = null;
+    private final Runnable mSshStartTimeout = new Runnable() {
+        @Override
+        public void run() {
+            if (!mSshStarting) return;
+            setSshStarting(false);
+            showSshState();
+            if (!SshServerService.isRunning()) {
+                Toast.makeText(SelectActivity.this, "SSH 服务启动超时", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
 
     private static boolean mKcpStart = false;
     private static boolean mTcpStart  = false;
@@ -168,6 +185,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(SubscribeService.BROADCAST_ACTION);
         intentFilter.addAction(HttpServerService.ACTION_STATE);
+        intentFilter.addAction(SshServerService.ACTION_STATE);
         this.registerReceiver(mBroadcastReceiverClass, intentFilter);
 
         setServiceConnection(new ServiceConnection() {
@@ -345,6 +363,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         // 复制 HTTP 访问地址到剪贴板
         findViewById(R.id.btn_http_copy).setOnClickListener(v -> copyHttpAccessUrl());
 
+        // SSH 服务同样交给前台服务：启动 / 复制连接信息 / 停止
+        findViewById(R.id.btn_ssh_server).setOnClickListener(v -> startSshServer());
+        findViewById(R.id.btn_ssh_stop).setOnClickListener(v ->
+                SshServerService.stop(SelectActivity.this));
+        findViewById(R.id.btn_ssh_copy).setOnClickListener(v -> copySshConnectionInfo());
+
         // 网络服务区域折叠/展开
         final LinearLayout networkContent = findViewById(R.id.network_content);
         final TextView networkArrow = findViewById(R.id.network_arrow);
@@ -357,8 +381,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 networkArrow.setText("▲");
             }
         });
-        // 页面恢复时同步 HTTP 前台服务运行状态（若已在后台运行）
+        // 页面恢复时同步 HTTP / SSH 前台服务运行状态（若已在后台运行）
         showHttpState();
+        showSshState();
     }
 
     private class BroadcastReceiverClass extends BroadcastReceiver {
@@ -381,6 +406,30 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 } else if (HttpServerService.STATE_STOPPED.equals(state)) {
                     tvStatus.setText("HTTP 文件服务已停止");
                     showHttpState();
+                }
+                return;
+            }
+            if (SshServerService.ACTION_STATE.equals(action)) {
+                String state = intent.getStringExtra(SshServerService.EXTRA_STATE);
+                TextView tvStatus = findViewById(R.id.txt_status);
+                handler.removeCallbacks(mSshStartTimeout);
+                if (SshServerService.STATE_STARTED.equals(state)) {
+                    setSshStarting(false);
+                    mSshError = null;
+                    tvStatus.setText("SSH 服务已启动 · " + SshServerService.getConnectionCommand());
+                    Toast.makeText(SelectActivity.this, "SSH 服务已启动", Toast.LENGTH_SHORT).show();
+                    showSshState();
+                } else if (SshServerService.STATE_FAILED.equals(state)) {
+                    String reason = intent.getStringExtra(SshServerService.EXTRA_REASON);
+                    setSshStarting(false);
+                    mSshError = TextUtils.isEmpty(reason) ? "端口被占用或初始化失败" : reason;
+                    tvStatus.setText("SSH 服务启动失败");
+                    showSshState();   // 失败原因挂在 txt_hint 上，不再弹 Toast
+                } else if (SshServerService.STATE_STOPPED.equals(state)) {
+                    setSshStarting(false);
+                    mSshError = null;
+                    tvStatus.setText("SSH 服务已停止");
+                    showSshState();
                 }
                 return;
             }
@@ -431,6 +480,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(mSshStartTimeout);
         SelectActivity.this.unregisterReceiver(mBroadcastReceiverClass);
         stopService(mSubscribeIntent);
         stopService(mPublisherIntent);
@@ -445,15 +495,17 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     protected void onResume() {
         super.onResume();
         showHttpState();
-        // HTTP 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
+        showSshState();
+        // HTTP / SSH 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && HttpServerService.isRunning()) {
+                && (HttpServerService.isRunning() || SshServerService.isRunning())) {
             maybeRequestBatteryOptimization();
         }
         // START_STICKY 重建服务可能晚于页面恢复，稍后再同步一次
         handler.postDelayed(() -> {
             if (!isFinishing() && !isDestroyed()) {
                 showHttpState();
+                showSshState();
             }
         }, 400);
     }
@@ -537,7 +589,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     }
 
     /** 根据前台服务快照同步 HTTP 状态：地址卡片与复制/停止按钮可用性 */
-    @SuppressLint("SetTextI18n")
     private void showHttpState() {
         boolean running = HttpServerService.isRunning();
         Button stopBtn = findViewById(R.id.btn_http_stop);
@@ -548,11 +599,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (copyBtn != null) {
             copyBtn.setEnabled(running);
         }
-        if (running) {
-            TextView tv = findViewById(R.id.txt_hint);
-            tv.setText("🌐 HTTP 文件服务\n访问地址: " + HttpServerService.getAccessUrl()
-                    + "\n共享目录: " + HttpServerService.getFolder());
-        }
+        refreshServiceHint();
     }
 
     /** 把当前 HTTP 访问地址复制到系统剪贴板 */
@@ -566,6 +613,109 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (cm != null) {
             cm.setPrimaryClip(ClipData.newPlainText("Device2Device HTTP", url));
             Toast.makeText(this, getString(R.string.http_copy_done, url), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 根据前台服务快照同步 SSH 状态：连接信息卡片与启动/复制/停止按钮可用性 */
+    private void showSshState() {
+        boolean running = SshServerService.isRunning();
+        // 复制/停止这两个操作默认折叠，服务跑起来后才展开
+        View actions = findViewById(R.id.ssh_actions);
+        if (actions != null) {
+            actions.setVisibility(running ? View.VISIBLE : View.GONE);
+        }
+        Button stopBtn = findViewById(R.id.btn_ssh_stop);
+        if (stopBtn != null) {
+            stopBtn.setEnabled(running);
+        }
+        Button copyBtn = findViewById(R.id.btn_ssh_copy);
+        if (copyBtn != null) {
+            copyBtn.setEnabled(running);
+        }
+        Button startBtn = findViewById(R.id.btn_ssh_server);
+        if (startBtn != null && !mSshStarting) {
+            // 运行中置灰并改文案，避免连点反复 startForegroundService 造成端口漂移
+            startBtn.setEnabled(!running);
+            startBtn.setText(running ? R.string.ssh_server_running : R.string.ssh_server);
+        }
+        refreshServiceHint();
+    }
+
+    /** 启动 SSH 服务：已在运行就只提示，启动过程中置灰按钮防连点 */
+    private void startSshServer() {
+        if (SshServerService.isRunning()) {
+            Toast.makeText(this, "SSH 服务已在运行", Toast.LENGTH_SHORT).show();
+            showSshState();
+            return;
+        }
+        setSshStarting(true);
+        mSshError = null;      // 重新开始时清掉上一次的错误，别让旧失败信息一直挂着
+        TextView tvStatus = findViewById(R.id.txt_status);
+        if (tvStatus != null) {
+            tvStatus.setText("SSH 服务启动中…");
+        }
+        refreshServiceHint();
+        SshServerService.start(SelectActivity.this);
+        // 服务被系统限制启动等情况下可能一直收不到广播，到点也要把按钮放出来
+        handler.removeCallbacks(mSshStartTimeout);
+        handler.postDelayed(mSshStartTimeout, 8000);
+    }
+
+    private void setSshStarting(boolean starting) {
+        mSshStarting = starting;
+        Button startBtn = findViewById(R.id.btn_ssh_server);
+        if (startBtn == null) {
+            return;
+        }
+        startBtn.setEnabled(!starting);
+        startBtn.setText(starting ? "SSH 服务启动中…" : getString(R.string.ssh_server));
+    }
+
+    /**
+     * 状态卡片由 HTTP 与 SSH 共用：谁在跑就拼谁的连接信息（两个都跑就都显示），
+     * 都停了留个空白占位，避免两个服务互相把对方那行覆盖掉。
+     */
+    @SuppressLint("SetTextI18n")
+    private void refreshServiceHint() {
+        TextView tv = findViewById(R.id.txt_hint);
+        if (tv == null) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (HttpServerService.isRunning()) {
+            sb.append("🌐 HTTP 文件服务\n访问地址: ").append(HttpServerService.getAccessUrl())
+                    .append("\n共享目录: ").append(HttpServerService.getFolder());
+        }
+        if (SshServerService.isRunning()) {
+            if (sb.length() > 0) {
+                sb.append("\n\n");
+            }
+            sb.append("🔐 SSH 服务\n").append(SshServerService.getConnectionCommand())
+                    .append("\n登录密码: ").append(SshServerService.getPassword())
+                    .append("\n根目录: ").append(SshServerService.getRootDir());
+        }
+        // 启动失败的原因也挂在状态卡片上：通知/Toast 一闪而过，这里能一直看着排查
+        if (!TextUtils.isEmpty(mSshError)) {
+            if (sb.length() > 0) {
+                sb.append("\n\n");
+            }
+            sb.append("⚠️ SSH 服务启动失败\n").append(mSshError);
+        }
+        tv.setText(sb.length() == 0 ? " " : sb.toString());
+    }
+
+    /** 复制 SSH 连接命令（带密码）到剪贴板 */
+    private void copySshConnectionInfo() {
+        if (!SshServerService.isRunning()) {
+            Toast.makeText(this, R.string.ssh_not_running, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String command = SshServerService.getConnectionCommand()
+                + "   # password: " + SshServerService.getPassword();
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("Device2Device SSH", command));
+            Toast.makeText(this, "连接信息已复制", Toast.LENGTH_SHORT).show();
         }
     }
     @Override

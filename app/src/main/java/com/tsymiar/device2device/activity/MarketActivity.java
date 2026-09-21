@@ -1,5 +1,6 @@
 package com.tsymiar.device2device.activity;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -88,6 +89,8 @@ public class MarketActivity extends AppCompatActivity {
 
     private String mSource = QuoteSource.AUTO;
     private String mInterval = "1d";
+    /** 当前数据源的周期列表：下拉显示中文名，选中时按下标回取原始周期（如 季K -> 1Q） */
+    private String[] mIntervals = QuoteSource.intervals(QuoteSource.AUTO);
     private boolean mAutoRefresh = false;
     private boolean mLoading = false;
     private String mName = "";          // 当前标的中文名（主图首行）
@@ -110,8 +113,13 @@ public class MarketActivity extends AppCompatActivity {
 
         applyPalette();      // 配色先按当前深浅模式定下来，再搭界面
         // 从小部件某一行跳进来时带着标的，下面 restorePrefs 会把它读成当前标的
-        MarketWidgetProvider.applyLaunchSymbol(this, getIntent());
+        boolean fromWidget = MarketWidgetProvider.applyLaunchSymbol(this, getIntent());
         restorePrefs();      // 先恢复上次选择，再按它初始化下拉
+        if (fromWidget) {
+            // 名称也一并带过来了：先顶上，取数回来会被接口给的全名替换
+            String name = getIntent().getStringExtra(MarketWidgetProvider.EXTRA_NAME);
+            if (name != null) mName = name;
+        }
         getWindow().setBackgroundDrawable(new ColorDrawable(C_BG));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -139,6 +147,37 @@ public class MarketActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         savePrefs();
+    }
+
+    /**
+     * 小部件某一行点进来时，若行情页已在栈里（CLEAR_TOP 复用 / singleTop），
+     * 新 intent 会走这里而不是 onCreate，也要切到点击的那个标的。
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (MarketWidgetProvider.applyLaunchSymbol(this, intent)) {
+            restorePrefs();
+            applyLaunchSymbolToUi(intent.getStringExtra(MarketWidgetProvider.EXTRA_NAME));
+        }
+    }
+
+    /** 把当前标的写回输入框与数据源下拉，并立刻重新取数 */
+    private void applyLaunchSymbolToUi(String launchName) {
+        if (mSymbolEdit != null) {
+            mSymbolEdit.setText(mSymbol);
+            mSymbolEdit.setSelection(mSymbol == null ? 0 : mSymbol.length());
+        }
+        int sourceIndex = Arrays.asList(QuoteSource.SOURCES).indexOf(mSource);
+        if (mSourceSpinner != null) {
+            mSourceSpinner.setSelection(Math.max(0, sourceIndex), false);
+        }
+        // 小部件顺带把名称也给过来了：先填上，取数回来再换成接口给的全名
+        mName = launchName == null ? "" : launchName;
+        if (mChart != null) mChart.setName(mName);
+        refreshIntervals(false);
+        load();
     }
 
     @Override
@@ -240,8 +279,9 @@ public class MarketActivity extends AppCompatActivity {
         mIntervalSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                Object item = parent.getItemAtPosition(position);
-                String interval = item == null ? mInterval : String.valueOf(item);
+                // 下拉里是「季K/年K」这类中文名，周期值要按下标从 mIntervals 回取
+                if (mIntervals == null || position < 0 || position >= mIntervals.length) return;
+                String interval = mIntervals[position];
                 if (interval.equals(mInterval)) return;
                 mInterval = interval;
                 savePrefs();
@@ -376,7 +416,10 @@ public class MarketActivity extends AppCompatActivity {
     /** 数据源变化后重建周期列表；若当前周期不被支持则回落到该源默认周期 */
     private void refreshIntervals(boolean reload) {
         String[] intervals = QuoteSource.intervals(mSource);
-        mIntervalSpinner.setAdapter(adapter(intervals));
+        mIntervals = intervals;
+        String[] labels = new String[intervals.length];
+        for (int i = 0; i < intervals.length; i++) labels[i] = QuoteSource.intervalLabel(intervals[i]);
+        mIntervalSpinner.setAdapter(adapter(labels));
         int index = 0;
         for (int i = 0; i < intervals.length; i++) {
             if (intervals[i].equals(mInterval)) index = i;
@@ -388,6 +431,7 @@ public class MarketActivity extends AppCompatActivity {
             mInterval = intervals[index];
         }
         mIntervalSpinner.setSelection(index, false);
+        if (mChart != null) mChart.setInterval(mInterval);
         if (mSymbolEdit != null) mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
         if (reload) load();
     }
@@ -481,6 +525,7 @@ public class MarketActivity extends AppCompatActivity {
                     mSymbolEdit.setSelection(code.length());
                 }
                 mChart.setLineMode(isMinuteInterval());
+                mChart.setInterval(mInterval);
                 mChart.setData(code + "  ·  " + source + "  ·  " + mInterval, quotes);
                 resolveName(code);
                 mStatus.setText(source + "  symbol=" + code + "  interval=" + mInterval

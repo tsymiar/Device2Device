@@ -30,7 +30,7 @@
     <!-- ===== Main Navigation ===== -->
     <string name="texture">📺 Texture</string>
     <string name="wave">〰️ Wave</string>
-    <string name="chart">📈 Chart</string>
+    <string name="chart">🚥 Chart</string>
     <string name="bluetooth">🔵 Serial</string>
     <string name="chat">💬 Chat Box</string>
     <string name="file_trans">📁 File Transfer</string>
@@ -148,6 +148,15 @@
     <string name="ngravity">Gravity:</string>
     <string name="accelerator">Accelerator:</string>
     <string name="nliner_accelerator">Liner-accelerator:</string>
+    <string name="ncompass">指南针（方向）</string>
+    <string name="naltitude">海拔</string>
+    <string name="nlevel">水平仪</string>
+    <string name="nmagnetic">磁场强度</string>
+    <string name="nsteps">步数</string>
+    <string name="ndistance">距离</string>
+    <string name="title_sensor_dashboard">传感器仪表</string>
+    <string name="title_texture">Texture</string>
+    <string name="title_wave">Wave</string>
 
     <!-- ===== Speech / Voice ===== -->
     <string name="speak">Speak</string>
@@ -170,6 +179,14 @@
     <string name="http_server_stop">⏹ 停止 HTTP</string>
     <string name="http_server_copy">📋 复制访问地址</string>
     <string name="http_copy_done">访问地址已复制：\n%1$s</string>
+
+    <!-- ===== SSH Server ===== -->
+    <string name="ssh_server">🔐 SSH Server</string>
+    <string name="ssh_server_running">🔐 SSH 服务运行中</string>
+    <string name="ssh_server_stop">⏹ 停止 SSH</string>
+    <string name="ssh_server_copy">📋 复制连接信息</string>
+    <string name="ssh_copy_done">连接信息已复制：\n%1$s</string>
+    <string name="ssh_not_running">SSH 服务未运行，无法复制</string>
 
     <!-- ===== Exit ===== -->
     <string name="exit_app">再次返回退出应用</string>

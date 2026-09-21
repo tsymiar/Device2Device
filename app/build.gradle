@@ -5,7 +5,10 @@ android {
     buildToolsVersion "30.0.3"
     defaultConfig {
         applicationId "com.tsymiar.device2device"
-        minSdkVersion 21 // 15 // Cannot fit requested classes in a single dex file
+        // SSH 服务端用的是 Apache MINA SSHD（纯 Java），它内部依赖 java.nio.file.Path，
+        // Android 到 8.0(API 26) 才提供该包；引入后方法数也会超单 dex 上限，故开 multidex
+        minSdkVersion 26 // 21 // Cannot fit requested classes in a single dex file
+        multiDexEnabled true
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 31
         versionCode 1
@@ -89,6 +92,15 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.2.0'
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation 'androidx.documentfile:documentfile:1.0.1'
+
+    // ===== SSH 服务端（exec / shell）=====
+    // Apache MINA SSHD：目前唯一活跃维护的纯 Java SSH 实现，sshd-core 自带服务端。
+    // 只开放命令执行与交互 shell，不需要文件传输，所以没引 sshd-sftp / sshd-scp。
+    // 版本选 2.9.2：仍然是 Java 8 字节码，和当前 AGP 4.1 的 D8 兼容（更新版本多为 Java 11+）。
+    implementation 'org.apache.sshd:sshd-core:2.9.2'
+    // sshd 用 slf4j 打日志，simple 实现把日志落到 System.err，logcat 里能看到
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    implementation 'org.slf4j:slf4j-simple:1.7.36'
     // implementation 'com.google.android.material:material:1.12.0'
 }
 
