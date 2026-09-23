@@ -135,77 +135,7 @@
                 android:orientation="vertical"
                 android:layout_marginBottom="8dp">
 
-                <!-- 第一行：Server + Client -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_server"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/server"
-                        android:textSize="12sp"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        app:cornerRadius="18dp"
-                        app:strokeColor="@color/colorPrimary"
-                        app:strokeWidth="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_client"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_weight="1"
-                        android:text="@string/client"
-                        android:textSize="12sp"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        app:cornerRadius="18dp"
-                        app:strokeColor="@color/colorPrimary"
-                        app:strokeWidth="1dp" />
-                </LinearLayout>
-
-                <!-- Server / Client 状态文字行 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/txt_server"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="@string/dftHint"
-                        android:textColor="#9E9E9E"
-                        android:textSize="10sp" />
-
-                    <TextView
-                        android:id="@+id/txt_client"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="@string/dftHint"
-                        android:textColor="#9E9E9E"
-                        android:textSize="10sp" />
-                </LinearLayout>
-
-                <!-- 第二行：Event + Time -->
+                <!-- Event + Time -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -275,38 +205,179 @@
                         android:textSize="10sp" />
                 </LinearLayout>
 
-                <!-- 第三行：TCP + KCP -->
+                <!-- UDP：server 绿框 / client 橙框 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:orientation="horizontal">
+                    android:layout_marginBottom="12dp"
+                    android:orientation="vertical"
+                    android:padding="10dp">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_tcp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="38dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/tcp"
-                        android:textSize="13sp"
-                        app:cornerRadius="20dp"
-                        app:strokeColor="@color/colorPrimary"
-                        app:strokeWidth="1dp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="6dp"
+                            android:text="@string/group_udp"
+                            android:textColor="@color/colorPrimary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_ikcp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="38dp"
-                        android:layout_weight="1"
-                        android:text="@string/kcprun"
-                        android:textSize="13sp"
-                        app:cornerRadius="20dp"
-                        app:strokeColor="#FF9800"
-                        app:strokeWidth="1dp" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_udp_server"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:paddingStart="8dp"
+                                android:paddingEnd="8dp"
+                                android:text="@string/udp_listen"
+                                android:textColor="#4CAF50"
+                                android:textSize="12sp"
+                                app:cornerRadius="18dp"
+                                app:strokeColor="#4CAF50"
+                                app:strokeWidth="1dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_udp_client"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_weight="1"
+                                android:paddingStart="8dp"
+                                android:paddingEnd="8dp"
+                                android:text="@string/udp_send"
+                                android:textSize="12sp"
+                                app:cornerRadius="18dp"
+                                app:strokeColor="#FF9800"
+                                app:strokeWidth="1dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/txt_udp_server"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="1"
+                                android:text="@string/dftHint"
+                                android:textColor="#9E9E9E"
+                                android:textSize="10sp" />
+
+                            <TextView
+                                android:id="@+id/txt_udp_client"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:gravity="center"
+                                android:maxLines="1"
+                                android:text="@string/dftHint"
+                                android:textColor="#9E9E9E"
+                                android:textSize="10sp" />
+                        </LinearLayout>
                 </LinearLayout>
+
+                <!-- KCP：server 绿框 / client 橙框 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="6dp"
+                            android:text="@string/group_kcp"
+                            android:textColor="@color/colorPrimary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_kcp_server"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="38dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:text="@string/kcp_server"
+                                android:textColor="#4CAF50"
+                                android:textSize="13sp"
+                                app:cornerRadius="20dp"
+                                app:strokeColor="#4CAF50"
+                                app:strokeWidth="1dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_kcp_client"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="38dp"
+                                android:layout_weight="1"
+                                android:text="@string/kcp_client"
+                                android:textSize="13sp"
+                                app:cornerRadius="20dp"
+                                app:strokeColor="#FF9800"
+                                app:strokeWidth="1dp" />
+                        </LinearLayout>
+
+                        <!-- KCP 状态行：start 显示，stop 收回 -->
+                        <LinearLayout
+                            android:id="@+id/kcp_text_row"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/txt_kcp_server"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:lineSpacingExtra="2dp"
+                                android:textColor="@color/hint_text"
+                                android:textSize="10sp"
+                                android:textStyle="italic"
+                                android:visibility="gone"
+                                tools:ignore="RtlHardcoded" />
+
+                            <TextView
+                                android:id="@+id/txt_kcp_client"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:lineSpacingExtra="2dp"
+                                android:textColor="@color/status_text"
+                                android:textSize="10sp"
+                                android:textStyle="italic"
+                                android:visibility="gone"
+                                tools:ignore="RtlHardcoded" />
+                        </LinearLayout>
+                </LinearLayout>
+
             </LinearLayout>
 
             <!-- 分割线 -->
@@ -584,11 +655,11 @@
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:layout_marginTop="4dp"
-                        android:lineSpacingExtra="4dp"
+                        android:lineSpacingExtra="2dp"
                         android:text="@string/dftHint"
                         android:textColor="@color/status_text"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
+                        android:textSize="12sp"
+                        android:textStyle="italic"
                         tools:ignore="RtlHardcoded" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

@@ -40,14 +40,36 @@ public class WaveCanvas {
     private boolean mIsRecording = false;// 录音线程控制标记
     private int mLineOff;//上下边距的距离
     private static final int RATE_X = 100;//控制多少帧取一帧
+    /** 麦克风采样率：抽稀后每秒 RATE_X 分之一的点进波形 */
+    private static final int SAMPLE_RATE = 16000;
+    /** 1× 时一屏铺满的音频时长（秒），X 轴放大后这个窗口变短 = 细节更多 */
+    private static final double WINDOW_SECONDS = 20.0;
+    /** Y 轴（幅度）缩放范围：以前最大只有 3×，看小信号不够用 */
+    private static final float ZOOM_Y_MIN = 0.1f;
+    private static final float ZOOM_Y_MAX = 20.0f;
+    /** X 轴（时基）缩放范围：1× = 20 秒一屏，8× = 2.5 秒一屏 */
+    private static final float ZOOM_X_MIN = 1.0f;
+    private static final float ZOOM_X_MAX = 8.0f;
+    /** 满刻度（0 dBFS）对应的声压级：1 Pa = 94 dB SPL */
+    private static final double DB_SPL_AT_FULL_SCALE = 94.0;
+    /** dBFS 下限：PCM 16bit 的动态范围到 -90 dBFS */
+    private static final double DBFS_FLOOR = -90.0;
+    /** 显示下限：手机底噪换算出来不到 30 dB，按「安静的室内」兜底，免得数字低得不真实 */
+    private static final double DB_SPL_FLOOR = 30.0;
     private int mBaseLine = 0;// Y轴基线
     private PaintingTask mAudioTask = null;
     private final int mMarginRight = 30;//波形图绘制距离右边的距离
     private float mDivider = 0.2f;//为了节约绘画时间，每0.2个像素画一个数据
     private long mCurrentTime;//当前时间戳
     private DecibelListener mDecibelListener;
-    private volatile double mCurrentDbFS = -90.0;
-    private float mZoomY = 1.0f;// Y轴缩放倍率
+    /**
+     * 实时分贝，单位 dB SPL（日常看到的分贝数：安静 ≈ 30 dB，正常说话 60 dB 上下）。
+     * 换算：先算 dBFS = 20·log10(rms / 满刻度)，再 +94 dB（0 dBFS 对应 1 Pa = 94 dB SPL）。
+     * 手机麦克风没有校准，这里是工程上通用的参考换算，够用来看相对大小。
+     */
+    private volatile double mCurrentDb = DB_SPL_FLOOR;
+    private float mZoomY = 1.0f;// Y轴缩放倍率（幅度）
+    private float mZoomX = 1.0f;// X轴缩放倍率（时基，越大时间窗口越短）
     private Paint mPaintDbBg;// 分贝文字背景
     private Paint mPaintDbText;// 分贝文字
     private String mSavePcmPath;//保存pcm文件路径
@@ -182,11 +204,11 @@ public class WaveCanvas {
                         }
                         double rms = Math.sqrt(sum / readSize);
                         if (rms <= 0) {
-                            mCurrentDbFS = 0.0;
+                            mCurrentDb = DB_SPL_FLOOR;
                         } else {
-                            // 安静→接近0，响亮→接近-90
-                            mCurrentDbFS = Math.max(-90.0,
-                                    Math.min(0.0, 20.0 * Math.log10(32768.0 / rms) - 90.0));
+                            // 标准算法：dBFS = 20·log10(rms / 满刻度)，再加 94 dB 换成声压级
+                            double dbfs = Math.max(DBFS_FLOOR, 20.0 * Math.log10(rms / 32768.0));
+                            mCurrentDb = Math.max(DB_SPL_FLOOR, dbfs + DB_SPL_AT_FULL_SCALE);
                         }
                     }
                     publishProgress();
@@ -234,7 +256,7 @@ public class WaveCanvas {
                 }
                 if (arrBuf != null) {
                     if (mDecibelListener != null) {
-                        mDecibelListener.onDecibelChanged(mCurrentDbFS);
+                        mDecibelListener.onDecibelChanged(mCurrentDb);
                     }
                     simpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
                 }
@@ -262,11 +284,15 @@ public class WaveCanvas {
         void simpleDraw(ArrayList<Short> buf, int mBaseLine) {
             //波形图绘制距离左边的距离
             int marginLeft = 20;
-            mDivider = (float) ((sfv.getWidth() - mMarginRight - marginLeft) / (16000 / RATE_X * 20.00));
+            // 每个采样点占多少像素：X 轴放大后一屏只画更短的一段音频，波形细节更多
+            double samplesPerSecond = SAMPLE_RATE / (double) RATE_X;
+            double windowSeconds = WINDOW_SECONDS / mZoomX;
+            mDivider = (float) ((sfv.getWidth() - mMarginRight - marginLeft)
+                    / (samplesPerSecond * windowSeconds));
             if (!mIsRecording)
                 return;
-            //  Y轴缩小的比例 默认为1
-            int rateY = (int) ((65535 / 2 / (sfv.getHeight() - mLineOff)) / mZoomY);
+            //  Y轴缩小的比例 默认为1；放大到很高倍率时别让它变成 0（除 0 会崩）
+            int rateY = Math.max(1, (int) ((65535 / 2 / (sfv.getHeight() - mLineOff)) / mZoomY));
 
             for (int i = 0; i < buf.size(); i++) {
                 byte[] bus = getBytes(buf.get(i));
@@ -293,6 +319,9 @@ public class WaveCanvas {
             canvas.drawLine(0, height*0.25f+20, sfv.getWidth(),height*0.25f+20, mPaintLine);//第二根线
             canvas.drawLine(0, height*0.75f+20, sfv.getWidth(),height*0.75f+20, mPaintLine);//第3根线
             float y;
+            float prevX = -1f;
+            float prevTop = 0f;
+            float prevBottom = 0f;
             for (int i = 0; i < buf.size(); i++) {
                 y = 1.f * buf.get(i) / rateY + mBaseLine;// 调节缩小比例，调节基准线
                 float x = (i) * mDivider;
@@ -314,16 +343,25 @@ public class WaveCanvas {
                     y1 = (sfv.getHeight() - (mLineOff >> 1) - 1);
                 }
                 canvas.drawLine(x, y, x, y1, mPaint);//中间出波形
+                if (prevX >= 0 && mDivider > 1.2f) {
+                    // 时基放大后点与点之间拉开距离，补上连线波形才连得起来
+                    canvas.drawLine(prevX, prevTop, x, y, mPaint);
+                    canvas.drawLine(prevX, prevBottom, x, y1, mPaint);
+                }
+                prevX = x;
+                prevTop = y;
+                prevBottom = y1;
             }
             // 在画布右上角绘制实时分贝
-            String dbText = String.format("%.0f dB", mCurrentDbFS);
+            String dbText = String.format("%.0f dB", mCurrentDb);
             float textW = mPaintDbText.measureText(dbText);
             float textH = mPaintDbText.getTextSize();
             float padX = 14, padY = 8;
-            canvas.drawRoundRect(
+            // 直角标签：页面里的卡片都不带圆角，这里也别例外
+            canvas.drawRect(
                     sfv.getWidth() - textW - padX * 2 - 6, 6,
                     sfv.getWidth() - 6, padY + textH + 8,
-                    6, 6, mPaintDbBg);
+                    mPaintDbBg);
             canvas.drawText(dbText, sfv.getWidth() - textW - padX - 6, padY + textH, mPaintDbText);
             sfv.getHolder().unlockCanvasAndPost(canvas);// 解锁画布，提交画好的图像
         }
@@ -400,17 +438,24 @@ public class WaveCanvas {
      * 实时分贝回调接口
      */
     public interface DecibelListener {
-        void onDecibelChanged(double dbFS);
+        /** 回传标准声压级 dB SPL（安静 ≈ 30 dB，正常说话 60 dB 上下） */
+        void onDecibelChanged(double dbSpl);
     }
 
     public void setDecibelListener(DecibelListener listener) {
         this.mDecibelListener = listener;
     }
 
-    /** 波形 Y 轴缩放 */
+    /** 波形 Y 轴（幅度）缩放：step 是每次点击的比例步长，按倍数缩放才够快爬到 20× */
     public float getZoomY() { return mZoomY; }
-    public void zoomIn(float step) { mZoomY = Math.min(mZoomY + step, 3.0f); }
-    public void zoomOut(float step) { mZoomY = Math.max(mZoomY - step, 0.3f); }
-    public void resetZoom() { mZoomY = 1.0f; }
+    public void zoomIn(float step) { mZoomY = Math.min(mZoomY * (1f + step), ZOOM_Y_MAX); }
+    public void zoomOut(float step) { mZoomY = Math.max(mZoomY / (1f + step), ZOOM_Y_MIN); }
+
+    /** 波形 X 轴（时基）缩放：倍率越大，一屏容纳的时间越短，细节越多 */
+    public float getZoomX() { return mZoomX; }
+    public void zoomTimeIn(float step) { mZoomX = Math.min(mZoomX * (1f + step), ZOOM_X_MAX); }
+    public void zoomTimeOut(float step) { mZoomX = Math.max(mZoomX / (1f + step), ZOOM_X_MIN); }
+
+    public void resetZoom() { mZoomY = 1.0f; mZoomX = 1.0f; }
 
 }

@@ -433,6 +433,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass, jstrin
 void callback(char* data)
 {
     if (data[0] != '\0') {
+        // 收到的数据仍走 UDP_SERVER：Java 侧按「第一条是启动状态、之后是收到的数据」分开显示
         Message::instance().setMessage(data, UDP_SERVER);
     }
 }
@@ -446,9 +447,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv*, jclass, jint po
             auto* sock = new UdpSocket(port);
             g_udpPort = port;
             int size;
+            std::string message = "udp receiver starts · port " + std::to_string(port);
+            Message::instance().setMessage(message, UDP_SERVER);
             do {
-                std::string message = "udp receiver starts";
-                Message::instance().setMessage(message, UDP_SERVER);
                 size = sock->Receiver(msg, total, callback);
                 usleep(10000);
             } while (size != 0);
@@ -543,37 +544,187 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopTcpServer)(JNIEnv*, jclass)
     return 0;
 }
 
+// ============ KCP 服务端 / 客户端控制状态 ============
+static std::mutex   g_kcpMutex;
+static KcpSocket* g_kcpServer = nullptr;
+static std::thread* g_kcpServerThread = nullptr;
+static KcpSocket* g_kcpClient = nullptr;
+static std::thread* g_kcpClientThread = nullptr;
+
+/** 去掉尾部的 '\0' / 换行，免得拼到 UI 上出现空行 */
+static std::string trimTail(const char* data, int len)
+{
+    std::string body(data, len);
+    while (!body.empty() && (body.back() == '\0' || body.back() == '\n')) {
+        body.pop_back();
+    }
+    return body;
+}
+
+/** KCP 服务端收到一条消息：剥掉 8 字节头，把真正的载荷推给页面底部 hint 区（KCP_HINT） */
+static void KcpServerRecv(const char* data, int len, void*)
+{
+    unsigned int sn = 0;
+    const char* payload = data;
+    int payloadLen = len;
+    if (len >= KCP_ECHO_HDR) {
+        memcpy(&sn, data, sizeof(sn));
+        payload = data + KCP_ECHO_HDR;
+        payloadLen = len - KCP_ECHO_HDR;
+    }
+    std::string body = trimTail(payload, payloadLen);
+    Message::instance().setMessage(
+        "KCP server recv sn=" + std::to_string(sn) + " " + std::to_string((int)body.size())
+        + "B: " + body, KCP_HINT);
+}
+
+/**
+ * KCP 客户端收到服务端回射的那包：按包头里的时间戳算 RTT，推给页面 status 区（KCP_CLIENT）。
+ */
+static void KcpClientEcho(unsigned int sn, unsigned int rttMs, const char* data, int len, void*)
+{
+    std::string body = trimTail(data, len);
+    Message::instance().setMessage(
+        "KCP echo sn=" + std::to_string(sn) + " rtt=" + std::to_string(rttMs) + "ms "
+        + std::to_string((int)body.size()) + "B: " + body, KCP_CLIENT);
+}
+
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv*, jclass, jint port)
 {
-    std::thread th([](int port) -> void {
-        KcpSocket kcpSocket{};
-        kcpSocket.init(port, false);
-        Message::instance().setMessage("Kcp server " + std::to_string(port), KCP_VIEW);
-        kcpSocket.startServer();
-        }, port);
-    if (th.joinable())
-        th.detach();
+    std::lock_guard<std::mutex> lock(g_kcpMutex);
+    if (g_kcpServer != nullptr) {
+        Message::instance().setMessage("KCP server already running", KCP_HINT);
+        return 1;
+    }
+    auto* sock = new KcpSocket();
+    int ret = sock->init(port, false);
+    if (ret != 0) {
+        std::string err = "KCP server start failed(" + std::to_string(ret) + "): " + strerror(errno);
+        Message::instance().setMessage(err, KCP_HINT);
+        delete sock;
+        return ret;
+    }
+    sock->setRecvCallback(KcpServerRecv, nullptr);
+    g_kcpServer = sock;
+    // 循环线程只负责跑 KCP 状态机，退出后再由 stopKcpServer() 统一回收对象
+    g_kcpServerThread = new std::thread([sock]() -> void {
+        sock->startServer();
+        });
+    Message::instance().setMessage("KCP server started · UDP " + std::to_string(port), KCP_HINT);
+    LOGI("KCP server started on port %d\n", port);
+    return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpServer)(JNIEnv*, jclass)
+{
+    KcpSocket* sock = nullptr;
+    std::thread* th = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_kcpMutex);
+        sock = g_kcpServer;
+        th = g_kcpServerThread;
+        g_kcpServer = nullptr;
+        g_kcpServerThread = nullptr;
+    }
+    if (sock == nullptr) {
+        Message::instance().setMessage("KCP server not running", KCP_HINT);
+        return -1;
+    }
+    sock->stop();                       // 循环里 recvfrom 是 MSG_DONTWAIT，1ms 一跳即可退出
+    if (th != nullptr) {
+        if (th->joinable()) {
+            th->join();
+        }
+        delete th;
+    }
+    sock->destroy();
+    delete sock;
+    Message::instance().setMessage("KCP server cleanup ok", KCP_HINT);
     return 0;
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* env, jclass, jstring ipstr, jint port)
 {
     std::string addr = Jstring2Cstring(env, ipstr);
-    auto* ipaddr = new unsigned char[addr.size() + 1];
-    memset(ipaddr, 0, addr.size() + 1);
-    memcpy(ipaddr, addr.c_str(), addr.size());
-    std::thread th([](int port, unsigned char* ip) -> void {
-        KcpSocket kcpSocket{};
-        kcpSocket.init(port, true, (const char*)ip);
-        char hint[128];
-        sprintf(hint, "Kcp client start %s:%d.", ip, port);
-        Message::instance().setMessage(hint, TOAST);
-        kcpSocket.startClient();
-        delete ip;
-        }, port, ipaddr);
-    if (th.joinable())
-        th.detach();
+    std::lock_guard<std::mutex> lock(g_kcpMutex);
+    if (g_kcpClient != nullptr) {
+        Message::instance().setMessage("KCP client already started", KCP_CLIENT);
+        return 1;
+    }
+    auto* sock = new KcpSocket();
+    int ret = sock->init(port, true, addr.c_str());
+    if (ret != 0) {
+        std::string err = "KCP client start failed(" + std::to_string(ret) + ")";
+        Message::instance().setMessage(err, KCP_CLIENT);
+        delete sock;
+        return ret;
+    }
+    // 客户端只关心自己发出去的包什么时候被回射回来，所以挂的是 echo 回调
+    sock->setEchoCallback(KcpClientEcho, nullptr);
+    g_kcpClient = sock;
+    g_kcpClientThread = new std::thread([sock]() -> void {
+        sock->startClient();
+        });
+    Message::instance().setMessage(
+        "KCP client started → " + addr + ":" + std::to_string(port), KCP_CLIENT);
     return 0;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpClient)(JNIEnv*, jclass)
+{
+    KcpSocket* sock = nullptr;
+    std::thread* th = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_kcpMutex);
+        sock = g_kcpClient;
+        th = g_kcpClientThread;
+        g_kcpClient = nullptr;
+        g_kcpClientThread = nullptr;
+    }
+    if (sock == nullptr) {
+        Message::instance().setMessage("KCP client not started yet", KCP_CLIENT);
+        return -1;
+    }
+    sock->stop();
+    if (th != nullptr) {
+        if (th->joinable()) {
+            th->join();
+        }
+        delete th;
+    }
+    sock->destroy();
+    delete sock;
+    Message::instance().setMessage("KCP client cleanup ok", KCP_CLIENT);
+    return 0;
+}
+
+/**
+ * 客户端发一条数据（页面传进来的是十六进制随机数）：带上 sn + 时间戳的 8 字节头，
+ * 服务端会原样回射，客户端收到后算 RTT。返回 ikcp_send 的结果，<0 为失败。
+ */
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstring text, jint len)
+{
+    std::string data = Jstring2Cstring(env, text);
+    KcpSocket* sock = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_kcpMutex);
+        sock = g_kcpClient;
+    }
+    if (sock == nullptr) {
+        Message::instance().setMessage("KCP client not started yet", KCP_CLIENT);
+        return -1;
+    }
+    int size = (len > 0 && len < (int)data.size()) ? len : (int)data.size();
+    int ret = sock->sendEcho(data.c_str(), size);
+    if (ret < 0) {
+        Message::instance().setMessage("KCP send failed(" + std::to_string(ret) + ")", KCP_CLIENT);
+    } else {
+        Message::instance().setMessage(
+            "KCP send sn=" + std::to_string(sock->lastSn()) + " " + std::to_string(size) + "B: "
+            + data.substr(0, size), KCP_CLIENT);
+    }
+    LOGI("sendKcpData %d bytes ret=%d sn=%u\n", size, ret, sock->lastSn());
+    return ret;
 }
 
 // ============ 文件传输 JNI 实现 ============

@@ -6,6 +6,7 @@
     android:layout_height="match_parent">
 
     <RelativeLayout
+        android:id="@+id/chart_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         tools:ignore="UselessParent">
@@ -27,28 +28,33 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
+                android:paddingStart="10dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="6dp"
                 android:text="@string/pull"
                 android:textColor="#FF8D00"
-                android:textSize="20sp" />
+                android:textSize="16sp" />
         </LinearLayout>
+
+        <!-- 从左到右：暂停 | 隐藏（隐藏在最右侧，点它顺带暂停采样并把暂停按钮收起来） -->
+        <Button
+            android:id="@+id/out_bn"
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="true"
+            android:text="@string/hide" />
 
         <Button
             android:id="@+id/pause_bn"
             style="?android:attr/buttonStyleSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
             android:layout_alignParentBottom="true"
+            android:layout_toStartOf="@id/out_bn"
             android:text="@string/pause" />
-
-        <Button
-            android:id="@+id/out_bn"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_toStartOf="@id/pause_bn"
-            android:text="@string/hide" />
 
         <TextView
             android:id="@+id/notification"
@@ -69,6 +75,7 @@
             android:src="@drawable/ic_minimize" />
 
         <TextView
+            android:id="@+id/min_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_above="@id/image_view"

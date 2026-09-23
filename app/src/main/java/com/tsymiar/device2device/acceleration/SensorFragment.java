@@ -37,6 +37,8 @@ public class SensorFragment extends Fragment implements SensorEventListener {
 
     private Handler mHandler;
     private NewChart mView;
+    private ChartControls mControls;
+    private boolean mPaused;
     private float upX;
     private float upY;
     private float downX;
@@ -65,14 +67,41 @@ public class SensorFragment extends Fragment implements SensorEventListener {
         mHandler = new Handler();
         mHandler.post(new SensorFragment.TimerProcess());
 
+        // 拖动 / 最小化 / 隐藏 / 暂停：布局里一直有这几个控件，这里才真正接上行为
+        mControls = ChartControls.attach(rootView, this::applyPaused);
+
         return rootView;
+    }
+
+    /** 暂停=停采样停重绘；继续=重新注册传感器并起定时器 */
+    private void applyPaused(boolean paused) {
+        mPaused = paused;
+        if (paused) {
+            mChart0.unregister();
+            mSensorManager.unregisterListener(this);
+            if (mHandler != null) {
+                mHandler.removeCallbacksAndMessages(null);
+            }
+            return;
+        }
+        mChart0.register();
+        mSensorManager.registerListener(this, mChart0.sensor, SensorManager.SENSOR_DELAY_GAME);
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler.post(new SensorFragment.TimerProcess());
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        if (mPaused) return;      // 手动暂停时切回来也别自己跑起来
         mChart0.register();
         mSensorManager.registerListener(this, mChart0.sensor, SensorManager.SENSOR_DELAY_GAME);
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler.post(new SensorFragment.TimerProcess());
+        }
     }
 
     @Override

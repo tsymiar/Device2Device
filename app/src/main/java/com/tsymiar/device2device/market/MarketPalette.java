@@ -48,6 +48,8 @@ public final class MarketPalette {
     public final int trend;           // 分时折线（1分钟等超短周期）
     public final int tooltipBg;       // 详情浮窗底（带 alpha）
     public final int tooltipStroke;
+    public final int tooltipText;     // 浮窗里的正文（浮窗底始终是深色，跟页面正文色分开取）
+    public final int tooltipTextDim;  // 浮窗里的次级文字（时间那行）
 
     private MarketPalette(Context c, boolean night) {
         this.night = night;
@@ -80,6 +82,8 @@ public final class MarketPalette {
         trend = color(c, R.color.market_trend);
         tooltipBg = color(c, R.color.market_tooltip_bg);
         tooltipStroke = color(c, R.color.market_tooltip_stroke);
+        tooltipText = color(c, R.color.market_tooltip_text);
+        tooltipTextDim = color(c, R.color.market_tooltip_text_dim);
     }
 
     /** 按当前系统深浅模式取配色 */

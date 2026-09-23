@@ -16,6 +16,7 @@ import android.view.View;
 import com.tsymiar.device2device.market.Indicators;
 import com.tsymiar.device2device.market.MarketPalette;
 import com.tsymiar.device2device.market.Quote;
+import com.tsymiar.device2device.market.Snapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -58,6 +59,9 @@ public class KLineView extends View {
     private int mRsi = 0xFFAB47BC;
     private int mTooltipBg = 0xEE151A21;
     private int mTooltipStroke = 0x664A5568;
+    /** 浮窗文字：浮窗底在日间/夜间都是深色，所以单独取色，不能跟着页面正文色走 */
+    private int mTooltipText = 0xFFE8EAED;
+    private int mTooltipTextDim = 0xFF9AA4B2;
     /** 分时折线（1分钟等超短周期用折线代替蜡烛）：线色与下方半透明面积色 */
     private int mTrend = 0xFF2F6FD0;
     private int mTrendFill = 0x332F6FD0;
@@ -83,9 +87,16 @@ public class KLineView extends View {
     /** 底部时间轴高度（随字号缩放变大，保证标签始终完整落在画布内） */
     private float mAxisHeight = 0f;
     private int mPanelMode = PANEL_VOLUME;
+    /**
+     * 用户手动点选过的副图：-1 = 还没选过，跟随默认；
+     * 选过之后刷新数据（自动刷新 / 换周期）都不再把它重置回成交量。
+     */
+    private int mPanelLocked = -1;
     /** true = 折线（分时）模式：1分钟这种超短周期蜡烛会糊成一片，改画收盘价折线 */
     private boolean mLineMode = false;
     private QuoteInfoListener mListener;
+    /** 实时盘口快照（市值等 K 线里没有的数据），没有时为 null */
+    private Snapshot mSnapshot;
 
     private float mDensity = 2f;
     private final RectF mMainRect = new RectF();
@@ -163,6 +174,8 @@ public class KLineView extends View {
         mRsi = p.rsi;
         mTooltipBg = p.tooltipBg;
         mTooltipStroke = p.tooltipStroke;
+        mTooltipText = p.tooltipText;
+        mTooltipTextDim = p.tooltipTextDim;
         mTrend = p.trend;
         mTrendFill = (p.trend & 0x00FFFFFF) | 0x33000000;    // 同色 20% 透明做面积
         setBackgroundColor(mBg);
@@ -190,24 +203,46 @@ public class KLineView extends View {
         mListener = listener;
     }
 
+    /**
+     * 实时盘口（市值 / 市盈 / 换手）：换标的时先传 null 清掉，取到再传进来。
+     * 只有部分标的（A股 / 港股）拿得到，没有的时候详情小窗只显示 K 线自带的数据。
+     */
+    public void setSnapshot(Snapshot snapshot) {
+        mSnapshot = snapshot;
+        invalidate();
+    }
+
     /** 装载数据并立即重绘；默认显示最后一段 */
     public void setData(String title, List<Quote> quotes) {
         mTitle = title == null ? "" : title;
         mData = quotes == null ? new ArrayList<Quote>() : new ArrayList<>(quotes);
         mPendingTail = true;
-        // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）
-        mPanelMode = hasVolume() ? PANEL_VOLUME : PANEL_MACD;
+        // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）；
+        // 用户手动切过副图后就一直用他选的那个，刷新不再覆盖（锁了成交量但该源没量才回落 MACD）
+        if (mPanelLocked >= 0) {
+            mPanelMode = (mPanelLocked == PANEL_VOLUME && !hasVolume()) ? PANEL_MACD : mPanelLocked;
+        } else {
+            mPanelMode = hasVolume() ? PANEL_VOLUME : PANEL_MACD;
+        }
         mSelected = -1;
         computeVisible();
         publishSelection();
         invalidate();
     }
 
-    /** 循环切换底部副图，返回当前副图名 */
+    /** 循环切换底部副图，返回当前副图名；手动切过之后记下来，刷新不再被重置 */
     public String cyclePanel() {
         mPanelMode = (mPanelMode + 1) % PANEL_NAMES.length;
+        mPanelLocked = mPanelMode;
         invalidate();
         return PANEL_NAMES[mPanelMode];
+    }
+
+    /** 换数据源时清掉手动选择，重新按该源的默认副图显示 */
+    public void resetPanelChoice() {
+        mPanelLocked = -1;
+        mPanelMode = hasVolume() ? PANEL_VOLUME : PANEL_MACD;
+        invalidate();
     }
 
     public String getPanelName() {
@@ -757,20 +792,30 @@ public class KLineView extends View {
     }
 
     /**
-     * 详情小窗口（浮窗）：主图/副图十字光标处弹出，显示该根K线的时间/开/高/低/收/量/涨跌。
+     * 详情小窗口（浮窗）：主图/副图十字光标处弹出，显示该根K线的时间/开/高/低/收/量/额/振幅/涨跌，
+     * 拿得到实时盘口时再补上市值 / 流通市值 / 换手率 / 市盈率。
      * 位置自动避让（光标在右半屏则浮窗放左侧，光标在上半屏则浮窗放下方）。
      */
     private void drawTooltip(Canvas canvas, float[] range) {
         if (mSelected < 0 || mSelected >= mData.size()) return;
         Quote q = mData.get(mSelected);
         float base = mSelected > 0 ? mData.get(mSelected - 1).close : q.open;
-        String[] lines = {
-                q.time,
-                "开 " + fmt(q.open) + "   高 " + fmt(q.high),
-                "低 " + fmt(q.low) + "   收 " + fmt(q.close),
-                "量 " + (hasVolume() ? compact(q.volume) : "-"),
-                "涨跌 " + String.format(Locale.US, "%+.2f%%", q.changePercent(base))
-        };
+        List<String> rows = new ArrayList<>();
+        rows.add(q.time);
+        rows.add("开 " + fmt(q.open) + "   高 " + fmt(q.high));
+        rows.add("低 " + fmt(q.low) + "   收 " + fmt(q.close));
+        rows.add("量 " + (hasVolume() ? compact(q.volume) : "-")
+                + "   额 " + (q.amount > 0 ? compact(q.amount) : "-"));
+        rows.add("振幅 " + String.format(Locale.US, "%.2f%%", q.amplitude(base)));
+        // 市值这类实时盘口数据只有部分标的拿得到（见 Snapshot），没有就不占行
+        if (mSnapshot != null) {
+            rows.add("市值 " + Snapshot.cap(mSnapshot.totalCap)
+                    + "   流通 " + Snapshot.cap(mSnapshot.floatCap));
+            rows.add("换手 " + String.format(Locale.US, "%.2f%%", mSnapshot.turnoverRate)
+                    + "   市盈 " + String.format(Locale.US, "%.2f", mSnapshot.pe));
+        }
+        rows.add("涨跌 " + String.format(Locale.US, "%+.2f%%", q.changePercent(base)));
+        String[] lines = rows.toArray(new String[0]);
 
         float textSize = sp(11);
         float pad = dp(7);
@@ -802,8 +847,9 @@ public class KLineView extends View {
         canvas.clipRect(boxX, boxY, boxX + boxW, boxY + boxH);
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         for (int i = 0; i < lines.length; i++) {
-            mTextPaint.setColor(i == 0 ? mTextDim : (i == lines.length - 1
-                    ? (q.isUp() ? mUp : mDown) : mText));
+            // 浮窗底在两套配色下都是深色：文字用浮窗专用色，涨跌行沿用红涨绿跌
+            mTextPaint.setColor(i == 0 ? mTooltipTextDim : (i == lines.length - 1
+                    ? (q.isUp() ? mUp : mDown) : mTooltipText));
             canvas.drawText(lines[i], boxX + pad, boxY + pad + lineH * i + sp(11), mTextPaint);
         }
         canvas.restoreToCount(save);
@@ -906,9 +952,11 @@ public class KLineView extends View {
         Quote q = mData.get(mSelected);
         float base = mSelected > 0 ? mData.get(mSelected - 1).close : q.open;
         String volume = hasVolume() ? ("  量 " + compact(q.volume)) : "";
+        String amount = q.amount > 0 ? ("  额 " + compact(q.amount)) : "";
+        String cap = mSnapshot != null ? ("  市值 " + Snapshot.cap(mSnapshot.totalCap)) : "";
         mListener.onQuoteInfo(String.format(Locale.US,
-                "%s  开 %s 高 %s 低 %s 收 %s%s  涨跌 %+.2f%%",
-                q.time, fmt(q.open), fmt(q.high), fmt(q.low), fmt(q.close), volume,
+                "%s  开 %s 高 %s 低 %s 收 %s%s%s%s  涨跌 %+.2f%%",
+                q.time, fmt(q.open), fmt(q.high), fmt(q.low), fmt(q.close), volume, amount, cap,
                 q.changePercent(base)));
     }
 

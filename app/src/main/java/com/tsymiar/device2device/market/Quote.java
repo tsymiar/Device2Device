@@ -34,6 +34,12 @@ public class Quote {
         return (close - base) / base * 100f;
     }
 
+    /** 振幅%（(高-低)/前收；base<=0 时按 0 处理，避免除零） */
+    public float amplitude(float base) {
+        if (base <= 0f) return 0f;
+        return (high - low) / base * 100f;
+    }
+
     /** 是否为阳线（收盘 >= 开盘），与行情软件"红涨绿跌"判定一致 */
     public boolean isUp() {
         return close >= open;

@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<!-- 外层 FrameLayout 只为挂一个整屏容器：指南针 / 水平仪卡片被点时把仪表搬进去最大化 -->
+<FrameLayout
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
-	android:layout_height="match_parent"
-	android:orientation="vertical"
-	android:padding="10dp"
-	android:background="#EEEEEE"
-	tools:context=".activity.GraphActivity">
+	android:layout_height="match_parent">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:padding="10dp"
+		android:background="#EEEEEE"
+		tools:context=".activity.GraphActivity">
 
 	<!-- 指南针 + 水平仪 并排 -->
 	<LinearLayout
@@ -16,8 +21,9 @@
 		android:orientation="horizontal"
 		android:layout_marginBottom="8dp">
 
-		<!-- 指南针（方向） -->
+		<!-- 指南针（方向）：点整张卡片最大化 -->
 		<LinearLayout
+			android:id="@+id/compass_card"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
 			android:layout_weight="1"
@@ -63,8 +69,9 @@
 				android:layout_height="150dp" />
 		</LinearLayout>
 
-		<!-- 水平仪 -->
+		<!-- 水平仪：点整张卡片最大化 -->
 		<LinearLayout
+			android:id="@+id/level_card"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
 			android:layout_weight="1"
@@ -303,4 +310,16 @@
 		android:background="@android:color/white"
 		android:name="com.tsymiar.device2device.acceleration.DefaultFragment" />
 
-</LinearLayout>
+	</LinearLayout>
+
+	<!-- 最大化容器：仪表搬进来整屏显示，点任意位置（或返回键）还原 -->
+	<FrameLayout
+		android:id="@+id/zoom_host"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:background="#EEEEEE"
+		android:clickable="true"
+		android:focusable="true"
+		android:visibility="gone" />
+
+</FrameLayout>

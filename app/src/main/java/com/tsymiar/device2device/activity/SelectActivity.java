@@ -70,8 +70,16 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private int mGValue = 1;
     Intent mPublisherIntent;
     Intent mSubscribeIntent;
+    /** 原 KCP 按钮：现在是「客户端发一串随机数」 */
     Button mKcpBtn;
-    Button mTcpBtn;
+    /** 原 TCP 按钮：现在是「KCP 服务启停」 */
+    Button mKcpServerBtn;
+    /** KCP 服务端最近收到的几条消息（server 按钮下方滚动显示） */
+    private final java.util.List<String> mKcpLog = new java.util.ArrayList<>();
+    /** KCP 客户端最近几条消息（client 按钮下方滚动显示） */
+    private final java.util.List<String> mKcpStatusLog = new java.util.ArrayList<>();
+    private boolean mKcpServerStart = false;
+    private boolean mKcpClientStart = false;
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
@@ -91,8 +99,10 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     };
 
-    private static boolean mKcpStart = false;
-    private static boolean mTcpStart  = false;
+    /** KCP 用同一个端口收（服务端）发（客户端，走 127.0.0.1 回环） */
+    private static final int KCP_PORT = 8090;
+    /** UDP 状态与收到的数据共用一路，靠「第一条是状态」区分落点 */
+    private boolean mUdpStatusShown = false;
 
     public static SelectActivity getInstance() {
         return mainActivity;
@@ -137,11 +147,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     break;
                 }
                 case Receiver.UDP_SERVER:
-                    tv = findViewById(R.id.txt_server);
+                    // 第一条是启动状态 → server 文字，之后是收到的数据 → client 文字
+                    tv = findViewById(mUdpStatusShown ? R.id.txt_udp_client : R.id.txt_udp_server);
+                    mUdpStatusShown = true;
                     tv.setText(msg.obj.toString());
                     break;
                 case Receiver.UDP_CLIENT:
-                    tv = findViewById(R.id.txt_client);
+                    tv = findViewById(R.id.txt_udp_client);
                     tv.setText(msg.obj.toString());
                     break;
                 case Receiver.TOAST:
@@ -154,6 +166,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     break;
                 case Receiver.KCP_VIEW:
                     mKcpBtn.setText(msg.obj.toString());
+                    break;
+                case Receiver.KCP_HINT:
+                    // 服务端收到什么
+                    appendKcpLog(msg.obj.toString());
+                    break;
+                case Receiver.KCP_CLIENT:
+                    // 客户端的 sn / RTT
+                    appendKcpStatus(msg.obj.toString());
                     break;
                 case Receiver.MSG_HINT:
                     tv = findViewById(R.id.txt_hint);
@@ -256,11 +276,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         WifiManager manager = (WifiManager)this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         assert manager != null;
         WifiManager.MulticastLock wifiLock = manager.createMulticastLock("localWifi");
-        findViewById(R.id.btn_server).setOnClickListener(v -> {
+        findViewById(R.id.btn_udp_server).setOnClickListener(v -> {
             wifiLock.acquire();
+            // 下一条 UDP_SERVER 是启动状态
+            mUdpStatusShown = false;
             NetworkWrapper.startUdpServer(8899);
         });
-        findViewById(R.id.btn_client).setOnClickListener(v -> {
+        findViewById(R.id.btn_udp_client).setOnClickListener(v -> {
             String text = Utils.MD5(mGValue + "").substring(0, 6);
             NetworkWrapper.sendUdpData(text, text.length());
             mGValue++;
@@ -304,31 +326,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 startService(mPublisherIntent);
             }
         });
-        mTcpBtn = findViewById(R.id.btn_tcp);
-        mTcpBtn.setOnClickListener(v -> {
-            if (!mTcpStart) {
-                NetworkWrapper.startTcpServer(8700);
-                mTcpBtn.setText(R.string.tcp_stop);
-                mTcpStart = true;
-            } else {
-                NetworkWrapper.stopTcpServer();
-                mTcpBtn.setText(R.string.tcp);
-                mTcpStart = false;
-            }
-        });
-        mKcpBtn = findViewById(R.id.btn_ikcp);
-        mKcpBtn.setOnClickListener(v -> {
-            if (!mKcpStart) {
-                NetworkWrapper.startKcpServer(8090);
-                NetworkWrapper.startKcpClient("127.0.0.1", 8090);
-                mKcpStart = true;
-            } else {
-                Message msg = new Message();
-                msg.obj = getString(R.string.kcprun);
-                msg.what = Receiver.KCP_VIEW;
-                handler.sendMessage(msg);
-            }
-        });
+        // KCP 服务启停（TCP 服务端代码保留在 native，这里不再调用）
+        mKcpServerBtn = findViewById(R.id.btn_kcp_server);
+        mKcpServerBtn.setText(R.string.kcp_server);
+        mKcpServerBtn.setOnClickListener(v -> toggleKcpServer());
+        // KCP 客户端：点一次发一串随机数
+        mKcpBtn = findViewById(R.id.btn_kcp_client);
+        mKcpBtn.setText(R.string.kcp_client);
+        mKcpBtn.setOnClickListener(v -> sendKcpRandom());
         findViewById(R.id.btn_market).setOnClickListener(v ->
                 startActivity(new Intent(SelectActivity.this, MarketActivity.class)));
         findViewById(R.id.btn_avatar).setOnClickListener(v ->
@@ -487,6 +492,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (mFloatService != null) {
             mFloatService.closeWindow();
         }
+        // KCP 是进程内的收发线程：退出页面就收掉，免得端口一直占着、线程空转
+        if (mKcpServerStart) {
+            NetworkWrapper.stopKcpServer();
+            mKcpServerStart = false;
+        }
+        if (mKcpClientStart) {
+            NetworkWrapper.stopKcpClient();
+            mKcpClientStart = false;
+        }
         // HTTP 文件服务由前台服务托管：退出页面不停止，后台继续运行
         super.onDestroy();
     }
@@ -586,6 +600,121 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 })
                 .setNegativeButton("暂不", (dialog, which) -> dialog.dismiss())
                 .show();
+    }
+
+    /** KCP 服务启停：收 UDP 8090，收到的内容打到 server 下方文字区 */
+    private void toggleKcpServer() {
+        if (!mKcpServerStart) {
+            int ret = NetworkWrapper.startKcpServer(KCP_PORT);
+            if (ret == 0 || ret == 1) {
+                mKcpServerStart = true;
+                mKcpServerBtn.setText(R.string.kcp_server_stop);
+                updateKcpTextVisibility();
+            }
+        } else {
+            NetworkWrapper.stopKcpServer();
+            // 服务端停了，客户端跟着一起收
+            if (mKcpClientStart) {
+                NetworkWrapper.stopKcpClient();
+                mKcpClientStart = false;
+            }
+            mKcpServerStart = false;
+            mKcpServerBtn.setText(R.string.kcp_server);
+            clearKcpViews();
+        }
+    }
+
+    /** 停服务时清掉 KCP 两个文字区的内容并把它们收起来 */
+    private void clearKcpViews() {
+        mKcpLog.clear();
+        mKcpStatusLog.clear();
+        setKcpText(R.id.txt_kcp_server, "");
+        setKcpText(R.id.txt_kcp_client, "");
+        updateKcpTextVisibility();
+    }
+
+    /** 谁 start 就显示谁的文字区，都停了整行收回 */
+    private void updateKcpTextVisibility() {
+        View row = findViewById(R.id.kcp_text_row);
+        if (row != null) {
+            row.setVisibility(mKcpServerStart || mKcpClientStart ? View.VISIBLE : View.GONE);
+        }
+        setKcpViewVisible(R.id.txt_kcp_server, mKcpServerStart);
+        setKcpViewVisible(R.id.txt_kcp_client, mKcpClientStart);
+    }
+
+    private void setKcpViewVisible(int id, boolean visible) {
+        TextView tv = findViewById(id);
+        if (tv != null) {
+            tv.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void setKcpText(int id, String text) {
+        TextView tv = findViewById(id);
+        if (tv != null) {
+            tv.setText(text);
+        }
+    }
+
+    /** 每次发送的随机数长度：16 个十六进制字符（= 8 个随机字节） */
+    private static final int KCP_RANDOM_CHARS = 16;
+
+    /**
+     * KCP 客户端：首次点击顺带把客户端拉起来，之后每次发一串十六进制随机数给本机服务端。
+     * 服务端会原样回射，客户端收到后把 sn / RTT 打到 client 下方的文字区。
+     */
+    @SuppressLint("SetTextI18n")
+    private void sendKcpRandom() {
+        if (!mKcpClientStart) {
+            int ret = NetworkWrapper.startKcpClient("127.0.0.1", KCP_PORT);
+            mKcpClientStart = (ret == 0 || ret == 1);
+            if (!mKcpClientStart) {
+                appendKcpStatus("KCP client start failed(" + ret + ")");
+                return;
+            }
+            updateKcpTextVisibility();
+        }
+        if (!mKcpServerStart) {
+            appendKcpStatus("KCP server not running, start it first");
+        }
+        // 随机数用十六进制：一眼能看出有没有被截断或错位
+        String random = randomHex(KCP_RANDOM_CHARS);
+        int ret = NetworkWrapper.sendKcpData(random, random.length());
+        if (ret < 0) {
+            appendKcpStatus("KCP send failed(" + ret + "): " + random);
+        }
+    }
+
+    /** 生成十六进制随机串（大写），charCount 是要的字符数（奇数时按 (charCount+1)/2 字节生成后截断） */
+    private static String randomHex(int charCount) {
+        int byteCount = (charCount + 1) / 2;
+        byte[] buf = new byte[byteCount];
+        new java.security.SecureRandom().nextBytes(buf);
+        StringBuilder sb = new StringBuilder(byteCount * 2);
+        for (byte b : buf) {
+            sb.append(Character.toUpperCase(Character.forDigit((b >> 4) & 0xF, 16)));
+            sb.append(Character.toUpperCase(Character.forDigit(b & 0xF, 16)));
+        }
+        return sb.substring(0, Math.min(charCount, sb.length()));
+    }
+
+    /** KCP server 按钮下方滚动显示最近 6 条（服务端收到什么） */
+    private void appendKcpLog(String line) {
+        mKcpLog.add(line);
+        while (mKcpLog.size() > 6) {
+            mKcpLog.remove(0);
+        }
+        setKcpText(R.id.txt_kcp_server, TextUtils.join("\n", mKcpLog));
+    }
+
+    /** KCP client 按钮下方滚动显示最近 6 条（启动 / 发送 / 回射的 sn 与 RTT） */
+    private void appendKcpStatus(String line) {
+        mKcpStatusLog.add(line);
+        while (mKcpStatusLog.size() > 6) {
+            mKcpStatusLog.remove(0);
+        }
+        setKcpText(R.id.txt_kcp_client, TextUtils.join("\n", mKcpStatusLog));
     }
 
     /** 根据前台服务快照同步 HTTP 状态：地址卡片与复制/停止按钮可用性 */
@@ -701,6 +830,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             }
             sb.append("⚠️ SSH 服务启动失败\n").append(mSshError);
         }
+        // KCP 的收发内容不再进这里：各自显示在 server / client 按钮下方的文字区
         tv.setText(sb.length() == 0 ? " " : sb.toString());
     }
 

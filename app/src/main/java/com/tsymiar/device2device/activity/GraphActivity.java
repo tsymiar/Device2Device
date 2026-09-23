@@ -19,7 +19,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -60,6 +62,14 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     private StepView mStep;
     private ProximityView mProximity;
 
+    /** 卡片最大化用的整屏容器（activity_graph.xml 里的 zoom_host） */
+    private FrameLayout mZoomHost;
+    /** 当前被搬进整屏容器的仪表：null 表示没在放大 */
+    private View mZoomed;
+    private ViewGroup mZoomedParent;
+    private int mZoomedIndex;
+    private ViewGroup.LayoutParams mZoomedParams;
+
     private Sensor mAccelSensor;
     private Sensor mMagSensor;
     private Sensor mStepSensor;
@@ -85,6 +95,9 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
             if (mAltitude != null) {
                 mAltitude.setAltitude((float) location.getAltitude());
                 mAltitude.setAvailable(true);
+            }
+            if (mCompass != null) {
+                mCompass.setLocation(location.getLatitude(), location.getLongitude());
             }
         }
 
@@ -130,6 +143,8 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
             }
         });
 
+        setupCardZoom();
+
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
@@ -151,8 +166,80 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         }
     }
 
+    /**
+     * 指南针 / 水平仪：点整张卡片把里面的仪表搬到整屏容器里显示，
+     * 整屏容器本身（含里面的仪表）再点一下就还原——传感器回调拿的还是同一个 View，
+     * 所以搬走期间读数照样实时更新。
+     */
+    private void setupCardZoom() {
+        mZoomHost = findViewById(R.id.zoom_host);
+        View compassCard = findViewById(R.id.compass_card);
+        View levelCard = findViewById(R.id.level_card);
+        if (compassCard != null) {
+            compassCard.setOnClickListener(v -> toggleZoom(mCompass));
+        }
+        if (levelCard != null) {
+            levelCard.setOnClickListener(v -> toggleZoom(mLevel));
+        }
+        if (mZoomHost != null) {
+            mZoomHost.setOnClickListener(v -> restoreZoom());
+        }
+    }
+
+    /** 已经是它就收回去，否则先还原上一个再放大这个 */
+    private void toggleZoom(View view) {
+        if (mZoomHost == null || view == null) return;
+        if (mZoomed == view) {
+            restoreZoom();
+            return;
+        }
+        if (mZoomed != null) {
+            restoreZoom();
+        }
+        ViewGroup parent = (ViewGroup) view.getParent();
+        if (parent == null) return;
+        mZoomed = view;
+        mZoomedParent = parent;
+        mZoomedIndex = parent.indexOfChild(view);
+        mZoomedParams = view.getLayoutParams();
+        parent.removeView(view);
+        mZoomHost.addView(view, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (view instanceof CompassView) {
+            ((CompassView) view).setZoomed(true);
+        } else if (view instanceof BubbleLevelView) {
+            ((BubbleLevelView) view).setZoomed(true);
+        }
+        mZoomHost.setVisibility(View.VISIBLE);
+        mZoomHost.bringToFront();
+    }
+
+    /** 把仪表按原来的位置塞回卡片，整屏容器收起来 */
+    private void restoreZoom() {
+        if (mZoomed == null) return;
+        View view = mZoomed;
+        if (view instanceof CompassView) {
+            ((CompassView) view).setZoomed(false);
+        } else if (view instanceof BubbleLevelView) {
+            ((BubbleLevelView) view).setZoomed(false);
+        }
+        mZoomHost.removeView(view);
+        if (mZoomedParent != null) {
+            mZoomedParent.addView(view, Math.min(mZoomedIndex, mZoomedParent.getChildCount()),
+                    mZoomedParams);
+        }
+        mZoomed = null;
+        mZoomedParent = null;
+        mZoomedParams = null;
+        mZoomHost.setVisibility(View.GONE);
+    }
+
     @Override
     public void onBackPressed() {
+        if (mZoomed != null) {
+            restoreZoom();
+            return;
+        }
         if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
             getSupportFragmentManager().popBackStack();
         } else {

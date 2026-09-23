@@ -13,13 +13,18 @@ enum MASSAGER {
     MESSAGE,
     TOAST,
     TEXTURE,
-    UDP_SERVER,
-    UDP_CLIENT,
     SUBSCRIBER,
     PUBLISHER,
     KCP_VIEW,
     FILE_PROGRESS,
-    MSG_HINT
+    MSG_HINT,
+    /** UDP 服务端的消息：启动时处理一次状态（端口），之后处理每一包收到的数据 */
+    UDP_SERVER,
+    UDP_CLIENT,
+    /** KCP 服务端收到的消息：Java 侧打到页面底部 hint 区 */
+    KCP_HINT,
+    /** KCP 客户端的消息（启动 / 发送 / 收到的回射包）：Java 侧打到页面 status 区 */
+    KCP_CLIENT
 };
 
 struct Messaging {

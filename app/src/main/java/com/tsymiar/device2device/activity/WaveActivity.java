@@ -38,6 +38,7 @@ import com.tsymiar.device2device.utils.LocalFile;
 import com.tsymiar.device2device.utils.SamplePlayer;
 import com.tsymiar.device2device.utils.SoundRecord;
 import com.tsymiar.device2device.utils.WaveCanvas;
+import com.tsymiar.device2device.view.DecibelView;
 import com.tsymiar.device2device.view.WaveSurface;
 import com.tsymiar.device2device.view.WaveformsView;
 
@@ -67,6 +68,8 @@ public class WaveActivity extends AppCompatActivity {
 
     private WaveSurface mWaveView;
     private WaveformsView mWaveform;
+    private DecibelView mDecibelView;
+    private View mResultCard;
     private TextView mStatView;
     private TextView mTvResult;
     private MaterialButton mRecordBtn;
@@ -74,6 +77,9 @@ public class WaveActivity extends AppCompatActivity {
     private TextView mZoomLabel;
     private MaterialButton mZoomInBtn;
     private MaterialButton mZoomOutBtn;
+    private MaterialButton mTimeInBtn;
+    private MaterialButton mTimeOutBtn;
+    private TextView mTimeLabel;
 
     private WaveCanvas mWaveCanvas;
     private File mFile;
@@ -138,22 +144,40 @@ public class WaveActivity extends AppCompatActivity {
         mWaveform.setLineOffset(42);
 
         mStatView = findViewById(R.id.wave_status);
+        mDecibelView = findViewById(R.id.db_meter);
+        mResultCard = findViewById(R.id.result_card);
         mZoomBar = findViewById(R.id.wave_zoom_bar);
         mZoomLabel = findViewById(R.id.wave_zoom_label);
         mZoomInBtn = findViewById(R.id.wave_zoom_in);
         mZoomOutBtn = findViewById(R.id.wave_zoom_out);
+        mTimeInBtn = findViewById(R.id.wave_time_in);
+        mTimeOutBtn = findViewById(R.id.wave_time_out);
+        mTimeLabel = findViewById(R.id.wave_time_label);
 
-        // 缩放按钮
+        // 幅度（Y 轴）缩放：最大 20×
         mZoomInBtn.setOnClickListener(v -> {
             if (mWaveCanvas != null) {
                 mWaveCanvas.zoomIn(0.25f);
-                mZoomLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomY()));
+                updateZoomLabels();
             }
         });
         mZoomOutBtn.setOnClickListener(v -> {
             if (mWaveCanvas != null) {
                 mWaveCanvas.zoomOut(0.25f);
-                mZoomLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomY()));
+                updateZoomLabels();
+            }
+        });
+        // 时基（X 轴）缩放：一屏时间越短，波形细节越多
+        mTimeInBtn.setOnClickListener(v -> {
+            if (mWaveCanvas != null) {
+                mWaveCanvas.zoomTimeIn(0.5f);
+                updateZoomLabels();
+            }
+        });
+        mTimeOutBtn.setOnClickListener(v -> {
+            if (mWaveCanvas != null) {
+                mWaveCanvas.zoomTimeOut(0.5f);
+                updateZoomLabels();
             }
         });
 
@@ -172,8 +196,14 @@ public class WaveActivity extends AppCompatActivity {
             mWaveform.setVisibility(View.VISIBLE);
             if (mWaveCanvas != null && mWaveCanvas.mIsRecording()) {
                 mRecordBtn.setText(R.string.record);
+                mWaveCanvas.setDecibelListener(null);
                 mWaveCanvas.stopRecording();
                 mWaveCanvas = null;
+                if (mDecibelView != null) {
+                    mDecibelView.reset();
+                    // 分贝卡片只在录音中露脸，停下来就收回
+                    mDecibelView.setVisibility(View.GONE);
+                }
                 mStatView.setVisibility(View.VISIBLE);
                 mStatView.setText("");
                 mZoomBar.setVisibility(View.GONE);
@@ -181,6 +211,8 @@ public class WaveActivity extends AppCompatActivity {
                 if (checkAudioPermissions()) {
                     mStatView.setVisibility(View.GONE);
                     mZoomBar.setVisibility(View.VISIBLE);
+                    // 分贝卡片只在录音中露脸（startDrawWave 里会 reset 历史与峰值）
+                    if (mDecibelView != null) mDecibelView.setVisibility(View.VISIBLE);
                     startDrawWave();
                 }
             }
@@ -405,10 +437,26 @@ public class WaveActivity extends AppCompatActivity {
         // bufSize 为字节数，PCM_16BIT 下需转为 short 数量
         mWaveCanvas.startRecording(audioRecord, bufSize / 2, mWaveView, FILE_NAME, DATA_DIRECTORY,
                 msg -> true);
+        // 实时分贝：WaveCanvas 已经换算成标准声压级（dB SPL），直接交给分贝卡片
+        mWaveCanvas.setDecibelListener(db -> runOnUiThread(() -> {
+            if (mDecibelView != null) mDecibelView.setLevel(db);
+        }));
 
         mRecordBtn.setText(getString(R.string.recording_state));
         mWaveCanvas.resetZoom();
-        mZoomLabel.setText("1.0×");
+        updateZoomLabels();
+        // 新的一轮录音：分贝的历史和「全程峰值」都从零开始算
+        if (mDecibelView != null) {
+            mDecibelView.reset();
+        }
+    }
+
+    /** 把幅度/时基倍率写到缩放条上 */
+    @SuppressLint("SetTextI18n")
+    private void updateZoomLabels() {
+        if (mWaveCanvas == null) return;
+        mZoomLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomY()));
+        mTimeLabel.setText(String.format("%.1f×", mWaveCanvas.getZoomX()));
     }
 
     // ---------- ActivityResult ----------
@@ -440,6 +488,8 @@ public class WaveActivity extends AppCompatActivity {
             ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
             if (result != null && !result.isEmpty()) {
                 mTvResult.setText(result.get(0));
+                // 有结果才占位：空着的时候把下面那块让给分贝图
+                if (mResultCard != null) mResultCard.setVisibility(View.VISIBLE);
             }
         }
     }
@@ -474,8 +524,11 @@ public class WaveActivity extends AppCompatActivity {
         handler.removeCallbacksAndMessages(null);
 
         // 停止录音
-        if (mWaveCanvas != null && mWaveCanvas.mIsRecording()) {
-            mWaveCanvas.stopRecording();
+        if (mWaveCanvas != null) {
+            mWaveCanvas.setDecibelListener(null);
+            if (mWaveCanvas.mIsRecording()) {
+                mWaveCanvas.stopRecording();
+            }
             mWaveCanvas = null;
         }
 

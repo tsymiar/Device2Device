@@ -32,6 +32,8 @@ public class DefaultFragment extends Fragment implements SensorEventListener {
 
 	private Handler mHandler;
 	private NewChart mView;
+	private ChartControls mControls;
+	private boolean mPaused;
 	private final PointF[] mPoints = new PointF[200];
 	Chart chart0;
 	ArrayList<Integer> xlist = new ArrayList<Integer>();
@@ -56,14 +58,38 @@ public class DefaultFragment extends Fragment implements SensorEventListener {
 		mHandler = new Handler();
 		mHandler.post(new TimerProcess());
 
+		// 拖动 / 最小化 / 隐藏 / 暂停：布局里一直有这几个控件，这里才真正接上行为
+		mControls = ChartControls.attach(rootView, this::applyPaused);
+
 		return rootView;
+	}
+
+	/** 暂停=停采样停重绘；继续=重新注册传感器并起定时器 */
+	private void applyPaused(boolean paused) {
+		mPaused = paused;
+		if (paused) {
+			chart0.unregister();
+			if (mHandler != null) {
+				mHandler.removeCallbacksAndMessages(null);
+			}
+			return;
+		}
+		chart0.register();
+		if (mHandler != null) {
+			mHandler.removeCallbacksAndMessages(null);
+			mHandler.post(new TimerProcess());
+		}
 	}
 
 	@Override
 	public void onResume() {
 		super.onResume();
+		if (mPaused) return;      // 手动暂停时切回来也别自己跑起来
 		chart0.register();
-		sensorManager.registerListener(this, chart0.sensor, SensorManager.SENSOR_DELAY_GAME);
+		if (mHandler != null) {
+			mHandler.removeCallbacksAndMessages(null);
+			mHandler.post(new TimerProcess());
+		}
 	}
 
 	@Override

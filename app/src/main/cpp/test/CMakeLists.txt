@@ -32,7 +32,6 @@ add_executable(NetworkClientTest
     NetworkClientTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/UdpSocket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/KcpSocket.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../socket/KcpEmulator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/kcp/ikcp.c
 )
 
@@ -54,7 +53,6 @@ add_executable(NetworkServerTest
     NetworkServerTest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/UdpSocket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/KcpSocket.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../socket/KcpEmulator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../socket/kcp/ikcp.c
 )
 

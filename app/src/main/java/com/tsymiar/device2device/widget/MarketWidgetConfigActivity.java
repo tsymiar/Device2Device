@@ -205,13 +205,19 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         // 同 buildSymbolRow：不用 CENTER_VERTICAL，防止以后加垂直 margin 再踩同一个坑
+        // 也不裁子控件：行高一旦小于内容（系统字号放大时）就把下沿切掉一小条
+        row.setClipChildren(false);
+        row.setClipToPadding(false);
 
         TextView label = new TextView(this);
         label.setText("数据源");
         label.setTextColor(C_DIM);
         label.setTextSize(13);
-        row.addView(label, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        label.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        labelLp.gravity = Gravity.CENTER_VERTICAL;
+        row.addView(label, labelLp);
 
         mSourceSpinner = new AppCompatSpinner(this);
         mSourceSpinner.setBackground(rounded(C_FIELD, C_FIELD_STROKE));
@@ -237,11 +243,34 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
-        // 整页按紧凑排版：输入类控件和底部按钮统一 40dp（原来 50/52 偏高，屏小的时候挤）；
-        // 内容区 = 40 - 上下内边距 8*2 = 24dp，14sp 文字即使字体放大也够用
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        // 整页按紧凑排版：输入类控件和底部按钮统一 40dp（原来 50/52 偏高，屏小的时候挤）。
+        // 40dp 是「下限」而不是死值：系统字号放大后，收起态那行文字（见
+        // item_market_spinner_selected）会顶满内容区、下沿被切掉一小条，所以高度按内容量，
+        // item 里同时去掉字体自带留白，保证 40dp 装得下；行也不裁子控件，双保险。
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         lp.setMargins(dp(10), 0, 0, 0);
+        mSourceSpinner.setMinimumHeight(dp(40));
+        mSourceSpinner.setPadding(dp(6), 0, dp(6), 0);
         row.addView(mSourceSpinner, lp);
+        // layout 之后若不到 40dp 再补齐一次（Spinner 不一定认 minimumHeight）；
+        // 内容本来就高于 40dp 时不做任何事，让它继续长高，绝不再把下沿切掉
+        mSourceSpinner.post(new Runnable() {
+            @Override
+            public void run() {
+                int h = mSourceSpinner.getHeight();
+                if (h == 0) {                  // 还没 layout，等下一帧
+                    mSourceSpinner.post(this);
+                    return;
+                }
+                if (h < dp(40)) {
+                    LinearLayout.LayoutParams fix =
+                            (LinearLayout.LayoutParams) mSourceSpinner.getLayoutParams();
+                    fix.height = dp(40);
+                    mSourceSpinner.setLayoutParams(fix);
+                }
+            }
+        });
         return row;
     }
 

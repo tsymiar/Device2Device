@@ -60,6 +60,8 @@
     <string name="mode_cpu">CPU</string>
     <string name="reload">Re-fresh</string>
     <string name="pick_file">pick</string>
+    <string name="amp">幅度</string>
+    <string name="time_base">时基</string>
     <string name="read">local</string>
     <string name="record">record</string>
     <string name="status">status</string>
@@ -121,6 +123,14 @@
     <string name="tcp">TCP</string>
     <string name="tcp_stop">STOP</string>
     <string name="kcprun">Kcp</string>
+    <!-- 按钮一律英文：不写 server / client，由分组框 + 边框颜色区分 -->
+    <string name="kcp_server">KCP 8090</string>
+    <string name="kcp_server_stop">KCP stop</string>
+    <string name="kcp_client">KCP send 16B</string>
+    <string name="group_udp">UDP</string>
+    <string name="group_kcp">KCP</string>
+    <string name="udp_listen">UDP 8899</string>
+    <string name="udp_send">UDP send 6B</string>
     <string name="address">192.168.0.1</string>
     <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
@@ -136,7 +146,10 @@
     <string name="testing">测试测试</string>
     <string name="begin">开始</string>
     <string name="pause">暂停</string>
+    <string name="resume">继续</string>
     <string name="hide">隐藏</string>
+    <string name="show">显示</string>
+    <string name="restore">还原</string>
     <string name="range">幅度</string>
     <string name="legend">图例：</string>
     <string name="pull">拖动</string>

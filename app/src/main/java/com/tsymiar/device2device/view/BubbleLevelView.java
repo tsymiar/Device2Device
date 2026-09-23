@@ -13,6 +13,8 @@ import androidx.annotation.Nullable;
  *
  * 气泡位置由倾角算：气泡朝「抬高的一侧」跑（与重力反向），
  * 圆心附近 ±1° 内判定为水平，下方给出 X / Y 两个方向的倾角。
+ *
+ * 放大到整屏（setZoomed(true)）后下方只留角度数字，不再带「左右 / 前后」字样。
  */
 public class BubbleLevelView extends View {
 
@@ -33,6 +35,7 @@ public class BubbleLevelView extends View {
     private float mTiltX = 0f;   // 左右倾角（度）：右抬为正
     private float mTiltY = 0f;   // 前后倾角（度）：上抬为正
     private boolean mAvailable = true;
+    private boolean mZoomed;     // 被搬到整屏容器：下方只留角度数字
 
     public BubbleLevelView(Context context) {
         this(context, null);
@@ -68,6 +71,13 @@ public class BubbleLevelView extends View {
         invalidate();
     }
 
+    /** 放大到整屏时置 true：下方只显示倾斜角度数字 */
+    public void setZoomed(boolean zoomed) {
+        if (mZoomed == zoomed) return;
+        mZoomed = zoomed;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -77,7 +87,7 @@ public class BubbleLevelView extends View {
             drawFittedText(canvas, "无加速度计，无法测水平", w / 2f, h / 2f, mHintPaint, w - dp(12));
             return;
         }
-        float bottom = dp(28);
+        float bottom = mZoomed ? dp(56) : dp(28);     // 放大后下方只放角度，多留点空
         float cx = w / 2f;
         float cy = (h - bottom) / 2f;
         float r = Math.min(w, h - bottom) / 2f - dp(6);
@@ -97,9 +107,19 @@ public class BubbleLevelView extends View {
         canvas.drawCircle(cx + offsetX, cy + offsetY, bubbleR, mBubblePaint);
         canvas.drawCircle(cx + offsetX, cy + offsetY, bubbleR, mBubbleEdge);
 
+        // 放大后只要角度：不再带「左右 / 前后」字样；「已水平」保留，那是个结论不是标签
         boolean leveled = Math.abs(mTiltX) <= LEVEL_TOLERANCE && Math.abs(mTiltY) <= LEVEL_TOLERANCE;
-        String value = leveled ? "已水平" : String.format("左右 %+.1f\u00b0  前后 %+.1f\u00b0", mTiltX, mTiltY);
-        drawFittedText(canvas, value, cx, cy + r + dp(20), mValuePaint, w - dp(12));
+        String value;
+        if (leveled) {
+            value = "已水平";
+        } else if (mZoomed) {
+            value = String.format("%+.1f\u00b0  %+.1f\u00b0", mTiltX, mTiltY);
+        } else {
+            value = String.format("左右 %+.1f\u00b0  前后 %+.1f\u00b0", mTiltX, mTiltY);
+        }
+        mValuePaint.setTextSize(dp(mZoomed ? 20f : 11f));
+        float base = Math.min(cy + r + (mZoomed ? dp(46) : dp(20)), h - dp(10));
+        drawFittedText(canvas, value, cx, base, mValuePaint, w - dp(12));
     }
 
     private static float clamp(float value, float min, float max) {

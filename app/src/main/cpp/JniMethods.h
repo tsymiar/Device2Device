@@ -65,7 +65,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv *, jclass, jint);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv *, jclass, jstring text, jint len);
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpServer)(JNIEnv* , jclass, jint);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpServer)(JNIEnv* , jclass);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* , jclass, jstring, jint);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpClient)(JNIEnv* , jclass);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* , jclass, jstring, jint);
 
 // 文件传输 JNI 方法
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jint port);

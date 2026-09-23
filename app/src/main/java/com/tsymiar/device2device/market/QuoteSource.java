@@ -102,6 +102,8 @@ public final class QuoteSource {
     private static final String TENCENT_SEARCH = "https://smartbox.gtimg.cn/s3/";
     /** 东财联想词：搜索备用（UTF-8 JSON） */
     private static final String EAST_SEARCH = "https://searchapi.eastmoney.com/api/suggest/get";
+    /** 东财实时盘口：市值 / 市盈率 / 换手率（K线接口不给这些） */
+    private static final String EAST_SNAPSHOT = "https://push2.eastmoney.com/api/qt/stock/get";
     /** 新浪国内期货（沪金/沪银）：var%20_ 用拼接而非格式化，避免 % 被当作格式符 */
     private static final String SINA_INNER = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_";
     /** 新浪国际期货（伦敦金/纽约金） */
@@ -309,6 +311,87 @@ public final class QuoteSource {
     }
 
     private QuoteSource() {
+    }
+
+    // ------------------------------------------------------------------
+    // 对外：实时盘口快照（市值 / 市盈率 / 换手率）
+    // ------------------------------------------------------------------
+
+    public interface SnapshotCallback {
+        /** 取不到快照时回传 null（代码换不出 secid、接口失败、加密货币等） */
+        void onSnapshot(Snapshot snapshot);
+    }
+
+    /**
+     * 实时盘口：只问东财一家，拿到就回传市值等字段，拿不到回传 null——
+     * 这是锦上添花的信息，失败不影响 K 线本身。回调在主线程（HttpsRequest 已切回）。
+     */
+    public static void fetchSnapshot(String code, SnapshotCallback cb) {
+        String secid = toEastSecid(code);
+        if (secid == null) {
+            cb.onSnapshot(null);
+            return;
+        }
+        String url = EAST_SNAPSHOT + "?secid=" + secid
+                + "&fields=f43,f57,f58,f59,f116,f117,f162,f168,f170"
+                + "&_=" + System.currentTimeMillis();
+        request(url, headersFor(EAST), body -> {
+            JSONObject root = new JSONObject(body);
+            JSONObject data = root.optJSONObject("data");
+            if (data == null) {
+                cb.onSnapshot(null);
+                return;
+            }
+            // 东财价量字段是整数：价格按 f59 给的小数位还原，比率类统一 /100
+            double div = Math.pow(10, data.optInt("f59", 2));
+            cb.onSnapshot(new Snapshot(
+                    data.optString("f58", ""),
+                    data.optDouble("f43", 0) / div,
+                    data.optDouble("f170", 0) / 100.0,
+                    data.optDouble("f116", 0),
+                    data.optDouble("f117", 0),
+                    data.optDouble("f162", 0) / 100.0,
+                    data.optDouble("f168", 0) / 100.0));
+        }, () -> cb.onSnapshot(null), new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+                cb.onSnapshot(null);
+            }
+
+            @Override
+            public void onError(String message) {
+                cb.onSnapshot(null);
+            }
+        });
+    }
+
+    /**
+     * 代码 -> 东财 secid：A股（6 位，6/9 开头归沪市 1.，其余归深市 0.）、
+     * 港股（hk + 5 位 -> 116.）、以及已经写好的 "1.600519"；其它形态返回 null。
+     */
+    private static String toEastSecid(String code) {
+        if (code == null) return null;
+        String s = code.trim().toLowerCase(Locale.US);
+        if (s.isEmpty()) return null;
+        if (s.matches("^\\d+\\.\\d+$")) return s;
+        String market = null;
+        if (s.startsWith("sh")) {
+            market = "1";
+            s = s.substring(2);
+        } else if (s.startsWith("sz") || s.startsWith("bj")) {
+            market = "0";
+            s = s.substring(2);
+        } else if (s.startsWith("hk")) {
+            market = "116";
+            s = s.substring(2);
+        }
+        if (!s.matches("\\d+")) return null;
+        if (market == null) {
+            if (s.length() != 6) return null;
+            char c = s.charAt(0);
+            market = (c == '6' || c == '9') ? "1" : "0";
+        }
+        return market + "." + s;
     }
 
     // ------------------------------------------------------------------

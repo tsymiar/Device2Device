@@ -15,7 +15,11 @@ public class NetworkWrapper {
 
     // KCP
     public static native int startKcpServer(int port);
+    public static native int stopKcpServer();
     public static native int startKcpClient(String addr, int port);
+    public static native int stopKcpClient();
+    /** 客户端发一条数据（服务端收到的内容会回传到页面底部 hint 区） */
+    public static native int sendKcpData(String text, int len);
 
     // 文件传输服务器
     public static native int startFileMsgServer(int port);

@@ -81,8 +81,8 @@ app/src/main/
 │   ├── entity/                    # Data entities (PubSubSetting, Receiver)
 │   ├── event/                     # Observer-pattern event system (EventHandle, EventNotify)
 │   ├── widget/                    # Home-screen app widget
-│   │   ├── MarketWidgetProvider   # 行情小部件：取数 / RemoteViews 渲染 / 手动刷新广播
-│   │   └── MarketWidgetConfigActivity # 添加小部件时的配置页（数据源 + 标的）
+│   │   ├── MarketWidgetProvider   # Quote widget: fetch / RemoteViews rendering / manual refresh broadcast
+│   │   └── MarketWidgetConfigActivity # Widget config screen shown when added (data source + symbol)
 │   ├── market/                    # Market data
 │   │   ├── QuoteSource            # 11 sources + symbol search/resolve + keyless HTTPS fetch & fallback
 │   │   ├── Quote                  # Single bar (time, open/high/low/close, volume, amount)
@@ -95,7 +95,7 @@ app/src/main/
 │   │   ├── AvatarSurfaceView      # GLSurfaceView wrapper: drag to rotate, pinch to zoom, screenshot
 │   │   └── PhotoAnalyzer          # Photo silhouette (shoulder/waist/hip ratios) + region color extraction
 │   ├── utils/                     # Utilities (Atom, MP4Header, WAVHeader, SoundRecord, WaveCanvas, HttpsRequest, Utils, etc.)
-│   ├── view/                      # Custom views (WaveSurface, WaveformsView, KLineView)
+│   ├── view/                      # Custom views (WaveSurface, WaveformsView, KLineView, CompassView, BubbleLevelView, DecibelView)
 │   └── wrapper/                   # JNI native bridge (Callback, Network, View, Media, Time)
 ├── cpp/                           # Native C++ code
 │   ├── JniMethods.cpp/h           # All JNI entry points
@@ -154,13 +154,13 @@ app/src/main/
 
 | Feature     | Description                                                                 |
 | :---------- | :-------------------------------------------------------------------------- |
-| Symbol Input | Code (`sh600519`, `1.600519`, `BTCUSDT`) or Chinese name / pinyin (`茅台`, `gzmt`, `沪金`, `美元指数`); ambiguous hits open a picker, the resolved name shows on the chart |
+| Symbol Input | Code (`sh600519`, `1.600519`, `BTCUSDT`) or Chinese name / pinyin (`茅台` Kweichow Moutai, `gzmt`, `沪金` Shanghai gold, `美元指数` USD index); ambiguous hits open a picker, the resolved name shows on the chart |
 | Chart      | Candles + wicks (red up / green down), MA5/MA10/MA20, last-price dashed line, adaptive price axis, smart time-axis labels |
-| Indicators | Main: MA; sub-panel cycles on tap: 成交量 / MACD(12,26,9) / RSI(14) / KDJ(9,3,3) (falls back to MACD when the source has no volume) |
+| Indicators | Main: MA; sub-panel cycles on tap: Volume / MACD(12,26,9) / RSI(14) / KDJ(9,3,3) (falls back to MACD when the source has no volume) |
 | Interaction | Drag to pan history (320 bars requested per screen), pinch to zoom bar width, tap the main chart for a crosshair + floating tooltip (time / OHLC / volume / change), tap the sub-panel to cycle panels |
 | Auto Refresh | 15s polling toggle; screen stays on while enabled |
 | Persistence | Source / interval / symbol / auto-refresh saved in `SharedPreferences` and restored on re-entry; retired source ids fall back to `auto` |
-| Home Widget | `📈 行情` app widget (2×2, resizable): per-instance source + symbol (or "follow the last symbol viewed in the app"), last price and change % coloured red-up / green-down, tap the card to open the K-line screen, tap 刷新 to fetch immediately; 30 min fallback refresh by the system, refreshed in sync whenever the market screen loads |
+| Home Widget | `📈 Quotes` app widget (2×2, resizable): per-instance source + symbol (or "follow the last symbol viewed in the app"), last price and change % coloured red-up / green-down, tap the card to open the K-line screen, tap Refresh to fetch immediately; 30 min fallback refresh by the system, refreshed in sync whenever the market screen loads |
 
 ### Message System (C++ ↔ Java)
 
@@ -175,7 +175,7 @@ The app uses a thread-safe message queue (`Message.h`) to bridge C++ native code
 | `PUBLISHER`   | C++ → Java | Publish service feedback                  |
 | `FILE_PROGRESS` | C++ → Java | File transfer progress update             |
 | `TEXTURE`     | C++ → Java | Texture rendering callback                |
-| `UDP_SERVER`  | C++ → Java | UDP server status                         |
+| `UDP_SERVER`  | C++ → Java | UDP server: first message after start is the status (port), every later one is received data |
 | `UDP_CLIENT`  | C++ → Java | UDP client status                         |
 | `KCP_VIEW`    | C++ → Java | KCP connection status                     |
 
@@ -194,12 +194,12 @@ The SelectActivity UI features a dual-status display: `txt_hint` (italic 12sp, s
 
 ### 3D Human Model (Avatar)
 
-Reachable from the dashboard Services card (`🧍 人物 3D 模型 · Avatar`). The pipeline is **parametric** and runs fully on-device — there is no photogrammetry / cloud reconstruction involved. A photo contributes *appearance and silhouette proportions*, the user supplies the *absolute scale*:
+Reachable from the dashboard Services card (`🧍 3D Human Model · Avatar`). The pipeline is **parametric** and runs fully on-device — there is no photogrammetry / cloud reconstruction involved. A photo contributes *appearance and silhouette proportions*, the user supplies the *absolute scale*:
 
 | Feature         | Description                                                            |
 | :-------------- | :--------------------------------------------------------------------- |
 | Photo Input     | Gallery (`ACTION_GET_CONTENT`) or camera (`FileProvider` + `ACTION_IMAGE_CAPTURE`); tap the thumbnail to preview the full image |
-| Cloud (Tripo3D) | Optional `☁ Tripo3D 照片生成 3D`: upload the photo (`POST /v3/files` → `image-to-model` → poll `GET /v3/tasks/{id}` → download GLB), parse it with `GlbLoader` and normalize to the current height. Needs the user's own API key, stored locally |
+| Cloud (Tripo3D) | Optional `☁ Tripo3D photo-to-3D`: upload the photo (`POST /v3/files` → `image-to-model` → poll `GET /v3/tasks/{id}` → download GLB), parse it with `GlbLoader` and normalize to the current height. Needs the user's own API key, stored locally |
 | Silhouette Fit  | Border-based background estimate → foreground mask → per-row width profile at shoulder / chest / waist / hip → `chestR` / `waistR` / `hipR` multipliers |
 | Color Extract   | Median foreground color of hair / face / upper / lower bands → hair, skin, top & bottom colors |
 | Body Params     | Gender, height (120–210 cm), weight (30–150 kg), head-to-body ratio (6–8.5), shoulder / chest / waist / hip fine tuning |
@@ -307,15 +307,19 @@ Short log — one line per change.
 
 ### 2026-09
 
-- **SSH Server** (`service/SshServerService.java`, `SshServerCore.java`, `SshShellCommand.java`): foreground service running Apache MINA SSHD on port 2222 (retries the next 9 ports if busy), user `d2d` with a random resettable password; login with `ssh d2d@<ip> -p <port>`, built-in `help / pwd / ls / cd / cat / echo / whoami / id / uname / date / df / ip`; start / stop / copy-connection buttons, failures shown in the status card instead of a long Toast.
-- **Sensor Dashboard** (`GraphActivity` + `view/CompassView`, `BubbleLevelView`, `AltitudeView`, `MagneticView`, `StepView`, `ProximityView`): chart page reworked — compass + bubble level in one row, magnetic field / altitude / steps / proximity in a second row; altitude now comes from GPS satellite fixes instead of the barometer, value text auto-shrinks to fit the card, missing hardware shows a placeholder.
-- **Interval Labels**: hourly bars display `1h` (no more "小时K"); picker reads `1m 5m 30m 1h 日K 周K 月K 季K 年K`.
-- **Misc**: Texture / Wave screens show their own titles instead of the app name; Chart entry dropped the `ic_chart` icon.
-- **3D Human Model** (`AvatarActivity` + `avatar/`): photo-driven parametric body, light-invariant skin detection, denser mesh (168 body voxels, 128x112 head), leg/foot sliders, OBJ+MTL or PNG export, optional Tripo3D cloud generation with the user's own API key.
-- **Market K-Line** (`MarketActivity` + `market/` + `view/KLineView`): 11 sources (A-shares, futures, forex/gold, crypto), name/pinyin symbol resolution, 320 bars per screen with pan/zoom, MA + MACD/RSI/KDJ sub-panels, smooth 1-minute trend line, day/night palette.
-- **Market Widget** (`widget/`): 2x2 resizable multi-instance widget, multiple symbols with drag-to-reorder rows, market code under each name, tap to open the market screen.
-- **HTTP Server**: multi-select ZIP download (streamed per file), sortable column headers, responsive narrow-screen layout, viewer navigation follows the current sort, throughput tuning (TCP_NODELAY + larger stream buffers).
-- **SAF Fix**: directory rows detected via `Document.MIME_TYPE_DIR` instead of the non-existent `FLAG_DIRECTORY` constant.
+- **Sensor Card Zoom**: tap the compass / bubble-level card → gauge goes full-screen; tap again or back to restore; readings keep updating.
+- **Compass (zoomed)**: 5° ticks + degree numbers every 15°, lat/lon above a triangle pointing at the dial top; cardinals / bearing / needle scale up.
+- **Bubble Level (zoomed)**: only the two angles, no left-right / front-back labels; the "Level" verdict is kept.
+- **Decibel Card**: visible only while recording; placeholder text removed.
+- **SSH Server**: MINA SSHD on port 2222 (next 9 ports if busy), user `d2d` + random password; built-in shell commands; status shown in the card.
+- **Sensor Dashboard**: compass + bubble level in one row, magnetic / altitude / steps / proximity in another; altitude from GPS, text auto-shrinks, placeholders for missing hardware.
+- **Interval Labels**: hourly bars show `1h`; picker reads `1m 5m 30m 1h 1d 1w 1M 1Q 1Y` (daily / weekly / monthly / quarterly / yearly).
+- **Misc**: Texture / Wave screens show their own titles; chart entry dropped `ic_chart`.
+- **3D Human Model**: photo-driven parametric body, silhouette + color extraction, face / hair styling, OBJ+MTL or PNG export, optional Tripo3D.
+- **Market K-Line**: 11 sources, name/pinyin resolution, pan/zoom, MA + MACD/RSI/KDJ sub-panels, day/night palette.
+- **Market Widget**: 2×2 resizable multi-instance widget, drag-to-reorder rows, tap to open the market screen.
+- **HTTP Server**: multi-select ZIP download, sortable columns, responsive layout, throughput tuning.
+- **SAF Fix**: directory rows via `Document.MIME_TYPE_DIR`.
 
 ### 2026-06
 

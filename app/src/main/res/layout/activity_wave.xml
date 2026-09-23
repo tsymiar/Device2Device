@@ -26,7 +26,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/wave_surface" />
 
-    <!-- 缩放控制 -->
+    <!-- 缩放控制：左边一组放大幅度(Y)，右边一组放大时基(X，看细节) -->
     <LinearLayout
         android:id="@+id/wave_zoom_bar"
         android:layout_width="wrap_content"
@@ -36,8 +36,16 @@
         android:orientation="horizontal"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/wave_surface"
         tools:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/amp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/wave_zoom_out"
@@ -54,7 +62,7 @@
 
         <TextView
             android:id="@+id/wave_zoom_label"
-            android:layout_width="40dp"
+            android:layout_width="46dp"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="1.0×"
@@ -63,6 +71,52 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/wave_zoom_in"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="＋"
+            android:textSize="16sp"
+            app:cornerRadius="18dp" />
+
+        <View
+            android:layout_width="14dp"
+            android:layout_height="1dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/time_base"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/wave_time_out"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="－"
+            android:textSize="16sp"
+            app:cornerRadius="18dp" />
+
+        <TextView
+            android:id="@+id/wave_time_label"
+            android:layout_width="46dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="1.0×"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/wave_time_in"
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="36dp"
             android:layout_height="36dp"
@@ -151,15 +205,16 @@
 
     <!-- 语音识别结果 -->
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/result_card"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="12dp"
-        android:layout_marginBottom="16dp"
+        android:visibility="gone"
         app:cardCornerRadius="8dp"
         app:cardElevation="1dp"
         app:contentPadding="12dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/db_meter"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btn_speak"
@@ -176,5 +231,19 @@
             android:textSize="16sp"
             tools:text="@string/speech_to_text" />
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- 录音时的实时分贝图：占住页面下方原来空着的那块；只在录音中显示（默认 gone） -->
+    <com.tsymiar.device2device.view.DecibelView
+        android:id="@+id/db_meter"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/result_card" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

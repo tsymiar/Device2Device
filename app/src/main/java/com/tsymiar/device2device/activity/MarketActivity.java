@@ -28,6 +28,7 @@ import com.tsymiar.device2device.market.Quote;
 import com.tsymiar.device2device.market.QuoteSource;
 import com.tsymiar.device2device.market.QuoteSource.Symbol;
 import com.tsymiar.device2device.market.MarketPalette;
+import com.tsymiar.device2device.market.Snapshot;
 import com.tsymiar.device2device.view.KLineView;
 import com.tsymiar.device2device.widget.MarketWidgetProvider;
 
@@ -261,6 +262,8 @@ public class MarketActivity extends AppCompatActivity {
                 String source = QuoteSource.SOURCES[position];
                 if (source.equals(mSource)) return;
                 mSource = source;
+                // 换数据源=换一套指标口径（有无成交量都可能变），副图选择回到该源默认
+                mChart.resetPanelChoice();
                 // 切换分类=换标的：先清空输入框，让提示语展示该源的代码写法，再加载该源默认标的
                 mSymbolEdit.setText("");
                 mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
@@ -505,6 +508,7 @@ public class MarketActivity extends AppCompatActivity {
             mSource = QuoteSource.TENCENT;
             int index = Arrays.asList(QuoteSource.SOURCES).indexOf(mSource);
             mSourceSpinner.setSelection(Math.max(0, index), false);
+            mChart.resetPanelChoice();
             refreshIntervals(false);
         }
         savePrefs();
@@ -530,6 +534,7 @@ public class MarketActivity extends AppCompatActivity {
                 resolveName(code);
                 mStatus.setText(source + "  symbol=" + code + "  interval=" + mInterval
                         + "  bars=" + quotes.size() + "  " + span(quotes));
+                loadSnapshot(code);
                 savePrefs();
                 // 顺带刷新桌面上的行情小部件（未单独配置的实例跟随这里的标的）
                 MarketWidgetProvider.pushUpdate(MarketActivity.this);
@@ -540,6 +545,22 @@ public class MarketActivity extends AppCompatActivity {
                 mLoading = false;
                 if (isFinishing()) return;
                 mStatus.setText("查询失败：" + message);
+            }
+        });
+    }
+
+    /**
+     * 实时盘口（市值 / 市盈 / 换手）：K线接口不给这些字段，单独问东财一次。
+     * 只有能换成 secid 的标的（A股 / 港股）才拿得到，其余回传 null，详情小窗自动少几行。
+     */
+    private void loadSnapshot(String code) {
+        if (mChart == null) return;
+        mChart.setSnapshot(null);      // 换标的先把上一只的市值清掉，免得串台
+        QuoteSource.fetchSnapshot(code, snapshot -> {
+            if (isFinishing() || snapshot == null) return;
+            mChart.setSnapshot(snapshot);
+            if (snapshot.totalCap > 0) {
+                mStatus.setText(mStatus.getText() + "  市值 " + Snapshot.cap(snapshot.totalCap));
             }
         });
     }

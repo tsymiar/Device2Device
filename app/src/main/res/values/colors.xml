@@ -62,6 +62,9 @@
     <color name="market_trend">#FF1E5FA8</color>
     <color name="market_tooltip_bg">#EE1F2937</color>
     <color name="market_tooltip_stroke">#66899BB3</color>
+    <!-- 详情小窗文字：日间的小窗底仍是深色，文字必须取浅色，不能复用页面正文色（深灰压深底看不清） -->
+    <color name="market_tooltip_text">#FFF9FAFB</color>
+    <color name="market_tooltip_text_dim">#FFCBD5E1</color>
 
     <!-- 行情桌面小部件（浅色）：白卡片 + 深色文字 -->
     <color name="market_widget_bg">#FFFFFFFF</color>
