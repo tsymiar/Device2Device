@@ -38,6 +38,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.avatar.AnnyModel;
 import com.tsymiar.device2device.avatar.BodyProfile;
 import com.tsymiar.device2device.avatar.GlbLoader;
 import com.tsymiar.device2device.avatar.HumanMesh;
@@ -60,6 +61,11 @@ import java.util.concurrent.Executors;
  *   照片(或拍照) ──抠图取轮廓(肩/腰/臀比例)＋分区取色(发/肤/上装/下装)──┐
  *   身高 / 体重 / 头身比 / 脸型 / 发型 ─────────────────────────────────┴→ 参数化建模 → OpenGL 预览
  *
+ * 建模引擎两套（进入页面前选择，页面内也能切换）：
+ *   · 原生：SDF 隐式曲面 + SurfaceNets 等值面提取，身体与五官全部程序化生成；
+ *   · 高分：Anny（NAVER LABS，基于 MakeHuman 社区人体测量数据的参数化人体模型）
+ *           的原型形变基替换掉程序化生成的 3D 模型，其余流程不变。
+ *
  * 模型在米制坐标里 1:1 生成（脚底 y=0，头顶 y=身高），预览区带地面网格与身高标尺，
  * 可直接导出 OBJ(+mtl) 或保存预览图。
  */
@@ -67,10 +73,18 @@ public class AvatarActivity extends AppCompatActivity {
 
     private static final String TAG = "AvatarActivity";
     private static final String PREF = "avatar_prefs";
+
+    /** 进入页面时指定的建模引擎 */
+    public static final String EXTRA_ENGINE = "avatar_engine";
+    /** 原生实现：隐式曲面 + 等值面提取 */
+    public static final int ENGINE_NATIVE = 0;
+    /** 高分实现：Anny（MakeHuman 人体测量形变基） */
+    public static final int ENGINE_ANNY = 1;
     private static final int REQ_PICK = 9101;
     private static final int REQ_SHOT = 9102;
     private static final int REQ_CAMERA_PERM = 9103;
     private static final int REQ_OBJ = 9104;
+    private static final int REQ_ANNY = 9105;
 
     private static final int C_BG = 0xFF0E1116;
     private static final int C_FIELD = 0xFF151A21;
@@ -105,11 +119,24 @@ public class AvatarActivity extends AppCompatActivity {
     private Slider mLeg, mTorso, mArm, mNeckLen, mMuscle, mBust;
     /** 腿脚细分：围度与脚的尺码单独可调 */
     private Slider mThigh, mCalf, mFootL, mFootW;
+    /** 女性罩杯：选中即从实测反解丰满度；每次建模结束回显实测到的那一杯 */
+    private LinearLayout mCupRow;
+    private AppCompatSpinner mCup;
+    private int mCupSelection = 0;
+    /** 回显下拉时不再触发联动，避免「建模 → 回显 → 又建模」转圈 */
+    private boolean mSyncUi = true;
+    /** 腰臀联动时不再互相回写，避免两个滑块来回推 */
+    private boolean mLinkWaistHip;
     /** 五官细分 */
     private Slider mFaceW, mFaceL, mJawW, mCheek, mChin, mForehead,
             mEyeSize, mEyeGap, mNoseW, mNoseH, mLipW, mLipT, mBrow;
     private View mSwatchSkin, mSwatchHair, mSwatchTop, mSwatchBottom;
+    /** 刘海那一行：只有原生引擎会按它搭刘海网格，高分引擎的发型是模型自带的 */
+    private View mBangsRow;
     private TextView mBtnMale, mBtnFemale;
+    /** 当前建模引擎（原生 / 高分 Anny） */
+    private int mEngine = ENGINE_NATIVE;
+    private TextView mBtnNative, mBtnAnny, mEngineNote;
     private HumanMesh.Result mMesh;
     private Uri mCameraUri;
     /** 当前素材（相册 / 拍照），点击缩略图可看大图 */
@@ -132,6 +159,8 @@ public class AvatarActivity extends AppCompatActivity {
 
     private static final class Slider {
         SeekBar bar;
+        /** 滑块所在的整块（标题 + 读数 + 拖动条）：某个引擎下这一项用不上时整块隐藏 */
+        View box;
         float min;
         float step;
 
@@ -150,8 +179,15 @@ public class AvatarActivity extends AppCompatActivity {
         mGl = findViewById(R.id.gl_view);
         mControls = findViewById(R.id.controls);
 
+        // 入口选择框传进来的引擎优先，其次用上次记住的
+        int engine = getIntent().getIntExtra(EXTRA_ENGINE, -1);
         restorePrefs();
+        if (engine == ENGINE_NATIVE || engine == ENGINE_ANNY) mEngine = engine;
         buildUi();
+        mSyncUi = false;              // 初始 selection 的回调不算「用户选了杯」
+        // 入口传进来的引擎可能与存档里的不同，腰臀比的允许区间两套引擎不一样，按当前引擎
+        // 再协调一次（滑块此时已建好，会一起回写显示）
+        linkWaistHip(0);
         rebuild();
     }
 
@@ -174,6 +210,28 @@ public class AvatarActivity extends AppCompatActivity {
     // ------------------------------------------------------------------
 
     private void buildUi() {
+        // ---- 建模引擎 ----
+        mControls.addView(caption("⓪ 建模引擎"));
+        LinearLayout engineRow = hRow();
+        mBtnNative = toggle("原生（程序化）", mEngine == ENGINE_NATIVE,
+                v -> setEngine(ENGINE_NATIVE));
+        mBtnAnny = toggle("高分（Anny）", mEngine == ENGINE_ANNY,
+                v -> setEngine(ENGINE_ANNY));
+        engineRow.addView(mBtnNative, weightParams(1f));
+        engineRow.addView(mBtnAnny, weightParams(1f));
+        mControls.addView(engineRow);
+        mEngineNote = new TextView(this);
+        mEngineNote.setTextSize(11);
+        mEngineNote.setTextColor(0xFF6B7280);
+        mEngineNote.setPadding(0, dp(4), 0, dp(2));
+        mControls.addView(mEngineNote);
+        LinearLayout annyRow = hRow();
+        annyRow.setPadding(0, dp(4), 0, 0);
+        annyRow.addView(actionButton("📥 替换 Anny 模型数据（anny.mhb）", v -> importAnny()),
+                weightParams(1f));
+        mControls.addView(annyRow);
+        updateEngineStyle();
+
         // ---- 照片来源 ----
         mControls.addView(caption("① 素材：相册照片 / 拍照"));
         LinearLayout srcRow = hRow();
@@ -249,24 +307,24 @@ public class AvatarActivity extends AppCompatActivity {
                     mProfile.muscleR = v;
                     scheduleRebuild();
                 });
-        mBust = addParamSlider("胸型", 0.20f, 1.80f,
+        mControls.addView(labelledRow("胸型", spinner(BodyProfile.BUST_SHAPES, mProfile.bustShape,
+                pos -> {
+                    mProfile.bustShape = pos;
+                    scheduleRebuild();
+                })));
+        mBust = addParamSlider("丰满度", 0.20f, 2.10f,
                 () -> mProfile.bustR, v -> {
                     mProfile.bustR = v;
                     scheduleRebuild();
                 });
+        mCup = spinner(BodyProfile.BUST_CUP_LABELS, mCupSelection, this::onCupPicked);
+        mCupRow = labelledRow("罩杯", mCup);
+        mCupRow.setVisibility(cupVisible() ? View.VISIBLE : View.GONE);
+        mControls.addView(mCupRow);
 
-        // ---- 腿脚细分 ----
-        mControls.addView(caption("⑤ 腿脚（大腿围 / 小腿围 / 脚长 / 脚宽）"));
-        mThigh = addParamSlider("大腿围", 0.70f, 1.45f,
-                () -> mProfile.thighR, v -> {
-                    mProfile.thighR = v;
-                    scheduleRebuild();
-                });
-        mCalf = addParamSlider("小腿围", 0.70f, 1.45f,
-                () -> mProfile.calfR, v -> {
-                    mProfile.calfR = v;
-                    scheduleRebuild();
-                });
+        // ---- 腿脚细分 ----（大腿围 / 小腿围都挪到下面臀围旁边了：调下半身时臀和大腿、
+        // 小腿是一起看的，分开在上下两段里很难调）
+        mControls.addView(caption("⑤ 腿脚（脚长 / 脚宽）"));
         mFootL = addParamSlider("脚长", 0.85f, 1.20f,
                 () -> mProfile.footR, v -> {
                     mProfile.footR = v;
@@ -345,6 +403,11 @@ public class AvatarActivity extends AppCompatActivity {
                     mProfile.browR = v;
                     scheduleRebuild();
                 });
+        addParamSlider("耳大小", 0.70f, 1.45f,
+                () -> mProfile.earSizeR, v -> {
+                    mProfile.earSizeR = v;
+                    scheduleRebuild();
+                });
         LinearLayout faceOp = hRow();
         faceOp.setPadding(0, dp(4), 0, 0);
         faceOp.addView(actionButton("🧹 清除脸部贴图", v -> {
@@ -354,7 +417,7 @@ public class AvatarActivity extends AppCompatActivity {
         mControls.addView(faceOp);
 
         // ---- 轮廓微调 ----
-        mControls.addView(caption("⑦ 轮廓微调（照片推断后可再手调）"));
+        mControls.addView(caption("⑦ 轮廓微调（肩 / 胸 / 腰 / 臀 / 大腿 / 小腿，照片推断后可再手调）"));
         mShoulder = addSlider("肩宽", 0.70f, 1.60f, 0.01f, mProfile.shoulderR, "×", "%.2f",
                 v -> {
                     mProfile.shoulderR = v;
@@ -368,11 +431,24 @@ public class AvatarActivity extends AppCompatActivity {
         mWaist = addSlider("腰围", 0.70f, 1.60f, 0.01f, mProfile.waistR, "×", "%.2f",
                 v -> {
                     mProfile.waistR = v;
+                    linkWaistHip(1);          // 腰照用户给的算，臀跟着配
                     scheduleRebuild();
                 });
         mHip = addSlider("臀围", 0.70f, 1.60f, 0.01f, mProfile.hipR, "×", "%.2f",
                 v -> {
                     mProfile.hipR = v;
+                    linkWaistHip(-1);         // 臀照用户给的算，腰跟着配
+                    scheduleRebuild();
+                });
+        // 大腿围 / 小腿围紧跟臀围：这三个是连着的，臀一大腿就得跟着，分开在上下两段里很难调
+        mThigh = addParamSlider("大腿围", 0.70f, 1.45f,
+                () -> mProfile.thighR, v -> {
+                    mProfile.thighR = v;
+                    scheduleRebuild();
+                });
+        mCalf = addParamSlider("小腿围", 0.70f, 1.45f,
+                () -> mProfile.calfR, v -> {
+                    mProfile.calfR = v;
                     scheduleRebuild();
                 });
 
@@ -388,6 +464,12 @@ public class AvatarActivity extends AppCompatActivity {
                     mProfile.hairStyle = pos;
                     scheduleRebuild();
                 })));
+        mBangsRow = labelledRow("刘海", spinner(BodyProfile.BANGS, mProfile.bangs,
+                pos -> {
+                    mProfile.bangs = pos;
+                    scheduleRebuild();
+                }));
+        mControls.addView(mBangsRow);
         // ---- 配色 ----
         mControls.addView(caption("⑨ 配色（点击色块更换）"));
         mSwatchSkin = addColorRow("肤色", mProfile.skin, c -> {
@@ -440,6 +522,10 @@ public class AvatarActivity extends AppCompatActivity {
         mStat.setPadding(0, dp(8), 0, dp(4));
         mStat.setLineSpacing(0, 1.25f);
         mControls.addView(mStat);
+
+        // 控件都建完了再按引擎收一次：updateEngineStyle 第一次被调用时（引擎那一行刚建好）
+        // 后面这些滑块还不存在，那会儿只能刷按钮样式
+        updateEngineStyle();
     }
 
     private TextView caption(String text) {
@@ -474,15 +560,36 @@ public class AvatarActivity extends AppCompatActivity {
         return row;
     }
 
+    private static int clampIndex(int i, int n) {
+        return i < 0 ? 0 : (i > n - 1 ? n - 1 : i);
+    }
+
     private AppCompatSpinner spinner(String[] items, int selection, IntConsumer onPick) {
         AppCompatSpinner sp = new AppCompatSpinner(this);
         sp.setBackground(rounded(C_FIELD, C_STROKE));
         sp.setPopupBackgroundDrawable(new android.graphics.drawable.ColorDrawable(C_FIELD));
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                R.layout.item_market_spinner_selected, items);
+        // 这两个 layout 跟行情页共用，那里是浅底；这里按 Avatar 的暗底覆写文字色，
+        // 免得深灰字落在 #FF151A21 的弹窗上（原色 #FF1F2937）几乎看不见
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                R.layout.item_market_spinner_selected, items) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                if (v instanceof TextView) ((TextView) v).setTextColor(C_TEXT);
+                return v;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View v = super.getDropDownView(position, convertView, parent);
+                if (v instanceof TextView) ((TextView) v).setTextColor(C_TEXT);
+                return v;
+            }
+        };
         adapter.setDropDownViewResource(R.layout.item_market_spinner);
         sp.setAdapter(adapter);
-        sp.setSelection(Math.max(0, selection), false);
+        // 存档里的下标可能比现在的选项表长（选项改过），夹一下，免得下拉框显示空白
+        sp.setSelection(clampIndex(selection, items.length), false);
         sp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -494,6 +601,27 @@ public class AvatarActivity extends AppCompatActivity {
             }
         });
         return sp;
+    }
+
+    /**
+     * 腰臀联动：拖其中一个滑块时把另一个也带上，别拉出「腰比臀还粗」或者「蚂蚁腰」这种
+     * 真人长不出来的体型（真人的腰臀比：女 0.67~0.85、男 0.80~0.95）。
+     *
+     * @param keep &gt;0 保住腰（拖腰围滑块）、&lt;0 保住臀（拖臀围滑块）、0 两边各让一半
+     */
+    private void linkWaistHip(int keep) {
+        if (mLinkWaistHip || mWaist == null || mHip == null) return;
+        float[] wh = {mProfile.waistR, mProfile.hipR};
+        if (mEngine == ENGINE_ANNY) BodyProfile.waistHipAnny(wh, mProfile.gender, keep);
+        else BodyProfile.waistHip(wh, mProfile.gender, keep);
+        if (Math.abs(wh[0] - mProfile.waistR) < 0.005f
+                && Math.abs(wh[1] - mProfile.hipR) < 0.005f) return;
+        mLinkWaistHip = true;
+        mProfile.waistR = wh[0];
+        mProfile.hipR = wh[1];
+        mWaist.set(wh[0]);
+        mHip.set(wh[1]);
+        mLinkWaistHip = false;
     }
 
     /** 直接绑定 BodyProfile 上某个「×倍率」参数的滑块 */
@@ -544,8 +672,15 @@ public class AvatarActivity extends AppCompatActivity {
         holder.bar = bar;
         holder.set(value);
         box.addView(bar);
+        holder.box = box;
         mControls.addView(box);
         return holder;
+    }
+
+    /** 某项参数在当前引擎下用不上时整块隐藏，别留一个拖了没反应的滑块在那儿 */
+    private static void setSliderVisible(Slider s, boolean visible) {
+        if (s == null || s.box == null) return;
+        s.box.setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 
     private View addColorRow(String title, int color, IntConsumer cb) {
@@ -658,17 +793,65 @@ public class AvatarActivity extends AppCompatActivity {
 
     private void setGender(int gender) {
         mProfile.gender = gender;
+        linkWaistHip(0);        // 男女的腰臀比区间不同，换性别时重新协调一次
         updateGenderStyle();
         scheduleRebuild();
     }
 
+    /** 切换建模引擎：原生（程序化）/ 高分（Anny 人体测量形变基） */
+    private void setEngine(int engine) {
+        if (mEngine == engine) return;
+        mEngine = engine;
+        updateEngineStyle();
+        linkWaistHip(0);        // 两套引擎的腰臀比区间不同，换引擎时把两个滑块重新协调回显
+        savePrefs();
+        rebuild();
+    }
+
     private void updateGenderStyle() {
         if (mBtnMale == null || mBtnFemale == null) return;
-        mBtnMale.setTextColor(mProfile.gender == 0 ? 0xFF0A0A12 : C_TEXT);
-        mBtnMale.setBackground(buttonBg(mProfile.gender == 0 ? C_PRIMARY : C_FIELD, C_STROKE,
-                C_PRIMARY_PRESSED, C_STROKE));
-        mBtnFemale.setTextColor(mProfile.gender == 1 ? 0xFF0A0A12 : C_TEXT);
-        mBtnFemale.setBackground(buttonBg(mProfile.gender == 1 ? C_PRIMARY : C_FIELD, C_STROKE,
+        styleToggle(mBtnMale, mProfile.gender == 0);
+        styleToggle(mBtnFemale, mProfile.gender == 1);
+        if (mCupRow != null) {
+            mCupRow.setVisibility(cupVisible() ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /** 罩杯读数是由高分引擎那一圈的实测差值算出来的，原生引擎 / 男性都没有这一项 */
+    private boolean cupVisible() {
+        return mProfile.gender == 1 && mEngine == ENGINE_ANNY;
+    }
+
+    private void updateEngineStyle() {
+        if (mBtnNative == null || mBtnAnny == null) return;
+        boolean nativeOn = mEngine == ENGINE_NATIVE;
+        styleToggle(mBtnNative, nativeOn);
+        styleToggle(mBtnAnny, !nativeOn);
+        if (mEngineNote != null) {
+            mEngineNote.setText(nativeOn
+                    ? "原生：隐式曲面（胶囊 / 椭球平滑并集）+ 等值面提取，身体与五官全程序化生成。"
+                    : "高分：Anny（MakeHuman 人体测量形变基）替换身体网格；"
+                    + "脸型 / 五官以模型自带形变为主，发型与刘海按实测头壳另搭，"
+                    + "体型与围度滑块仍按人体测量生效；"
+                    + "臂长 / 鼻宽 / 鼻长只有原生引擎才有，这里已收起。");
+        }
+        if (mCupRow != null) {
+            mCupRow.setVisibility(cupVisible() ? View.VISIBLE : View.GONE);
+        }
+        // 这几项只有原生引擎真的接了：高分的身体是 Anny 网格，臂长没有对应的形变
+        // （AnnyModel 里只有腿长 / 躯干长 / 颈长），鼻子是那颗真脸上自带的（没有鼻宽 / 鼻长
+        // 这两个参数）。与其留着拖不动的滑块，不如整块收起
+        // 刘海不在此列：高分这边的头发也是按实测头壳表搭出来的（AnnyModel.addHair →
+        // HumanMesh.buildHair），刘海那一圈同样贴得上，所以两套引擎都给
+        boolean anny = mEngine == ENGINE_ANNY;
+        setSliderVisible(mArm, !anny);
+        setSliderVisible(mNoseW, !anny);
+        setSliderVisible(mNoseH, !anny);
+    }
+
+    private void styleToggle(TextView tv, boolean selected) {
+        tv.setTextColor(selected ? 0xFF0A0A12 : C_TEXT);
+        tv.setBackground(buttonBg(selected ? C_PRIMARY : C_FIELD, C_STROKE,
                 C_PRIMARY_PRESSED, C_STROKE));
     }
 
@@ -753,6 +936,8 @@ public class AvatarActivity extends AppCompatActivity {
             handlePhoto(mCameraUri);
         } else if (requestCode == REQ_OBJ && data != null && data.getData() != null) {
             handleObj(data.getData());
+        } else if (requestCode == REQ_ANNY && data != null && data.getData() != null) {
+            handleAnny(data.getData());
         }
     }
 
@@ -792,6 +977,49 @@ public class AvatarActivity extends AppCompatActivity {
                 mGl.setMesh(result.mesh);
                 mStat.setText(ObjLoader.stat(result.mesh));
                 toast("已导入，已归一化为 " + Math.round(mProfile.heightCm) + " cm");
+            });
+        }).start();
+    }
+
+    /**
+     * 高分引擎的模型数据（anny.mhb）由 tools/export_anny*.py 离线导出，默认已经打进
+     * assets/anny/ 里随 APK 一起发布，装上就能直接用，不需要任何额外操作。
+     *
+     * 这里提供的是旁路：换一份自己导出的数据装进来，不用重新打包 APK。
+     */
+    private void importAnny() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        try {
+            startActivityForResult(Intent.createChooser(intent, "选择 anny.mhb"), REQ_ANNY);
+        } catch (Exception e) {
+            Log.w(TAG, "pick anny failed", e);
+            toast("无法打开文件选择器");
+        }
+    }
+
+    private void handleAnny(final Uri uri) {
+        toast("正在载入 Anny 模型数据…");
+        new Thread(() -> {
+            boolean ok = false;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                ok = in != null && AnnyModel.install(in);
+            } catch (Exception e) {
+                Log.e(TAG, "load anny failed", e);
+            }
+            final boolean done = ok;
+            runOnUiThread(() -> {
+                if (!done) {
+                    toast("载入失败：不是有效的 anny.mhb");
+                    return;
+                }
+                toast("Anny 模型数据已载入");
+                mEngine = ENGINE_ANNY;           // 载入成功就切到高分
+                updateEngineStyle();
+                linkWaistHip(0);
+                savePrefs();
+                rebuild();
             });
         }).start();
     }
@@ -954,6 +1182,7 @@ public class AvatarActivity extends AppCompatActivity {
         mProfile.chestR = r.chestR;
         mProfile.waistR = r.waistR;
         mProfile.hipR = r.hipR;
+        linkWaistHip(0);            // 照片量出来的腰臀比一般是真人的，越界的顺手夹回来
         mChest.set(mProfile.chestR);
         mWaist.set(mProfile.waistR);
         mHip.set(mProfile.hipR);
@@ -1056,25 +1285,49 @@ public class AvatarActivity extends AppCompatActivity {
     };
 
     /**
-     * 建模（隐式曲面 + 等值面提取）在手机上需要几百毫秒，放到单线程池里跑，
-     * 只保留最后一次结果，避免连续拖动滑块时堆积任务。
+     * 建模在手机上需要几百毫秒，放到单线程池里跑，只保留最后一次结果，
+     * 避免连续拖动滑块时堆积任务。两套引擎输出同一种 {@link HumanMesh.Result}，
+     * 于是渲染、导出、截图这些框架完全共用。
      */
     private void rebuild() {
         final BodyProfile snapshot = mProfile.copy();
+        final int engine = mEngine;
         final int seq = ++mBuildSeq;
-        if (mStat != null) mStat.setText("建模中…（隐式曲面等值面提取）");
+        if (mStat != null) {
+            mStat.setText(engine == ENGINE_ANNY
+                    ? "Anny 求解中…（原型形变基插值 + 人体测量形变）"
+                    : "建模中…（隐式曲面等值面提取）");
+        }
         mBuildExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                final HumanMesh.Result r = HumanMesh.build(snapshot);
+                HumanMesh.Result r;
+                String warn = null;
+                if (engine == ENGINE_ANNY) {
+                    AnnyModel model = AnnyModel.get(AvatarActivity.this);
+                    if (model == null) {
+                        // 没打包 Anny 模型数据时退回原生，页面照常能用
+                        warn = "未找到 Anny 模型数据（assets/" + AnnyModel.ASSET_DIR + "/"
+                                + AnnyModel.ASSET_NAME + "），先用原生实现";
+                        r = HumanMesh.build(snapshot);
+                    } else {
+                        r = model.build(snapshot);
+                    }
+                } else {
+                    r = HumanMesh.build(snapshot);
+                }
+                final HumanMesh.Result result = r;
+                final String warning = warn;
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
                         if (seq != mBuildSeq || isFinishing() || isDestroyed()) return;
-                        mMesh = r;
-                        mGl.setMesh(r);
+                        mMesh = result;
+                        mGl.setMesh(result);
                         updateStat();
+                        updateCupReadout();
                         savePrefs();
+                        if (warning != null) toast(warning);
                     }
                 });
             }
@@ -1084,16 +1337,94 @@ public class AvatarActivity extends AppCompatActivity {
     private void updateStat() {
         if (mStat == null || mMesh == null) return;
         mStat.setText(String.format(Locale.US,
-                "身高 %.1f cm · 体重 %.1f kg · BMI %.1f（%s）\n"
+                "引擎：%s\n"
+                        + "身高 %.1f cm · 体重 %.1f kg · BMI %.1f（%s）\n"
                         + "头身比 %.1f · 肩宽 %.1f cm · 臂展 %.1f cm · 下裆 %.1f cm\n"
-                        + "胸围 %.1f · 腰围 %.1f · 臀围 %.1f cm（椭圆周长估算）\n"
+                        + "胸围 %.1f · 腰围 %.1f · 臀围 %.1f cm\n"
                         + "大腿围 %.1f · 小腿围 %.1f cm · 脚长 %.1f cm\n"
                         + "标准体重 %.1f kg · 网格 %d 顶点 / %d 三角面",
+                engineName(),
                 mProfile.heightCm, mProfile.weightKg, mProfile.bmi(), mProfile.bmiLabel(),
                 mProfile.headRatio, mMesh.shoulderCm, mMesh.armSpanCm, mMesh.inseamCm,
                 mMesh.chestCm, mMesh.waistCm, mMesh.hipCm,
                 mMesh.thighCm, mMesh.calfCm, mMesh.footCm,
-                mProfile.standardWeight(), mMesh.vertices, mMesh.triangles));
+                mProfile.standardWeight(), mMesh.vertices, mMesh.triangles)
+                + cupLine());
+    }
+
+    private String cupLine() {
+        if (mMesh == null || mProfile.gender != 1 || mMesh.underbustCm <= 0f) return "";
+        float cup = AnnyModel.cupCm(mMesh);
+        return String.format(Locale.US, "\n下胸围 %.1f cm · 罩杯 %s（实测差 %.1f cm）",
+                mMesh.underbustCm, BodyProfile.BUST_CUP_LABELS[cupIndexOf(cup)], cup);
+    }
+
+    private void onCupPicked(int pos) {
+        if (mSyncUi || pos == mCupSelection) return;
+        mCupSelection = pos;
+        pickCup(pos);
+    }
+
+    /** 选一只杯：把目标杯差反解成丰满度再重建（反解要跑两遍形变，放后台线程） */
+    private void pickCup(final int pos) {
+        if (pos < 0 || pos >= BodyProfile.BUST_CUP_CM.length) return;
+        final float target = BodyProfile.BUST_CUP_CM[pos];
+        if (mStat != null) mStat.setText("按罩杯反解丰满度中…");
+        mBuildExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                AnnyModel model = AnnyModel.get(AvatarActivity.this);
+                if (model == null) {
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            toast("罩杯需要高分引擎的模型数据才解得准");
+                        }
+                    });
+                    return;
+                }
+                final float bustR = model.bustRForCup(mProfile, target);
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mProfile.bustR = bustR;
+                        if (mBust != null) mBust.set(bustR);
+                        rebuild();
+                    }
+                });
+            }
+        });
+    }
+
+    /** 建模结果出来之后把下拉回显到实测的那一杯 */
+    private void updateCupReadout() {
+        if (mCup == null || mMesh == null || mProfile.gender != 1) return;
+        if (mMesh.underbustCm <= 0f) return;
+        final int idx = cupIndexOf(AnnyModel.cupCm(mMesh));
+        mSyncUi = true;
+        mCupSelection = idx;
+        mCup.setSelection(idx, false);
+        mSyncUi = false;
+    }
+
+    private static int cupIndexOf(float cm) {
+        int best = 0;
+        float bd = Float.MAX_VALUE;
+        for (int i = 0; i < BodyProfile.BUST_CUP_CM.length; i++) {
+            float d = Math.abs(BodyProfile.BUST_CUP_CM[i] - cm);
+            if (d < bd) {
+                bd = d;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    private String engineName() {
+        if (mEngine == ENGINE_ANNY) {
+            return "高分 · Anny（MakeHuman 人体测量形变基）";
+        }
+        return "原生 · SDF 隐式曲面 + SurfaceNets";
     }
 
     private void exportObj() {
@@ -1142,22 +1473,35 @@ public class AvatarActivity extends AppCompatActivity {
 
     private void restorePrefs() {
         SharedPreferences p = getSharedPreferences(PREF, MODE_PRIVATE);
+        // anny.mhb 已内置进 assets，所以默认直接上高分引擎；没打包数据时才退回原生
+        int defEngine = AnnyModel.isAvailable(this) ? ENGINE_ANNY : ENGINE_NATIVE;
+        mEngine = p.getInt("engine", defEngine);
+        if (mEngine != ENGINE_NATIVE && mEngine != ENGINE_ANNY) mEngine = defEngine;
         mProfile.gender = p.getInt("gender", 0);
         mProfile.heightCm = p.getFloat("height", 172f);
         mProfile.weightKg = p.getFloat("weight", 65f);
         mProfile.headRatio = p.getFloat("head", 7.5f);
-        mProfile.faceShape = p.getInt("face", 0);
-        mProfile.hairStyle = p.getInt("hairStyle", 2);
+        // 选项表的长度可能变过（加了 / 减了款），存档里的下标先夹回表内再建下拉框
+        mProfile.faceShape = clampIndex(p.getInt("face", 0), BodyProfile.FACE_SHAPES.length);
+        mProfile.hairStyle = clampIndex(p.getInt("hairStyle", 2), BodyProfile.HAIR_STYLES.length);
+        mProfile.bangs = clampIndex(p.getInt("bangs", 0), BodyProfile.BANGS.length);
         mProfile.shoulderR = p.getFloat("shoulderR", 1f);
         mProfile.chestR = p.getFloat("chestR", 1f);
         mProfile.waistR = p.getFloat("waistR", 1f);
         mProfile.hipR = p.getFloat("hipR", 1f);
+        // 老存档可能是两个滑块各拉各的存下来的，读进来先按腰臀比协调一次（滑块此时还没建）
+        float[] wh = {mProfile.waistR, mProfile.hipR};
+        if (mEngine == ENGINE_ANNY) BodyProfile.waistHipAnny(wh, mProfile.gender, 0);
+        else BodyProfile.waistHip(wh, mProfile.gender, 0);
+        mProfile.waistR = wh[0];
+        mProfile.hipR = wh[1];
         mProfile.legR = p.getFloat("legR", 1f);
         mProfile.torsoR = p.getFloat("torsoR", 1f);
         mProfile.armR = p.getFloat("armR", 1f);
         mProfile.neckLenR = p.getFloat("neckLenR", 1f);
         mProfile.muscleR = p.getFloat("muscleR", 1f);
         mProfile.bustR = p.getFloat("bustR", 1f);
+        mProfile.bustShape = p.getInt("bustShape", 1);
         mProfile.thighR = p.getFloat("thighR", 1f);
         mProfile.calfR = p.getFloat("calfR", 1f);
         mProfile.footR = p.getFloat("footR", 1f);
@@ -1170,6 +1514,7 @@ public class AvatarActivity extends AppCompatActivity {
         mProfile.foreheadR = p.getFloat("foreheadR", 1f);
         mProfile.browR = p.getFloat("browR", 1f);
         mProfile.eyeSizeR = p.getFloat("eyeSizeR", 1f);
+        mProfile.earSizeR = p.getFloat("earSizeR", 1f);
         mProfile.eyeGapR = p.getFloat("eyeGapR", 1f);
         mProfile.noseWR = p.getFloat("noseWR", 1f);
         mProfile.noseHR = p.getFloat("noseHR", 1f);
@@ -1179,7 +1524,6 @@ public class AvatarActivity extends AppCompatActivity {
         mProfile.hair = p.getInt("hair", mProfile.hair);
         mProfile.top = p.getInt("top", mProfile.top);
         mProfile.bottom = p.getInt("bottom", mProfile.bottom);
-        mProfile.shoe = p.getInt("shoe", mProfile.shoe);
         // Tripo3D：只记 Key 与面数上限，不记生成的模型
         mTripoKey = p.getString("tripo_key", "");
         mTripoFaces = p.getInt("tripo_faces", 20000);
@@ -1188,6 +1532,7 @@ public class AvatarActivity extends AppCompatActivity {
     private void savePrefs() {
         SharedPreferences p = getSharedPreferences(PREF, MODE_PRIVATE);
         p.edit()
+                .putInt("engine", mEngine)
                 .putInt("gender", mProfile.gender)
                 .putFloat("height", mProfile.heightCm)
                 .putFloat("weight", mProfile.weightKg)
@@ -1204,6 +1549,8 @@ public class AvatarActivity extends AppCompatActivity {
                 .putFloat("neckLenR", mProfile.neckLenR)
                 .putFloat("muscleR", mProfile.muscleR)
                 .putFloat("bustR", mProfile.bustR)
+                .putInt("bustShape", clampIndex(mProfile.bustShape, BodyProfile.BUST_SHAPES.length))
+                .putInt("bangs", mProfile.bangs)
                 .putFloat("thighR", mProfile.thighR)
                 .putFloat("calfR", mProfile.calfR)
                 .putFloat("footR", mProfile.footR)
@@ -1216,6 +1563,7 @@ public class AvatarActivity extends AppCompatActivity {
                 .putFloat("foreheadR", mProfile.foreheadR)
                 .putFloat("browR", mProfile.browR)
                 .putFloat("eyeSizeR", mProfile.eyeSizeR)
+                .putFloat("earSizeR", mProfile.earSizeR)
                 .putFloat("eyeGapR", mProfile.eyeGapR)
                 .putFloat("noseWR", mProfile.noseWR)
                 .putFloat("noseHR", mProfile.noseHR)
@@ -1225,7 +1573,6 @@ public class AvatarActivity extends AppCompatActivity {
                 .putInt("hair", mProfile.hair)
                 .putInt("top", mProfile.top)
                 .putInt("bottom", mProfile.bottom)
-                .putInt("shoe", mProfile.shoe)
                 .putString("tripo_key", mTripoKey)
                 .putInt("tripo_faces", mTripoFaces)
                 .apply();

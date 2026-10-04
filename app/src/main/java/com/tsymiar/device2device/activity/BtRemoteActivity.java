@@ -49,8 +49,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
-public class CommitActivity extends Activity {
-    private static final String TAG = "CommitActivity";
+public class BtRemoteActivity extends Activity {
+    private static final String TAG = "BtRemoteActivity";
     private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final int READ = 1;
 
@@ -87,7 +87,7 @@ public class CommitActivity extends Activity {
                 finish();
             }
         };
-        registerReceiver(exitReceiver, new IntentFilter(ConnectActivity.ACTION_EXIT_BLUETOOTH));
+        registerReceiver(exitReceiver, new IntentFilter(BtDialogActivity.ACTION_EXIT_BLUETOOTH));
 
         mEditText = findViewById(R.id.edit_text);
         mSwitch0 = findViewById(R.id.img_switch);
@@ -244,9 +244,9 @@ public class CommitActivity extends Activity {
                 mData = mEditText.getText().toString().trim();
                 sendData(mData);
                 if (mData.isEmpty()) {
-                    Toast.makeText(CommitActivity.this, getString(R.string.none_type), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(BtRemoteActivity.this, getString(R.string.none_type), Toast.LENGTH_SHORT).show();
                 } else {
-                    mToast = Toast.makeText(CommitActivity.this, mData, Toast.LENGTH_SHORT);
+                    mToast = Toast.makeText(BtRemoteActivity.this, mData, Toast.LENGTH_SHORT);
                     mToast.setGravity(Gravity.BOTTOM, 0, 30);
                     mToast.show();
                 }
@@ -261,7 +261,7 @@ public class CommitActivity extends Activity {
                 File dir = new File(Environment.getExternalStorageDirectory() + "/Device2Device");
                 File file = new File(dir, getString(R.string.file_local));
                 if (!file.exists()) {
-                    Toast.makeText(CommitActivity.this, "文件不存在", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(BtRemoteActivity.this, "文件不存在", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Intent fi = new Intent(Intent.ACTION_VIEW);
@@ -436,16 +436,16 @@ public class CommitActivity extends Activity {
      * TouchHandler uses the main looper to repeat-send commands.
      */
     static class TouchHandler extends Handler {
-        private final WeakReference<CommitActivity> ref;
+        private final WeakReference<BtRemoteActivity> ref;
 
-        TouchHandler(CommitActivity activity) {
+        TouchHandler(BtRemoteActivity activity) {
             super(Looper.getMainLooper());
             this.ref = new WeakReference<>(activity);
         }
 
         @Override
         public void handleMessage(@NonNull Message msg) {
-            CommitActivity act;
+            BtRemoteActivity act;
             act = ref.get();
             if (act == null) return;
             if (msg.what == 0 && msg.obj instanceof String) {

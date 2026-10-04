@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -255,7 +256,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_chart)
                 .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, GraphActivity.class)));
         findViewById(R.id.btn_bluetooth)
-                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, ConnectActivity.class)));
+                .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, BtDialogActivity.class)));
         findViewById(R.id.btn_time).setOnClickListener(v -> {
             TextView tv = findViewById(R.id.txt_time);
             time.x = (int)tv.getX();
@@ -336,8 +337,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         mKcpBtn.setOnClickListener(v -> sendKcpRandom());
         findViewById(R.id.btn_market).setOnClickListener(v ->
                 startActivity(new Intent(SelectActivity.this, MarketActivity.class)));
-        findViewById(R.id.btn_avatar).setOnClickListener(v ->
-                startActivity(new Intent(SelectActivity.this, AvatarActivity.class)));
+        findViewById(R.id.btn_avatar).setOnClickListener(v -> showAvatarEnginePicker());
         findViewById(R.id.btn_deduction).setOnClickListener(v ->
                 GameDialog.showDeduction(SelectActivity.this));
 
@@ -603,6 +603,32 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     }
 
     /** KCP 服务启停：收 UDP 8090，收到的内容打到 server 下方文字区 */
+    /**
+     * 进入 avatar 之前先选建模引擎：原生（程序化）/ 高分（Anny）。
+     * 选择会记在 avatar_prefs 里，下次打开默认选中上一次的。
+     */
+    private void showAvatarEnginePicker() {
+        final SharedPreferences pref = getSharedPreferences("avatar_prefs", MODE_PRIVATE);
+        int current = pref.getInt("engine", AvatarActivity.ENGINE_NATIVE);
+        if (current != AvatarActivity.ENGINE_ANNY) current = AvatarActivity.ENGINE_NATIVE;
+        final int[] pick = {current};
+        String[] items = {
+                "原生：SDF 隐式曲面 + 等值面提取",
+                "高分：Anny · MakeHuman 人体测量形变基"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("选择建模引擎")
+                .setSingleChoiceItems(items, current, (dialog, which) -> pick[0] = which)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("进入", (dialog, which) -> {
+                    pref.edit().putInt("engine", pick[0]).apply();
+                    Intent intent = new Intent(SelectActivity.this, AvatarActivity.class);
+                    intent.putExtra(AvatarActivity.EXTRA_ENGINE, pick[0]);
+                    startActivity(intent);
+                })
+                .show();
+    }
+
     private void toggleKcpServer() {
         if (!mKcpServerStart) {
             int ret = NetworkWrapper.startKcpServer(KCP_PORT);
@@ -686,15 +712,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
-    /** 生成十六进制随机串（大写），charCount 是要的字符数（奇数时按 (charCount+1)/2 字节生成后截断） */
+    /** 生成十六进制随机串（小写），charCount 是要的字符数（奇数时按 (charCount+1)/2 字节生成后截断） */
     private static String randomHex(int charCount) {
         int byteCount = (charCount + 1) / 2;
         byte[] buf = new byte[byteCount];
         new java.security.SecureRandom().nextBytes(buf);
         StringBuilder sb = new StringBuilder(byteCount * 2);
         for (byte b : buf) {
-            sb.append(Character.toUpperCase(Character.forDigit((b >> 4) & 0xF, 16)));
-            sb.append(Character.toUpperCase(Character.forDigit(b & 0xF, 16)));
+            sb.append(Character.toLowerCase(Character.forDigit((b >> 4) & 0xF, 16)));
+            sb.append(Character.toLowerCase(Character.forDigit(b & 0xF, 16)));
         }
         return sb.substring(0, Math.min(charCount, sb.length()));
     }

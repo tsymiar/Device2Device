@@ -70,6 +70,11 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     private int mZoomedIndex;
     private ViewGroup.LayoutParams mZoomedParams;
 
+    /** 底部图表区域：默认隐藏，点 Draw 才绘制出来 */
+    private View mChartArea;
+    /** 放大前 ActionBar 的标题：还原时按原样设回去 */
+    private CharSequence mBaseTitle;
+
     private Sensor mAccelSensor;
     private Sensor mMagSensor;
     private Sensor mStepSensor;
@@ -132,6 +137,9 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         mStep = findViewById(R.id.step_view);
         mProximity = findViewById(R.id.proximity_view);
 
+        mBaseTitle = getTitle();
+        mChartArea = findViewById(R.id.fragment_container);
+
         Button open = findViewById(R.id.bt);
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
@@ -142,6 +150,12 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 }
             }
         });
+
+        // Draw：默认不显示底部区域，点一下把底部图表绘制出来，再点收起
+        Button draw = findViewById(R.id.draw);
+        if (draw != null) {
+            draw.setOnClickListener(v -> toggleChart());
+        }
 
         setupCardZoom();
 
@@ -186,6 +200,13 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         }
     }
 
+    /** Draw 按钮：默认不显示底部区域，点一下把底部图表绘制出来，再点收起 */
+    private void toggleChart() {
+        if (mChartArea == null) return;
+        boolean show = mChartArea.getVisibility() != View.VISIBLE;
+        mChartArea.setVisibility(show ? View.VISIBLE : View.GONE);
+    }
+
     /** 已经是它就收回去，否则先还原上一个再放大这个 */
     private void toggleZoom(View view) {
         if (mZoomHost == null || view == null) return;
@@ -207,8 +228,11 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (view instanceof CompassView) {
             ((CompassView) view).setZoomed(true);
+            // 整屏显示时标题栏跟着换成对应仪表名
+            setTitle(R.string.ncompass);
         } else if (view instanceof BubbleLevelView) {
             ((BubbleLevelView) view).setZoomed(true);
+            setTitle(R.string.nlevel);
         }
         mZoomHost.setVisibility(View.VISIBLE);
         mZoomHost.bringToFront();
@@ -232,6 +256,10 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         mZoomedParent = null;
         mZoomedParams = null;
         mZoomHost.setVisibility(View.GONE);
+        // 缩回后标题栏还原
+        if (mBaseTitle != null) {
+            setTitle(mBaseTitle);
+        }
     }
 
     @Override

@@ -104,12 +104,12 @@
         <service android:name=".service.ReceiverService" />
         <service android:name=".service.SaveDataService" />
         <activity
-            android:name=".activity.ConnectActivity"
+            android:name=".activity.BtDialogActivity"
             android:exported="true"
             android:label="@string/title"
             android:theme="@style/BluetoothDialog" />
         <activity
-            android:name=".activity.CommitActivity"
+            android:name=".activity.BtRemoteActivity"
             android:alwaysRetainTaskState="true"
             android:exported="true"
             android:label="@string/window"
@@ -120,7 +120,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".activity.DevicesActivity"
+            android:name=".activity.BtDevicesActivity"
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/title_activity_e"
             android:screenOrientation="fullSensor"

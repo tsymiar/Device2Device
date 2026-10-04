@@ -24,7 +24,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.tsymiar.device2device.R;
 
-public class ConnectActivity extends Activity {
+public class BtDialogActivity extends Activity {
     public static final String TAG = "Connection";
     public static final String ACTION_EXIT_BLUETOOTH = "com.tsymiar.device2device.EXIT_BLUETOOTH";
 
@@ -72,7 +72,7 @@ public class ConnectActivity extends Activity {
             if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_SCAN)
                     != PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ActivityCompat.requestPermissions(ConnectActivity.this,
+                    ActivityCompat.requestPermissions(BtDialogActivity.this,
                             new String[]{Manifest.permission.BLUETOOTH_SCAN}, 0);
                 }
                 return;
@@ -82,7 +82,7 @@ public class ConnectActivity extends Activity {
                 intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
                 startActivityForResult(intent, REQUEST_DISCOVER_DEVICE);
             } else {
-                Toast toast = Toast.makeText(ConnectActivity.this, R.string.can_be_find, Toast.LENGTH_SHORT);
+                Toast toast = Toast.makeText(BtDialogActivity.this, R.string.can_be_find, Toast.LENGTH_SHORT);
                 toast.setGravity(Gravity.CENTER, 0, 0);
                 toast.show();
             }
@@ -91,21 +91,21 @@ public class ConnectActivity extends Activity {
         // "搜索设备" 按钮
         findViewById(R.id.btn_join).setOnClickListener(v -> {
             if (!mBluetoothAdapter.isEnabled()) {
-                Toast toast = Toast.makeText(ConnectActivity.this, R.string.retry, Toast.LENGTH_SHORT);
+                Toast toast = Toast.makeText(BtDialogActivity.this, R.string.retry, Toast.LENGTH_SHORT);
                 toast.setGravity(Gravity.CENTER, 0, 0);
                 toast.show();
                 Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_CONNECT)
                         != PackageManager.PERMISSION_GRANTED) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        ActivityCompat.requestPermissions(ConnectActivity.this,
+                        ActivityCompat.requestPermissions(BtDialogActivity.this,
                                 new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
                     }
                     return;
                 }
                 startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
             } else {
-                startActivityForResult(new Intent(this, DevicesActivity.class), REQUEST_DISCOVER_DEVICE);
+                startActivityForResult(new Intent(this, BtDevicesActivity.class), REQUEST_DISCOVER_DEVICE);
             }
         });
 
@@ -120,7 +120,7 @@ public class ConnectActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         retryCount++;
         if (requestCode == REQUEST_DISCOVER_DEVICE) {
-            // DevicesActivity 返回退出信号，级联关闭自身
+            // BtDevicesActivity 返回退出信号，级联关闭自身
             if (resultCode == Activity.RESULT_FIRST_USER) {
                 resetScanMode();
                 finish();
@@ -138,7 +138,7 @@ public class ConnectActivity extends Activity {
                 if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
                         != PackageManager.PERMISSION_GRANTED) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        ActivityCompat.requestPermissions(ConnectActivity.this,
+                        ActivityCompat.requestPermissions(BtDialogActivity.this,
                                 new String[]{Manifest.permission.BLUETOOTH_CONNECT}, requestCode);
                     }
                     return;
@@ -166,7 +166,7 @@ public class ConnectActivity extends Activity {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
                     != PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ActivityCompat.requestPermissions(ConnectActivity.this,
+                    ActivityCompat.requestPermissions(BtDialogActivity.this,
                             new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
                 }
                 return;

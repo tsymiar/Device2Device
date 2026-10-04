@@ -56,9 +56,9 @@ app/src/main/
 │   │   ├── WaveActivity           # Audio recording & real-time waveform + speech recognition
 │   │   ├── GraphActivity          # Sensor real-time data display
 │   │   ├── SensorActivity         # List all device sensors
-│   │   ├── CommitActivity         # Bluetooth serial communication (RFCOMM)
-│   │   ├── ConnectActivity        # Bluetooth discoverability & device scanning
-│   │   ├── DevicesActivity        # Paired & discovered Bluetooth devices list
+│   │   ├── BtRemoteActivity       # Bluetooth serial communication (RFCOMM)
+│   │   ├── BtDialogActivity       # Bluetooth discoverability & device scanning
+│   │   ├── BtDevicesActivity      # Paired & discovered Bluetooth devices list
 │   │   ├── BuggerActivity         # Bug report / email feedback
 │   │   ├── MyGitActivity          # Open project GitHub page
 │   │   └── ThanksActivity         # Acknowledgements page
@@ -89,6 +89,10 @@ app/src/main/
 │   │   └── Indicators             # SMA / EMA / MACD / RSI / KDJ math
 │   ├── avatar/                    # 3D human model
 │   │   ├── BodyProfile            # Body params (gender/height/weight/head ratio) + BMI & girth derivation
+│   │   ├── AnnyModel              # High-res engine: Anny (MakeHuman anthropometric) shape solve → HumanMesh.Result
+│   │   ├── AnnyTargets            # Anny deform targets: multi-linear solve, w = Π c over each target's phenotype deps
+│   │   ├── AnnyParams             # BodyProfile → Anny phenotype parameters (gender/age/height/weight/muscle/breast)
+│   │   ├── AnnyMeasure            # Normalize / smooth normals / slice-based girth & inseam measurement
 │   │   ├── MeshBuilder            # Tube (lofted) & ellipsoid primitives → normals/colors/parts
 │   │   ├── HumanMesh              # Parametric life-size body from BodyProfile + OBJ/MTL export
 │   │   ├── AvatarRenderer         # OpenGL ES 2.0 renderer: lighting, ground grid, height ruler, capture
@@ -194,12 +198,19 @@ The SelectActivity UI features a dual-status display: `txt_hint` (italic 12sp, s
 
 ### 3D Human Model (Avatar)
 
-Reachable from the dashboard Services card (`🧍 3D Human Model · Avatar`). The pipeline is **parametric** and runs fully on-device — there is no photogrammetry / cloud reconstruction involved. A photo contributes *appearance and silhouette proportions*, the user supplies the *absolute scale*:
+Reachable from the dashboard Services card (`🧍 3D Human Model · Avatar`). Fully parametric and on-device — no photogrammetry, no cloud reconstruction. A photo contributes *appearance and silhouette proportions*, the user supplies the *absolute scale*.
+
+A picker on entry asks for the modeling engine (remembered, switchable in-page):
+
+| Engine | Description |
+| :----- | :---------- |
+| `Native` (原生) | SDF implicit surface (smooth union of capsules / ellipsoids) + SurfaceNets isosurface extraction — the current implementation, body & face fully procedural |
+| `High-res` (高分) | **Anny** ([naver/anny](https://github.com/naver/anny), Apache-2.0, geometry from the MakeHuman community / CC0): phenotype parameters (gender, age, height, weight, muscle …) drive prototype blendshapes, replacing the procedural mesh while the rest of the pipeline stays the same. Shape data is exported offline by `tools/export_anny_targets.py` into `app/src/main/assets/anny/anny.mhb` (or loaded at runtime) and solved on device as `w = Π c`; without it the page falls back to `Native` |
 
 | Feature         | Description                                                            |
 | :-------------- | :--------------------------------------------------------------------- |
 | Photo Input     | Gallery (`ACTION_GET_CONTENT`) or camera (`FileProvider` + `ACTION_IMAGE_CAPTURE`); tap the thumbnail to preview the full image |
-| Cloud (Tripo3D) | Optional `☁ Tripo3D photo-to-3D`: upload the photo (`POST /v3/files` → `image-to-model` → poll `GET /v3/tasks/{id}` → download GLB), parse it with `GlbLoader` and normalize to the current height. Needs the user's own API key, stored locally |
+| Cloud (Tripo3D) | Optional `☁ Tripo3D photo-to-3D` (own API key, stored locally): upload → poll → download GLB, parsed by `GlbLoader` and normalized to the current height |
 | Silhouette Fit  | Border-based background estimate → foreground mask → per-row width profile at shoulder / chest / waist / hip → `chestR` / `waistR` / `hipR` multipliers |
 | Color Extract   | Median foreground color of hair / face / upper / lower bands → hair, skin, top & bottom colors |
 | Body Params     | Gender, height (120–210 cm), weight (30–150 kg), head-to-body ratio (6–8.5), shoulder / chest / waist / hip fine tuning |
@@ -305,27 +316,52 @@ MIT License
 
 Short log — one line per change.
 
+### 2026-10
+
+- **Air Bangs**: more strands, thinner — denser and more natural.
+- **Anny Bust**: taller, rounder, smoother edges; no flat disc or shading seams.
+- **Hip Fullness**: higher default hip calibration — visible glutes.
+
 ### 2026-09
 
-- **Sensor Card Zoom**: tap the compass / bubble-level card → gauge goes full-screen; tap again or back to restore; readings keep updating.
-- **Compass (zoomed)**: 5° ticks + degree numbers every 15°, lat/lon above a triangle pointing at the dial top; cardinals / bearing / needle scale up.
-- **Bubble Level (zoomed)**: only the two angles, no left-right / front-back labels; the "Level" verdict is kept.
-- **Decibel Card**: visible only while recording; placeholder text removed.
-- **SSH Server**: MINA SSHD on port 2222 (next 9 ports if busy), user `d2d` + random password; built-in shell commands; status shown in the card.
-- **Sensor Dashboard**: compass + bubble level in one row, magnetic / altitude / steps / proximity in another; altitude from GPS, text auto-shrinks, placeholders for missing hardware.
-- **Interval Labels**: hourly bars show `1h`; picker reads `1m 5m 30m 1h 1d 1w 1M 1Q 1Y` (daily / weekly / monthly / quarterly / yearly).
-- **Misc**: Texture / Wave screens show their own titles; chart entry dropped `ic_chart`.
-- **3D Human Model**: photo-driven parametric body, silhouette + color extraction, face / hair styling, OBJ+MTL or PNG export, optional Tripo3D.
-- **Market K-Line**: 11 sources, name/pinyin resolution, pan/zoom, MA + MACD/RSI/KDJ sub-panels, day/night palette.
-- **Market Widget**: 2×2 resizable multi-instance widget, drag-to-reorder rows, tap to open the market screen.
-- **HTTP Server**: multi-select ZIP download, sortable columns, responsive layout, throughput tuning.
-- **SAF Fix**: directory rows via `Document.MIME_TYPE_DIR`.
+- **Anny Face & Head**: fixed double features, added face texture; head measured from real mesh.
+- **Anny Bust Dome**: full-dome growth kernel, no flat plate.
+- **Anny Stance & Toe**: auto-straighten A-pose legs; restored outer toe.
+- **Photo Fallback**: revert to default body when hip outline is missing.
+- **Hip Recalibration**: retuned coefficients after leg straightening.
+- **Sensor Card Zoom**: tap compass / bubble-level to go fullscreen.
+- **Compass / Bubble Level**: larger ticks and readouts; level shows two angles only.
+- **Decibel Card**: shown only while recording.
+- **SSH Server**: MINA SSHD on port 2222, user `d2d` + random password.
+- **Sensor Dashboard**: compass+level row, mag/altitude/steps/proximity row.
+- **Interval Labels**: hourly bars show `1h`; picker supports 1m–1Y.
+- **Misc**: texture / wave screens show own titles; 3D body model, AA–F cup by measurement.
+- **Chest Drives Breasts**: chest slider feeds breast volume; higher gain.
+- **Seam Smoothing**: monotone-cubic keyframes; feathered hard masks.
+- **Hip Calibration**: anthropometric hip calibration.
+- **Hair Placement Fix**: hair / features offset by head bbox center.
+- **Anny Facial Features**: reused `buildFeatures`; added ear-size param.
+- **Spinner Colors**: dark-aware dropdown text.
+- **Built-in Anny Data**: bundled `anny.mhb` in APK; high-res engine default.
+- **Bust Shape Options**: shape dropdown + fullness slider.
+- **Anny Chest Parameters**: chest / waist / hip interpolated per height.
+- **Barefoot**: no shoes drawn; SDF feet.
+- **Anny Engine**: offline high-res engine via `anny.mhb`.
+- **Anny Scaling**: girth scaling follows actual height.
+- **Anny Bust & Hip**: local bust lift without affecting girth.
+- **Anny Face & Hair**: face + 8 hairstyles.
+- **Anny Teardrop Bust**: teardrop shape tuning.
+- **Anny Measurements**: A-pose measurement fixes.
+- **Market K-Line**: 11 sources, indicators, day/night palette.
+- **Market Widget**: 2×2 resizable widget.
+- **HTTP Server**: multi-select ZIP, sortable columns.
+- **SAF Fix**: directory rows via `MIME_TYPE_DIR`.
 
 ### 2026-06
 
-- **MSG_HINT**: new `MSG_HINT = 9`, C++ can push auxiliary hints to `SelectActivity`.
-- **UI Polish**: `sample_text` pinned to the footer; `txt_hint` (italic 12sp) above `txt_status` (bold 14sp) with a divider, colors day/night aware.
-- **Pub/Sub Async** (`JniMethods.cpp`): subscribe returns immediately, publish runs on a detached thread — no ANR.
-- **Topic Isolation** (`PubSubSetting.java`): separate `topic` and `pubTopic` fields.
-- **Subscribe Use-After-Free Fix** (`Subscriber.cpp`): body buffer held by `shared_ptr`, fixes trailing garbage in received messages.
-- **Port Parsing Guard** (`SubscribeService.java`): `parseInt` wrapped in try-catch, invalid input falls back to 9999.
+- **MSG_HINT**: new `MSG_HINT = 9` for auxiliary hints.
+- **UI Polish**: footer layout, day/night aware colors.
+- **Pub/Sub Async**: no ANR on subscribe / publish.
+- **Topic Isolation**: separate `topic` and `pubTopic`.
+- **Subscribe Fix**: `shared_ptr` buffer, fixes trailing garbage.
+- **Port Parsing Guard**: invalid port falls back to 9999.

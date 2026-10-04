@@ -32,6 +32,8 @@ public final class PhotoAnalyzer {
         public float chestR = 1f;
         public float waistR = 1f;
         public float hipR = 1f;
+        /** hipOk=false：轮廓里没量到臀围（多为半身照），胸 / 腰 / 臀取默认体型 */
+        public boolean hipOk;
         public boolean fullBody;
         public String note = "";
 
@@ -142,6 +144,14 @@ public final class PhotoAnalyzer {
         }
         if (shoulderPx > 2 && hipPx > 2) {
             r.hipR = clamp((hipPx / (float) shoulderPx) / STD_HIP, 0.70f, 1.60f);
+            r.hipOk = true;
+        }
+        // 没量到臀围（半身照、下半身被裁掉或穿了外扩的衣服）时，不要拿残缺的轮廓去猜：
+        // 那一格里的「最宽一行」常常是衣摆 / 手臂，换算出来的倍率能把人拉成方桶。
+        // 直接回到默认体型：臀 1.00×、腰 0.80× —— 腰收一档，侧面看才像个人
+        if (!r.hipOk) {
+            r.hipR = 1f;
+            r.waistR = 0.80f;
         }
 
         // ---- 分段取色 ----
@@ -184,6 +194,7 @@ public final class PhotoAnalyzer {
                 .append(" 腰×").append(String.format("%.2f", r.waistR))
                 .append(" 臀×").append(String.format("%.2f", r.hipR))
                 .append(r.fullBody ? "（全身照）" : "（半身照）");
+        if (!r.hipOk) note.append("，未识别到臀围 → 取默认 臀×1.00 腰×0.80");
         if (r.faceOk) note.append("｜脸部已定位，五官按照片对齐");
         r.note = note.toString();
         return r;

@@ -52,6 +52,12 @@ android {
             jniLibs.srcDirs = ['libs']
         }
     }
+    // 高分引擎的模型数据（assets/anny/anny.mhb）有 4.7MB：
+    // AssetManager 读取「被压缩」的资源时有 1MB 上限（Data exceeds UNCOMPRESS_DATA_MAX），
+    // 所以这份数据必须原样打进 APK，不能参与压缩
+    aaptOptions {
+        noCompress 'mhb'
+    }
     packagingOptions {
         pickFirst 'lib/arm64-v8a/*.so'
         pickFirst 'lib/armeabi-v7a/*.so'

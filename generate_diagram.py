@@ -474,15 +474,15 @@ act_items = [
     ("TextureActivity",  INDIGO_700, ["GPU/CPU Rendering",          "Image & Video Processing"]),
     ("WaveActivity",     INDIGO_700, ["Audio Waveform",             "Recording & Playback"]),
     ("GraphActivity",    INDIGO_700, ["Sensor / Menu Hub",          "Real-time Charts, Sub-nav"]),
-    ("ConnectActivity",  INDIGO_800, ["Bluetooth Setup",            "Discoverability & Scanning"]),
+    ("BtDialogActivity",  INDIGO_800, ["Bluetooth Setup",            "Discoverability & Scanning"]),
     ("MainActivity",     INDIGO_900, ["Splash Screen",              "Auto-navigate Entry"]),
     None,  # ThanksActivity — drawn manually as mini card (unified secondary style)
     # Row 1
     None,
     None,
     ("SensorActivity",   INDIGO_800, ["Sensor List",                "Device Sensor Inventory"]),
-    None,  # DevicesActivity — drawn manually with content-adapted width
-    ("CommitActivity",   INDIGO_800, ["BT Communication",           "RFCOMM Serial Exchange"]),
+    None,  # BtDevicesActivity — drawn manually with content-adapted width
+    ("BtRemoteActivity",   INDIGO_800, ["BT Communication",           "RFCOMM Serial Exchange"]),
     None,  # MyGit + Bugger — stacked half-height mini cards, drawn manually
 ]
 cols1, v_gap1 = 6, int(40*S)  # 80px — room for cross-row arrow routing between rows
@@ -524,7 +524,7 @@ draw_card(hub_x, current_y, hub_card_w, hub_card_h, INDIGO_700,
 # Draw grid cards — Thanks(idx 5), Devices(idx 9), MyGit/Bugger(idx 11) handled manually
 _act_items_auto = act_items.copy()
 _act_items_auto[5] = None   # skip ThanksActivity (col 5 row 0) — drawn as unified mini card
-_act_items_auto[9] = None   # skip DevicesActivity (col 3 row 1) — drawn manually
+_act_items_auto[9] = None   # skip BtDevicesActivity (col 3 row 1) — drawn manually
 _act_items_auto[11] = None  # skip MyGit/Bugger slot (col 5 row 1) — drawn as unified mini cards
 fill_row_cards(start_x1, grid_y, cols1, card_w1, card_h1, h_gap1, _act_items_auto, v_gap1)
 
@@ -534,16 +534,16 @@ _mini_h = card_h1 // 2                                              # half-heigh
 draw_mini_card(_mini_x, grid_y + int(8*S), card_w1, _mini_h, INDIGO_900,
                "ThanksActivity", "Credits & Acknowledgements")
 
-# DevicesActivity at col 3 row 1 — content-adapted width, centered under ConnectActivity
+# BtDevicesActivity at col 3 row 1 — content-adapted width, centered under BtDialogActivity
 _devices_pad = int(24*S)
 _devices_max_w = max(
-    draw.textlength("DevicesActivity", font=font_body),
+    draw.textlength("BtDevicesActivity", font=font_body),
     draw.textlength("BT Device List", font=font_small),
     draw.textlength("Paired & Discovered", font=font_small))
 _devices_card_w = int(_devices_max_w + _devices_pad + int(8*S))
 _devices_x = start_x1 + 3*(card_w1 + h_gap1) + (card_w1 - _devices_card_w)//2  # centered in col 3 slot
 _devices_y = grid_y + card_h1 + v_gap1           # row 1 top
-draw_card(_devices_x, _devices_y, _devices_card_w, card_h1, INDIGO_800, "DevicesActivity",
+draw_card(_devices_x, _devices_y, _devices_card_w, card_h1, INDIGO_800, "BtDevicesActivity",
     ["BT Device List", "Paired & Discovered"])
 
 # ---- Thanks / MyGit / Bugger: evenly spaced in col 5, MyGit centered between Thanks & Bugger ----
@@ -567,14 +567,14 @@ draw_intra_deps(start_x1, grid_y, cols1, card_w1, card_h1, h_gap1,
         (3, 9, "scan"),        # Connect(col3,row0) → Devices(col3,row1) — same-col vertical
     ], INDIGO_500, v_gap1)
 
-# ---- "connect" arrow: DevicesActivity → CommitActivity (same-row adjacent, custom Devices width) ----
-# Uses actual DevicesActivity right-edge so arrow starts ON the card border, not in mid-air
+# ---- "connect" arrow: BtDevicesActivity → BtRemoteActivity (same-row adjacent, custom Devices width) ----
+# Uses actual BtDevicesActivity right-edge so arrow starts ON the card border, not in mid-air
 _caw  = int(4*S)       # arrow line width
 _casz = int(14*S)      # arrowhead size
-_d_right = _devices_x + _devices_card_w                          # DevicesActivity actual right edge
-_d_cy = _devices_y + card_h1//2                                   # DevicesActivity vertical center
-_c_left = start_x1 + 4*(card_w1 + h_gap1)                         # CommitActivity left edge
-_c_cy = grid_y + 1*(card_h1 + v_gap1) + card_h1//2                # CommitActivity vertical center
+_d_right = _devices_x + _devices_card_w                          # BtDevicesActivity actual right edge
+_d_cy = _devices_y + card_h1//2                                   # BtDevicesActivity vertical center
+_c_left = start_x1 + 4*(card_w1 + h_gap1)                         # BtRemoteActivity left edge
+_c_cy = grid_y + 1*(card_h1 + v_gap1) + card_h1//2                # BtRemoteActivity vertical center
 _my = (_d_cy + _c_cy) // 2                                        # mid-y for adjacent horizontal arrow
 draw.line((_d_right, _my, _c_left - _casz, _my), fill=INDIGO_500, width=_caw)
 draw.polygon([(_c_left, _my), (_c_left - _casz, _my - _casz//2),

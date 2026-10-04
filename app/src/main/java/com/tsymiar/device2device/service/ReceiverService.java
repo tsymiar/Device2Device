@@ -26,7 +26,7 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 import com.tsymiar.device2device.R;
-import com.tsymiar.device2device.activity.DevicesActivity;
+import com.tsymiar.device2device.activity.BtDevicesActivity;
 
 import java.lang.ref.WeakReference;
 
@@ -70,7 +70,7 @@ public class ReceiverService extends Service {
     }
 
     private void startForegroundService() {
-        Intent notificationIntent = new Intent(this, DevicesActivity.class);
+        Intent notificationIntent = new Intent(this, BtDevicesActivity.class);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;

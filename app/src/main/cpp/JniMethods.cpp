@@ -123,6 +123,61 @@ void RecvHook(const Scadup::Message& msg)
     Message::instance().setMessage(message, MESSAGE);
 }
 
+/**
+ * 订阅线程的任务体。
+ *
+ * 工程按 -std=c++11 编译，写不了 `[addr = std::move(address), ...]` 这种 lambda
+ * 初始化捕获（那是 C++14 扩展，会报 -Wc++14-extensions）。改成「普通函数 + std::thread
+ * 变参构造」：线程构造时把实参逐个 move / 拷贝到线程内部存储再回调，生命周期与原写法
+ * 完全一致（detach 之后也不依赖调用栈）。
+ */
+static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RECV_CALLBACK hook)
+{
+    Scadup::Subscriber sub;
+    int ret = sub.setup(addr.c_str(), static_cast<unsigned short>(port));
+    if (ret < 0) {
+        char content[128];
+        snprintf(content, sizeof(content), "Subscribe connect fail: %s:%d",
+            addr.c_str(), port);
+        Message::instance().setMessage(content, TOAST);
+        return;
+    }
+
+    {
+        char content[128];
+        snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x",
+            addr.c_str(), port, topic);
+        Message::instance().setMessage(content, TOAST);
+    }
+
+    ret = static_cast<int>(sub.subscribe(topic, hook));
+
+    char content[256];
+    snprintf(content, sizeof(content), "Subscribe ended: %s:%d topic 0x%04x status=%d",
+        addr.c_str(), port, topic, ret);
+    Message::instance().setMessage(content, SUBSCRIBER);
+}
+
+/** 发布线程的任务体，同样是为避开 C++14 的 lambda 初始化捕获 */
+static void PublishTask(std::string pubAddr, int pubPort, uint32_t topic, std::string payload)
+{
+    Scadup::Publisher pub{};
+    int ret = pub.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
+    if (ret < 0) {
+        Message::instance().setMessage(
+            "Publish connect failed: " + pubAddr + ":" + std::to_string(pubPort), TOAST);
+        return;
+    }
+    ssize_t stat = pub.publish(topic, payload);
+    if (stat < 0) {
+        Message::instance().setMessage("Publish send failed!", TOAST);
+    } else {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "Published to 0x%x (%zd bytes)", topic, stat);
+        Message::instance().setMessage(buf, MSG_HINT);
+    }
+}
+
 JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, jint port, jstring topic, jstring, jint)
 {
     std::string address = Jstring2Cstring(env, addr);
@@ -142,33 +197,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, 
         g_pubSubParam.hook = RecvHook;
     }
 
-    std::thread task([addr = std::move(address), port, topic = iTopic, hook = RecvHook]() {
-        Scadup::Subscriber sub;
-        int ret = sub.setup(addr.c_str(), static_cast<unsigned short>(port));
-        if (ret < 0) {
-            char content[128];
-            snprintf(content, sizeof(content), "Subscribe connect fail: %s:%d",
-                addr.c_str(), port);
-            Message::instance().setMessage(content, TOAST);
-            return;
-        }
-
-        {
-            char content[128];
-            snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x",
-                addr.c_str(), port, topic);
-            Message::instance().setMessage(content, TOAST);
-        }
-
-        ret = static_cast<int>(sub.subscribe(topic, hook));
-
-        {
-            char content[256];
-            snprintf(content, sizeof(content), "Subscribe ended: %s:%d topic 0x%04x status=%d",
-                addr.c_str(), port, topic, ret);
-            Message::instance().setMessage(content, SUBSCRIBER);
-        }
-        });
+    std::thread task(SubscribeTask, std::move(address), port, iTopic, RecvHook);
     task.detach();
     return 0;
 }
@@ -211,23 +240,7 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstrin
 
     uint32_t iTopic = strtol(topicHex.c_str(), nullptr, 16);
 
-    std::thread task([pubAddr = std::move(pubAddr), pubPort, iTopic, payload = std::move(payload)]() {
-        Scadup::Publisher pub{};
-        int ret = pub.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
-        if (ret < 0) {
-            Message::instance().setMessage(
-                "Publish connect failed: " + pubAddr + ":" + std::to_string(pubPort), TOAST);
-            return;
-        }
-        ssize_t stat = pub.publish(iTopic, payload);
-        if (stat < 0) {
-            Message::instance().setMessage("Publish send failed!", TOAST);
-        } else {
-            char buf[128];
-            snprintf(buf, sizeof(buf), "Published to 0x%x (%zd bytes)", iTopic, stat);
-            Message::instance().setMessage(buf, MSG_HINT);
-        }
-        });
+    std::thread task(PublishTask, std::move(pubAddr), pubPort, iTopic, std::move(payload));
     task.detach();
 }
 
@@ -720,7 +733,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstrin
         Message::instance().setMessage("KCP send failed(" + std::to_string(ret) + ")", KCP_CLIENT);
     } else {
         Message::instance().setMessage(
-            "KCP send sn=" + std::to_string(sock->lastSn()) + " " + std::to_string(size) + "B: "
+            "KCP sent sn=" + std::to_string(sock->lastSn()) + " " + std::to_string(size) + "B: "
             + data.substr(0, size), KCP_CLIENT);
     }
     LOGI("sendKcpData %d bytes ret=%d sn=%u\n", size, ret, sock->lastSn());

@@ -31,8 +31,8 @@ import com.tsymiar.device2device.utils.ExitAll;
 
 import java.util.Set;
 
-public class DevicesActivity extends Activity {
-    private static final String TAG = "DevicesActivity";
+public class BtDevicesActivity extends Activity {
+    private static final String TAG = "BtDevicesActivity";
 
     private BluetoothAdapter mBtAdapter;
     private ArrayAdapter<String> mNewDevicesArrayAdapter;
@@ -113,7 +113,7 @@ public class DevicesActivity extends Activity {
                 // 清除可检测性残留的系统UI浮层
                 resetScanMode();
                 // 退出由 btn_bluetooth 启动的所有窗口
-                sendBroadcast(new Intent(ConnectActivity.ACTION_EXIT_BLUETOOTH));
+                sendBroadcast(new Intent(BtDialogActivity.ACTION_EXIT_BLUETOOTH));
                 setResult(Activity.RESULT_FIRST_USER);
                 finish();
             });
@@ -183,7 +183,7 @@ public class DevicesActivity extends Activity {
                 if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_SCAN)
                         != PackageManager.PERMISSION_GRANTED) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        ActivityCompat.requestPermissions(DevicesActivity.this,
+                        ActivityCompat.requestPermissions(BtDevicesActivity.this,
                                 new String[]{Manifest.permission.BLUETOOTH_SCAN}, 0);
                     }
                     return;
@@ -193,7 +193,7 @@ public class DevicesActivity extends Activity {
                 String info = ((TextView) v).getText().toString();
                 String address = info.substring(info.length() - 17);
 
-                Intent intent = new Intent(DevicesActivity.this, CommitActivity.class);
+                Intent intent = new Intent(BtDevicesActivity.this, BtRemoteActivity.class);
                 Bundle bundle = new Bundle();
                 bundle.putString("address", address);
                 intent.putExtras(bundle);
@@ -210,7 +210,7 @@ public class DevicesActivity extends Activity {
                 if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_CONNECT)
                         != PackageManager.PERMISSION_GRANTED) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        ActivityCompat.requestPermissions(DevicesActivity.this,
+                        ActivityCompat.requestPermissions(BtDevicesActivity.this,
                                 new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
                     }
                     return;

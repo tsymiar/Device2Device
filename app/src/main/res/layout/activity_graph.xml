@@ -288,26 +288,48 @@
 		</LinearLayout>
 	</LinearLayout>
 
-	<!-- 操作按钮 -->
-	<Button
-		android:id="@+id/bt"
+	<!-- 操作按钮：Start Chart 与 Draw 并排 -->
+	<LinearLayout
 		android:layout_width="match_parent"
-		android:layout_height="48dp"
+		android:layout_height="wrap_content"
 		android:layout_marginBottom="10dp"
-		android:text="@string/start_chart"
-		android:textSize="14sp"
-		android:textColor="@android:color/white"
-		android:backgroundTint="@color/colorPrimary"
-		android:elevation="4dp"
-		android:stateListAnimator="@null" />
+		android:orientation="horizontal">
 
-	<!-- 图表容器 -->
+		<Button
+			android:id="@+id/bt"
+			android:layout_width="0dp"
+			android:layout_height="48dp"
+			android:layout_weight="1"
+			android:layout_marginEnd="5dp"
+			android:text="@string/start_chart"
+			android:textSize="14sp"
+			android:textColor="@android:color/white"
+			android:backgroundTint="@color/colorPrimary"
+			android:elevation="4dp"
+			android:stateListAnimator="@null" />
+
+		<Button
+			android:id="@+id/draw"
+			android:layout_width="0dp"
+			android:layout_height="48dp"
+			android:layout_weight="1"
+			android:layout_marginStart="5dp"
+			android:text="@string/draw"
+			android:textSize="14sp"
+			android:textColor="@android:color/white"
+			android:backgroundTint="@color/colorPrimary"
+			android:elevation="4dp"
+			android:stateListAnimator="@null" />
+	</LinearLayout>
+
+	<!-- 图表容器：默认不显示，点 Draw 才把底部区域绘制出来 -->
 	<androidx.fragment.app.FragmentContainerView
 		android:id="@+id/fragment_container"
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
 		android:background="@android:color/white"
+		android:visibility="gone"
 		android:name="com.tsymiar.device2device.acceleration.DefaultFragment" />
 
 	</LinearLayout>

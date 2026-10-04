@@ -9,14 +9,13 @@ import java.util.ArrayList;
  * 关节处用平滑最小值（polynomial smooth-min）做并集，于是肩、髋、膝、腋下都会自然过渡出圆角，
  * 不会出现拼接的硬边与穿插裂缝；等值面再由 {@link SurfaceNets} 提取成三角网格。
  *
- * 场值同时记录「最近图元的材质」，用于给顶点着色（皮肤 / 上装 / 下装 / 鞋）。
+ * 场值同时记录「最近图元的材质」，用于给顶点着色（皮肤 / 上装 / 下装）。
  */
 public final class SdfModel {
 
     public static final int MAT_SKIN = 0;
     public static final int MAT_TOP = 1;
     public static final int MAT_BOTTOM = 2;
-    public static final int MAT_SHOE = 3;
 
     private static final int CAPSULE = 0;
     private static final int ELLIPSOID = 1;
@@ -57,7 +56,7 @@ public final class SdfModel {
         mPrims.add(p);
     }
 
-    /** 圆角盒（rx/ry/rz 为半尺寸，round 为圆角半径），用来做鞋这类带平面的形状 */
+    /** 圆角盒（rx/ry/rz 为半尺寸，round 为圆角半径），用来做脚（脚掌）这类带平面的形状 */
     public void addBox(float cx, float cy, float cz, float rx, float ry, float rz, float round, int mat) {
         Prim p = new Prim(BOX, mat);
         p.a0 = cx; p.a1 = cy; p.a2 = cz;

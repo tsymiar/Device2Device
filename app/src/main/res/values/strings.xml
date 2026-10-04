@@ -143,6 +143,7 @@
 
     <!-- ===== Chart / Wave / Sensor ===== -->
     <string name="start_chart">Start Chart</string>
+    <string name="draw">Draw</string>
     <string name="testing">测试测试</string>
     <string name="begin">开始</string>
     <string name="pause">暂停</string>

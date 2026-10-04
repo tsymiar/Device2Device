@@ -140,7 +140,6 @@ private:
     ProgressCallback m_progressCallback;
 
     std::string m_pendingFileName;
-    uint64_t m_pendingFileSize;
 
     ClientSessionMgr m_sessionMgr;
 };

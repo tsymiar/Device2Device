@@ -7,6 +7,7 @@ app/build
 captures
 .externalNativeBuild
 .cxx
+.tmp
 app/src/main/jniLibs
 *.zip
 *.dylib
@@ -18,3 +19,7 @@ pic
 .vs*
 *.log
 test
+
+# Python
+__pycache__/
+*.py[cod]
