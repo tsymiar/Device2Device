@@ -143,6 +143,9 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         Button open = findViewById(R.id.bt);
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
+                // 图表区还是收着的话先展开：Draw 在前、Start Chart 在后，
+                // 直接点 Start Chart 不该什么都没发生
+                showChartArea(true);
                 if (savedInstanceState == null) {
                     getSupportFragmentManager().beginTransaction()
                             .replace(R.id.fragment_container, new SensorFragment())
@@ -203,7 +206,12 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     /** Draw 按钮：默认不显示底部区域，点一下把底部图表绘制出来，再点收起 */
     private void toggleChart() {
         if (mChartArea == null) return;
-        boolean show = mChartArea.getVisibility() != View.VISIBLE;
+        showChartArea(mChartArea.getVisibility() != View.VISIBLE);
+    }
+
+    /** 底部图表区显示 / 收起 */
+    private void showChartArea(boolean show) {
+        if (mChartArea == null) return;
         mChartArea.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 

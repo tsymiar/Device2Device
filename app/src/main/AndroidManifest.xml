@@ -66,7 +66,7 @@
 
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/market_widget_info" />
+                android:resource="@xml/widget_market_list" />
         </receiver>
         <activity
             android:name=".widget.MarketWidgetConfigActivity"
@@ -83,6 +83,30 @@
             android:name=".widget.MarketWidgetService"
             android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 行情曲线小部件：桌面上与列表版并列的一个独立部件，只盯一个标的画走势。
+             曲线画成位图后直接用 setImageViewBitmap 送过去，不需要 ListView 数据源 -->
+        <receiver
+            android:name=".widget.MarketChartWidgetProvider"
+            android:exported="true"
+            android:label="@string/market_chart_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_market_chart" />
+        </receiver>
+        <activity
+            android:name=".widget.MarketChartConfigActivity"
+            android:exported="true"
+            android:label="@string/market_chart_widget_config"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <activity android:name=".activity.WaveActivity" android:label="@string/title_wave" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
         <activity android:name=".activity.GraphActivity"
             android:label="@string/title_sensor_dashboard" />

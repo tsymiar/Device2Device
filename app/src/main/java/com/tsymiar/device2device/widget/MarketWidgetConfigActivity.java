@@ -41,12 +41,14 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 行情小部件的配置页：添加小部件时挑「数据源 + 标的」，一次可以放进多个标的。
+ * 行情小部件（列表版）的配置页：添加小部件时挑「数据源 + 标的」，一次可以放进多个标的。
  *
  * 一个部件一份列表，按 appWidgetId 单独保存；标的数量不限（上限 MAX_ITEMS），
  * 列表可拖动排序（长按整行或拖 ☰ 手柄），这个顺序就是小部件里行的顺序；
  * 部件里的列表可滚动，所以标的多也不用特意拉高 —— 这里只管收集与排序。
  * 填名称/拼音时先搜索成代码再入列，避免小部件每次刷新都走一次搜索。
+ *
+ * 单个标的看走势的那种部件是另一个组件，有自己的配置页（MarketChartConfigActivity）。
  *
  * 排版：上半屏是「数据源 + 标的输入框 + 添加」，固定不动；下半屏是已选标的列表，
  * 自己占剩下的高度并滚动 —— 标的一多也不会把输入框顶出可视区（原来整页一个 ScrollView 会）。
@@ -170,7 +172,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         // 页面标题省掉（ActionBar 上已经有「行情小部件设置」），说明文字直接顶到上面
         TextView hint = new TextView(this);
         hint.setText("可以放多个标的（自选股 / 黄金 / 原油 / 加密货币均可）；"
-                + "长按或拖 ☰ 调整顺序，部件里每行小字标出市场代码，超出高度可上下滚动");
+                + "长按或拖 ☰ 调整顺序，每行小字标注市场代码，超出高度可上下滚动。");
         hint.setTextColor(C_DIM);
         hint.setTextSize(12);
         hint.setPadding(0, 0, 0, dp(12));

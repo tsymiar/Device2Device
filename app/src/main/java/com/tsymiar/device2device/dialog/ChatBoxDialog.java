@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -38,6 +39,7 @@ import androidx.core.widget.TextViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.button.MaterialButton;
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.utils.HttpsRequest;
 import com.tsymiar.device2device.utils.TimeUtils;
@@ -54,8 +56,15 @@ import java.util.Objects;
 
 public class ChatBoxDialog extends Dialog {
     public static final int CHAT_FILE_REQUEST = 1001;
+    /** API Key 的本地存放位置：填过一次之后下次打开自动带出 */
+    private static final String CHAT_PREFS = "chat_prefs";
+    private static final String KEY_API = "api_key";
     private final Activity mActivity;
     private EditText etMessage;
+    private EditText etApiKey;
+    private MaterialButton btnKeyMask;
+    /** Key 默认打码显示：聊天框常驻在屏幕上，明文挂着不合适 */
+    private boolean mKeyMasked = true;
     private RecyclerView rvMessages;
     private MessageAdapter adapter;
     private Spinner spinnerOptions;
@@ -74,16 +83,16 @@ public class ChatBoxDialog extends Dialog {
         CHAT_GPT,
         MIXED,         // 混合模式
     }
-    public static final int[] State =  {
-            0,
-            -1
-    };
+    /** Handler 消息类型：0=收到回复，-1=请求失败 */
+    private static final int MSG_RECEIVED = 0;
+    private static final int MSG_FAILED = -1;
     private ChatSpin currentSpinner = ChatSpin.MIXED;
     private ChatSpin currentChatter = ChatSpin.CHAT_DPSK;
 
     public ChatBoxDialog(@NonNull Context context) {
         super(context);
-        mActivity = (Activity) context;
+        // 后续要用 startActivityForResult，这里必须是 Activity；不是的话不强转，避免 ClassCastException
+        mActivity = context instanceof Activity ? (Activity) context : null;
         setContentView(R.layout.dialog_chat_box);
         setupViews();
         Window window = getWindow();
@@ -107,17 +116,22 @@ public class ChatBoxDialog extends Dialog {
         }
         request.setHeader(header);
     }
-    private final Handler handler = new Handler() {
-        @SuppressLint({"SetTextI18n", "HandlerLeak"})
+    // Looper.getMainLooper()：无论从哪个线程创建都不会因为没有 Looper 直接抛异常
+    private final Handler handler = new Handler(Looper.getMainLooper()) {
+        @SuppressLint("SetTextI18n")
         @Override
         public void handleMessage(@NonNull android.os.Message msg) {
             super.handleMessage(msg);
+            // 对话框已经关掉了（发完就退出再进来时是另一个实例），别再去动已经销毁的 view
+            if (!isShowing()) return;
+            // msg.obj 可能是 null：以前 msg.obj.toString() 会直接空指针闪退
+            String text = msg.obj == null ? "" : String.valueOf(msg.obj);
             switch (msg.what) {
-                case 0:
-                    receiveTextMessage(msg.obj.toString());
+                case MSG_RECEIVED:
+                    receiveTextMessage(text);
                     break;
-                case -1:
-                    Toast.makeText(getContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+                case MSG_FAILED:
+                    Toast.makeText(getContext(), text, Toast.LENGTH_SHORT).show();
                     break;
                 default:
                     break;
@@ -128,6 +142,8 @@ public class ChatBoxDialog extends Dialog {
         // 初始化视图
         spinnerOptions = findViewById(R.id.spinner_options);
         etMessage = findViewById(R.id.et_message);
+        etApiKey = findViewById(R.id.et_api_key);
+        btnKeyMask = findViewById(R.id.btn_key_mask);
         rvMessages = findViewById(R.id.rv_messages);
         checkBox = findViewById(R.id.check_dpsk);
         chatHint = findViewById(R.id.check_hint);
@@ -163,8 +179,11 @@ public class ChatBoxDialog extends Dialog {
             if (isChecked) {
                 currentChatter = ChatSpin.CHAT_THINK;
                 header.think = true;
-                request.setHeader(header);
+            } else {
+                currentChatter = ChatSpin.CHAT_DPSK;
+                header.think = false;
             }
+            request.setHeader(header);
         });
 
         @SuppressLint("CutPasteId") EditText et_message = findViewById(R.id.et_message);
@@ -176,6 +195,8 @@ public class ChatBoxDialog extends Dialog {
                     TextViewCompat.AUTO_SIZE_TEXT_TYPE_UNIFORM
             );
         }
+
+        setupApiKey();
 
         // 附件按钮点击
         Button btnAttach = findViewById(R.id.btn_attach);
@@ -192,7 +213,7 @@ public class ChatBoxDialog extends Dialog {
 
         // 发送按钮点击
         btnSend.setOnClickListener(v -> {
-            String message = etMessage.getText().toString();
+            String message = etMessage.getText() == null ? "" : etMessage.getText().toString();
             if (!message.isEmpty()) {
                 sendTextMessage(message);
                 etMessage.setText("");
@@ -206,6 +227,76 @@ public class ChatBoxDialog extends Dialog {
             }
         });
     }
+    // ------------------------------------------------------------------
+    // API Key
+    // ------------------------------------------------------------------
+
+    /** 输入框 + 打码开关：填过一次就存在本地，下次打开自动带出 */
+    private void setupApiKey() {
+        if (etApiKey == null) return;
+        etApiKey.setText(loadApiKey());
+        etApiKey.setSelection(etApiKey.getText().length());
+        // 光标移开就落盘，不用专门点"保存"
+        etApiKey.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) saveApiKey();
+        });
+        if (btnKeyMask != null) {
+            btnKeyMask.setOnClickListener(v -> {
+                mKeyMasked = !mKeyMasked;
+                applyKeyMask();
+            });
+        }
+        applyKeyMask();
+    }
+
+    private String loadApiKey() {
+        return getContext().getSharedPreferences(CHAT_PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_API, "");
+    }
+
+    private void saveApiKey() {
+        if (etApiKey == null) return;
+        String key = etApiKey.getText() == null ? "" : etApiKey.getText().toString().trim();
+        getContext().getSharedPreferences(CHAT_PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_API, key).apply();
+    }
+
+    /** 切换明文 / 打码；改 inputType 会丢光标位置，这里手动放回去 */
+    private void applyKeyMask() {
+        if (etApiKey == null || etApiKey.getText() == null) return;
+        // 没聚焦过的 EditText，getSelectionStart() 会返回 -1；
+        // API 28+ 的 Selection.setSelection 不再自动裁剪，越界直接抛 IndexOutOfBoundsException。
+        int len = etApiKey.getText().length();
+        int start = clampTo(etApiKey.getSelectionStart(), len);
+        int end = clampTo(etApiKey.getSelectionEnd(), len);
+        etApiKey.setInputType(mKeyMasked
+                ? (android.text.InputType.TYPE_CLASS_TEXT
+                   | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
+                : (android.text.InputType.TYPE_CLASS_TEXT
+                   | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD));
+        etApiKey.setSelection(start, end);
+        if (btnKeyMask != null) {
+            btnKeyMask.setText(mKeyMasked ? R.string.chat_api_key_mask : R.string.chat_api_key_show);
+        }
+    }
+
+    /** 把可能为负的光标下标夹到 [0, len] */
+    private static int clampTo(int value, int len) {
+        return Math.max(0, Math.min(value, len));
+    }
+
+    /** 当前生效的 Key：空串表示沿用内置的那一个 */
+    private String currentApiKey() {
+        if (etApiKey == null || etApiKey.getText() == null) return "";
+        return etApiKey.getText().toString().trim();
+    }
+
+    @Override
+    public void dismiss() {
+        saveApiKey();
+        super.dismiss();
+    }
+
     // 处理选项选择的私有方法
     private void handleSpinnerSelection(int position) {
         switch (position) {
@@ -218,14 +309,18 @@ public class ChatBoxDialog extends Dialog {
                 currentChatter = ChatSpin.CHAT_GPT;
                 checkBox.setVisibility(View.GONE);
                 chatHint.setVisibility(View.GONE);
-            default:
+                // fall through：切到 OpenRouter 也提示一下当前选项
+            default: {
                 String[] items = getContext().getResources()
                         .getStringArray(R.array.chat_options);
+                // 下标来自外部恢复流程时可能越界，直接 items[position] 会数组越界闪退
+                if (position < 0 || position >= items.length) return;
                 String current = items[position];
                 if (!current.equals(items[items.length - 1])) {
                     Toast.makeText(getContext(), "已切换：" + current, Toast.LENGTH_SHORT).show();
                 }
                 break;
+            }
         }
 
         // 清除当前输入内容
@@ -237,13 +332,17 @@ public class ChatBoxDialog extends Dialog {
     }
 
     public void restoreState(Bundle savedInstanceState) {
-        if (savedInstanceState != null) {
-            int modeIndex = savedInstanceState.getInt("chat_mode", 2);
-            currentSpinner = ChatSpin.values()[modeIndex];
-            spinnerOptions.setSelection(modeIndex);
-        }
+        if (savedInstanceState == null || spinnerOptions == null) return;
+        int modeIndex = savedInstanceState.getInt("chat_mode", 2);
+        ChatSpin[] values = ChatSpin.values();
+        // 存档里的下标可能来自旧版本（枚举项增减过），越界访问会直接崩
+        if (modeIndex < 0 || modeIndex >= values.length) modeIndex = 2;
+        currentSpinner = values[modeIndex];
+        spinnerOptions.setSelection(modeIndex);
     }
     private void openFileChooser() {
+        // 拿不到 Activity 或已经收摊了就别发起跳转，回来也没人接
+        if (mActivity == null || mActivity.isFinishing() || mActivity.isDestroyed()) return;
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -303,6 +402,10 @@ public class ChatBoxDialog extends Dialog {
     private void sendTextMessage(String text) {
         Message message = new Message(text, Message.MessageType.SENT_TEXT);
         message.setStatus(Message.MessageStatus.RECEIVING);
+        // 每次发送前重灌一次请求头：Key 刚改过也能立刻生效（留空则回落到内置 Key）
+        saveApiKey();
+        header.token = currentApiKey();
+        request.setHeader(header);
         request.start(text);
         messageList.add(message);
         adapter.notifyItemInserted(messageList.size() - 1);
@@ -311,6 +414,7 @@ public class ChatBoxDialog extends Dialog {
         // new Handler().postDelayed(this::receiveMockMessage, 1000);
     }
     private void sendFileMessage(String text) {
+        if (adapter == null || rvMessages == null) return;
         Message message = new Message(text, currentSpinner == ChatSpin.MIXED ?
                 Message.MessageType.SENT_FILE :
                 Message.MessageType.SENT_TEXT);
@@ -324,6 +428,7 @@ public class ChatBoxDialog extends Dialog {
 
 
     private void receiveTextMessage(String content) {
+        if (adapter == null) return;
         Message message = new Message(content, Message.MessageType.RECEIVED_TEXT);
         message.setStatus(Message.MessageStatus.RECEIVED);
         messageList.add(message);
@@ -333,14 +438,16 @@ public class ChatBoxDialog extends Dialog {
 
     // 自动滚动到底部
     private void scrollToBottom() {
-        if (!messageList.isEmpty()) {
-            rvMessages.post(() -> {
-                rvMessages.smoothScrollToPosition(messageList.size() - 1);
-                // 或者使用以下代码确保完全滚动到底部
-                LinearLayoutManager layoutManager = (LinearLayoutManager) rvMessages.getLayoutManager();
-                Objects.requireNonNull(layoutManager).scrollToPositionWithOffset(messageList.size() - 1, 0);
-            });
-        }
+        if (rvMessages == null || adapter == null || messageList.isEmpty()) return;
+        final int last = messageList.size() - 1;
+        rvMessages.post(() -> {
+            rvMessages.smoothScrollToPosition(last);
+            // 或者使用以下代码确保完全滚动到底部
+            RecyclerView.LayoutManager lm = rvMessages.getLayoutManager();
+            if (lm instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) lm).scrollToPositionWithOffset(last, 0);
+            }
+        });
     }
 
     // 消息适配器
@@ -497,7 +604,6 @@ public class ChatBoxDialog extends Dialog {
         private final String TOKEN = "sk-66xxxx";
         private final String REQ_URL = "https://api.deepseek.com/chat/completions";
         private final HashMap<String, String> headers = new HashMap<>();
-        android.os.Message message = new android.os.Message();
         public static class Header {
             String token = null;
             String reqUrl = null;
@@ -516,6 +622,40 @@ public class ChatBoxDialog extends Dialog {
             headers.put("Authorization", "Bearer " + header.token);
         }
 
+        private String buildChatBody(String userText) throws JSONException {
+            JSONObject system = new JSONObject();
+            system.put("role", "system");
+            system.put("content", "You are a helpful assistant.");
+            JSONObject user = new JSONObject();
+            user.put("role", "user");
+            user.put("content", userText == null ? "" : userText);
+            JSONArray messages = new JSONArray();
+            messages.put(system);
+            messages.put(user);
+            JSONObject payload = new JSONObject();
+            payload.put("model", mHeader.think ? "deepseek-reasoner" : "deepseek-chat");
+            payload.put("messages", messages);
+            payload.put("stream", false);
+            return payload.toString();
+        }
+
+        /**
+         * 把结果丢回主线程。
+         *
+         * 以前这里复用同一个 android.os.Message 实例：Looper 派发完会把消息回收进全局对象池
+         * （recycleUnchecked 仍然保留 FLAG_IN_USE），再 sendMessage 同一个对象就会命中
+         * MessageQueue 的 "This message is already in use." IllegalStateException——
+         * 也就是「第一轮能聊，第二轮必崩」的根因。必须每次 obtain 一个新的。
+         */
+        private void deliver(int what, String text) {
+            if (mHeader.handler == null) {
+                Log.w("HTTPS", "no handler to deliver result");
+                return;
+            }
+            mHeader.handler.sendMessage(
+                    android.os.Message.obtain(mHeader.handler, what, text));
+        }
+
         public int start(String text) {
             String method = "GET";
             String body = null;
@@ -525,9 +665,13 @@ public class ChatBoxDialog extends Dialog {
             if (mHeader.isPost) {
                 headers.put("Content-Type", "application/json");
                 method = "POST";
-                body = "{\"model\": \"deepseek-chat\",\"messages\" : [{\"role\": \"system\", \"content\" : \"You are a helpful assistant.\"},{ \"role\": \"user\", \"content\" : \"" + text + "\" }] ,\"stream\" : false}";
-                if (mHeader.think) {
-                    body = "{\"model\": \"deepseek-reasoner\",\"messages\" : [{\"role\": \"system\", \"content\" : \"You are a helpful assistant.\"},{ \"role\": \"user\", \"content\" : \"" + text + "\" }] ,\"stream\" : false}";
+                // 用 JSONObject 拼而不是手写字符串：用户消息里的引号/换行/emoji 以前会把
+                // JSON 拼坏，服务端回 400，界面上就成了"发了没反应"
+                try {
+                    body = buildChatBody(text);
+                } catch (JSONException e) {
+                    Log.e("HTTPS", "build request body failed", e);
+                    return -1;
                 }
             }
             HttpsRequest.executeRequest(
@@ -538,28 +682,34 @@ public class ChatBoxDialog extends Dialog {
                     new HttpsRequest.HttpsRequestCallback() {
                         @Override
                         public void onSuccess(int responseCode, String response, Map<String, String> headers) {
-                            message.what = State[0];
-                            String content = "";
+                            String content = response == null ? "" : response;
                             try {
-                                JSONObject jsonObject = new JSONObject(response);
-                                JSONArray choices = jsonObject.getJSONArray("choices");
-                                JSONObject firstChoice = choices.getJSONObject(0);
-                                JSONObject message = firstChoice.getJSONObject("message");
-                                content = message.getString("content");
+                                JSONObject jsonObject = new JSONObject(content);
+                                JSONArray choices = jsonObject.optJSONArray("choices");
+                                if (choices != null && choices.length() > 0) {
+                                    JSONObject firstChoice = choices.optJSONObject(0);
+                                    JSONObject msgObj = firstChoice == null ? null
+                                            : firstChoice.optJSONObject("message");
+                                    if (msgObj != null) {
+                                        content = String.valueOf(msgObj.optString("content", content));
+                                    }
+                                }
                             } catch (JSONException e) {
-                                content = response;
-                                // throw new RuntimeException(e);
+                                // 非预期格式（多数是网关错误页）直接整段回显示，方便排查
+                                Log.w("HTTPS", "unexpected response format", e);
                             }
-                            message.obj = content;
-                            mHeader.handler.sendMessage(message);
+                            deliver(MSG_RECEIVED, content);
                             Log.d("HTTPS", "Response: " + response);
                         }
                         @Override
                         public void onFailure(Exception e) {
-                            message.what = State[1];
-                            message.obj = e.getMessage();
-                            mHeader.handler.sendMessage(message);
-                            Log.e("HTTPS", "Error: " + e.getMessage());
+                            // e.getMessage() 经常是 null，直接塞进 msg.obj 会让 Handler 里 toString() 空指针闪退
+                            String reason = e == null ? null : e.getMessage();
+                            if (reason == null || reason.isEmpty()) {
+                                reason = e == null ? "未知错误" : (e.getClass().getSimpleName());
+                            }
+                            deliver(MSG_FAILED, reason);
+                            Log.e("HTTPS", "Error: " + (e == null ? "" : e.getMessage()));
                         }
                     });
             return 0;

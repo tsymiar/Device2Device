@@ -91,6 +91,47 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- API Key：填了就用它调 LLM，留空沿用内置 Key；值存在本地，下次打开自动带出 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_api_key"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_edit"
+                    android:hint="@string/chat_api_key_hint"
+                    android:imeOptions="actionDone"
+                    android:importantForAutofill="no"
+                    android:inputType="textVisiblePassword"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
+                    android:textColor="#212121"
+                    android:textColorHint="#B0B0B0"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_key_mask"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:minWidth="0dp"
+                    android:text="@string/chat_api_key_mask"
+                    android:textSize="11sp"
+                    app:cornerRadius="18dp"
+                    app:strokeColor="@color/colorAccent"
+                    app:strokeWidth="1dp" />
+            </LinearLayout>
+
             <!-- 消息输入框 -->
             <EditText
                 android:id="@+id/et_message"

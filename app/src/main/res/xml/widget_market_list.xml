@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 行情小部件配置：默认 2x2 格，可横向 / 纵向自由拉伸（标的多就拉高一点）。
+<!-- 行情小部件（列表版）配置：默认 2x2 格，可横向 / 纵向自由拉伸（标的多就拉高一点）。
      标的行装在 ListView 里，超出可视高度可上下滚动，所以拉多高只影响一屏能看几行；
      只放一个标的时那一行会自动撑大字号；reconfigurable 允许长按重新改标的列表。
+     单个标的看走势的「行情曲线」部件是另一个组件（widget_market_chart.xml）。
      minWidth/minHeight 是不支持 targetCell 的桌面的兜底尺寸 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.tsymiar.device2device.widget.MarketWidgetConfigActivity"

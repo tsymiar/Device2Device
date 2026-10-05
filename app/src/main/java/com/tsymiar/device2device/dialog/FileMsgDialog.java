@@ -10,7 +10,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
+import android.util.Log;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.util.Objects;
 
 public class FileMsgDialog extends DialogFragment {
+    private static final String TAG = "FileMsgDialog";
     private static final int REQUEST_PERMISSION = 1001;
 
     private EditText etIp, etPort;
@@ -133,6 +134,7 @@ public class FileMsgDialog extends DialogFragment {
         btnStartServer.setOnClickListener(v -> {
             if (!isServerStarted) {
                 int port = Integer.parseInt(etPort.getText().toString());
+                applySavePath();
                 int ret = NetworkWrapper.startFileMsgServer(port);
                 if (ret >= 0) {
                     isServerStarted = true;
@@ -155,9 +157,7 @@ public class FileMsgDialog extends DialogFragment {
                 int ret = NetworkWrapper.connectFileMsgServer(ip, port);
                 if (ret >= 0) {
                     isConnected = true;
-                    // Use Scoped Storage compatible path for API 29+
-                    String savePath = Environment.getExternalStorageDirectory().toString() + "/Device2Device";
-                    NetworkWrapper.setFileSavePath(savePath);
+                    applySavePath();
                     tvStatus.setText(String.format("Connected to %s:%d", ip, port));
                 } else {
                     Toast.makeText(getContext(), "Connection failed: " + ret, Toast.LENGTH_SHORT).show();
@@ -207,6 +207,21 @@ public class FileMsgDialog extends DialogFragment {
             }
             updateUI();
         });
+    }
+
+    /**
+     * 接收目录：用应用专属外部目录（Android 10+ 无需存储权限即可写），
+     * 服务端与客户端都要设 —— 服务端收文件时同样靠它落盘。
+     */
+    private void applySavePath() {
+        android.content.Context ctx = getContext();
+        if (ctx == null) return;
+        File dir = new File(ctx.getExternalFilesDir(null), "Device2Device");
+        if (dir == null) dir = new File(ctx.getFilesDir(), "Device2Device");
+        if (!dir.exists() && !dir.mkdirs()) {
+            Log.w(TAG, "cannot create receive dir: " + dir.getAbsolutePath());
+        }
+        NetworkWrapper.setFileSavePath(dir.getAbsolutePath());
     }
 
     private void checkPermissionAndOpenPicker() {
@@ -304,7 +319,8 @@ public class FileMsgDialog extends DialogFragment {
                 tvStatus.setText(status);
             }
             if (pbTransfer != null) {
-                if (current >= total) {
+                // total<=0 是纯状态消息（客户端上下线等），没有进度可言，直接收起进度条
+                if (total <= 0 || current >= total) {
                     pbTransfer.setVisibility(android.view.View.GONE);
                 } else {
                     pbTransfer.setVisibility(android.view.View.VISIBLE);

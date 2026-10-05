@@ -115,6 +115,8 @@ public final class QuoteSource {
     private static final String USD_TRENDS_SECID = "100.UDI";
     /** 美元指数在新浪外汇的快照代码（东财不可达时的实时价回退，只有当前一笔） */
     private static final String USD_SINA_CODE = "DINIW";
+    /** 美元兑人民币在新浪外汇的快照代码（国际金换算人民币价用） */
+    private static final String USDCNY_SINA_CODE = "fx_susdcny";
     /** 欧洲央行参考汇率（免密钥）：美元指数没有免费日线源，按 ICE 官方权重反算 */
     private static final String FRANKFURTER = "https://api.frankfurter.dev/v1/";
     private static final String USDX_CURRENCIES = "EUR,JPY,GBP,CAD,SEK,CHF";
@@ -179,11 +181,12 @@ public final class QuoteSource {
 
         // 1h 与 60m 同为 60 分钟，统一用 60m 表示「小时线」，避免下拉里出现重复项
         // 1Q=季线，1Y=年线，两者没有现成接口，由月线（或日线）聚合出来
-        String[] cn = {"1m", "5m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
+        // 15m 之前漏在列表外（MINUTE_STEP / TENCENT_MINUTE_KEY / EAST_KLT 都支持它），补回来
+        String[] cn = {"1m", "5m", "15m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
         // 新浪期货（国内/国际）只到日线；美元指数仅有东财分时，无免费日线
         String[] futures = {"1m", "5m", "30m", "60m", "1d"};
         // 美元指数：分钟线靠分时/快照聚合，日线及以上由汇率反算（已补齐日线支持）
-        String[] usdIndex = {"1m", "5m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
+        String[] usdIndex = {"1m", "5m", "15m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
         SUPPORTED.put(TENCENT, cn);
         SUPPORTED.put(EAST, cn);
         SUPPORTED.put(BINANCE, new String[]{"1m", "3m", "5m", "30m", "2h", "4h",
@@ -537,6 +540,127 @@ public final class QuoteSource {
     public static void load(String source, String symbol, String interval, int limit, Callback callback) {
         List<String> names = candidates(source, symbol);
         step(new ArrayDeque<>(names), symbol, interval, limit, callback, new ArrayList<String>());
+    }
+
+    // ------------------------------------------------------------------
+    // 对外：黄金的人民币价（元/克）
+    // ------------------------------------------------------------------
+
+    /** 1 金衡盎司 = 31.1034768 克：国际金（美元/盎司）换算成元/克要除它 */
+    public static final float OUNCE_GRAMS = 31.1034768f;
+
+    /** 汇率缓存有效期：一天也就动一点，别每次刷新都多打一个请求 */
+    private static final long FX_TTL_MS = 10 * 60 * 1000L;
+    private static volatile float sUsdCny = 0f;
+    private static volatile long sUsdCnyAt = 0L;
+
+    public interface RateCallback {
+        /** 美元兑人民币；<=0 表示两路接口都没取到 */
+        void onRate(float rate);
+    }
+
+    /** 是不是黄金：沪金（元/克）/ 伦敦金 / 纽约金（均美元/盎司）；白银不算 */
+    public static boolean isGold(String source, String symbol) {
+        return !goldCode(source, symbol).isEmpty();
+    }
+
+    /** 报价单位已经是「元/克」的黄金（沪金）；国际金是美元/盎司，要乘汇率再除盎司 */
+    public static boolean isCnyGold(String source, String symbol) {
+        return "AU0".equals(goldCode(source, symbol));
+    }
+
+    /** 黄金归一到 AU0 / XAU / GC，非黄金返回空串 */
+    private static String goldCode(String source, String symbol) {
+        // 这几个源不可能出黄金：靠前缀猜只会把 AUDIOUSDT 之类误判成金
+        if (BINANCE.equals(source) || TENCENT.equals(source) || EAST.equals(source)
+                || USD.equals(source) || CRUDE.equals(source) || BRENT.equals(source)
+                || NG.equals(source)) {
+            return "";
+        }
+        String text = symbol == null ? "" : symbol.trim();
+        String upper = text.toUpperCase(Locale.US);
+        String target = COMMODITY_ALIASES.get(text.toLowerCase(Locale.US));
+        if (target == null) {
+            // au2412 / xauusd 这类带后缀的写法，按前缀落到对应品种（ag 开头是白银，不是金）
+            if (upper.startsWith("XAU")) target = "XAU";
+            else if (upper.startsWith("GC")) target = "GC";
+            else if (upper.startsWith("AU")) target = "AU0";
+            else if (upper.startsWith("AG")) return "";
+        }
+        // 代码说不清时信数据源：沪金源默认就是沪金
+        if (target == null && GOLD.equals(source)) target = "AU0";
+        if (target == null && XAU.equals(source)) target = "XAU";
+        if (target == null && GC.equals(source)) target = "GC";
+        if (target == null) return "";
+        return "AU0".equals(target) || "XAU".equals(target) || "GC".equals(target) ? target : "";
+    }
+
+    /**
+     * 美元兑人民币：新浪外汇实时快照为主，欧洲央行参考汇率兜底（免密钥，日频工作日）。
+     * 只用来把国际金的「美元/盎司」标注成「元/克」，取不到就回 0 —— 界面那边不显示这一栏即可。
+     */
+    public static void loadUsdCny(final RateCallback cb) {
+        float cached = sUsdCny;
+        if (cached > 0f && System.currentTimeMillis() - sUsdCnyAt < FX_TTL_MS) {
+            cb.onRate(cached);
+            return;
+        }
+        loadUsdCnySina(cb);
+    }
+
+    private static void loadUsdCnySina(final RateCallback cb) {
+        fetchText(SINA_SNAPSHOT + USDCNY_SINA_CODE, sinaHeaders(), body -> {
+            float rate = parseSinaUsdCny(body);
+            if (rate <= 0f) throw new IllegalArgumentException("外汇快照无有效汇率");
+            cacheUsdCny(rate);
+            cb.onRate(rate);
+        }, () -> loadUsdCnyFrankfurter(cb), fxSink(() -> loadUsdCnyFrankfurter(cb)));
+    }
+
+    private static void loadUsdCnyFrankfurter(final RateCallback cb) {
+        fetchText(FRANKFURTER + "latest?base=USD&symbols=CNY", headersFor(USD), body -> {
+            float rate = parseFrankfurterCny(body);
+            if (rate <= 0f) throw new IllegalArgumentException("汇率接口无数据");
+            cacheUsdCny(rate);
+            cb.onRate(rate);
+        }, () -> cb.onRate(0f), fxSink(() -> cb.onRate(0f)));
+    }
+
+    /** request() 只按 retry / 解析异常走，StepCallback 里的 onError 基本不会被调到，留个兜底 */
+    private static StepCallback fxSink(final Runnable fail) {
+        return new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+            }
+
+            @Override
+            public void onError(String message) {
+                fail.run();
+            }
+        };
+    }
+
+    private static void cacheUsdCny(float rate) {
+        sUsdCny = rate;
+        sUsdCnyAt = System.currentTimeMillis();
+    }
+
+    /** 新浪外汇快照: var hq_str_fx_susdcny="时间,开,昨收,…,最新价,…,日期"；只认人民币这个量级的数 */
+    private static float parseSinaUsdCny(String text) {
+        Matcher matcher = SNAPSHOT_BODY.matcher(text == null ? "" : text);
+        if (!matcher.find()) return 0f;
+        String[] parts = matcher.group(1).split(",");
+        if (parts.length < 9) return 0f;
+        float rate = (float) safe(parts[8]);
+        return rate > 3f && rate < 15f ? rate : 0f;
+    }
+
+    /** 欧洲央行汇率: {"base":"USD","rates":{"CNY":6.70}} */
+    private static float parseFrankfurterCny(String body) throws Exception {
+        JSONObject root = new JSONObject(body);
+        JSONObject rates = root.optJSONObject("rates");
+        double cny = rates == null ? 0d : rates.optDouble("CNY", 0d);
+        return cny > 3f && cny < 15f ? (float) cny : 0f;
     }
 
     // ------------------------------------------------------------------

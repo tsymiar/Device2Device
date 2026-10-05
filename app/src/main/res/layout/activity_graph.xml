@@ -288,7 +288,7 @@
 		</LinearLayout>
 	</LinearLayout>
 
-	<!-- 操作按钮：Start Chart 与 Draw 并排 -->
+	<!-- 操作按钮：Draw 与 Start Chart 并排（先 Draw 展开图表区，再 Start Chart 载入曲线） -->
 	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
@@ -296,12 +296,12 @@
 		android:orientation="horizontal">
 
 		<Button
-			android:id="@+id/bt"
+			android:id="@+id/draw"
 			android:layout_width="0dp"
 			android:layout_height="48dp"
 			android:layout_weight="1"
 			android:layout_marginEnd="5dp"
-			android:text="@string/start_chart"
+			android:text="@string/draw"
 			android:textSize="14sp"
 			android:textColor="@android:color/white"
 			android:backgroundTint="@color/colorPrimary"
@@ -309,12 +309,12 @@
 			android:stateListAnimator="@null" />
 
 		<Button
-			android:id="@+id/draw"
+			android:id="@+id/bt"
 			android:layout_width="0dp"
 			android:layout_height="48dp"
 			android:layout_weight="1"
 			android:layout_marginStart="5dp"
-			android:text="@string/draw"
+			android:text="@string/start_chart"
 			android:textSize="14sp"
 			android:textColor="@android:color/white"
 			android:backgroundTint="@color/colorPrimary"

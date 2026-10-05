@@ -30,6 +30,7 @@ import com.tsymiar.device2device.market.QuoteSource.Symbol;
 import com.tsymiar.device2device.market.MarketPalette;
 import com.tsymiar.device2device.market.Snapshot;
 import com.tsymiar.device2device.view.KLineView;
+import com.tsymiar.device2device.widget.MarketChartWidgetProvider;
 import com.tsymiar.device2device.widget.MarketWidgetProvider;
 
 import java.util.Arrays;
@@ -90,6 +91,14 @@ public class MarketActivity extends AppCompatActivity {
 
     private String mSource = QuoteSource.AUTO;
     private String mInterval = "1d";
+    /**
+     * 重建周期下拉期间置 true。
+     * Spinner.setAdapter() 会补发一次 onItemSelected(position=0)，若不拦住，
+     * 恢复/切换数据源时当前周期会被悄悄改回列表第一项（1m），显示的周期就不对了。
+     */
+    private boolean mIntervalRebuilding = false;
+    /** 重建后 expect 的下标：收到它才算重建真正落地，可以放行后续事件 */
+    private int mExpectedIntervalIndex = 0;
     /** 当前数据源的周期列表：下拉显示中文名，选中时按下标回取原始周期（如 季K -> 1Q） */
     private String[] mIntervals = QuoteSource.intervals(QuoteSource.AUTO);
     private boolean mAutoRefresh = false;
@@ -282,6 +291,12 @@ public class MarketActivity extends AppCompatActivity {
         mIntervalSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                // 重建下拉时 Spinner 补发的选中事件不算用户操作，直接忽略；
+                // 收到期望下标说明重建已落地，立刻放行，避免把用户真正的操作一起吞掉
+                if (mIntervalRebuilding) {
+                    if (position == mExpectedIntervalIndex) mIntervalRebuilding = false;
+                    return;
+                }
                 // 下拉里是「季K/年K」这类中文名，周期值要按下标从 mIntervals 回取
                 if (mIntervals == null || position < 0 || position >= mIntervals.length) return;
                 String interval = mIntervals[position];
@@ -422,18 +437,26 @@ public class MarketActivity extends AppCompatActivity {
         mIntervals = intervals;
         String[] labels = new String[intervals.length];
         for (int i = 0; i < intervals.length; i++) labels[i] = QuoteSource.intervalLabel(intervals[i]);
+        mIntervalRebuilding = true;
+        mExpectedIntervalIndex = 0;
         mIntervalSpinner.setAdapter(adapter(labels));
         int index = 0;
         for (int i = 0; i < intervals.length; i++) {
             if (intervals[i].equals(mInterval)) index = i;
         }
         if (!mInterval.equals(intervals[index])) {
+            // 当前周期不被该数据源支持：回落到日线，都不支持就用第一项
+            index = -1;
             for (int i = 0; i < intervals.length; i++) {
                 if ("1d".equals(intervals[i])) index = i;
             }
+            if (index < 0) index = 0;
             mInterval = intervals[index];
         }
+        mExpectedIntervalIndex = index;
         mIntervalSpinner.setSelection(index, false);
+        // 兜底：万一补发的选中事件迟迟不来（或顺序和预期不同），两帧后也必须放行
+        mIntervalSpinner.postDelayed(() -> mIntervalRebuilding = false, 200);
         if (mChart != null) mChart.setInterval(mInterval);
         if (mSymbolEdit != null) mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
         if (reload) load();
@@ -442,6 +465,13 @@ public class MarketActivity extends AppCompatActivity {
     // ------------------------------------------------------------------
     // 取数
     // ------------------------------------------------------------------
+
+    /** 周期显示文本：1d 之类原始值看不出是什么线，日K/周K 更直观，两者都给出来便于核对 */
+    private String intervalText() {
+        String label = QuoteSource.intervalLabel(mInterval);
+        if (label == null || label.isEmpty() || label.equals(mInterval)) return mInterval;
+        return mInterval + "/" + label;
+    }
 
     /** 输入框内容（为空时按数据源默认标的） */
     private String symbolText() {
@@ -518,7 +548,7 @@ public class MarketActivity extends AppCompatActivity {
     private void loadQuotes() {
         String symbol = symbolText();
         mLoading = true;
-        mStatus.setText("加载中…  " + mSource + " / " + mInterval + " / " + symbol);
+        mStatus.setText("加载中…  " + mSource + " / " + intervalText() + " / " + symbol);
         QuoteSource.load(mSource, symbol, mInterval, LIMIT, new QuoteSource.Callback() {
             @Override
             public void onLoaded(String source, String code, List<Quote> quotes) {
@@ -530,14 +560,15 @@ public class MarketActivity extends AppCompatActivity {
                 }
                 mChart.setLineMode(isMinuteInterval());
                 mChart.setInterval(mInterval);
-                mChart.setData(code + "  ·  " + source + "  ·  " + mInterval, quotes);
+                mChart.setData(code + "  ·  " + source + "  ·  " + intervalText(), quotes);
                 resolveName(code);
-                mStatus.setText(source + "  symbol=" + code + "  interval=" + mInterval
+                mStatus.setText(source + "  symbol=" + code + "  interval=" + intervalText()
                         + "  bars=" + quotes.size() + "  " + span(quotes));
                 loadSnapshot(code);
                 savePrefs();
                 // 顺带刷新桌面上的行情小部件（未单独配置的实例跟随这里的标的）
                 MarketWidgetProvider.pushUpdate(MarketActivity.this);
+                MarketChartWidgetProvider.pushUpdate(MarketActivity.this);
             }
 
             @Override

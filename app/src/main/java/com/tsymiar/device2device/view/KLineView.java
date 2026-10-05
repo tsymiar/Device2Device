@@ -111,6 +111,10 @@ public class KLineView extends View {
     private int mSelected = -1;
     private boolean mPendingTail = true;
     private int mDecimals = 2;
+    /** 上一次生效的纵轴量程 [低, 高]：用于迟滞，避免刷新时整幅图上下抖 */
+    private float[] mRange = null;
+    /** 纵轴收窄的死区（占当前量程的比例）：小于它就不改量程 */
+    private static final float RANGE_DEAD_BAND = 0.03f;
 
     private float mTouchDownX, mTouchDownY, mLastX;
     private boolean mMoved;
@@ -212,11 +216,24 @@ public class KLineView extends View {
         invalidate();
     }
 
-    /** 装载数据并立即重绘；默认显示最后一段 */
+    /**
+     * 装载数据并立即重绘。
+     *
+     * 自动刷新（默认 15s 一次）也会走这里，所以刷新要"就地更新"而不是整体重置：
+     *  - 视窗原本贴在最新一根才继续跟随最新；用户拖去看历史时不把他拽回去；
+     *  - 十字光标选中的那根保持不变（刷新前选的是第 N 根，刷新后还是第 N 根）；
+     *  - 纵轴量程带迟滞，最后一根K线的微小跳动不会让整幅图上下位移。
+     * 换标的 / 换周期这类数据规模变化很大的情况，clampStart() 会把视窗收回合法范围。
+     */
     public void setData(String title, List<Quote> quotes) {
         mTitle = title == null ? "" : title;
+        int oldSize = mData.size();
+        boolean atTail = oldSize == 0 || mPendingTail || mStart + mVisible >= oldSize;
+        int keepStart = mStart;
+        int keepSelected = mSelected;
+
         mData = quotes == null ? new ArrayList<Quote>() : new ArrayList<>(quotes);
-        mPendingTail = true;
+        mPendingTail = atTail;
         // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）；
         // 用户手动切过副图后就一直用他选的那个，刷新不再覆盖（锁了成交量但该源没量才回落 MACD）
         if (mPanelLocked >= 0) {
@@ -224,8 +241,12 @@ public class KLineView extends View {
         } else {
             mPanelMode = hasVolume() ? PANEL_VOLUME : PANEL_MACD;
         }
-        mSelected = -1;
+        if (!atTail) {
+            mStart = Math.max(0, Math.min(keepStart, Math.max(0, mData.size() - 1)));
+        }
+        mSelected = (keepSelected >= 0 && keepSelected < mData.size()) ? keepSelected : -1;
         computeVisible();
+        clampStart();
         publishSelection();
         invalidate();
     }
@@ -374,7 +395,15 @@ public class KLineView extends View {
         canvas.drawText("暂无行情数据", getWidth() / 2f, getHeight() / 2f, mTextPaint);
     }
 
-    /** 视窗内的 [最低, 最高] */
+    /**
+     * 视窗内的 [最低, 最高]。
+     *
+     * 带迟滞（hysteresis）：
+     *  - 需要放大量程（出现了更高/更低的K线）立刻扩，保证蜡烛不出框；
+     *  - 需要收窄时，收窄幅度小于量程的 RANGE_DEAD_BAND 就维持不动。
+     * 这样最后一根K线每次刷新时的小幅跳动不会让整幅图上下平移（"整体抖动"）。
+     * padding 两边各留 6%，死区取 3% 远小于它，不会把K线挤出去。
+     */
     private float[] visibleRange() {
         float min = Float.MAX_VALUE;
         float max = -Float.MAX_VALUE;
@@ -383,10 +412,23 @@ public class KLineView extends View {
             if (q.low < min) min = q.low;
             if (q.high > max) max = q.high;
         }
-        if (min == Float.MAX_VALUE) return new float[]{0f, 1f};
+        if (min == Float.MAX_VALUE) {
+            mRange = null;
+            return new float[]{0f, 1f};
+        }
         float pad = (max - min) * 0.06f;
         if (pad <= 0) pad = Math.max(Math.abs(max) * 0.01f, 0.5f);
-        return new float[]{min - pad, max + pad};
+        float lo = min - pad;
+        float hi = max + pad;
+        if (mRange != null) {
+            float cLo = mRange[0];
+            float cHi = mRange[1];
+            float span = Math.max(1e-6f, cHi - cLo);
+            if (lo > cLo && lo - cLo < span * RANGE_DEAD_BAND) lo = cLo;
+            if (hi < cHi && cHi - hi < span * RANGE_DEAD_BAND) hi = cHi;
+        }
+        mRange = new float[]{lo, hi};
+        return mRange;
     }
 
     private void drawGrid(Canvas canvas, float[] range) {

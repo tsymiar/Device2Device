@@ -3,28 +3,15 @@
 
 # Device2Device
 
-A feature-rich Android application for **peer-to-peer communication** and **multimedia processing** between devices.
+A feature-rich Android app for **peer-to-peer communication** and **multimedia processing** between devices.
 
-**Core capabilities:**
-- 🔵 Bluetooth RFCOMM serial communication with device discovery and data logging
-- 🌐 Multi-protocol networking: TCP, UDP (multicast), KCP (reliable UDP)
-- 📨 Pub/Sub messaging via scadup message queue library
-- 🎨 GPU (OpenGL ES) and CPU image/video rendering
-- 🎤 Audio recording (16kHz PCM) with real-time waveform visualization and speech recognition
-- 📊 Real-time sensor monitoring (accelerometer, gravity, linear acceleration) and a dashboard (compass, bubble level, altitude, magnetic field, steps, proximity)
-- 🖥 SSH server: remote shell into the device over Wi-Fi
-- 🧍 Photo / camera driven life-size 3D human model (parametric body, face & hair styling, OBJ export)
-- 🤖 AI chat powered by DeepSeek API (Chat + Deep Think models)
-- 📈 Market quotes: multi-source K-line (A-shares, futures, forex/gold, crypto) with technical indicators and a home-screen quote widget
-- 📁 Embedded HTTP file server with directory browsing
+**Core capabilities:** Bluetooth RFCOMM serial · multi-protocol networking (TCP / UDP multicast / KCP) · Pub/Sub messaging · GPU/CPU image & video rendering · audio recording + real-time waveform + STT · real-time sensor dashboard · SSH server · parametric life-size 3D human model · DeepSeek AI chat · market K-line quotes + home widgets · embedded HTTP file server.
 
 ---
 
 ## Architecture
 
 ![Architecture](image/device2device.png)
-
----
 
 ### Technology Stack
 
@@ -33,335 +20,106 @@ A feature-rich Android application for **peer-to-peer communication** and **mult
 | Platform    | Android (API 21+, target 31)                              |
 | Language    | Java, C++ (C++11)                                        |
 | Native      | JNI, CMake 2.8+, OpenGL ES 2.0, OpenSL ES, NDK 23       |
-| Network     | UDP (Multicast), TCP, KCP (Reliable UDP), HTTP, Bluetooth |
-| Market Data | Keyless public HTTPS endpoints: Tencent, Eastmoney, Sina, Binance, Frankfurter (ECB rates) |
-| Media       | AudioRecord, AudioTrack, MediaExtractor, OpenGL ES, YUV↔RGB, PCM↔WAV |
-| 3D          | OpenGL ES 2.0 (parametric human mesh, GLSurfaceView), OBJ/MTL export |
-| UI          | Material Design, ConstraintLayout, Custom Views (incl. `KLineView`), Day/Night color resources, System Overlay |
-| Build       | Gradle 7.x, CMake, NDK (ARM NEON optimizations)           |
-
----
+| Network     | UDP (multicast), TCP, KCP, HTTP, Bluetooth                |
+| Market Data | Keyless public HTTPS: Tencent, Eastmoney, Sina, Binance, Frankfurter (ECB) |
+| Media       | AudioRecord/Track, MediaExtractor, OpenGL ES, YUV↔RGB, PCM↔WAV |
+| 3D          | OpenGL ES 2.0 parametric mesh, OBJ/MTL export            |
+| UI          | Material Design, ConstraintLayout, custom views, Day/Night |
+| Build       | Gradle 7.x, CMake, NDK (ARM NEON)                        |
 
 ### Project Structure
 
 ```
 app/src/main/
 ├── java/com/tsymiar/device2device/
-│   ├── activity/                  # Activities (13)
-│   │   ├── MainActivity           # Splash screen → auto-navigate
-│   │   ├── SelectActivity         # Main dashboard (network, sensor, chat, files, Bluetooth, market)
-│   │   ├── MarketActivity         # Market quotes: source/interval/symbol pickers + K-line chart
-│   │   ├── AvatarActivity         # Photo/camera → life-size 3D human model (params, face, hair, export)
-│   │   ├── TextureActivity        # Image/Video GPU & CPU rendering
-│   │   ├── WaveActivity           # Audio recording & real-time waveform + speech recognition
-│   │   ├── GraphActivity          # Sensor real-time data display
-│   │   ├── SensorActivity         # List all device sensors
-│   │   ├── BtRemoteActivity       # Bluetooth serial communication (RFCOMM)
-│   │   ├── BtDialogActivity       # Bluetooth discoverability & device scanning
-│   │   ├── BtDevicesActivity      # Paired & discovered Bluetooth devices list
-│   │   ├── BuggerActivity         # Bug report / email feedback
-│   │   ├── MyGitActivity          # Open project GitHub page
-│   │   └── ThanksActivity         # Acknowledgements page
-│   ├── service/                   # Background services (7)
-│   │   ├── SubscribeService       # Pub/Sub subscribe floating window
-│   │   ├── PublishService         # Pub/Sub publish floating window
-│   │   ├── HttpBrowserService        # Embedded HTTP file server (File & SAF modes)
-│   │   ├── ToastNotificationService  # Global floating toast notifications
-│   │   ├── ReceiverService        # Bluetooth data receive floating window
-│   │   ├── WindowService          # Generic text overlay floating window
-│   │   ├── SaveDataService        # Persist Bluetooth received data to file
-│   │   └── Voice                  # Audio alert playback service
-│   ├── acceleration/              # Sensor & Voice modules
-│   │   ├── SensorFragment         # Real-time accelerometer chart (Bézier-smoothed)
-│   │   ├── DefaultFragment        # Basic sensor chart variant
-│   │   └── Voice                  # Over-acceleration warning (threshold: 7.0 m/s²)
-│   ├── dialog/                    # UI dialogs
-│   │   ├── ChatBoxDialog          # DeepSeek AI chat (Chat / Reasoner models)
-│   │   └── FileMsgDialog          # File transfer with progress & SAF file picker
-│   ├── entity/                    # Data entities (PubSubSetting, Receiver)
-│   ├── event/                     # Observer-pattern event system (EventHandle, EventNotify)
-│   ├── widget/                    # Home-screen app widget
-│   │   ├── MarketWidgetProvider   # Quote widget: fetch / RemoteViews rendering / manual refresh broadcast
-│   │   └── MarketWidgetConfigActivity # Widget config screen shown when added (data source + symbol)
-│   ├── market/                    # Market data
-│   │   ├── QuoteSource            # 11 sources + symbol search/resolve + keyless HTTPS fetch & fallback
-│   │   ├── Quote                  # Single bar (time, open/high/low/close, volume, amount)
-│   │   └── Indicators             # SMA / EMA / MACD / RSI / KDJ math
-│   ├── avatar/                    # 3D human model
-│   │   ├── BodyProfile            # Body params (gender/height/weight/head ratio) + BMI & girth derivation
-│   │   ├── AnnyModel              # High-res engine: Anny (MakeHuman anthropometric) shape solve → HumanMesh.Result
-│   │   ├── AnnyTargets            # Anny deform targets: multi-linear solve, w = Π c over each target's phenotype deps
-│   │   ├── AnnyParams             # BodyProfile → Anny phenotype parameters (gender/age/height/weight/muscle/breast)
-│   │   ├── AnnyMeasure            # Normalize / smooth normals / slice-based girth & inseam measurement
-│   │   ├── MeshBuilder            # Tube (lofted) & ellipsoid primitives → normals/colors/parts
-│   │   ├── HumanMesh              # Parametric life-size body from BodyProfile + OBJ/MTL export
-│   │   ├── AvatarRenderer         # OpenGL ES 2.0 renderer: lighting, ground grid, height ruler, capture
-│   │   ├── AvatarSurfaceView      # GLSurfaceView wrapper: drag to rotate, pinch to zoom, screenshot
-│   │   └── PhotoAnalyzer          # Photo silhouette (shoulder/waist/hip ratios) + region color extraction
-│   ├── utils/                     # Utilities (Atom, MP4Header, WAVHeader, SoundRecord, WaveCanvas, HttpsRequest, Utils, etc.)
-│   ├── view/                      # Custom views (WaveSurface, WaveformsView, KLineView, CompassView, BubbleLevelView, DecibelView)
-│   └── wrapper/                   # JNI native bridge (Callback, Network, View, Media, Time)
-├── cpp/                           # Native C++ code
-│   ├── JniMethods.cpp/h           # All JNI entry points
-│   ├── bitmap/                    # BMP image processing
-│   ├── callback/                  # Java↔C++ bidirectional callbacks
-│   ├── convert/                   # PCM↔WAV, YUV↔RGB format conversion
-│   ├── display/                   # GPU (EGL/GLES2) & CPU rendering
-│   ├── message/                   # Thread-safe message queue
-│   ├── socket/                    # UDP / TCP / KCP / FileMsg protocol
-│   ├── scadup/                    # Message queue library (tsymiar/scadup)
-│   ├── test/                      # Unit tests (FileMsgSocket)
-│   ├── time/                      # Timestamp utilities
-│   └── utils/                     # File utilities, logging, constants
+│   ├── activity/      # 14 Activities: MainActivity, SelectActivity (dashboard),
+│   │                 #   Market/Avatar/Texture/Wave/Graph/Sensor, BtRemote/Dialog/Devices,
+│   │                 #   Bugger, MyGit, Thanks
+│   ├── service/       # 7 services: Subscribe/Publish/HTTP server/Toast/Receiver/Window/SaveData + Voice
+│   ├── acceleration/  # Sensor & Voice modules
+│   ├── dialog/        # ChatBox (DeepSeek) + FileMsg
+│   ├── entity/ event/ # Data entities & observer event system
+│   ├── widget/        # MarketWidgetProvider + config, MarketChartWidgetProvider + config
+│   ├── market/        # QuoteSource (11 sources), Quote, Indicators
+│   ├── avatar/        # BodyProfile, AnnyModel/AnnyTargets/AnnyParams/AnnyMeasure,
+│   │                 #   MeshBuilder, HumanMesh, AvatarRenderer/SurfaceView, PhotoAnalyzer
+│   ├── utils/         # Utilities (Atom, headers, SoundRecord, HttpsRequest, …)
+│   ├── view/          # Custom views (KLineView, WaveSurface, Compass, BubbleLevel, Decibel, …)
+│   └── wrapper/       # JNI native bridge (Callback, Network, View, Media, Time)
+└── cpp/               # Native: JniMethods, bitmap, callback, convert, display,
+                        #   message, socket, scadup (tsymiar/scadup), test, time, utils
 ```
 
 ---
 
 ## Features
 
-### Bluetooth Communication
+### Bluetooth
+Device scanning & pairing · bidirectional RFCOMM serial with directional commands · auto data logging · draggable floating receive window.
 
-| Feature        | Description                                                          |
-| :------------- | :------------------------------------------------------------------- |
-| Device Scanning | Scan for nearby Bluetooth devices                                    |
-| Pairing         | List paired devices and discover new ones                            |
-| Serial Comm     | Bidirectional RFCOMM communication with directional control commands |
-| Data Logging    | Auto-save received data to local file                                |
-| Floating Window | Receive data display in draggable system overlay                     |
-
-### Network Communication
-
-| Feature     | Description                                                     |
-| :---------- | :--------------------------------------------------------------- |
-| UDP Server  | Start a UDP multicast server to receive data                     |
-| UDP Client  | Start a UDP multicast client to send data                        |
-| TCP Server  | Start a TCP server to receive data                               |
-| KCP         | KCP (Reliable UDP) protocol for low-latency transmission         |
-| Pub/Sub     | Subscribe & Publish messages via floating dialog windows; async connection with real-time status feedback |
-| File Transfer | Custom binary protocol with chunked transfer (64KB/chunk) and progress callback |
-| HTTP Server | Embedded HTTP server (filesystem & SAF) with sortable/responsive HTML directory listing, in-page image viewer, and streaming transfers tuned for Wi-Fi LAN throughput |
-| SSH Server  | Embedded SSH server (Apache MINA SSHD) on port 2222 with a built-in shell command set, run as a foreground service |
+### Networking
+UDP/TCP multicast, KCP reliable UDP, Pub/Sub floating dialogs, 64 KB/chunk file transfer with progress, embedded HTTP server (FS & SAF) with sortable listing + in-page viewer, SSH server (Apache MINA SSHD) on port 2222 as a foreground service.
 
 ### Market Quotes (K-Line)
+`MarketActivity` + `market/` + `KLineView`; keyless public HTTPS; bar fields (`time, open, high, low, close, volume, amount`) match the `matkline.py` toolset.
 
-`MarketActivity` + `market/` package + `KLineView`. All endpoints are keyless public HTTPS; callbacks run on the main thread; bar fields (`time, open, high, low, close, volume, amount`) match the `matkline.py` toolset so scripts and the app share one parsing/indicator convention.
+**Sources (`QuoteSource`):** `auto` (smart pick + fallback), `tencent` (A-shares/indices/funds), `eastmoney` (A-shares/futures/HK), `gold`/`xau`/`gc`, `crude`/`brent`/`ng`, `usd` (USD index), `binance` (crypto). Intervals span 1m…1M per source.
 
-| Source (`QuoteSource`) | Covers | Intervals |
-| :--------------------- | :----- | :-------- |
-| `auto` | Picks source by symbol shape, then falls back one by one | 1m…1M |
-| `tencent` | A-shares / indices / funds (name, pinyin or code) | 1m, 5m, 15m, 30m, 60m, 1h, 1d, 1w, 1M |
-| `eastmoney` | A-shares / futures / HK (`1.600519`) | same as above |
-| `gold` / `xau` / `gc` | Shanghai gold AU0 (AG0) / London spot XAU / COMEX GC | 1m…1d (Sina futures daily-max) |
-| `crude` / `brent` / `ng` | WTI CL / Brent OIL / US natural gas NG | 1m…1d |
-| `usd` | US Dollar Index UDI — minute bars aggregated from Eastmoney ticks (falls back to Sina FX snapshot), daily+ reverse-computed from ECB reference rates | 1m…1M |
-| `binance` | Crypto pairs (`BTCUSDT`) | 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M |
-
-| Feature     | Description                                                                 |
-| :---------- | :-------------------------------------------------------------------------- |
-| Symbol Input | Code (`sh600519`, `1.600519`, `BTCUSDT`) or Chinese name / pinyin (`茅台` Kweichow Moutai, `gzmt`, `沪金` Shanghai gold, `美元指数` USD index); ambiguous hits open a picker, the resolved name shows on the chart |
-| Chart      | Candles + wicks (red up / green down), MA5/MA10/MA20, last-price dashed line, adaptive price axis, smart time-axis labels |
-| Indicators | Main: MA; sub-panel cycles on tap: Volume / MACD(12,26,9) / RSI(14) / KDJ(9,3,3) (falls back to MACD when the source has no volume) |
-| Interaction | Drag to pan history (320 bars requested per screen), pinch to zoom bar width, tap the main chart for a crosshair + floating tooltip (time / OHLC / volume / change), tap the sub-panel to cycle panels |
-| Auto Refresh | 15s polling toggle; screen stays on while enabled |
-| Persistence | Source / interval / symbol / auto-refresh saved in `SharedPreferences` and restored on re-entry; retired source ids fall back to `auto` |
-| Home Widget | `📈 Quotes` app widget (2×2, resizable): per-instance source + symbol (or "follow the last symbol viewed in the app"), last price and change % coloured red-up / green-down, tap the card to open the K-line screen, tap Refresh to fetch immediately; 30 min fallback refresh by the system, refreshed in sync whenever the market screen loads |
+**Features:** code / name / pinyin input with picker · candles + MA5/10/20 + last-price line · indicators (MA / Volume / MACD / RSI / KDJ) · drag-pan, pinch-zoom, crosshair tooltip · 15s auto-refresh · persisted prefs · **home widgets** — `📈 Quotes` (2×2 resizable, per-instance source+symbol) and the `行情曲线` chart widget (single-symbol trend sparkline, resizable, 2×2-friendly; 黄金标的额外标注人民币价 元/克).
 
 ### Message System (C++ ↔ Java)
+Thread-safe queue (`Message.h`) + `MASSAGER` enum bridging native and UI: toast/status/hint, pub-sub feedback, file progress, texture, UDP server/client, KCP status. `SelectActivity` shows dual status (`txt_hint` / `txt_status`) with day/night-aware colors.
 
-The app uses a thread-safe message queue (`Message.h`) to bridge C++ native code with Java UI. Messages are dispatched via the `MASSAGER` enum:
-
-| Type          | Direction | Description                               |
-| :------------ | :-------: | :---------------------------------------- |
-| `MESSAGE`     | C++ → Java | General toast notifications               |
-| `TOAST`       | C++ → Java | Status text update (`txt_status`)         |
-| `MSG_HINT`    | C++ → Java | Hint text update (`txt_hint`)             |
-| `SUBSCRIBER`  | C++ → Java | Subscribe service feedback                |
-| `PUBLISHER`   | C++ → Java | Publish service feedback                  |
-| `FILE_PROGRESS` | C++ → Java | File transfer progress update             |
-| `TEXTURE`     | C++ → Java | Texture rendering callback                |
-| `UDP_SERVER`  | C++ → Java | UDP server: first message after start is the status (port), every later one is received data |
-| `UDP_CLIENT`  | C++ → Java | UDP client status                         |
-| `KCP_VIEW`    | C++ → Java | KCP connection status                     |
-
-The SelectActivity UI features a dual-status display: `txt_hint` (italic 12sp, secondary blue-grey) for supplementary hints and `txt_status` (bold 14sp, teal) for primary status, separated by a divider line. The three colors come from `@color/hint_text`, `@color/status_text`, `@color/card_divider`, which have separate `values` / `values-night` definitions (`SelectActivity` runs on a `DayNight` theme), so contrast stays above 4.5:1 on both light and dark card backgrounds.
-
-### Multimedia Processing
-
-| Feature        | Description                                                            |
-| :------------- | :--------------------------------------------------------------------- |
-| GPU Rendering  | Image/video rendering via OpenGL ES 2.0 (EGL/GLESv2)                  |
-| CPU Rendering  | Software-based image/video decoding and display                        |
-| Audio Recording | 16kHz PCM recording with real-time waveform visualization              |
-| Audio Playback  | Play WAV/MP4/OGG/MP3/AAC/AMR files with waveform analysis              |
-| Speech to Text  | Built-in speech recognition (STT) integration                          |
-| Sensor Monitor  | Real-time accelerometer, gravity, and linear acceleration data display |
+### Multimedia
+GPU (EGL/GLES2) & CPU image/video rendering · 16 kHz PCM recording with live waveform · WAV/MP4/OGG/MP3/AAC/AMR playback + waveform · built-in STT.
 
 ### 3D Human Model (Avatar)
-
-Reachable from the dashboard Services card (`🧍 3D Human Model · Avatar`). Fully parametric and on-device — no photogrammetry, no cloud reconstruction. A photo contributes *appearance and silhouette proportions*, the user supplies the *absolute scale*.
-
-A picker on entry asks for the modeling engine (remembered, switchable in-page):
+On-device parametric model (no cloud). A photo contributes appearance + silhouette proportions; the user supplies the absolute scale. Engine picker on entry:
 
 | Engine | Description |
 | :----- | :---------- |
-| `Native` (原生) | SDF implicit surface (smooth union of capsules / ellipsoids) + SurfaceNets isosurface extraction — the current implementation, body & face fully procedural |
-| `High-res` (高分) | **Anny** ([naver/anny](https://github.com/naver/anny), Apache-2.0, geometry from the MakeHuman community / CC0): phenotype parameters (gender, age, height, weight, muscle …) drive prototype blendshapes, replacing the procedural mesh while the rest of the pipeline stays the same. Shape data is exported offline by `tools/export_anny_targets.py` into `app/src/main/assets/anny/anny.mhb` (or loaded at runtime) and solved on device as `w = Π c`; without it the page falls back to `Native` |
+| `Native` (原生) | SDF implicit surface + SurfaceNets — fully procedural body & face |
+| `High-res` (高分) | **Anny** ([naver/anny](https://github.com/naver/anny), Apache-2.0, MakeHuman/CC0): phenotype params drive prototype blendshapes; baked offline by `tools/export_anny_targets.py` → `anny.mhb`, solved on device as `w = Π c`; falls back to `Native` if missing |
 
-| Feature         | Description                                                            |
-| :-------------- | :--------------------------------------------------------------------- |
-| Photo Input     | Gallery (`ACTION_GET_CONTENT`) or camera (`FileProvider` + `ACTION_IMAGE_CAPTURE`); tap the thumbnail to preview the full image |
-| Cloud (Tripo3D) | Optional `☁ Tripo3D photo-to-3D` (own API key, stored locally): upload → poll → download GLB, parsed by `GlbLoader` and normalized to the current height |
-| Silhouette Fit  | Border-based background estimate → foreground mask → per-row width profile at shoulder / chest / waist / hip → `chestR` / `waistR` / `hipR` multipliers |
-| Color Extract   | Median foreground color of hair / face / upper / lower bands → hair, skin, top & bottom colors |
-| Body Params     | Gender, height (120–210 cm), weight (30–150 kg), head-to-body ratio (6–8.5), shoulder / chest / waist / hip fine tuning |
-| Face & Hair     | 6 face shapes (oval/round/square/long/heart/diamond) and 8 hairstyles (bald → long, ponytail, bun, curly) driving head profile & hair volumes |
-| Life-Size Mesh  | 7.5-head canon landmarks (shoulder 0.82H … ankle 0.045H) in metres, feet at `y=0`; girth from BMI (limbs ≈ √BMI, waist/hip steeper) |
-| Preview         | OpenGL ES 2.0: ground grid (0.2 m), height ruler with on-screen scale numbers (0.5 m steps + the current height reading) and contact shadow, drag-rotate / pinch-zoom / double-tap reset |
-| Measurements    | BMI + CN grading, shoulder width, chest / waist / hip circumference (ellipse perimeter), arm span, inseam |
-| Export          | OBJ + MTL grouped by body part with per-part colors, and PNG screenshot of the preview |
-| Persistence     | All params & colors saved in `SharedPreferences` and restored on re-entry |
+> Regenerate `anny.mhb`: `python3 tools/export_anny_targets.py export --anny-dir /path/to/anny --out app/src/main/assets/anny/anny.mhb` (or `--synthetic` for a placeholder; `selftest` checks byte-exactness). Bakes gender/muscle/weight/height into 56 multi-linear blendshapes.
 
-### Intelligent Features
+**Features:** photo / cloud (Tripo3D) input · silhouette & color extraction · body params (gender/height/weight/head ratio + girth tuning) · face shapes & 8 hairstyles · life-size mesh + measurements (BMI, circumferences, inseam) · OpenGL ES preview (grid/ruler/shadow) · OBJ+MTL export & PNG screenshot · persisted prefs.
 
-| Feature      | Description                                                        |
-| :----------- | :------------------------------------------------------------------ |
-| AI Chat      | DeepSeek API integration with Chat / Reasoner (Deep Think) models   |
-| Sensor Alert | Automatic warning audio when acceleration exceeds 7.0 m/s² threshold |
+### Intelligent
+DeepSeek AI chat (Chat / Reasoner) · acceleration alert at 7.0 m/s².
 
-### System Integration
-
-| Feature       | Description                                                    |
-| :------------ | :-------------------------------------------------------------- |
-| Event System  | Observer-pattern event broadcast for inter-component communication |
-| Time Sync     | Native timestamp acquisition and synchronization                |
-| Global Toast  | Floating toast notification service (3s auto-dismiss)            |
-| One-Tap Exit | Global exit manager to terminate all activities and services     |
+### System
+Observer event bus · native time sync · global 3s toast · one-tap exit.
 
 ---
 
 ## Build Requirements
 
-| Component      | Version                          |
-| :------------- | :------------------------------- |
-| Android SDK    | 31 (compileSdk) / 21+ (minSdk)  |
-| Android NDK    | 23.0.7599858                     |
-| Build Tools    | 30.0.3                           |
-| Gradle         | 7.x                              |
-| CMake          | 2.8+                             |
-| JDK            | 8 or 11                          |
-| ABIs           | arm64-v8a, armeabi-v7a, x86_64   |
-| C++ Standard   | C++11 (ARM NEON optimized)       |
-
----
+Android SDK 31 / min 21 · NDK 23.0.7599858 · Build Tools 30.0.3 · Gradle 7.x · CMake 2.8+ · JDK 8/11 · ABIs arm64-v8a, armeabi-v7a, x86_64 · C++11 (ARM NEON).
 
 ## Permissions
 
-```xml
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-<uses-permission android:name="android.permission.READ_PHONE_STATE" />
-<uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
-```
-
----
+`BLUETOOTH` (+`ADMIN`/`CONNECT`/`SCAN`), `WRITE`/`READ_EXTERNAL_STORAGE`, `CAMERA`, `RECORD_AUDIO`, `INTERNET`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`, `SYSTEM_ALERT_WINDOW`, `ACCESS_NETWORK_STATE`, `READ_PHONE_STATE`, `HIGH_SAMPLING_RATE_SENSORS`.
 
 ## Building
 
-```bash
-# Local build
-./build.sh
-
-# CI build (Azure Pipelines)
-# See azure-pipelines.yml
-```
-
----
-
-## CI/CD
-
-This project uses Azure Pipelines for continuous integration on `macos-latest`. The pipeline:
-
-- Checks out the main repo and `tsymiar/scadup` submodule
-- Copies scadup native library to `app/src/main/cpp/scadup/`
-- Installs Android SDK components (NDK 23, build-tools 30.0.3, platform 31)
-- Sets up JDK 11 and builds with Gradle 7.0.2
-- Produces debug APK for `arm64-v8a`, `armeabi-v7a`, `x86_64`
-
----
+`./build.sh` (local). Azure Pipelines CI on `macos-latest` checks out the repo + the `tsymiar/scadup` submodule, installs NDK/SDK/JDK, and builds debug APKs for the three ABIs.
 
 ## Screenshots
 
-<img src="image/MainActivity.jpg" title="MainActivity" height="30%" width="30%">
-
----
+<img src="image/MainActivity.jpg" title="MainActivity" height="50%" width="50%">
 
 ## License
 
-MIT License
-
----
+MIT
 
 ## Recent Changes
 
-Short log — one line per change.
-
 ### 2026-10
-
-- **Air Bangs**: more strands, thinner — denser and more natural.
-- **Anny Bust**: taller, rounder, smoother edges; no flat disc or shading seams.
-- **Hip Fullness**: higher default hip calibration — visible glutes.
+- Air Bangs; Anny Bust (taller/rounder, no seams); Hip Fullness calibration.
 
 ### 2026-09
-
-- **Anny Face & Head**: fixed double features, added face texture; head measured from real mesh.
-- **Anny Bust Dome**: full-dome growth kernel, no flat plate.
-- **Anny Stance & Toe**: auto-straighten A-pose legs; restored outer toe.
-- **Photo Fallback**: revert to default body when hip outline is missing.
-- **Hip Recalibration**: retuned coefficients after leg straightening.
-- **Sensor Card Zoom**: tap compass / bubble-level to go fullscreen.
-- **Compass / Bubble Level**: larger ticks and readouts; level shows two angles only.
-- **Decibel Card**: shown only while recording.
-- **SSH Server**: MINA SSHD on port 2222, user `d2d` + random password.
-- **Sensor Dashboard**: compass+level row, mag/altitude/steps/proximity row.
-- **Interval Labels**: hourly bars show `1h`; picker supports 1m–1Y.
-- **Misc**: texture / wave screens show own titles; 3D body model, AA–F cup by measurement.
-- **Chest Drives Breasts**: chest slider feeds breast volume; higher gain.
-- **Seam Smoothing**: monotone-cubic keyframes; feathered hard masks.
-- **Hip Calibration**: anthropometric hip calibration.
-- **Hair Placement Fix**: hair / features offset by head bbox center.
-- **Anny Facial Features**: reused `buildFeatures`; added ear-size param.
-- **Spinner Colors**: dark-aware dropdown text.
-- **Built-in Anny Data**: bundled `anny.mhb` in APK; high-res engine default.
-- **Bust Shape Options**: shape dropdown + fullness slider.
-- **Anny Chest Parameters**: chest / waist / hip interpolated per height.
-- **Barefoot**: no shoes drawn; SDF feet.
-- **Anny Engine**: offline high-res engine via `anny.mhb`.
-- **Anny Scaling**: girth scaling follows actual height.
-- **Anny Bust & Hip**: local bust lift without affecting girth.
-- **Anny Face & Hair**: face + 8 hairstyles.
-- **Anny Teardrop Bust**: teardrop shape tuning.
-- **Anny Measurements**: A-pose measurement fixes.
-- **Market K-Line**: 11 sources, indicators, day/night palette.
-- **Market Widget**: 2×2 resizable widget.
-- **HTTP Server**: multi-select ZIP, sortable columns.
-- **SAF Fix**: directory rows via `MIME_TYPE_DIR`.
+- Anny face/head texture + real-mesh head; bust dome; A-pose leg straighten + outer toe; photo fallback; hip recalibration; sensor card zoom + compass/level fullscreen; decibel card; SSH server (port 2222); sensor dashboard; interval labels; chest→breast; seam smoothing; hip/chest calibration; hair placement; facial features; dark-aware spinners; bundled `anny.mhb`; bust/chest params; barefoot; Anny engine + scaling; face & hair; teardrop bust; measurements; Market K-Line (11 sources); Market Widget (2×2); HTTP server; SAF fix.
 
 ### 2026-06
-
-- **MSG_HINT**: new `MSG_HINT = 9` for auxiliary hints.
-- **UI Polish**: footer layout, day/night aware colors.
-- **Pub/Sub Async**: no ANR on subscribe / publish.
-- **Topic Isolation**: separate `topic` and `pubTopic`.
-- **Subscribe Fix**: `shared_ptr` buffer, fixes trailing garbage.
-- **Port Parsing Guard**: invalid port falls back to 9999.
+- `MSG_HINT`; UI polish; Pub/Sub async + topic isolation; subscribe buffer fix; port-parsing guard.

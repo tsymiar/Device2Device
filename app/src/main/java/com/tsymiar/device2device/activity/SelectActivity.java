@@ -135,14 +135,27 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     tv.setText(msg.obj.toString());
                     break;
                 case Receiver.FILE_PROGRESS: {
-                    // 格式: "status|current|total" → 路由到文件传输对话框
+                    // 格式: "status[|落盘路径]|current|total" → 路由到文件传输对话框
+                    // 传输完成时 native 会在 status 后面追加一个真实落盘路径，
+                    // 所以 current/total 固定取最后两段，其余原样拼回 status。
                     String data = msg.obj.toString();
                     if (mFileMsgDialog != null) {
-                        String[] parts = data.split("\\|", 3);
-                        if (parts.length == 3) {
-                            long current = Long.parseLong(parts[1]);
-                            long total = Long.parseLong(parts[2]);
-                            mFileMsgDialog.updateProgress(current, total, parts[0]);
+                        String[] parts = data.split("\\|");
+                        if (parts.length >= 3) {
+                            try {
+                                long total = Long.parseLong(parts[parts.length - 1]);
+                                long current = Long.parseLong(parts[parts.length - 2]);
+                                StringBuilder status = new StringBuilder();
+                                for (int i = 0; i < parts.length - 2; i++) {
+                                    if (i > 0) status.append('|');
+                                    status.append(parts[i]);
+                                }
+                                mFileMsgDialog.updateProgress(current, total, status.toString());
+                            } catch (NumberFormatException ignored) {
+                                mFileMsgDialog.updateStatus(data);
+                            }
+                        } else {
+                            mFileMsgDialog.updateStatus(data);
                         }
                     }
                     break;
@@ -346,8 +359,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
         findViewById(R.id.btn_chat).setOnClickListener(v ->
         {
-            mChatBoxDialog = new ChatBoxDialog(SelectActivity.this);
-            mChatBoxDialog.show();
+            // Activity 正在收摊时 show() 会抛 BadTokenException
+            if (SelectActivity.this.isFinishing() || SelectActivity.this.isDestroyed()) return;
+            // 复用同一个实例：避免每次点击都新建一个 Dialog（也就不会再叠加一堆 Handler）
+            if (mChatBoxDialog == null) {
+                mChatBoxDialog = new ChatBoxDialog(SelectActivity.this);
+            }
+            if (!mChatBoxDialog.isShowing()) {
+                mChatBoxDialog.show();
+            }
         });
         findViewById(R.id.btn_file_trans).setOnClickListener(v ->
         {

@@ -40,12 +40,19 @@
     <string name="section_files">💬 Services</string>
     <string name="section_game">🎮 Games</string>
     <string name="market_quote">📈 行情 K线 · Market</string>
-    <string name="market_widget_label">📈 行情</string>
-    <string name="market_widget_desc">一个部件可放多个自选标的的最新价与涨跌幅，每行小字标出市场代码，超出高度可上下滚动；点某一行看该标的，点右上角「刷新」立即取数</string>
-    <string name="market_widget_config">行情小部件设置</string>
+    <string name="market_widget_label">📈 多行情</string>
+    <string name="market_widget_desc">一个部件可放多个自选标的的最新价与涨跌幅，小字标出市场代码，超出高度可上下滚动。</string>
+    <string name="market_widget_config">行情列表设置</string>
     <string name="market_widget_loading">加载中…</string>
     <string name="market_widget_refresh">刷新</string>
     <string name="market_widget_title">行情</string>
+    <!-- 行情曲线小部件：桌面上与「行情」并列的另一个部件，只盯一个标的画走势 -->
+    <string name="market_chart_widget_label">📈 行情曲线</string>
+    <string name="market_chart_widget_desc">只盯一个标的，按时段画出它的走势曲线，分钟级周期表示当天分时行情。点整块看该标的，点右上角「刷新」立即取数据。</string>
+    <string name="market_chart_widget_config">行情曲线设置</string>
+    <string name="market_widget_chart_interval">曲线周期</string>
+    <string name="market_widget_chart_wait">等待数据…</string>
+    <string name="market_widget_chart_none">暂无曲线数据</string>
     <string name="avatar_3d">🧍 人物 3D 模型 · Avatar</string>
     <string name="deduction_board">🧩 声纹推演盘 · Deduction Board</string>
     <string name="sensor">传感器</string>
@@ -104,6 +111,9 @@
     <string name="msg">请输入要发送的消息</string>
     <string name="pkg">📎</string>
     <string name="commit">发送</string>
+    <string name="chat_api_key_hint">API Key（留空用内置 Key）</string>
+    <string name="chat_api_key_mask">●●●</string>
+    <string name="chat_api_key_show">sk-*****</string>
 
     <!-- ===== Serial Command Buttons ===== -->
     <string name="is_0">❨0❩</string>

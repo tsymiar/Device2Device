@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行情曲线小部件（MarketChartWidgetProvider）的布局：只盯一个标的，
+     主体是最近 N 根K线连成的走势图。列表版那一个用的是 widget_market.xml。
+
+     注意 RemoteViews 只认它自己那份 View 白名单：能用 LinearLayout / FrameLayout /
+     TextView / ImageView，但 Space、自定义 View 都会让整个部件 inflate 失败，
+     加了却什么都看不到。缺「弹性空格」时用 0dp + weight 1 的 TextView 顶。
+
+     RemoteViews 也不支持自定义 View，曲线是在 Provider 里用 Canvas 画成 Bitmap 后
+     setImageViewBitmap 贴到 widget_chart 上的；部件尺寸变了会按新尺寸重画，所以这里
+     只管把 ImageView 拉满剩余空间（height 0dp + weight 1）。
+
+     还有一个上限：RemoteViews 走 Binder 传输有体积限制，位图不能无限大，
+     超出由 MarketSparkline 里的 MAX_W / MAX_H 兜住（超了会跨进程失败，表现为部件空白）。
+
+     曲线区没有 ListView，所以这里不要出现 widget_list / widget_empty。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_market_bg"
+    android:orientation="vertical"
+    android:padding="9dp">
+
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/market_widget_title"
+                android:textColor="@color/market_widget_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_symbol"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/market_widget_text_hint"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="6dp"
+            android:paddingEnd="2dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="@string/market_widget_refresh"
+            android:textColor="@color/market_widget_text_dim"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- 曲线主体：吃掉上部标题与下部价格行之间的全部剩余空间。
+         scaleType=fitXY：位图比例与实际框略有出入时铺满，不留黑边 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="2dp"
+        android:layout_weight="1">
+
+        <ImageView
+            android:id="@+id/widget_chart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/market_widget_title"
+            android:scaleType="fitXY" />
+
+        <TextView
+            android:id="@+id/widget_chart_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="@string/market_widget_chart_wait"
+            android:textColor="@color/market_widget_text_hint"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- 价格行：最新价 + 涨跌幅（相对上一根收盘），整块用涨跌色统一染色 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="--"
+            android:textColor="@color/market_widget_text"
+            android:textSize="23sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_change"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="@color/market_widget_text_dim"
+            android:textSize="12sp" />
+
+        <!-- 吃掉剩余宽度把自己顶到最右。别用 Space 占位：RemoteViews 只认它自己那份
+             View 白名单，<Space> 不在里面，部件会直接 inflate 失败 -->
+        <TextView
+            android:id="@+id/widget_range"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="end"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="@color/market_widget_text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <!-- 黄金专用的一行：标注对应的人民币价（元/克）。默认 GONE，只有黄金标的才显示，
+         非黄金标的不会因为多这一行被挤掉曲线高度 -->
+    <TextView
+        android:id="@+id/widget_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text=""
+        android:textColor="@color/market_widget_text_hint"
+        android:textSize="9sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/market_widget_loading"
+        android:textColor="@color/market_widget_text_hint"
+        android:textSize="9sp" />
+
+</LinearLayout>

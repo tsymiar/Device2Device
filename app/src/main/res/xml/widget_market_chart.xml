@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 行情曲线小部件（只盯一个标的画走势）的 AppWidget 配置：默认 2x2 格，可自由拉伸，
+     拉伸后曲线按新尺寸重画（onAppWidgetOptionsChanged）。
+     多标的的列表版是另一个组件（widget_market_list.xml）。
+     注意：这里是 res/xml，与同名的布局 res/layout/widget_market_chart.xml 是两种资源类型 -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.tsymiar.device2device.widget.MarketChartConfigActivity"
+    android:description="@string/market_chart_widget_desc"
+    android:initialLayout="@layout/widget_market_chart"
+    android:maxResizeHeight="420dp"
+    android:maxResizeWidth="420dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="96dp"
+    android:minResizeWidth="110dp"
+    android:minWidth="110dp"
+    android:previewLayout="@layout/widget_market_chart"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

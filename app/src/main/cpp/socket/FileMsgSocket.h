@@ -14,6 +14,8 @@
 #include <fstream>
 #include <memory>
 #include <map>
+#include <vector>
+#include <future>
 
 #ifndef LOG_TAG
 #define LOG_TAG "FileMsgSocket"
@@ -21,7 +23,8 @@
 
 #include <utils/logging.h>
 
-// 文件传输协议头 (64字节)
+// 文件传输协议头 (64字节), 大端序(网络字节序)
+// 与 MyAutomatic/LinxSrvc/Mac/Transfer 的 TransferEngine.h 逐字段对齐，两端才能互通
 #pragma pack(push, 1)
 struct FileHeader {
     uint8_t  magic[4];       // 魔数: "FTF\0"
@@ -33,9 +36,13 @@ struct FileHeader {
     uint32_t chunkCount;     // 分片总数
     uint32_t currentChunk;   // 当前分片索引
     uint64_t transSize;      // 已传输大小
-    uint8_t  reserved[16];   // 保留
+    uint8_t  reserved[25];   // 保留（补齐到 64 字节）
 };
 #pragma pack(pop)
+
+// 协议头必须是 64 字节：字段自然长度只有 39 字节，靠 reserved 补齐。
+// 一旦有人改动字段，这里会直接编译失败，避免线上出现"头长度对不上"的兼容性问题。
+static_assert(sizeof(FileHeader) == 64, "FileHeader must be exactly 64 bytes");
 
 // 传输进度回调
 using ProgressCallback = std::function<void(uint64_t current, uint64_t total, const std::string& status)>;
@@ -50,6 +57,7 @@ struct ClientSession {
     uint64_t pendingFileSize;         // 待接收文件大小
     uint64_t transSize;              // 已传输大小
     std::atomic<bool> active;         // 会话是否活跃
+    std::string currentFilePath;      // 本次实际落盘的完整路径（完成后回传给 UI）
 
     ClientSession() : sock(-1), clientPort(0), pendingFileSize(0), transSize(0), active(false) {}
 };
@@ -66,7 +74,7 @@ public:
 
 private:
     std::map<int, std::unique_ptr<ClientSession>> m_sessions;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
 };
 
 class FileMsgSocket {
@@ -79,8 +87,11 @@ public:
 
     static constexpr uint32_t MAX_CHUNK_SIZE = 64 * 1024;  // 64KB per chunk
     static constexpr uint16_t DEFAULT_PORT = 8800;
+    static constexpr int CONNECT_TIMEOUT_MS = 3000;    // 客户端 connect 超时
     static constexpr int RECV_POLL_TIMEOUT_MS = 5000;  // 服务端 poll 超时（避免 Nagle/RTT 导致文件名读取超时）
-    static constexpr int RECV_RESP_TIMEOUT_MS = 5000;   // 客户端等待响应超时
+    static constexpr int RECV_RESP_TIMEOUT_MS = 5000;  // 客户端等待响应超时
+    static constexpr int SEND_TIMEOUT_SEC = 30;        // 发送超时（对端一直不读时不会永久卡死）
+    static constexpr uint32_t MAX_FILE_NAME_LEN = 1024; // 文件名长度上限（防恶意长度触发超大分配）
 
     FileMsgSocket();
     ~FileMsgSocket();
@@ -114,7 +125,7 @@ private:
     void fileClientProcess();
     void clientHandler(int sock, const std::string& clientIp, unsigned short clientPort);
 
-    int sendFileData(int sock, const std::string& filePath, uint64_t fileSize);
+    int sendSliceData(int sock, const std::string& filePath, uint64_t fileSize);
     int sendHeader(int sock, const void* data, size_t len);
     int sendHeader(int sock, const FileHeader& header);
     int recvHeader(int sock, FileHeader& header);
@@ -130,16 +141,18 @@ private:
 
     std::thread m_serverThread;
     std::thread m_receiveThread;
+    // 每个客户端一个异步任务。已结束的任务会在 accept 时被回收，
+    // 否则长时间运行的 server 会一直堆积线程对象（原实现只在 stopServer 才 join）。
+    std::vector<std::future<void>> m_clientFutures;
 
     std::mutex m_sendMutex;
+    std::mutex m_clientThreadMutex;
 
     std::string m_savePath;
     std::string m_serverIp;
     unsigned short m_serverPort;
 
     ProgressCallback m_progressCallback;
-
-    std::string m_pendingFileName;
 
     ClientSessionMgr m_sessionMgr;
 };

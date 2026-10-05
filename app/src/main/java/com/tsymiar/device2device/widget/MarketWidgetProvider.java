@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 行情桌面小部件：一个部件里可以放多个标的（自选股 / 黄金 / 原油 / 加密货币混着也行）。
+ * 行情桌面小部件（列表版）：一个部件里可以放多个标的（自选股 / 黄金 / 原油 / 加密货币混着也行）。
  *
  * - 每个小部件实例各自记一份标的列表（未配置时跟随行情页最近查看的标的）；
  * - 标的行装在 ListView 里，超出可视高度可以上下滚动（RemoteViews 里只有 AdapterView
@@ -48,6 +48,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - 系统每 30 分钟兜底刷新一次（AppWidget 允许的最小间隔），点「刷新」可立即取数；
  * - 点某行进行情页对应标的，点空白处进行情页，行情页取数成功后也会顺带刷新小部件；
  * - 取数是异步的，用 goAsync() 撑住广播生命周期，避免进程被提前回收。
+ *
+ * 想看单个标的的走势曲线请用另一个部件 {@link MarketChartWidgetProvider}，
+ * 两者共用标的配置与小工具类（fmtPrice / marketCode / now 等做成包可见就是为了这个）。
  */
 public class MarketWidgetProvider extends AppWidgetProvider {
 
@@ -220,6 +223,16 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     @Override
     public void onDeleted(Context context, int[] appWidgetIds) {
         super.onDeleted(context, appWidgetIds);
+        clearPrefs(context, appWidgetIds);
+    }
+
+    /**
+     * 清掉某几个部件的配置。
+     *
+     * 两个部件共用一份 prefs（key 都按 widgetId 区分）：曲线部件删掉自己时也走这里，
+     * 见 {@link MarketChartWidgetProvider#onDeleted} —— 不然它的 {@code items_} 会残留在文件里。
+     */
+    static void clearPrefs(Context context, int[] appWidgetIds) {
         if (appWidgetIds == null) return;
         SharedPreferences.Editor editor =
                 context.getSharedPreferences(PREF_WIDGET, Context.MODE_PRIVATE).edit();
@@ -305,7 +318,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
             sPending.remove(widgetId);
             try {
                 RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market);
-                views.setOnClickPendingIntent(R.id.widget_root, openMarket(context));
+                views.setOnClickPendingIntent(R.id.widget_root, openMarket(context, widgetId));
                 views.setTextViewText(R.id.widget_meta, "加载失败：" + t.getClass().getSimpleName());
                 manager.updateAppWidget(widgetId, views);
             } catch (Throwable ignored) {
@@ -492,7 +505,8 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     private static Row rowOf(Item item, List<Quote> quotes, String error) {
         if (quotes == null || quotes.isEmpty()) {
             if (error != null) Log.w(TAG, "widget fetch failed: " + item.symbol + " " + error);
-            return new Row(item, false, "--", error == null ? "无数据" : error, R.color.market_flat, error);
+            return new Row(item, false, "--", error == null ? "无数据" : error,
+                    R.color.market_flat, error);
         }
         Quote last = quotes.get(quotes.size() - 1);
         float base = quotes.size() > 1 ? quotes.get(quotes.size() - 2).close : last.open;
@@ -520,10 +534,10 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         // 列表：挂上数据源（MarketWidgetService），点击模板负责把某一行的标的带给行情页
         views.setRemoteAdapter(R.id.widget_list, MarketWidgetService.adapterIntent(context, widgetId));
         views.setEmptyView(R.id.widget_list, R.id.widget_empty);
-        views.setPendingIntentTemplate(R.id.widget_list, openMarket(context));
+        views.setPendingIntentTemplate(R.id.widget_list, openMarket(context, widgetId));
         // 点空白进行情页，点「刷新」只取数
-        views.setOnClickPendingIntent(R.id.widget_root, openMarket(context));
-        views.setOnClickPendingIntent(R.id.widget_header, openMarket(context));
+        views.setOnClickPendingIntent(R.id.widget_root, openMarket(context, widgetId));
+        views.setOnClickPendingIntent(R.id.widget_header, openMarket(context, widgetId));
         views.setOnClickPendingIntent(R.id.widget_refresh, refreshIntent(context, widgetId));
         return views;
     }
@@ -557,8 +571,8 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         return rowView;
     }
 
-    /** 行里那行小字：市场代码 + 市场（sh600519 · 沪 / BTCUSDT · 加密货币） */
-    private static String marketCode(Item item) {
+    /** 行里那行小字：市场代码 + 市场（sh600519 · 沪 / BTCUSDT · 加密货币）；曲线部件也用它 */
+    static String marketCode(Item item) {
         String code = item.symbol == null ? "" : item.symbol.trim();
         String tag = marketTag(code, item.source);
         return TextUtils.isEmpty(tag) ? code : code + " · " + tag;
@@ -596,12 +610,18 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         return ContextCompat.getColor(context, resId);
     }
 
-    private static PendingIntent openMarket(Context context) {
+    /**
+     * 列表项的 fillIn 模板：具体标的由 rowViews 的 fillInIntent 补。
+     *
+     * requestCode 必须带 widgetId：多个部件共用 0 的话，FLAG_UPDATE_CURRENT 会让它们
+     * 互相覆盖 extras，点第二个部件也会跳到第一个部件（或第一个标的）上去。
+     */
+    private static PendingIntent openMarket(Context context, int widgetId) {
         Intent intent = new Intent(context, MarketActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         // 列表行的标的靠 fillInIntent 补进来：Android 12+ 只有可变的模板才会收下这些 extra，
         // 模板若建成不可变，点哪一行都只会打开上次那个标的
-        return PendingIntent.getActivity(context, 0, intent, templateFlags());
+        return PendingIntent.getActivity(context, widgetId, intent, templateFlags());
     }
 
     /** fillInIntent 用可变模板；其余场景保持不可变 */
@@ -630,14 +650,14 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         return flags;
     }
 
-    /** 按价位决定小数位：股价两位，小币种/低价标的多给几位 */
-    private static String fmtPrice(float price) {
+    /** 按价位决定小数位：股价两位，小币种/低价标的多给几位；曲线部件也用它 */
+    static String fmtPrice(float price) {
         float abs = Math.abs(price);
         int decimals = abs >= 100f ? 2 : (abs >= 1f ? 3 : 4);
         return String.format(Locale.US, "%." + decimals + "f", price);
     }
 
-    private static String now() {
+    static String now() {
         return new SimpleDateFormat("更新 HH:mm", Locale.getDefault()).format(new Date());
     }
 
