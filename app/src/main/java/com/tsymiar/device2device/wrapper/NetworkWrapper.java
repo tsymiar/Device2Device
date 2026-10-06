@@ -31,7 +31,7 @@ public class NetworkWrapper {
     public static native void disconnectFileMsg();
 
     // 发送文件
-    public static native int sendLocalFile(String filePath);
+    public static native int postLocalFile(String filePath);
 
     // 请求文件
     public static native int requestFile(String ip, int port, String fileName);

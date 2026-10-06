@@ -74,7 +74,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* , jclass, jstring, 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jint port);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv*, jclass, jstring ip, jint port);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass);
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLocalFile)(JNIEnv*, jclass, jstring filePath);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(postLocalFile)(JNIEnv*, jclass, jstring filePath);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv*, jclass, jstring ip, jint port, jstring fileName);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv*, jclass, jstring path);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass);

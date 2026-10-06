@@ -8,12 +8,12 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="12dp"
         android:text="File Message"
         android:textSize="20sp"
         android:textStyle="bold" />
 
-    <!-- 服务器/端口 -->
+    <!-- 监听地址：服务端起来后填监听 IP:Port 并置灰不可编辑 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="textUri"
                 android:text="192.168.1.1"
-                android:textColor="@color/dark_grey"/>
+                android:textColor="@color/dark_grey" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -50,50 +50,171 @@
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:text="8800"
-                android:textColor="@color/dark_grey"/>
+                android:textColor="@color/dark_grey" />
         </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
 
-    <!-- 文件选择区域 -->
-    <LinearLayout
+    <!-- ============ 接收端 / Server ============ -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="接收端（对端主动连接）"
+        android:textColor="@color/colorPrimary"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btn_file_trans_server"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:text="Start Server" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="12dp"
+        android:background="#E0E0E0" />
+
+    <!-- ============ 发送端 / Client ============ -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="发送端（主动连接对端）"
+        android:textColor="@color/colorAccent"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btn_file_trans_connect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
+        android:text="Connect" />
+
+    <!-- 连接成功后才展开：文件选择 + 发送/断开，全部归到发送端一组 -->
+    <LinearLayout
+        android:id="@+id/client_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_file_trans_path"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#f5f5f5"
+                android:ellipsize="middle"
+                android:hint="No file selected"
+                android:maxLines="1"
+                android:padding="12dp"
+                android:textColor="@color/dark_grey" />
+
+            <Button
+                android:id="@+id/btn_file_trans_select"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Select" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_file_trans_disconnect"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="Disconnect" />
+
+            <Button
+                android:id="@+id/btn_file_trans_send"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="Send File" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="12dp"
+        android:background="#E0E0E0" />
+
+    <!-- ============ 日志 ============ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
-            android:id="@+id/tv_file_trans_path"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="#f5f5f5"
-            android:ellipsize="middle"
-            android:hint="No file selected"
-            android:padding="12dp"
-            android:maxLines="1"
-            android:textColor="@color/dark_grey" />
+            android:text="Log"
+            android:textColor="@color/dark_grey"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btn_file_trans_select"
+        <TextView
+            android:id="@+id/tv_file_trans_clear"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Select" />
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="Clear"
+            android:textColor="@color/status_text"
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- 状态显示 -->
-    <TextView
-        android:id="@+id/tv_file_trans_status"
+    <ScrollView
+        android:id="@+id/sv_file_trans_log"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_height="120dp"
+        android:layout_marginBottom="8dp"
         android:background="#f5f5f5"
-        android:padding="8dp"
-        android:text="Ready"
-        android:textColor="@color/dark_grey" />
+        android:fillViewport="false"
+        android:padding="8dp">
 
-    <!-- 进度条 -->
+        <TextView
+            android:id="@+id/tv_file_trans_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/dark_grey"
+            android:textSize="11sp"
+            android:typeface="monospace" />
+    </ScrollView>
+
     <ProgressBar
         android:id="@+id/pb_file_trans"
         style="@style/Widget.AppCompat.ProgressBar.Horizontal"
@@ -102,53 +223,5 @@
         android:layout_marginBottom="8dp"
         android:max="100"
         android:visibility="gone" />
-
-    <!-- 按钮区域 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btn_file_trans_server"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:text="Start Server" />
-
-        <Button
-            android:id="@+id/btn_file_trans_connect"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:text="Connect" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btn_file_trans_send"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="Send File" />
-
-        <Button
-            android:id="@+id/btn_file_trans_disconnect"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="Disconnect" />
-    </LinearLayout>
 
 </LinearLayout>

@@ -1,20 +1,19 @@
 /**
- * FileMsgSocket Client — standalone file-sending client.
+ * FileMsg Client — standalone file-sending client.
  *
- * Connects to a running FileMsgSocket server and sends a file.
- * Unlike FileMsgSocketServer (fork-based), this client runs independently.
+ * Connects to a running FileMsg server (FileMsgServer --server) and sends a file.
  *
  * Build:
- *   cd test/build && cmake .. && make FileMsgSocketClient
+ *   cd test/build && cmake .. && make FileMsgClient
  *
  * Usage:
- *   Terminal 1: ./FileMsgSocketServer --server --port 8800
- *   Terminal 2: ./FileMsgSocketClient --ip 127.0.0.1 --port 8800 --file ./test.bin
+ *   Terminal 1: ./FileMsgServer --server --port 8800
+ *   Terminal 2: ./FileMsgClient --ip 127.0.0.1 --port 8800 --file ./test.bin
  *   # Or auto-generate a random file of given size:
- *   Terminal 2: ./FileMsgSocketClient --ip 127.0.0.1 --port 8800 --size 524288
+ *   Terminal 2: ./FileMsgClient --ip 127.0.0.1 --port 8800 --size 524288
  */
 
-#include "FileMsgSocketClient.h"
+#include "FileMsgClient.h"
 #include "../socket/FileMsgSocket.h"
 
 #include <iostream>
@@ -25,11 +24,12 @@
 #include <vector>
 #include <sys/stat.h>
 #include <cstring>
+#include <cerrno>
 
  // ---------------------------------------------------------------------------
  // createTestFile — generate a binary file with random content
  // ---------------------------------------------------------------------------
-std::string FileMsgSocketClient::createTestFile(const std::string& path, size_t size)
+std::string FileMsgClient::createTestFile(const std::string& path, size_t size)
 {
     std::ofstream file(path, std::ios::binary);
     if (!file.is_open()) {
@@ -60,7 +60,7 @@ std::string FileMsgSocketClient::createTestFile(const std::string& path, size_t 
 // ---------------------------------------------------------------------------
 // sendLocalFile — connect and transfer with progress display
 // ---------------------------------------------------------------------------
-int FileMsgSocketClient::sendLocalFile(const std::string& ip, unsigned short port,
+int FileMsgClient::sendLocalFile(const std::string& ip, unsigned short port,
     const std::string& filePath)
 {
     // Verify the file exists
@@ -99,7 +99,7 @@ int FileMsgSocketClient::sendLocalFile(const std::string& ip, unsigned short por
 
     // Send
     std::cout << "Sending " << filePath << " ..." << std::endl;
-    ret = client.sendLocalFile(filePath);
+    ret = client.postLocalFile(filePath);
     if (ret < 0) {
         std::cerr << "Send failed: " << ret << std::endl;
         client.disconnect();
@@ -131,7 +131,7 @@ static void usage(const char* prog)
         << "  --help, -h      Show this help\n"
         << "\n"
         << "Examples:\n"
-        << "  Terminal 1: ./FileMsgSocketServer --server --port 8800\n"
+        << "  Terminal 1: ./FileMsgServer --server --port 8800\n"
         << "  Terminal 2: " << prog << " --ip 127.0.0.1 --port 8800 --file ./data.bin\n"
         << "  Terminal 2: " << prog << " --ip 127.0.0.1 --port 8800 --size 1048576\n"
         << std::endl;
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     // If --size specified, generate file first
     if (genSize > 0) {
         filePath = "./" + genName;
-        FileMsgSocketClient::createTestFile(filePath, genSize);
+        FileMsgClient::createTestFile(filePath, genSize);
     }
 
     if (filePath.empty()) {
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    int rc = FileMsgSocketClient::sendLocalFile(ip, port, filePath);
+    int rc = FileMsgClient::sendLocalFile(ip, port, filePath);
 
     if (rc == 0)
         std::cout << "\nFileMsgSocket client finished successfully." << std::endl;

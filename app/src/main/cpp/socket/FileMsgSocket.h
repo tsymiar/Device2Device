@@ -109,7 +109,7 @@ public:
     void setProgressCallback(ProgressCallback callback);
 
     // 文件发送
-    int sendLocalFile(const std::string& filePath);
+    int postLocalFile(const std::string& filePath);
     int requestFile(const std::string& ip, unsigned short port, const std::string& fileName);
 
     // 状态查询

@@ -1,9 +1,9 @@
-#ifndef DEVICE2DEVICE_NetworkServerTest_H
-#define DEVICE2DEVICE_NetworkServerTest_H
+#ifndef DEVICE2DEVICE_NetworkServer_H
+#define DEVICE2DEVICE_NetworkServer_H
 
 #include <string>
 
-class NetworkServerTest {
+class NetworkServer {
 public:
     /** TCP echo server — accepts one connection, echoes back, then exits */
     static int runTcpServer(unsigned short port);

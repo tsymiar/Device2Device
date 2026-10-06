@@ -19,6 +19,9 @@ pic
 .vs*
 *.log
 test
+# 上面那条 test 会把 cpp/test/ 整个目录也忽略掉（里面的源码本来是提交的），单独放开。
+# 注意：父目录被排除时无法再用 !文件路径 把它下面的文件捞回来，必须先放开目录本身。
+!app/src/main/cpp/test/
 
 # Python
 __pycache__/

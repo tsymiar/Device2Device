@@ -1,13 +1,13 @@
-#ifndef DEVICE2DEVICE_FileMsgSocketClient_H
-#define DEVICE2DEVICE_FileMsgSocketClient_H
+#ifndef DEVICE2DEVICE_FileMsgClient_H
+#define DEVICE2DEVICE_FileMsgClient_H
 
 #include <string>
 #include <cstdint>
 
-class FileMsgSocketClient {
+class FileMsgClient {
 public:
     /**
-     * Connect to a FileMsgSocket server and send a file.
+     * Connect to a FileMsg server and send a file.
      *
      * @param ip          Server IP address
      * @param port        Server port

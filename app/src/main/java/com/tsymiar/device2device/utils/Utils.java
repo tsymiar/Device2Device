@@ -260,20 +260,37 @@ public class Utils {
             }
         } catch (Exception ignored) {}
 
-        // 备选：遍历网络接口
+        // 备选：遍历网络接口。
+        // 注意别挑到 VPN(tun*) / 拨号(ppp*) / 蜂窝(rmnet*、ccmni*) 这类网卡 ——
+        // 它们的地址对端根本连不上，而本端自测走 127.0.0.1 完全发现不了这个问题。
         try {
+            InetAddress fallback = null;
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
                 NetworkInterface iface = interfaces.nextElement();
                 if (iface.isLoopback() || !iface.isUp()) continue;
+                String name = iface.getName() == null
+                        ? "" : iface.getName().toLowerCase(java.util.Locale.US);
+                if (name.startsWith("tun") || name.startsWith("ppp")
+                        || name.startsWith("rmnet") || name.startsWith("ccmni")
+                        || name.startsWith("clat")) {
+                    continue;
+                }
                 Enumeration<InetAddress> addresses = iface.getInetAddresses();
                 while (addresses.hasMoreElements()) {
                     InetAddress addr = addresses.nextElement();
                     if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
-                        return addr.getHostAddress();
+                        // Wi-Fi / 以太网优先；其它类型只作兜底
+                        if (name.startsWith("wlan") || name.startsWith("eth")
+                                || name.startsWith("ap") || name.startsWith("wlp")
+                                || name.startsWith("en")) {
+                            return addr.getHostAddress();
+                        }
+                        if (fallback == null) fallback = addr;
                     }
                 }
             }
+            if (fallback != null) return fallback.getHostAddress();
         } catch (Exception ignored) {}
 
         return "127.0.0.1";

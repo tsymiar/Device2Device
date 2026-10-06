@@ -1,16 +1,16 @@
 /**
- * Network Client Tests — standalone TCP / UDP / KCP client validation.
+ * Network Client — standalone TCP / UDP / KCP client validation.
  *
  * Build (from test/):
  *   mkdir -p build && cd build && cmake .. && make
  *
  * Usage:
- *   ./NetworkClientTest --tcp  --ip 127.0.0.1 --port 8800 --msg "hello"
- *   ./NetworkClientTest --udp  --ip 127.0.0.1 --port 8800 --msg "hello"
- *   ./NetworkClientTest --kcp  --ip 127.0.0.1 --port 8800
+ *   ./NetworkClient --tcp  --ip 127.0.0.1 --port 8800 --msg "hello"
+ *   ./NetworkClient --udp  --ip 127.0.0.1 --port 8800 --msg "hello"
+ *   ./NetworkClient --kcp  --ip 127.0.0.1 --port 8800
  */
 
-#include "NetworkClientTest.h"
+#include "NetworkClient.h"
 #include "../socket/UdpSocket.h"
 #include "../socket/KcpSocket.h"
 
@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------
 // TCP Client — raw POSIX socket, connect → send → recv echo
 // ---------------------------------------------------------------------------
-int NetworkClientTest::runTcpTest(const std::string& ip, unsigned short port,
+int NetworkClient::runTcpTest(const std::string& ip, unsigned short port,
                                   const std::string& message)
 {
     int sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -84,7 +84,7 @@ int NetworkClientTest::runTcpTest(const std::string& ip, unsigned short port,
 // ---------------------------------------------------------------------------
 // UDP Client — multicast send via UdpSocket (same API used in production)
 // ---------------------------------------------------------------------------
-int NetworkClientTest::runUdpTest(const std::string& ip, unsigned short port,
+int NetworkClient::runUdpTest(const std::string& ip, unsigned short port,
                                   const std::string& message)
 {
     UdpSocket udp(ip, port);
@@ -114,7 +114,7 @@ int NetworkClientTest::runUdpTest(const std::string& ip, unsigned short port,
 // ---------------------------------------------------------------------------
 // KCP Client — reliable-UDP handshake with server
 // ---------------------------------------------------------------------------
-int NetworkClientTest::runKcpTest(const std::string& ip, unsigned short port)
+int NetworkClient::runKcpTest(const std::string& ip, unsigned short port)
 {
     KcpSocket kcp;
 
@@ -199,9 +199,9 @@ int main(int argc, char* argv[])
 
     int rc = 0;
     switch (mode) {
-    case TCP: rc = NetworkClientTest::runTcpTest(ip, port, msg); break;
-    case UDP: rc = NetworkClientTest::runUdpTest(ip, port, msg); break;
-    case KCP: rc = NetworkClientTest::runKcpTest(ip, port);       break;
+    case TCP: rc = NetworkClient::runTcpTest(ip, port, msg); break;
+    case UDP: rc = NetworkClient::runUdpTest(ip, port, msg); break;
+    case KCP: rc = NetworkClient::runKcpTest(ip, port);       break;
     default: break;
     }
 

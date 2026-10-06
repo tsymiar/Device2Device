@@ -1,21 +1,21 @@
 /**
- * Network Server Tests — standalone TCP / UDP / KCP server echo endpoints.
+ * Network Server — standalone TCP / UDP / KCP server echo endpoints.
  *
  * Build:
- *   cd test/build && cmake .. && make NetworkServerTest
+ *   cd test/build && cmake .. && make NetworkServer
  *
  * Usage:
- *   Terminal 1: ./NetworkServerTest --tcp --port 8800
- *   Terminal 2: ./NetworkClientTest --tcp --ip 127.0.0.1 --port 8800 --msg "hello"
+ *   Terminal 1: ./NetworkServer --tcp --port 8800
+ *   Terminal 2: ./NetworkClient --tcp --ip 127.0.0.1 --port 8800 --msg "hello"
  *
- *   Terminal 1: ./NetworkServerTest --udp --port 8800
- *   Terminal 2: ./NetworkClientTest --udp --ip 127.0.0.1 --port 8800 --msg "hello"
+ *   Terminal 1: ./NetworkServer --udp --port 8800
+ *   Terminal 2: ./NetworkClient --udp --ip 127.0.0.1 --port 8800 --msg "hello"
  *
- *   Terminal 1: ./NetworkServerTest --kcp --port 8800
- *   Terminal 2: ./NetworkClientTest --kcp --ip 127.0.0.1 --port 8800
+ *   Terminal 1: ./NetworkServer --kcp --port 8800
+ *   Terminal 2: ./NetworkClient --kcp --ip 127.0.0.1 --port 8800
  */
 
-#include "NetworkServerTest.h"
+#include "NetworkServer.h"
 #include "../socket/UdpSocket.h"
 #include "../socket/KcpSocket.h"
 
@@ -39,7 +39,7 @@ static void sigHandler(int) { g_running = 0; }
 // ---------------------------------------------------------------------------
 // TCP Echo Server — bind → listen → accept → recv → echo → close
 // ---------------------------------------------------------------------------
-int NetworkServerTest::runTcpServer(unsigned short port)
+int NetworkServer::runTcpServer(unsigned short port)
 {
     signal(SIGINT,  sigHandler);
     signal(SIGTERM, sigHandler);
@@ -137,7 +137,7 @@ int NetworkServerTest::runTcpServer(unsigned short port)
 // ---------------------------------------------------------------------------
 // UDP Echo Server — bind → recvfrom → sendto back
 // ---------------------------------------------------------------------------
-int NetworkServerTest::runUdpServer(unsigned short port)
+int NetworkServer::runUdpServer(unsigned short port)
 {
     signal(SIGINT,  sigHandler);
     signal(SIGTERM, sigHandler);
@@ -207,7 +207,7 @@ int NetworkServerTest::runUdpServer(unsigned short port)
 // ---------------------------------------------------------------------------
 // KCP Server — init (server mode) → startServer loop
 // ---------------------------------------------------------------------------
-int NetworkServerTest::runKcpServer(unsigned short port)
+int NetworkServer::runKcpServer(unsigned short port)
 {
     signal(SIGINT,  sigHandler);
     signal(SIGTERM, sigHandler);
@@ -260,10 +260,10 @@ static void usage(const char* prog)
               << "\n"
               << "Examples:\n"
               << "  Terminal 1: " << prog << " --tcp --port 8800\n"
-              << "  Terminal 2: ./NetworkClientTest --tcp --ip 127.0.0.1 --port 8800 --msg hello\n"
+              << "  Terminal 2: ./NetworkClient --tcp --ip 127.0.0.1 --port 8800 --msg hello\n"
               << "\n"
               << "  Terminal 1: " << prog << " --kcp --port 8800\n"
-              << "  Terminal 2: ./NetworkClientTest --kcp --ip 127.0.0.1 --port 8800\n"
+              << "  Terminal 2: ./NetworkClient --kcp --ip 127.0.0.1 --port 8800\n"
               << std::endl;
 }
 
@@ -297,9 +297,9 @@ int main(int argc, char* argv[])
 
     int rc = 0;
     switch (mode) {
-    case TCP: rc = NetworkServerTest::runTcpServer(port); break;
-    case UDP: rc = NetworkServerTest::runUdpServer(port); break;
-    case KCP: rc = NetworkServerTest::runKcpServer(port); break;
+    case TCP: rc = NetworkServer::runTcpServer(port); break;
+    case UDP: rc = NetworkServer::runUdpServer(port); break;
+    case KCP: rc = NetworkServer::runKcpServer(port); break;
     default: break;
     }
 

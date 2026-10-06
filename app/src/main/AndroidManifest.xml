@@ -121,6 +121,10 @@
         <service
             android:name=".service.SshServerService"
             android:exported="false" />
+        <!-- 文件传输接收端：前台服务托管，对话框关闭后仍能收文件 -->
+        <service
+            android:name=".service.FileMsgServerService"
+            android:exported="false" />
         <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"
             tools:ignore="MissingClass" />

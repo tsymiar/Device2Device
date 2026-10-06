@@ -413,6 +413,9 @@ static int g_udpPort = 8899;
 // 文件传输
 static FileMsgSocket* g_fileMsg = nullptr;
 static std::mutex g_fileTransMutex;
+// 接收落盘路径缓存：applySavePath() 通常先于 start/connect 调用，
+// 那时 g_fileMsg 还没创建，所以先把路径存在这里，建好实例再套用（否则会落到 "./"）。
+static std::string g_fileSavePath;
 
 JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save)
 {
@@ -771,6 +774,11 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jin
     }
     g_fileMsg = new FileMsgSocket();
     g_fileMsg->setProgressCallback(FileMsgProgressCallback);
+    // 套用缓存的接收落盘路径（Java 端 applySavePath 通常先于本调用，那时 g_fileMsg 还不存在）
+    if (!g_fileSavePath.empty()) {
+        g_fileMsg->setSavePath(g_fileSavePath);
+        LOGI("FileMsg server saving to: %s", g_fileSavePath.c_str());
+    }
     int ret = g_fileMsg->startServer((unsigned short)port);
     if (ret < 0) {
         delete g_fileMsg;
@@ -791,6 +799,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv* env, jclas
     }
     g_fileMsg = new FileMsgSocket();
     g_fileMsg->setProgressCallback(FileMsgProgressCallback);
+    if (!g_fileSavePath.empty()) {
+        g_fileMsg->setSavePath(g_fileSavePath);
+    }
     int ret = g_fileMsg->connectToServer(address, (unsigned short)port);
     if (ret < 0) {
         delete g_fileMsg;
@@ -812,7 +823,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass)
     }
 }
 
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLocalFile)(JNIEnv* env, jclass, jstring filePath)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(postLocalFile)(JNIEnv* env, jclass, jstring filePath)
 {
     std::string path = Jstring2Cstring(env, filePath);
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
@@ -820,7 +831,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLocalFile)(JNIEnv* env, jclass, jstr
         LOGE("FileMsg not connected");
         return -1;
     }
-    int ret = g_fileMsg->sendLocalFile(path);
+    int ret = g_fileMsg->postLocalFile(path);
     if (ret < 0) {
         Message::instance().setMessage("File send failed", MESSAGE);
         return ret;
@@ -845,6 +856,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv* env, jclass, js
 {
     std::string savePath = Jstring2Cstring(env, path);
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    g_fileSavePath = savePath;
     if (g_fileMsg != nullptr) {
         g_fileMsg->setSavePath(savePath);
         LOGI("FileMsg is saving to: %s", savePath.c_str());

@@ -316,13 +316,21 @@ int FileMsgSocket::createClientSocket(const std::string& ip, unsigned short port
     addr.sin_port = htons(port);
 
     if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) {
-        struct hostent* he = gethostbyname(ip.c_str());
-        if (he == nullptr) {
-            LOGE("inet_pton: invalid address %s", ip.c_str());
+        // 主机名解析走 getaddrinfo（与 Transfer 实现一致）：gethostbyname 已废弃，
+        // 且返回的 hostent 指向静态内存，多线程同时解析会互相踩。
+        struct addrinfo hints{};
+        struct addrinfo* res = nullptr;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        int ga = getaddrinfo(ip.c_str(), nullptr, &hints, &res);
+        if (ga != 0 || res == nullptr) {
+            LOGE("getaddrinfo(%s) failed: %s", ip.c_str(), gai_strerror(ga));
             close(sock);
             return -2;
         }
-        memcpy(&addr.sin_addr, he->h_addr_list[0], he->h_length);
+        memcpy(&addr.sin_addr, &((struct sockaddr_in*)res->ai_addr)->sin_addr,
+            sizeof(addr.sin_addr));
+        freeaddrinfo(res);
     }
 
     // ── 非阻塞 connect + poll 超时 ──
@@ -454,7 +462,7 @@ int FileMsgSocket::connectToServer(const std::string& ip, unsigned short port)
     m_connected.store(true);
     m_running.store(true);
 
-    // 客户端模式下无需后台接收线程 — 响应由 sendLocalFile 同步处理
+    // 客户端模式下无需后台接收线程 — 响应由 postLocalFile 同步处理
     LOGI("connected successfully to %s:%d (fd=%d)", ip.c_str(), port, m_clientSock);
     return 0;
 }
@@ -496,6 +504,32 @@ void FileMsgSocket::fileServerProcess()
         char ipStr[INET_ADDRSTRLEN];
         unsigned short clientPort = ntohs(clientAddr.sin_port);
         inet_ntop(AF_INET, &clientAddr.sin_addr, ipStr, sizeof(ipStr));
+
+        // 丢弃"到达即死"的连接：accept() 可能返回对端已经 abort 的连接，
+        // 这种 fd 上 recv 只会报 EOF / ENOTCONN，交给 clientHandler 纯属白跑一趟。
+        // 用非阻塞 MSG_PEEK 探一个字节：不消耗已到达的数据，空闲连接返回 EAGAIN 属正常。
+        int probeFlags = fcntl(clientSock, F_GETFL, 0);
+        if (probeFlags >= 0) {
+            fcntl(clientSock, F_SETFL, probeFlags | O_NONBLOCK);
+        }
+        char probeByte = 0;
+        ssize_t probe = recv(clientSock, &probeByte, 1, MSG_PEEK);
+        int probeErrno = errno;   // 必须在还原 flags 前快照，后续 syscall 会覆盖 errno
+        if (probeFlags >= 0) {
+            fcntl(clientSock, F_SETFL, probeFlags);
+        }
+        if (probe == 0) {
+            LOGW("client %s:%d already closed (EOF) — dropping fd=%d", ipStr, clientPort, clientSock);
+            close(clientSock);
+            continue;
+        }
+        if (probe < 0 && probeErrno != EAGAIN && probeErrno != EWOULDBLOCK && probeErrno != EINTR) {
+            LOGW("client %s:%d dead on arrival (errno=%d/%s) — dropping fd=%d",
+                ipStr, clientPort, probeErrno, strerror(probeErrno), clientSock);
+            close(clientSock);
+            continue;
+        }
+
         LOGI("FileMsgSocket client connected from %s:%d", ipStr, clientPort);
 
         // 禁用 Nagle 确保响应等小包立即发出
@@ -527,7 +561,7 @@ void FileMsgSocket::fileServerProcess()
 void FileMsgSocket::fileClientProcess()
 {
     // 客户端模式下此线程原本只做空转 sleep，无实际接收逻辑。
-    // 响应和超时均由 sendLocalFile 所在的调用线程同步处理。
+    // 响应和超时均由 postLocalFile 所在的调用线程同步处理。
     // 此函数保留以兼容头文件声明，connectToServer 不再启动此线程。
     LOGI("fileClientProcess: stub — no background receive needed in client mode");
 }
@@ -535,6 +569,20 @@ void FileMsgSocket::fileClientProcess()
 void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigned short clientPort)
 {
     LOGI("clientHandler START fd=%d from %s:%u", sock, clientIp.c_str(), clientPort);
+
+    // 确保 socket 处于阻塞模式：recvAll 是 poll + 阻塞 recv，
+    // 万一这个 fd 继承了 O_NONBLOCK，recv 会立刻返回 EAGAIN，被误判成"对端超时"。
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags < 0) {
+        LOGE("clientHandler fd=%d fcntl(F_GETFL) failed (%s) — fd invalid, exiting",
+            sock, strerror(errno));
+        close(sock);
+        return;
+    }
+    if (flags & O_NONBLOCK) {
+        LOGW("clientHandler fd=%d was O_NONBLOCK, forcing blocking mode", sock);
+        fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
+    }
 
     // 添加会话到管理器
     m_sessionMgr.addSession(sock, clientIp, clientPort);
@@ -551,21 +599,46 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
 
     std::string statusPrefix = "[" + clientIp + ":" + std::to_string(clientPort) + "] ";
 
+    // ── ENOTCONN / EBADF 处理 ──
+    // 一条已 accept 的 socket 在 recv 时返回 ENOTCONN（首次 SO_ERROR 还可能是 EBADF），
+    // 基本等于对端已经 RST/abort —— 这不是"系统还没准备好"那种能自愈的瞬时状态。
+    // 所以只给极短宽限，宽限用尽就判定连接已死并关闭；按指数退避重试十几次只会把
+    // 这个处理线程卡住几分钟（还会刷满日志），并不能把它救回来。
+    static constexpr int RECV_ERR_RETRY_MAX = 3;        // 仅覆盖极少数平台的瞬时异常
+    static constexpr int RECV_ERR_RETRY_DELAY_MS = 20;  // 固定 20ms，不做指数退避
+    int errRetries = 0;
+
     while (m_running.load() && session->active.load()) {
         FileHeader header{};
         int ret = recvAll(sock, &header, sizeof(header), RECV_POLL_TIMEOUT_MS);
         if (ret <= 0) {
             if (ret == -1) {
                 // 超时，回到 while 检查 m_running 是否被 stopServer() 置为 false
+                errRetries = 0;
                 continue;
+            }
+            if (ret == -2) {
+                if (errRetries < RECV_ERR_RETRY_MAX) {
+                    ++errRetries;
+                    LOGW("%s recv header ENOTCONN/EBADF, retry %d/%d (peer likely gone)",
+                        statusPrefix.c_str(), errRetries, RECV_ERR_RETRY_MAX);
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(RECV_ERR_RETRY_DELAY_MS));
+                    continue;
+                }
+                // 宽限用尽：连接确已死亡，按对端断开处理
+                LOGW("%s recv header ENOTCONN persists after %d retries — peer aborted, closing (fd=%d)",
+                    statusPrefix.c_str(), RECV_ERR_RETRY_MAX, sock);
+                break;
             }
             if (ret == 0) {
                 LOGI("%s client disconnected (EOF/POLLHUP)", statusPrefix.c_str());
             } else {
-                LOGW("%s recv header failed(%d)", statusPrefix.c_str(), ret);
+                LOGW("%s recv header failed(%d) — retries exhausted", statusPrefix.c_str(), ret);
             }
             break;
         }
+        errRetries = 0;   // 成功读到数据，重置退避计数
 
         // 收到的头是网络序，先转回主机序再解析
         headerToHost(header);
@@ -863,7 +936,7 @@ int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t
     return 0;
 }
 
-int FileMsgSocket::sendLocalFile(const std::string& filePath)
+int FileMsgSocket::postLocalFile(const std::string& filePath)
 {
     if (!m_connected.load()) {
         LOGE("server not connected");
@@ -881,7 +954,7 @@ int FileMsgSocket::sendLocalFile(const std::string& filePath)
         int pr = poll(&pfd, 1, 0);
         // poll POLLHUP/POLLERR 检测显式断开
         if (pr > 0 && (pfd.revents & (POLLHUP | POLLERR))) {
-            LOGE("sendLocalFile: socket already broken (poll=%s), disconnecting",
+            LOGE("postLocalFile: socket already broken (poll=%s), disconnecting",
                 (pfd.revents & POLLHUP) ? "POLLHUP" : "POLLERR");
             m_connected.store(false);
             return -1;
@@ -890,7 +963,7 @@ int FileMsgSocket::sendLocalFile(const std::string& filePath)
         int soErr = 0;
         socklen_t soLen = sizeof(soErr);
         if (getsockopt(m_clientSock, SOL_SOCKET, SO_ERROR, &soErr, &soLen) == 0 && soErr != 0) {
-            LOGE("sendLocalFile: socket broken SO_ERROR=%d/%s, disconnecting",
+            LOGE("postLocalFile: socket broken SO_ERROR=%d/%s, disconnecting",
                 soErr, strerror(soErr));
             m_connected.store(false);
             return -1;

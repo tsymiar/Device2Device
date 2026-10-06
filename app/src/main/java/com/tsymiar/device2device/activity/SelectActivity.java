@@ -42,10 +42,12 @@ import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
 import com.tsymiar.device2device.event.EventHandle;
 import com.tsymiar.device2device.event.EventNotify;
+import com.tsymiar.device2device.service.FileMsgServerService;
 import com.tsymiar.device2device.service.HttpServerService;
 import com.tsymiar.device2device.service.PublishService;
 import com.tsymiar.device2device.service.SshServerService;
 import com.tsymiar.device2device.service.SubscribeService;
+import com.tsymiar.device2device.utils.FileMsgStore;
 import com.tsymiar.device2device.utils.JvmMethods;
 import com.tsymiar.device2device.utils.Utils;
 import com.tsymiar.device2device.wrapper.CallbackWrapper;
@@ -79,6 +81,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private final java.util.List<String> mKcpLog = new java.util.ArrayList<>();
     /** KCP 客户端最近几条消息（client 按钮下方滚动显示） */
     private final java.util.List<String> mKcpStatusLog = new java.util.ArrayList<>();
+    /** 文件传输后台运行时打到 txt_hint 的滚动日志（对话框关着时唯一可见的出口） */
+    private final java.util.List<String> mFileMsgHintLog = new java.util.ArrayList<>();
     private boolean mKcpServerStart = false;
     private boolean mKcpClientStart = false;
     private long mCurTime;
@@ -139,7 +143,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     // 传输完成时 native 会在 status 后面追加一个真实落盘路径，
                     // 所以 current/total 固定取最后两段，其余原样拼回 status。
                     String data = msg.obj.toString();
-                    if (mFileMsgDialog != null) {
+                    boolean dialogVisible = mFileMsgDialog != null && mFileMsgDialog.isShowing();
+                    if (dialogVisible) {
                         String[] parts = data.split("\\|");
                         if (parts.length >= 3) {
                             try {
@@ -157,7 +162,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         } else {
                             mFileMsgDialog.updateStatus(data);
                         }
+                    } else {
+                        // 对话框没开（服务端在后台跑）：把状态打到状态卡片的 txt_hint，
+                        // 用户不打开对话框也能看到收发进度；文件照样要搬。
+                        showFileMsgHint(data);
                     }
+                    publishReceived(data);
                     break;
                 }
                 case Receiver.UDP_SERVER:
@@ -220,6 +230,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         intentFilter.addAction(SubscribeService.BROADCAST_ACTION);
         intentFilter.addAction(HttpServerService.ACTION_STATE);
         intentFilter.addAction(SshServerService.ACTION_STATE);
+        intentFilter.addAction(FileMsgServerService.ACTION_STATE);
         this.registerReceiver(mBroadcastReceiverClass, intentFilter);
 
         setServiceConnection(new ServiceConnection() {
@@ -455,6 +466,19 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     mSshError = null;
                     tvStatus.setText("SSH 服务已停止");
                     showSshState();
+                }
+                return;
+            }
+            if (FileMsgServerService.ACTION_STATE.equals(action)) {
+                String state = intent.getStringExtra(FileMsgServerService.EXTRA_STATE);
+                if (FileMsgServerService.STATE_STARTED.equals(state)) {
+                    appendFileMsgHint("文件接收服务已启动 · 对端连接 "
+                            + FileMsgServerService.getEndpoint(SelectActivity.this));
+                } else if (FileMsgServerService.STATE_FAILED.equals(state)) {
+                    String reason = intent.getStringExtra(FileMsgServerService.EXTRA_REASON);
+                    appendFileMsgHint("文件接收服务启动失败：" + (reason == null ? "未知原因" : reason));
+                } else if (FileMsgServerService.STATE_STOPPED.equals(state)) {
+                    appendFileMsgHint("文件接收服务已停止");
                 }
                 return;
             }
@@ -761,6 +785,87 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             mKcpStatusLog.remove(0);
         }
         setKcpText(R.id.txt_kcp_client, TextUtils.join("\n", mKcpStatusLog));
+    }
+
+    /**
+     * 收到完整文件后：把 native 暂存目录里的文件搬到公共下载目录。
+     * 与对话框是否在场无关 —— 服务端现在跑在前台服务里，对话框关着照样收文件，
+     * 不搬的话文件会一直躺在应用私有目录（用户看不到）。
+     */
+    private void publishReceived(String data) {
+        // data 形如 "status[|落盘路径]|current|total"：末两段固定是 current/total，
+        // 前面重组回 status —— 只有完成消息的 status 里还会带一个 '|'，后面才是路径。
+        if (data == null) return;
+        String[] parts = data.split("\\|");
+        if (parts.length < 3) return;
+        StringBuilder status = new StringBuilder();
+        for (int i = 0; i < parts.length - 2; i++) {
+            if (i > 0) status.append('|');
+            status.append(parts[i]);
+        }
+        int bar = status.indexOf("|");
+        if (bar < 0) return;
+        String path = status.substring(bar + 1);
+        if (path.isEmpty()) return;
+        FileMsgStore.publishAsync(this, path, (ok, dest) -> {
+            if (!ok) return; // 失败则留在应用私有目录，不打扰
+            // 对话框开着时由对话框自己打 "Saved:"，避免重复；关着才打到 txt_hint
+            if (!(mFileMsgDialog != null && mFileMsgDialog.isShowing())) {
+                appendFileMsgHint("已保存：" + dest);
+            }
+        });
+    }
+
+    /**
+     * 把一条文件传输事件转成可读文字（去掉 native 暂存路径那段）打到 txt_hint。
+     * data 形如 "status[|落盘路径]|current|total"：末两段是进度，前面是消息。
+     */
+    private void showFileMsgHint(String data) {
+        if (data == null) return;
+        String[] parts = data.split("\\|");
+        String line;
+        if (parts.length >= 3) {
+            try {
+                long total = Long.parseLong(parts[parts.length - 1]);
+                long current = Long.parseLong(parts[parts.length - 2]);
+                StringBuilder status = new StringBuilder();
+                for (int i = 0; i < parts.length - 2; i++) {
+                    if (i > 0) status.append('|');
+                    status.append(parts[i]);
+                }
+                String readable = stripPath(status.toString());
+                if (total > 0) {
+                    line = String.format(java.util.Locale.US, "%s  %d%% (%d/%d)",
+                            readable, (int) (current * 100 / total), current, total);
+                } else {
+                    line = readable;
+                }
+            } catch (NumberFormatException e) {
+                line = stripPath(data);
+            }
+        } else {
+            line = stripPath(data);
+        }
+        appendFileMsgHint(line);
+    }
+
+    /** 去掉 "msg|path" 里最后那段 native 暂存路径，只留给人看的状态 */
+    private static String stripPath(String s) {
+        int bar = s.indexOf('|');
+        return bar >= 0 ? s.substring(0, bar) : s;
+    }
+
+    /** 文件传输日志滚动展示在状态卡片的 txt_hint（保留最近 6 条）。可能来自工作线程，统一切回主线程 */
+    private void appendFileMsgHint(String line) {
+        mFileMsgHintLog.add(line);
+        while (mFileMsgHintLog.size() > 6) {
+            mFileMsgHintLog.remove(0);
+        }
+        final String text = TextUtils.join("\n", mFileMsgHintLog);
+        runOnUiThread(() -> {
+            TextView tv = findViewById(R.id.txt_hint);
+            if (tv != null) tv.setText(text);
+        });
     }
 
     /** 根据前台服务快照同步 HTTP 状态：地址卡片与复制/停止按钮可用性 */
