@@ -1,3 +1,4 @@
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -34,6 +35,10 @@ extern std::string g_className;
 extern std::string Jstring2Cstring(JNIEnv* env, jstring jstr);
 extern void SetTextView(JNIEnv* env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv* env, int viewId, const char* text);
+
+/** EGL 状态（display/context/surface/program）是 EglGpuRender.cpp 里那一全局份 */
+extern EGL2 EGL2;
+
 namespace {
     int g_height = -1;
     int g_width = -1;
@@ -113,14 +118,30 @@ struct PubSubParam {
 
 static std::mutex g_paramMutex;
 
+/**
+ * 订阅是否还在跑。
+ *
+ * 悬浮窗上连点几次 Confirm 就会来几个 StartSubscribe，几路订阅线程共用
+ * 一个 Subscriber 的静态状态（m_exit / 线程池 / socket），
+ * 互相把对方的 socket 关掉、把对方的池子停掉 —— 表现就是「订阅两次必崩」。
+ */
+static std::atomic<bool> g_subscribing{false};
+
+namespace {
+/** 任何出口（正常结束 / 连不上 / 中途 return）都把订阅标志复位 */
+struct SubscribeGuard {
+    ~SubscribeGuard() { g_subscribing.store(false); }
+};
+}
+
 void RecvHook(const Scadup::Message& msg)
 {
     std::stringstream ss;
     ss << std::hex << msg.head.topic;
     std::string message = "Recv topic:\t[0x" + ss.str()
         + "]\tsize=" + std::to_string(msg.head.size) + "\nPayload:\t[" + msg.payload.status
-        + "]\t[" + msg.payload.content + "].";
-    Message::instance().setMessage(message, MESSAGE);
+        + "]\t[ " + msg.payload.content + " ].";
+    Message::instance().setMessage(message, MSG_STAT);
 }
 
 /**
@@ -133,6 +154,7 @@ void RecvHook(const Scadup::Message& msg)
  */
 static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RECV_CALLBACK hook)
 {
+    SubscribeGuard guard;
     Scadup::Subscriber sub;
     int ret = sub.setup(addr.c_str(), static_cast<unsigned short>(port));
     if (ret < 0) {
@@ -197,8 +219,20 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, 
         g_pubSubParam.hook = RecvHook;
     }
 
-    std::thread task(SubscribeTask, std::move(address), port, iTopic, RecvHook);
-    task.detach();
+    if (g_subscribing.exchange(true)) {
+        // 上一路还没退出，先把这路挡回去：不是失败，只是没必要再开一路
+        Message::instance().setMessage("Subscribe is already running", TOAST);
+        return 0;
+    }
+    try {
+        std::thread task(SubscribeTask, std::move(address), port, iTopic, RecvHook);
+        task.detach();
+    } catch (const std::exception& e) {
+        g_subscribing.store(false);
+        Message::instance().setMessage("Subscribe failed: cannot start thread", TOAST);
+        LOGE("StartSubscribe thread error: %s", e.what());
+        return -1;
+    }
     return 0;
 }
 
@@ -290,28 +324,43 @@ JNIEXPORT void JNICALL CPP_FUNC_VIEW(setLocalFile)(JNIEnv* env, jclass, jstring 
 
 JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobject texture)
 {
-    if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
-        LOGI("loaded Surface class");
+    if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
+        LOGE("setup surface fail while [updateEglSurface]");
+        return -3;
     }
     ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
         GLuint program = EglShader::GetShaderProgram();
+        if (program == 0) {
+            LOGE("GetShaderProgram failed while [updateEglSurface]");
+            EglGpuRender::CloseGLSurface();
+            return -2;
+        }
+        // FrameRender 用 EGL2.glProgram 拿着色器程序，没赋值的话 glUseProgram(0) 等于什么都没画
+        EGL2.glProgram = program;
         EglTexture::SetTextureBuffers(program);
-        extern EGL2 EGL2;
-        LOGD("OpenGL rendering initialized WxH = (%d, %d)", EGL2.width, EGL2.height);
-        int state = FileUtils::ReadBinaryFile(g_filename, EGL2.width * EGL2.height, EglGpuRender::FrameRender);
+        if (EGL2.width == 0 || EGL2.height == 0) {
+            LOGE("render size not set, call setRenderSize first");
+            EglGpuRender::CloseGLSurface();
+            return -4;
+        }
+        LOGD("OpenGL rendering initialized WxH = (%u, %u)", EGL2.width, EGL2.height);
+        // 一帧 I420 是 w*h*1.5 字节，切片按这个来，回调里取 U/V 才不越过缓冲末尾
+        size_t frameSize = (size_t) EGL2.width * EGL2.height * 3 / 2;
+        int state = FileUtils::ReadBinaryFile(g_filename, frameSize, EglGpuRender::FrameRender);
         EglGpuRender::CloseGLSurface();
         return state;
     } else {
-        LOGE("native window is null while [updateTextureFile]");
+        LOGE("native window is null while [updateEglSurface]");
         return -1;
     }
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobject texture)
 {
-    if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
-        LOGI("loaded Surface class");
+    if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
+        LOGE("setup surface fail while [updateEglTexture]");
+        return -3;
     }
     ANativeWindow* window = EglGpuRender::OpenGLSurface();
     if (window != nullptr) {
@@ -320,7 +369,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglTexture)(JNIEnv* env, jclass, jobj
         EglGpuRender::CloseGLSurface();
         return state;
     } else {
-        LOGE("native window is null while [updateTextureFile]");
+        LOGE("native window is null while [updateEglTexture]");
         return -1;
     }
 }
@@ -332,38 +381,30 @@ JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobj
         LOGD("No-implementation");
         return -1;
     case 3: {
-        if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
-            LOGI("loaded Surface class");
+        if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
+            LOGE("setup surface fail while [updateCpuTexture]");
+            return -4;
         }
-        long size = 0;
-        unsigned char* content = FileUtils::GetFileContentNeedFree(g_filename.c_str(), size);
-        LOGD("CPU rendering initialized [%ld]", size);
-        if (content != nullptr) {
-            BITMAPINFO* info = nullptr;
-            uint8_t* data = LoadDIBitmap(g_filename.c_str(), &info);
-            if (info == nullptr || data == nullptr) {
-                LOGE("LoadDIBitmap failed: info=%p, data=%p", info, data);
-                return -2;
-            }
-            CpuRenderView::setDisplaySize((int)info->bmiHeader.biHeight,
-                (int)info->bmiHeader.biWidth);
-            CpuRenderView::drawSurface(data);
-        } else {
-            static constexpr uint32_t colors[] = {
-                    0x00000000,
-                    0x0055aaff,
-                    0x5500aaff,
-                    0xaaff0055,
-                    0xff55aa00,
-                    0xaa0055ff,
-                    0xffffffff
-            };
-            static int iteration = 0;
-            CpuRenderView::drawRGBColor(
-                colors[iteration++ % (sizeof(colors) / sizeof(*colors))], g_filename.c_str());
+        /**
+         * CPU 渲染图片：BMP → RGBA → 直接写进 window buffer。
+         *
+         * 直接解码成 RGBA 再交给 CpuRenderView：LoadDIBitmap 给的是 3 通道 RGB，
+         * 当 RGBA 拷会通道错位、行长短一截，读到后面就越界。
+         */
+        unsigned char* rgba = nullptr;
+        BITMAPPROP prop = BitmapToRgba(g_filename.c_str(), &rgba);
+        if (prop.blSize <= 0 || rgba == nullptr) {
+            LOGE("decode [%s] failed, code = %ld", g_filename.c_str(), prop.blSize);
+            free(rgba);
+            Message::instance().setMessage("Not a 24/32-bit BMP file", TOAST);
+            CpuRenderView::releaseSurfaceView(env);
+            return -2;
         }
+        LOGD("CPU rendering initialized [%u]x[%u]", prop.biWidth, prop.biHeight);
+        CpuRenderView::setDisplaySize((int)prop.biHeight, (int)prop.biWidth);
+        CpuRenderView::drawRgba(rgba, (int)prop.biWidth, (int)prop.biHeight, (size_t)prop.blSize);
+        free(rgba);
         CpuRenderView::releaseSurfaceView(env);
-        delete[] content;
         break;
     }
     case 5:
@@ -380,15 +421,22 @@ JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobj
 
 JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuSurface)(JNIEnv* env, jclass, jobject texture)
 {
-    if (CpuRenderView::setupSurfaceView(env, texture) > 0) {
-        LOGD("OpenGL rendering initialized(%d, %d)", g_height, g_width);
-        int state = FileUtils::ReadBinaryFile(g_filename, g_width * g_height, CpuRenderView::drawSurface);
-        CpuRenderView::releaseSurfaceView(env);
-        return state;
-    } else {
+    if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
         LOGE("native window is null while [updateCpuVideoFile]");
-        return 0;
+        return -1;
     }
+    if (g_width <= 0 || g_height <= 0) {
+        LOGE("render size not set (%dx%d), call setRenderSize first", g_width, g_height);
+        CpuRenderView::releaseSurfaceView(env);
+        return -2;
+    }
+    LOGD("CPU surface rendering initialized(%d, %d)", g_height, g_width);
+    CpuRenderView::setDisplaySize(g_height, g_width);
+    // 窗口是 RGBA8888，切片按 w*h*4 字节来，一帧才铺满整屏
+    int state = FileUtils::ReadBinaryFile(g_filename, (size_t) g_width * g_height * 4,
+                                          CpuRenderView::drawSurface);
+    CpuRenderView::releaseSurfaceView(env);
+    return state;
 }
 
 JNIEXPORT jlong JNICALL CPP_FUNC_TIME(getAbsoluteTimestamp)(JNIEnv*, jclass)
@@ -440,7 +488,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendUdpData)(JNIEnv* env, jclass, jstrin
     auto* sock = new UdpSocket("127.0.0.1", g_udpPort);
     if (int ret = sock->Sender(tx, (unsigned int)len + 1) < 0) {
         message = "Sender fail: " + std::to_string(ret);
-        Message::instance().setMessage(message, MESSAGE);
+        Message::instance().setMessage(message, MSG_STAT);
     }
     delete sock;
     return 0;
@@ -684,7 +732,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startKcpClient)(JNIEnv* env, jclass, jst
     Message::instance().setMessage(
         "KCP client started → " + addr + ":" + std::to_string(port), KCP_CLIENT);
     return 0;
-}
+}       
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpClient)(JNIEnv*, jclass)
 {
@@ -785,7 +833,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jin
         g_fileMsg = nullptr;
         return ret;
     }
-    Message::instance().setMessage("FileMsg Server Started on Port " + std::to_string(port), MESSAGE);
+    Message::instance().setMessage("FileMsg Server Started on Port " + std::to_string(port), MSG_STAT);
     return 0;
 }
 
@@ -808,7 +856,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv* env, jclas
         g_fileMsg = nullptr;
         return ret;
     }
-    Message::instance().setMessage("Connected to FileMsg server " + address + ":" + std::to_string(port), MESSAGE);
+    Message::instance().setMessage("Connected to FileMsg server " + address + ":" + std::to_string(port), MSG_STAT);
     return 0;
 }
 
@@ -819,7 +867,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass)
         g_fileMsg->disconnect();
         delete g_fileMsg;
         g_fileMsg = nullptr;
-        Message::instance().setMessage("FileMsg disconnected", MESSAGE);
+        Message::instance().setMessage("FileMsg disconnected", MSG_STAT);
     }
 }
 
@@ -833,10 +881,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(postLocalFile)(JNIEnv* env, jclass, jstr
     }
     int ret = g_fileMsg->postLocalFile(path);
     if (ret < 0) {
-        Message::instance().setMessage("File send failed", MESSAGE);
+        Message::instance().setMessage("File send failed", MSG_STAT);
         return ret;
     }
-    Message::instance().setMessage("File send complete: " + path, MESSAGE);
+    Message::instance().setMessage("File send complete: " + path, MSG_STAT);
     return 0;
 }
 
@@ -870,7 +918,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass)
         g_fileMsg->stopServer();
         delete g_fileMsg;
         g_fileMsg = nullptr;
-        Message::instance().setMessage("FileMsg Server Exit", MESSAGE);
+        Message::instance().setMessage("FileMsg Server Exit", MSG_STAT);
     }
 }
 

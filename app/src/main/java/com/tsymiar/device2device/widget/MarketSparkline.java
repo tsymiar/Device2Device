@@ -29,7 +29,8 @@ import com.tsymiar.device2device.market.MarketPalette;
  *   因此必须用 ARGB_8888；RGB_565 没有 alpha 通道，透明区会变成黑块。
  *
  * 配色走 {@link MarketPalette}：曲线色按「最新一段是涨还是跌」取涨跌色（红涨绿跌），
- * 中间那条虚线是前收盘基准线，用来直观看出当前价格在昨收之上还是之下。
+ * 中间那条虚线是基准线（调用方传进来的是当天开盘价），
+ * 用来直观看出当前价格在开盘价之上还是之下。
  */
 public final class MarketSparkline {
 
@@ -48,7 +49,7 @@ public final class MarketSparkline {
      * 画一张走势图。
      *
      * @param closes  收盘价序列（按时间升序），至少 2 个点才画得出来，否则返回 null
-     * @param base    基准价（一般是前一周期的收盘），画成横向虚线；<=0 表示不画这条线
+     * @param base    基准价（行情曲线部件传的是当天开盘价），画成横向虚线；<=0 表示不画这条线
      * @param widthDp 可用宽度（dp，已减去布局的左右 padding）
      * @param heightDp 可用高度（dp，已减去上下其它行占掉的部分）
      * @param haloColor 末点外圈的底色：要跟部件卡片底色一致，取值必须是 market_widget_bg，
@@ -143,7 +144,7 @@ public final class MarketSparkline {
                 Shader.TileMode.CLAMP));
         canvas.drawPath(fill, fillPaint);
 
-        // 前收盘基准线：虚线 + 网格色，看一眼就知道当前价在昨收之上还是之下
+        // 开盘基准线：虚线 + 网格色，看一眼就知道当前价在开盘价之上还是之下
         if (base > 0f) {
             float baseY = padTop + (max - base) / span * usableH;
             Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);

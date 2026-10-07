@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -55,6 +56,28 @@ public class SubscribeService extends Service {
     public void onDestroy() {
         super.onDestroy();
         connecting = false;
+        // 服务被收掉时悬浮窗必须一起撤：留着就是一个点不动的坏窗，还会拖住 WindowManager
+        removeFloatView();
+    }
+
+    /**
+     * 撤掉悬浮窗。
+     *
+     * 三种情况下这个 View 并没有挂在 WindowManager 上：没拿到悬浮窗授权、
+     * 点过「最小化」、服务已经重建过。这些时候 removeView 会抛
+     * IllegalArgumentException（"View not attached to window manager"），
+     * 所以先判 isAttachedToWindow()。
+     */
+    private void removeFloatView() {
+        if (windowManager == null || floatView == null) return;
+        try {
+            if (floatView.isAttachedToWindow()) {
+                windowManager.removeView(floatView);
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            Log.w(TAG, "remove float view failed", e);
+        }
+        floatView = null;
     }
 
     private WindowManager windowManager = null;
@@ -129,6 +152,9 @@ public class SubscribeService extends Service {
     @Override
     public void onStart(Intent intent, int startId) {
         super.onStart(intent, startId);
+        // 重复 startService（再点一次 Subscribe）时先把上一个收掉，
+        // 否则两个悬浮窗叠在一起，关闭只能撤掉后加的那个
+        removeFloatView();
         floatView = layoutInflater.inflate(R.layout.dialog_subscribe, null);
 
         WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
@@ -193,9 +219,7 @@ public class SubscribeService extends Service {
                             PubSubSetting.setPort(9999);
                         }
                     }
-                    if (windowManager != null) {
-                        windowManager.removeView(floatView);
-                    }
+                    removeFloatView();
                 }
         );
         floatView.findViewById(R.id.btn_close).setOnClickListener(
@@ -211,8 +235,6 @@ public class SubscribeService extends Service {
 
     public void closeWindow() {
         CallbackWrapper.QuitSubscribe();
-        if (windowManager != null) {
-            windowManager.removeView(floatView);
-        }
+        removeFloatView();
     }
 }

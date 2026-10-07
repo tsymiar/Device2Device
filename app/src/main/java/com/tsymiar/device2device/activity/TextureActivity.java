@@ -26,6 +26,8 @@ import com.tsymiar.device2device.wrapper.ViewWrapper;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class TextureActivity extends AppCompatActivity
@@ -52,16 +54,21 @@ public class TextureActivity extends AppCompatActivity
      */
     private final static TextView[] mLog = new TextView[3];
 
-    private final int EGL_TEXTURE_FILE = 1;
-    private final int EGL_SURFACE_FILE = 2;
-    private final int CPU_TEXTURE_FILE = 3;
-    private final int CPU_SURFACE_FILE = 4;
-    private final int DISCONNECT_WINDOW = 5;
+    /** spinner 位置常量：static 才能在 sampleName() 这样的静态方法里用 */
+    private static final int EGL_TEXTURE_FILE = 1;
+    private static final int EGL_SURFACE_FILE = 2;
+    private static final int CPU_TEXTURE_FILE = 3;
+    private static final int CPU_SURFACE_FILE = 4;
+    private static final int DISCONNECT_WINDOW = 5;
 
     /** 用户选择的文件路径 */
     private String mPickedPath = null;
     /** CPU 渲染所需的 BMP 临时文件路径 */
     private String mBmpPath = null;
+    /** mBmpPath 对应的源文件：换一张图之后不能拿上一张的 BMP 顶着 */
+    private String mBmpSrc = null;
+    /** Surface 还没建好时先记下"待渲染"，onSurfaceTextureAvailable 里补一次 */
+    private boolean mPendingRender = false;
     private TextView mPathView = null;
     private RadioGroup mModeGroup = null;
     private int mRenderMode = MODE_AUTO;
@@ -90,7 +97,20 @@ public class TextureActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_texture);
         ensureDataDir();
+        // 先量一次屏幕：进页面就选文件的话，等 onResume 再设渲染尺寸已经晚了
+        measureDisplay();
         initViews();
+        flushPendingLog();
+        log("Auto 模式：点 Pick 选一张图片或一段视频即可渲染；"
+                + "也可以先在 spinner 里指定渲染方式");
+    }
+
+    /** 取屏幕像素尺寸（getMetrics 已废弃但各版本通用，这里只是给渲染一个上限） */
+    private void measureDisplay() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        mDisplayHeight = metrics.heightPixels;
+        mDisplayWidth = metrics.widthPixels;
     }
 
     protected void initViews() {
@@ -179,11 +199,19 @@ public class TextureActivity extends AppCompatActivity
     @Override
     public void onResume() {
         super.onResume();
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        mDisplayHeight = metrics.heightPixels;
-        mDisplayWidth = metrics.widthPixels;
+        // 转屏回来尺寸会变；真正的渲染尺寸在 onSurfaceTextureAvailable 里还会用
+        // 纹理实际大小再校正一次
+        measureDisplay();
         ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // 页面收摊后日志区不能再被写：置空，log() 会转成攒进 sPendingLog
+        mLog[0] = null;
+        mLog[1] = null;
+        mLog[2] = null;
     }
 
     @Override
@@ -198,12 +226,23 @@ public class TextureActivity extends AppCompatActivity
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
                                           @IntRange(from = 1) int height) {
+        // 用纹理的实际尺寸而不是屏幕尺寸：TextureView 上面还压着控件，两者并不一样
+        mDisplayHeight = height;
+        mDisplayWidth = width;
+        ViewWrapper.setRenderSize(height, width);
         log(String.format(Locale.ROOT, "Texture created (%d×%d)", width, height));
+        // 进页面后马上选文件的话，那一笔渲染请求落在了 surface 建好之前，这里补上
+        if (mPendingRender) {
+            mPendingRender = false;
+            renderWithMode();
+        }
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, @IntRange(from = 1) int width,
                                             @IntRange(from = 1) int height) {
+        mDisplayHeight = height;
+        mDisplayWidth = width;
         ViewWrapper.setRenderSize(height, width);
         log(String.format(Locale.ROOT, "Texture resized (%d×%d)", width, height));
     }
@@ -238,11 +277,12 @@ public class TextureActivity extends AppCompatActivity
                 String path = copyUriToFile(uri);
                 if (path != null) {
                     mPickedPath = path;
-                    // 清除旧的 BMP 缓存
+                    // 清除旧的 BMP 缓存：换图之后不能拿上一张的转换结果顶着
                     if (mBmpPath != null) {
                         //noinspection ResultOfMethodCallIgnored
                         new File(mBmpPath).delete();
                         mBmpPath = null;
+                        mBmpSrc = null;
                     }
                     if (mPathView != null) {
                         mPathView.setText(mPickedPath);
@@ -323,12 +363,19 @@ public class TextureActivity extends AppCompatActivity
      * Auto 模式：走 spinner 选择的路径
      */
     private void renderWithMode() {
+        if (mTextureView == null) return;
         SurfaceTexture texture = mTextureView.getSurfaceTexture();
-        if (texture == null) return;
+        if (texture == null) {
+            // TextureView 的 SurfaceTexture 是异步建好的：刚进页面就选文件的话这里还是 null。
+            // 记下来等 surface 就绪补渲染，直接 return 的话就是"选了文件什么都没发生"。
+            mPendingRender = getInputPath(null) != null;
+            log("等待 Surface 就绪…");
+            return;
+        }
 
         String inputPath = getInputPath(null);
         if (inputPath == null) {
-            log("No file selected, just return.");
+            log("没有选中文件：先点 Pick 选一张图片 / 一段视频");
             return;
         }
 
@@ -340,11 +387,18 @@ public class TextureActivity extends AppCompatActivity
         switch (mRenderMode) {
             case MODE_GPU:
                 if (!checkFileValid(inputPath, "GPU")) break;
-                ViewWrapper.setLocalFile(inputPath);
                 if (isImage) {
+                    // cpp 那边的图片解码器只有 BMP（bitmap.c），jpg/png 先转一手再交给它
+                    String bmpFile = ensureBmpCopy(inputPath);
+                    if (bmpFile == null) {
+                        log("BMP conversion failed");
+                        return;
+                    }
+                    ViewWrapper.setLocalFile(bmpFile);
                     state = ViewWrapper.updateEglTexture(texture);
                     label = "GPU-OpenGL (image)";
                 } else {
+                    ViewWrapper.setLocalFile(inputPath);
                     state = ViewWrapper.updateEglSurface(texture);
                     label = "GPU-surface (video)";
                 }
@@ -374,11 +428,17 @@ public class TextureActivity extends AppCompatActivity
                 // Auto 模式：有用户文件时按类型路由；无则回退到 spinner 预设
                 if (mPickedPath != null) {
                     if (!checkFileValid(inputPath, "Auto")) return;
-                    ViewWrapper.setLocalFile(inputPath);
                     if (isImage) {
+                        String bmpFile = ensureBmpCopy(inputPath);
+                        if (bmpFile == null) {
+                            log("BMP conversion failed");
+                            return;
+                        }
+                        ViewWrapper.setLocalFile(bmpFile);
                         state = ViewWrapper.updateEglTexture(texture);
                         label = "Auto-EGL (image)";
                     } else {
+                        ViewWrapper.setLocalFile(inputPath);
                         state = ViewWrapper.updateEglSurface(texture);
                         label = "Auto-EGL (video)";
                     }
@@ -410,18 +470,38 @@ public class TextureActivity extends AppCompatActivity
 
     public void updateSurfaceView(@IntRange(from = 0) int item) {
         String[] selValue = getResources().getStringArray(R.array.types);
+        if (mTextureView == null) return;
         SurfaceTexture texture = mTextureView.getSurfaceTexture();
-        if (texture == null) return;
+        if (texture == null) {
+            // 同 renderWithMode：surface 还没建好就把这一笔记下来，建好后重放
+            mPendingRender = true;
+            log("等待 Surface 就绪…");
+            return;
+        }
 
         ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
         int state = 0;
         String msg = null;
 
+        // 内置素材（test.jpg / test.yuv…）没有打进包里，没选文件的时候这几个分支
+        // 必然是 file not found —— 直接说清楚，别让人以为选了没生效
+        if (mPickedPath == null && item != 0 && item != DISCONNECT_WINDOW
+                && !new File(mDataDirectory + sampleName(item)).exists()) {
+            log("没有内置素材（" + sampleName(item) + "）：先点 Pick 选一个文件");
+            return;
+        }
+
         switch (item) {
             case EGL_TEXTURE_FILE: {
                 String filePath = resolvePath("test.jpg");
                 if (!checkFileValid(filePath, "EGL_TEXTURE")) break;
-                ViewWrapper.setLocalFile(filePath);
+                // cpp 侧只有 BMP 解码器，选到 jpg/png 先转一手再交给它
+                String bmpFile = ensureBmpCopy(filePath);
+                if (bmpFile == null) {
+                    log("BMP conversion failed");
+                    break;
+                }
+                ViewWrapper.setLocalFile(bmpFile);
                 state = ViewWrapper.updateEglTexture(texture);
                 msg = selValue[item];
                 break;
@@ -437,7 +517,12 @@ public class TextureActivity extends AppCompatActivity
             case CPU_TEXTURE_FILE: {
                 String filePath = resolvePath("test.bmp");
                 if (!checkFileValid(filePath, "CPU_TEXTURE")) break;
-                ViewWrapper.setLocalFile(filePath);
+                String bmpFile = ensureBmpCopy(filePath);
+                if (bmpFile == null) {
+                    log("BMP conversion failed");
+                    break;
+                }
+                ViewWrapper.setLocalFile(bmpFile);
                 state = ViewWrapper.updateCpuTexture(texture, item);
                 msg = selValue[item];
                 break;
@@ -451,12 +536,18 @@ public class TextureActivity extends AppCompatActivity
                 break;
             }
             case DISCONNECT_WINDOW:
+                // 断开 / 重连窗口：GONE→VISIBLE 会让 TextureView 重建 surface
                 mTextureView.setVisibility(View.GONE);
                 mTextureView.setVisibility(View.VISIBLE);
                 msg = selValue[item];
                 break;
             default:
-                msg = (item == 0) ? selValue[item] : "Not implement: " + item;
+                if (item == 0) {
+                    // 「None」本来就是不渲染，但得说出来，否则看着像选了没反应
+                    log("已选 None：画面保持当前内容（想渲染请先 Pick 一个文件）");
+                    return;
+                }
+                msg = "Not implement: " + item;
                 break;
         }
         log(String.format(Locale.ROOT, "(%s: item=%d stat=%d)", msg, item, state));
@@ -488,6 +579,27 @@ public class TextureActivity extends AppCompatActivity
         return mDataDirectory + defaultName;
     }
 
+    /**
+     * 各渲染项对应的内置素材文件名（放在外部 cache 目录）。
+     *
+     * 这几个文件并没有打进 apk，所以没选文件时这些分支必然是 file not found；
+     * 名字集中在这里，也好让人一眼看出该往 cache 目录放什么。
+     */
+    private static String sampleName(int item) {
+        switch (item) {
+            case EGL_TEXTURE_FILE:
+                return "test.jpg";
+            case EGL_SURFACE_FILE:
+                return "test.yuv";
+            case CPU_TEXTURE_FILE:
+                return "test.bmp";
+            case CPU_SURFACE_FILE:
+                return "test.h264";
+            default:
+                return "";
+        }
+    }
+
     public void reload(@NonNull View view) {
         renderWithMode();
     }
@@ -506,8 +618,8 @@ public class TextureActivity extends AppCompatActivity
             return srcPath;
         }
 
-        // 已缓存
-        if (mBmpPath != null && new File(mBmpPath).exists()) {
+        // 已缓存：必须是同一张源图的缓存，换了图就得重转
+        if (mBmpPath != null && srcPath.equals(mBmpSrc) && new File(mBmpPath).exists()) {
             return mBmpPath;
         }
 
@@ -521,6 +633,7 @@ public class TextureActivity extends AppCompatActivity
             bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
 
             mBmpPath = mDataDirectory + "cpu_render.bmp";
+            mBmpSrc = srcPath;
             try (FileOutputStream fos = new FileOutputStream(mBmpPath)) {
                 // BMP 文件头 (14 bytes) + 信息头 (40 bytes) + 像素数据
                 int rowBytes = (w * 3 + 3) & ~3;  // 每行对齐到 4 字节
@@ -626,12 +739,36 @@ public class TextureActivity extends AppCompatActivity
 
     // ---------- 日志 ----------
 
+    /**
+     * 本 Activity 建好之前攒下来的日志。
+     *
+     * 日志区是静态的（native 侧的日志由 SelectActivity 转过来），那些日志可能在
+     * TextureActivity 还没 onCreate 时就到 —— 那时 mLog 里全是 null，直接写就是 NPE。
+     */
+    private static final List<String> sPendingLog = new ArrayList<>();
+
     public static void log(@NonNull String message) {
+        if (mLog[0] == null || mLog[1] == null || mLog[2] == null) {
+            sPendingLog.add(message);
+            if (sPendingLog.size() > 3) {
+                sPendingLog.remove(0);
+            }
+            return;
+        }
         for (TextView textView : mLog) {
             textView.setTextSize(14);
         }
         mLog[2].setText(mLog[1].getText());
         mLog[1].setText(mLog[0].getText());
         mLog[0].setText(String.format(Locale.ROOT, "%s", message));
+    }
+
+    /** 把建好之前攒下的日志补进日志区：倒着放，最新的那条才在最上面 */
+    private void flushPendingLog() {
+        if (mLog[0] == null) return;
+        for (int i = sPendingLog.size() - 1; i >= 0; i--) {
+            log(sPendingLog.get(i));
+        }
+        sPendingLog.clear();
     }
 }

@@ -1100,7 +1100,9 @@ if crop_h < H:
 # ============================================================
 # SAVE
 # ============================================================
-out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image", "device2device.png")
+# This script lives in tools/, one level below the project root the image folder sits in
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+out_path = os.path.join(_root, "image", "device2device.png")
 img.save(out_path, "PNG")
 _out_h = crop_h if crop_h < H else H
 _fill_pct = final_bottom / _out_h * 100

@@ -117,7 +117,7 @@ public class FileMsgDialog extends DialogFragment {
                 appendLog("Server start failed: " + (reason == null ? "unknown" : reason));
             } else if (FileMsgServerService.STATE_STOPPED.equals(state)) {
                 isServerStarted = false;
-                appendLog("Server stopped");
+                appendLog("Server has stopped by service");
             }
             updateUI();
         }
@@ -225,7 +225,7 @@ public class FileMsgDialog extends DialogFragment {
             } else {
                 FileMsgServerService.stop(requireContext());
                 isServerStarted = false;
-                appendLog("Server stopped");
+                appendLog("Server has stopped by user");
             }
             updateUI();
         });

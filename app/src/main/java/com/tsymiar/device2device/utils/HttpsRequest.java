@@ -10,9 +10,9 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.net.HttpURLConnection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import javax.net.ssl.HttpsURLConnection;
 
 public class HttpsRequest {
 
@@ -32,11 +32,12 @@ public class HttpsRequest {
             HttpsRequestCallback callback) {
 
         executor.execute(() -> {
-            HttpsURLConnection connection = null;
+            HttpURLConnection connection = null;
             try {
-                // 创建连接
+                // 创建连接。基类 HttpURLConnection：url 是 https 时 openConnection 返回的
+                // 就是 HttpsURLConnection，顺带也就支持了 http（本地自建的 LLM 服务走 http）
                 URL url = new URL(urlString);
-                connection = (HttpsURLConnection) url.openConnection();
+                connection = (HttpURLConnection) url.openConnection();
 
                 // 设置基本参数
                 connection.setRequestMethod(method);

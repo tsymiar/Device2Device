@@ -39,7 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 与列表版（{@link MarketWidgetProvider}）是两个不同的 AppWidget 组件：各有自己的 provider 配置、
  * 布局、配置页和广播 Action，互不干扰 —— 桌面上想看一排标的用列表版，想盯单个标的看走势用这个。
  *
- * 这个部件只盯一个标的：标题 / 市场代码 → 走势曲线 → 大字最新价 + 涨跌幅 + 区间高低 → 更新时间。
+ * 这个部件只盯一个标的：标题 / 市场代码 → 走势曲线 → 大字最新价 + 涨跌幅（相对当天开盘价）
+ * → 底部一行（周期 + 区间高低在左，更新时间靠右）。
  * 曲线是把最近 N 根收盘价画成位图（{@link MarketSparkline}）后贴上去的，
  * RemoteViews 不支持自定义 View，桌面那边只认它自己能 inflate 的东西，没有别的路可走。
  *
@@ -62,8 +63,14 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     /** 没配过周期时的默认：日线各数据源都支持，也最能代表"最近这段走势" */
     public static final String DEFAULT_INTERVAL = "1d";
 
-    /** 曲线位图之外被占掉的高度 / 宽度（dp）：根布局 padding + 标题行 + 价格行 + 更新时间 */
-    private static final int CHART_CHROME_DP = 88;
+    /**
+     * 曲线位图之外被占掉的高度 / 宽度（dp）：根布局 padding + 标题行 + 价格行 + 底部一行。
+     *
+     * 更新时间不再自己占一行（和周期/高低并排、靠右），这里也就比原来少算十来 dp，
+     * 曲线相应拿到更多高度。估小一点没关系：ImageView 是 weight=1 的，多出来的空间
+     * 由 fitXY 铺满，不会把曲线裁掉。
+     */
+    private static final int CHART_CHROME_DP = 76;
     private static final int CHART_SIDE_DP = 18;
     /** 黄金那行人民币标注占掉的高度（dp）：只有显示时才从曲线高度里扣 */
     private static final int NOTE_DP = 12;
@@ -369,7 +376,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
                     R.color.market_flat, error, interval, null, 0f, 0f, 0f, 0f, null);
         }
         Quote last = quotes.get(quotes.size() - 1);
-        float base = quotes.size() > 1 ? quotes.get(quotes.size() - 2).close : last.open;
+        float base = dayOpen(quotes);
         float percent = last.changePercent(base);
         int color = percent > 0f ? R.color.market_up
                 : (percent < 0f ? R.color.market_down : R.color.market_flat);
@@ -388,12 +395,47 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
                 goldNote(item, last.close, 0f));
     }
 
+    /**
+     * 当天开盘价 —— 涨跌幅的基准。
+     *
+     * 序列里最后一根就是"当前"这根，往前回溯到同一天的第一根取它的 open：
+     * 日线周期下它就是 last.open；分钟周期（5m/15m/…）下 BARS 根会跨过午夜，
+     * 直接用上一根收盘算出来的"涨幅"是相对上一根的，跟行情软件对不上。
+     */
+    private static float dayOpen(List<Quote> quotes) {
+        Quote last = quotes.get(quotes.size() - 1);
+        String day = dayOf(last.time);
+        if (day == null) return firstPositive(last.open, last.close);
+        int i = quotes.size() - 1;
+        while (i > 0 && day.equals(dayOf(quotes.get(i - 1).time))) {
+            i--;
+        }
+        return firstPositive(quotes.get(i).open, last.open, last.close);
+    }
+
+    /** K线时间的前 10 位就是日期 "YYYY-MM-DD"；格式不对（或数据源没给时间）返回 null */
+    private static String dayOf(String time) {
+        if (time == null || time.length() < 10) return null;
+        return time.substring(0, 10);
+    }
+
+    /** 依次取第一个 >0 的值：开盘价为 0（部分接口当日未开盘时会给 0）时退回昨收 */
+    private static float firstPositive(float... values) {
+        if (values != null) {
+            for (float value : values) {
+                if (value > 0f) return value;
+            }
+        }
+        return 0f;
+    }
+
     // ------------------------------------------------------------------
     // 渲染 RemoteViews
     // ------------------------------------------------------------------
 
     /**
-     * 整块 RemoteViews：标题 / 代码 → 占满剩余空间的曲线位图 → 最新价 + 涨跌幅 + 区间高低 → 更新时间。
+     * 整块 RemoteViews：标题 / 代码 → 占满剩余空间的曲线位图 → 最新价 + 涨跌幅
+     * → 底部一行（周期 / 区间高低靠左，更新时间靠右）。
      *
      * 曲线不挂在 ListView 上，跟着这次 updateAppWidget 一起过去就行，不需要再 notify 什么。
      */
@@ -467,7 +509,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return views;
     }
 
-    /** 价格行右侧：周期 + 区间高低（曲线没画出来时不显示高低，免得误导） */
+    /** 底部一行左侧：周期 + 区间高低（曲线没画出来时不显示高低，免得误导） */
     private static String rangeText(Row row) {
         StringBuilder sb = new StringBuilder(QuoteSource.intervalLabel(row.interval));
         if (row.ok && row.high > 0f && row.low > 0f) {

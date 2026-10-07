@@ -114,6 +114,17 @@
     <string name="chat_api_key_hint">API Key（留空用内置 Key）</string>
     <string name="chat_api_key_mask">●●●</string>
     <string name="chat_api_key_show">sk-*****</string>
+    <string name="chat_ollama_local">本地</string>
+    <string name="chat_ollama_cloud">在线</string>
+    <string name="chat_ollama_host_hint">服务地址，如 127.0.0.1 / 192.168.1.20:11434</string>
+    <string name="chat_model">模型</string>
+    <string name="chat_model_pick">点选模型</string>
+    <string name="chat_model_pick_title">选择模型</string>
+    <string name="chat_model_refresh">刷新</string>
+    <string name="chat_model_reset">默认</string>
+    <string name="chat_model_fetching">正在获取模型…</string>
+    <string name="chat_model_none">没有取到模型</string>
+    <string name="chat_model_fetch_failed">获取模型失败：%1$s</string>
 
     <!-- ===== Serial Command Buttons ===== -->
     <string name="is_0">❨0❩</string>

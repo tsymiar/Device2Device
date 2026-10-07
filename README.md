@@ -5,7 +5,7 @@
 
 A feature-rich Android app for **peer-to-peer communication** and **multimedia processing** between devices.
 
-**Core capabilities:** Bluetooth RFCOMM serial · multi-protocol networking (TCP / UDP multicast / KCP) · Pub/Sub messaging · GPU/CPU image & video rendering · audio recording + real-time waveform + STT · real-time sensor dashboard · SSH server · parametric life-size 3D human model · DeepSeek AI chat · market K-line quotes + home widgets · embedded HTTP file server.
+**Core capabilities:** Bluetooth RFCOMM serial · multi-protocol networking (TCP / UDP multicast / KCP) · Pub/Sub messaging · GPU/CPU image & video rendering · audio recording + real-time waveform + STT · real-time sensor dashboard · SSH server · parametric life-size 3D human model · multi-provider AI chat (DeepSeek / Ollama / OpenRouter) · market K-line quotes + home widgets · embedded HTTP file server.
 
 ---
 
@@ -37,7 +37,7 @@ app/src/main/
 │   │                 #   Bugger, MyGit, Thanks
 │   ├── service/       # 7 services: Subscribe/Publish/HTTP server/Toast/Receiver/Window/SaveData + Voice
 │   ├── acceleration/  # Sensor & Voice modules
-│   ├── dialog/        # ChatBox (DeepSeek) + FileMsg
+│   ├── dialog/        # ChatBox (multi-provider) + FileMsg
 │   ├── entity/ event/ # Data entities & observer event system
 │   ├── widget/        # MarketWidgetProvider + config, MarketChartWidgetProvider + config
 │   ├── market/        # QuoteSource (11 sources), Quote, Indicators
@@ -86,7 +86,9 @@ On-device parametric model (no cloud). A photo contributes appearance + silhouet
 **Features:** photo / cloud (Tripo3D) input · silhouette & color extraction · body params (gender/height/weight/head ratio + girth tuning) · face shapes & 8 hairstyles · life-size mesh + measurements (BMI, circumferences, inseam) · OpenGL ES preview (grid/ruler/shadow) · OBJ+MTL export & PNG screenshot · persisted prefs.
 
 ### Intelligent
-DeepSeek AI chat (Chat / Reasoner) · acceleration alert at 7.0 m/s².
+Multi-provider AI chat (Chat / Reasoner) · acceleration alert at 7.0 m/s².
+
+**ChatBox providers:** DeepSeek (falls back to the built-in key) · Ollama — self-hosted (host/IP editable, port defaults to 11434) or Ollama Cloud · OpenRouter. Ollama and OpenRouter fetch the model list from the service on demand — OpenRouter is filtered down to free models — and the chosen model is remembered per provider. Text attachments are read and sent with the message.
 
 ### System
 Observer event bus · native time sync · global 3s toast · one-tap exit.
@@ -116,10 +118,14 @@ MIT
 ## Recent Changes
 
 ### 2026-10
-- Air Bangs; Anny Bust (taller/rounder, no seams); Hip Fullness calibration.
+- **ChatBox:** multi-provider (DeepSeek / Ollama local + cloud / OpenRouter), editable Ollama host, on-demand model list (OpenRouter free-only).
+- **Avatar:** Air Bangs; Anny Bust (taller/rounder, no seams); Hip Fullness calibration.
 
 ### 2026-09
-- Anny face/head texture + real-mesh head; bust dome; A-pose leg straighten + outer toe; photo fallback; hip recalibration; sensor card zoom + compass/level fullscreen; decibel card; SSH server (port 2222); sensor dashboard; interval labels; chest→breast; seam smoothing; hip/chest calibration; hair placement; facial features; dark-aware spinners; bundled `anny.mhb`; bust/chest params; barefoot; Anny engine + scaling; face & hair; teardrop bust; measurements; Market K-Line (11 sources); Market Widget (2×2); HTTP server; SAF fix.
+- **Avatar:** Anny engine (bundled `anny.mhb`, phenotype scaling), face & hair, real-mesh head, bust/chest params, A-pose legs, barefoot, measurements, photo fallback, seam smoothing.
+- **Sensors:** dashboard with zoom, compass/level fullscreen, decibel card.
+- **Market:** K-Line (11 sources) + 2×2 home widget.
+- **System:** SSH server (port 2222), HTTP server + SAF fix, dark-aware spinners.
 
 ### 2026-06
-- `MSG_HINT`; UI polish; Pub/Sub async + topic isolation; subscribe buffer fix; port-parsing guard.
+- **Messaging:** `MSG_HINT`, Pub/Sub async + topic isolation, subscribe buffer fix, port-parsing guard, UI polish.

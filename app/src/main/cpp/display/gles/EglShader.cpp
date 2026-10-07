@@ -10,7 +10,13 @@
 #endif
 #include <utils/logging.h>
 
-#define SR_FAIL 1
+/** GetShaderProgram() 失败返回值。必须是 0：glCreateProgram() 也会从 1 开始发号，
+    返回 1 会被调用方当成合法 program 继续用 */
+#define SR_FAIL 0
+
+GLuint g_Texture2D[3] = {0};
+GLuint g_vertexPosBuffer = 0;
+GLuint g_texturePosBuffer = 0;
 
 const char* g_vertexShader =
 "precision mediump float;"
@@ -60,7 +66,7 @@ GLuint GetGLShader(GLenum shaderType, const char* pSource)
                 char* buf = (char*)malloc((size_t)infoLen);
                 if (buf) {
                     glGetShaderInfoLog(shader, infoLen, nullptr, buf);
-                    LOGI("GetShader Could not compile shader %d:\n%s", shaderType, buf);
+                    LOGI("GetShader Could not compile shader %u:\n%s", shaderType, buf);
                     free(buf);
                 }
                 glDeleteShader(shader);
@@ -121,7 +127,7 @@ GLuint EglShader::CreateProgram(const char* pVertexShaderSource, const char* pFr
             program = 0;
         }
     }
-    LOGI("CreateProgram: %d", program);
+    LOGI("CreateProgram: %u", program);
     return program;
 }
 
