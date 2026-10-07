@@ -38,7 +38,7 @@ unsigned long long TimeStamp::BootTime()
              ttm->tm_hour,
              ttm->tm_min,
              ttm->tm_sec);
-    LOGD("BootTime: micro = %lld, value = %ld, szTime = %s", micro, tmVal, szTime);
+    LOGD("BootTime: micro = %llu, value = %ld, szTime = %s", micro, tmVal, szTime);
     return micro;
 }
 
@@ -49,6 +49,6 @@ unsigned long long TimeStamp::AbsoluteTime()
     char stm[TIME_LANG] = "";
     strftime(stm, sizeof(stm), "%Y-%m-%d %T", localtime(&time.tv_sec));
     unsigned long long micro = (unsigned long long) time.tv_sec * KILO + time.tv_usec / KILO;
-    LOGD("Absolute TimeStamp = %lld, %s", micro, stm);
+    LOGD("Absolute TimeStamp = %llu, %s", micro, stm);
     return micro;
 }

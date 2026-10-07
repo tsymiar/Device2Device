@@ -126,17 +126,30 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         Log.i(TAG, Arrays.toString(event));
     }
 
+    /**
+     * 往状态区写一行。
+     *
+     * native 的推送（订阅收到的消息就走这里）随时可能到，Activity 已经收摊时
+     * findViewById 返回 null，tv.setText 就是一句 NPE。
+     */
+    private void setTextSafely(int viewId, String text) {
+        if (text == null) return;
+        TextView tv = findViewById(viewId);
+        if (tv != null) {
+            tv.setText(text);
+        }
+    }
+
     @SuppressLint("HandlerLeak")
     private final Handler handler = new Handler() {
         @SuppressLint("SetTextI18n")
         @Override
         public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
-            TextView tv;
+            if (msg.obj == null) return;
             switch (msg.what) {
-                case Receiver.MESSAGE:
-                    tv = findViewById(R.id.txt_status);
-                    tv.setText(msg.obj.toString());
+                case Receiver.MSG_STAT:
+                    setTextSafely(R.id.txt_status, msg.obj.toString());
                     break;
                 case Receiver.FILE_PROGRESS: {
                     // 格式: "status[|落盘路径]|current|total" → 路由到文件传输对话框
@@ -172,13 +185,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 }
                 case Receiver.UDP_SERVER:
                     // 第一条是启动状态 → server 文字，之后是收到的数据 → client 文字
-                    tv = findViewById(mUdpStatusShown ? R.id.txt_udp_client : R.id.txt_udp_server);
+                    setTextSafely(mUdpStatusShown ? R.id.txt_udp_client : R.id.txt_udp_server,
+                            msg.obj.toString());
                     mUdpStatusShown = true;
-                    tv.setText(msg.obj.toString());
                     break;
                 case Receiver.UDP_CLIENT:
-                    tv = findViewById(R.id.txt_udp_client);
-                    tv.setText(msg.obj.toString());
+                    setTextSafely(R.id.txt_udp_client, msg.obj.toString());
                     break;
                 case Receiver.TOAST:
                 case Receiver.KAI_SUBSCRIBE:
@@ -189,7 +201,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     TextureActivity.log(msg.obj.toString());
                     break;
                 case Receiver.KCP_VIEW:
-                    mKcpBtn.setText(msg.obj.toString());
+                    if (mKcpBtn != null) {
+                        mKcpBtn.setText(msg.obj.toString());
+                    }
                     break;
                 case Receiver.KCP_HINT:
                     // 服务端收到什么
@@ -200,8 +214,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     appendKcpStatus(msg.obj.toString());
                     break;
                 case Receiver.MSG_HINT:
-                    tv = findViewById(R.id.txt_hint);
-                    tv.setText(msg.obj.toString());
+                    setTextSafely(R.id.txt_hint, msg.obj.toString());
                     break;
                 default:
                     break;

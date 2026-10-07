@@ -229,7 +229,7 @@ void FileMsgServer::runServerTest(unsigned short port)
     std::cout << "\nStopping server (" << g_receivedCount.load() << " file(s) received)..."
               << std::endl;
     server.stopServer();
-    std::cout << "Server stopped." << std::endl;
+    std::cout << "[FileMsgServer] Server stopped." << std::endl;
 }
 
 // ---------------------------------------------------------------------------

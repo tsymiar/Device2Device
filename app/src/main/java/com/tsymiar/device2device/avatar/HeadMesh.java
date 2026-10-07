@@ -302,8 +302,8 @@ public final class HeadMesh {
         float rx = hh * 0.020f * (0.55f + 0.45f * p.browR);
         float rz = hd * 0.050f;
         for (int sgn = -1; sgn <= 1; sgn += 2) {
-            // 眉毛是贴着眉骨长的一条：以前是两根直 tube，眉骨是弧面，直管子的中段必然
-            // 翘在皮肤外面（眉尾悬空）或者埋进肉里。分几段沿曲面取点接起来，整条都贴着走
+            // 眉毛是贴着眉骨长的一条：分几段沿曲面取点接起来，整条都贴着走。
+            // 眉骨是弧面，一根直 tube 拉过去中段必然翘在皮肤外面（眉尾悬空）或者埋进肉里
             float[] ts = {0.18f, 0.42f, 0.66f};
             float[] ss = {S_BROW + 0.020f, S_BROW + 0.038f, S_BROW - 0.010f};
             int seg = 6;

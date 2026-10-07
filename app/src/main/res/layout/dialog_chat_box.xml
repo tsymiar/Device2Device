@@ -23,6 +23,118 @@
         android:popupBackground="@android:color/white"
         android:popupElevation="4dp" />
 
+    <!-- Ollama 接入方式：自建服务（地址可填）或官方云。选到 Ollama 时才出现 -->
+    <LinearLayout
+        android:id="@+id/ollama_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_spinner"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <RadioGroup
+            android:id="@+id/rg_ollama_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rb_ollama_local"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:buttonTint="@color/colorAccent"
+                android:checked="true"
+                android:text="@string/chat_ollama_local"
+                android:textColor="#212121"
+                android:textSize="13sp" />
+
+            <RadioButton
+                android:id="@+id/rb_ollama_cloud"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:buttonTint="@color/colorAccent"
+                android:text="@string/chat_ollama_cloud"
+                android:textColor="#212121"
+                android:textSize="13sp" />
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/et_ollama_host"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_edit"
+            android:hint="@string/chat_ollama_host_hint"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="textNoSuggestions"
+            android:maxLines="1"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textColor="#212121"
+            android:textColorHint="#B0B0B0"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 模型：Ollama / OpenRouter 会从服务端拉一份列表，选中哪个用哪个 -->
+    <LinearLayout
+        android:id="@+id/model_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_spinner"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/chat_model"
+            android:textColor="#212121"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_model"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:minHeight="36dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/chat_model_pick"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_model_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:minHeight="36dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/chat_model_refresh"
+            android:textSize="12sp" />
+    </LinearLayout>
+
     <!-- 消息显示区域 (占据剩余空间) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_messages"

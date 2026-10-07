@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <vector>
 
 int FileUtils::MakeDirs(const char *fullPath)
 {
@@ -101,6 +102,17 @@ unsigned char* FileUtils::GetFileContentNeedFree(const char *filename, long& siz
 long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, FileCallback callback)
 {
     using namespace std;
+    /**
+     * 按 sliceSize 切片读文件，每片回调一次（渲染一帧）。
+     * 返回渲染出去的片数；<0 表示失败。
+     *
+     * 缓冲在堆上分配（栈上放几 MB 的帧会爆栈），循环由 gcount() 驱动：
+     * 只看 fin.read() 的返回值的话，读到 0 字节时循环条件恒真会卡死。
+     */
+    if (sliceSize == 0) {
+        LOGE("sliceSize is 0 for [%s]", filename.c_str());
+        return -1;
+    }
     ifstream fin;
     fin.open(filename, ios_base::binary);
     if (!fin.is_open())
@@ -110,32 +122,33 @@ long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, Fi
     }
 
     fin.seekg(0, ios::end);
-    long size = fin.tellg();
-    long fileSize = size;
-
+    long fileSize = fin.tellg();
     fin.seekg(0, ios::beg);
+    if (fileSize <= 0) {
+        LOGE("Empty or unreadable file[%s], size = %ld", filename.c_str(), fileSize);
+        fin.close();
+        return -2;
+    }
 
-    long len = sliceSize;
-    uint8_t frame[len];
-    memset(frame, 0, sliceSize);
-
-    if (fileSize <= sliceSize)
-        len = fileSize;
-
-    while (fin.read((char*)frame, len))
+    std::vector<uint8_t> frame(sliceSize);
+    long remain = fileSize;
+    long slices = 0;
+    while (remain > 0)
     {
-        if (callback != nullptr) {
-            callback(frame, len);
-        }
-        fileSize -= sliceSize;
-        if (fileSize <= sliceSize)
-        {
-            len = fileSize;
-        }
-        if (fileSize < 0)
+        size_t want = (static_cast<size_t>(remain) < sliceSize) ? static_cast<size_t>(remain) : sliceSize;
+        fin.read(reinterpret_cast<char*>(frame.data()), static_cast<std::streamsize>(want));
+        std::streamsize got = fin.gcount();
+        if (got <= 0) {
             break;
+        }
+        if (callback != nullptr) {
+            callback(frame.data(), static_cast<size_t>(got));
+        }
+        remain -= static_cast<long>(got);
+        slices++;
     }
 
     fin.close();
-    return size;
+    LOGI("ReadBinaryFile[%s]: %ld bytes, %ld slice(s) of %zu", filename.c_str(), fileSize, slices, sliceSize);
+    return slices;
 }

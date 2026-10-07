@@ -36,6 +36,19 @@
 #define LOG_TAG "native"
 #endif
 
+/**
+ * 取路径里的文件名。
+ *
+ * 不能写成 basename(strdup(__FILE__))：strdup 出来的那份没人 free，
+ * 每打一条日志就泄漏一块 —— 日志越密漏得越快。
+ */
+static inline const char* logFileName(const char* path)
+{
+    // 这个头文件 C 与 C++ 都包含，只能用 NULL —— nullptr 在 C 里编译不过
+    const char* slash = strrchr(path, '/');
+    return slash != NULL ? slash + 1 : path;
+}
+
 static inline void getCurrentTime(char* buf, size_t len)
 {
     struct timeval tv;
@@ -49,10 +62,12 @@ static inline void getCurrentTime(char* buf, size_t len)
 
 #ifdef __ANDROID__
 #define _LOG_PRINT_(level, tag, fmt, ...) do { \
-    char timeBuf[16]; \
-    getCurrentTime(timeBuf, sizeof(timeBuf)); \
-    __android_log_print(level, tag, "[%s](%s:%d)[%s]: " fmt, \
-        timeBuf, basename(strdup(__FILE__)), __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+    if (level >= LOG_LEVEL) { \
+        char timeBuf[16]; \
+        getCurrentTime(timeBuf, sizeof(timeBuf)); \
+        __android_log_print(level, tag, "[%s](%s:%d)[%s]: " fmt, \
+            timeBuf, logFileName(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+    } \
 } while(0)
 #elif defined(__linux__) || defined(__APPLE__)
 #define _LOG_PRINT_(level, tag, fmt, ...) do { \
@@ -67,7 +82,7 @@ static inline void getCurrentTime(char* buf, size_t len)
             default:               color_code = "0;31"; break; \
         } \
         fprintf(stderr, "\033[%sm[%s][%s](%s:%d)[%s]: \033[0m" fmt "\n", \
-                color_code, timeBuf, tag, basename(strdup(__FILE__)), __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+                color_code, timeBuf, tag, logFileName(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__); \
     } \
 } while(0)
 #else
@@ -76,7 +91,7 @@ static inline void getCurrentTime(char* buf, size_t len)
         char timeBuf[16]; \
         getCurrentTime(timeBuf, sizeof(timeBuf)); \
         fprintf(stderr, "[%s][%s:%d]: " fmt "\n", \
-                timeBuf, basename(strdup(__FILE__)), __LINE__, ##__VA_ARGS__); \
+                timeBuf, logFileName(__FILE__), __LINE__, ##__VA_ARGS__); \
     } \
 } while(0)
 #endif

@@ -44,7 +44,7 @@ public class WaveCanvas {
     private static final int SAMPLE_RATE = 16000;
     /** 1× 时一屏铺满的音频时长（秒），X 轴放大后这个窗口变短 = 细节更多 */
     private static final double WINDOW_SECONDS = 20.0;
-    /** Y 轴（幅度）缩放范围：以前最大只有 3×，看小信号不够用 */
+    /** Y 轴（幅度）缩放范围：上限给到 20×，小信号才放得出来 */
     private static final float ZOOM_Y_MIN = 0.1f;
     private static final float ZOOM_Y_MAX = 20.0f;
     /** X 轴（时基）缩放范围：1× = 20 秒一屏，8× = 2.5 秒一屏 */

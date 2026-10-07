@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -38,9 +39,16 @@ import com.tsymiar.device2device.view.MagneticView;
 import com.tsymiar.device2device.view.ProximityView;
 import com.tsymiar.device2device.view.StepView;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
  * 传感器页：上半屏是五个仪表/数值卡片——指南针（方向）、水平仪、海拔（GPS）、
  * 磁场强度、步数；下面那块是原来的加速度曲线（点 Start Chart 载入 SensorFragment）。
+ *
+ * 步数那张卡片显示的是今日步数（每天 0 点清零）：系统计步器给的是累计值，
+ * 换算在 {@link #applyStepCounter} 里做。
  */
 public class GraphActivity extends AppCompatActivity implements SensorEventListener {
 
@@ -52,6 +60,11 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     private static final int RC_LOCATION_STEP = 1001;
     private static final long GPS_MIN_TIME_MS = 1000L;
     private static final float GPS_MIN_DISTANCE_M = 1f;
+
+    /** 今日步数基线的存放位置：系统计步器给的是累计值且跨天不清零，当天起点得自己记 */
+    private static final String PREF_STEP = "step_counter";
+    private static final String K_STEP_DAY = "day";
+    private static final String K_STEP_BASE = "base";
 
     private SensorManager mSensorManager;
     private LocationManager mLocationManager;
@@ -286,6 +299,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     @Override
     protected void onResume() {
         super.onResume();
+        resetStepBaselineIfNewDay();
         register(mAccelSensor);
         register(mMagSensor);
         register(mStepSensor);
@@ -387,9 +401,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
                 }
                 break;
             case Sensor.TYPE_STEP_COUNTER:
-                if (mStep != null) {
-                    mStep.setSteps((long) event.values[0]);
-                }
+                applyStepCounter((long) event.values[0]);
                 return;
             case Sensor.TYPE_PROXIMITY:
                 if (mProximity != null) {
@@ -438,6 +450,37 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         float tiltX = (float) Math.toDegrees(Math.atan2(x, z));
         float tiltY = (float) Math.toDegrees(Math.atan2(y, z));
         mLevel.setTilt(tiltX, tiltY);
+    }
+
+    /**
+     * 把系统计步器的累计值换算成今日步数。
+     *
+     * TYPE_STEP_COUNTER 报的是自开机以来累计走的步数，跨天不会自己归零，
+     * 所以记一个「当天第一次读到的累计值」当基线，之后都用当前值减它。
+     * 换天（或计步器因重启归零导致当前值反而小于基线）时把基线重置成当前值，
+     * 于是新的一天从 0 开始 —— 也就是每天自动清零。
+     */
+    private void applyStepCounter(long total) {
+        if (mStep == null || total < 0L) return;
+        SharedPreferences sp = getSharedPreferences(PREF_STEP, MODE_PRIVATE);
+        long base = sp.getLong(K_STEP_BASE, -1L);
+        if (base < 0L || total < base) {
+            // 新基线：今天（或重启后）从 0 起算
+            base = total;
+            sp.edit().putLong(K_STEP_BASE, base).apply();
+        }
+        mStep.setSteps(total - base);
+    }
+
+    /** 回到前台时若已跨天，先把基线作废并归零：计步器要等走出第一步才回调 */
+    private void resetStepBaselineIfNewDay() {
+        SharedPreferences sp = getSharedPreferences(PREF_STEP, MODE_PRIVATE);
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        if (today.equals(sp.getString(K_STEP_DAY, null))) return;
+        sp.edit().putString(K_STEP_DAY, today).remove(K_STEP_BASE).apply();
+        if (mStep != null) {
+            mStep.setSteps(0L);
+        }
     }
 
     private static void lowPass(float[] out, float[] in, float alpha) {

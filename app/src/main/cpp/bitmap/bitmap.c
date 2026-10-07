@@ -7,6 +7,7 @@
 #include "bitmap.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 
 #ifndef LOG_TAG
@@ -515,90 +516,157 @@ write_long(FILE *fp, /* I - File to write to */
     return (putc(l >> 24, fp));
 }
 
-unsigned char *channelChange(int imageChannel, unsigned char* data, unsigned int width, unsigned int height) {
-    unsigned char *pBmpBits = (unsigned char *) calloc(sizeof(unsigned char),
-                                                       width * height * 4);
-    for (int i = 0; i < height; i++) {
-        unsigned char *pSrc = data + i * width * imageChannel;
-        unsigned char *pDst = pBmpBits + i * width * 4;
-
-        for (int j = 0; j < width; j++) {
-            if (imageChannel == 1) {
-                unsigned char p = *(pSrc++);
-                *(pDst++) = p;    //B Channel
-                *(pDst++) = p;    //G Channel
-                *(pDst++) = p;    //R Channel
-                *(pDst++) = 0;    //Alpha Channel (fixed to 0)
-            } else if (imageChannel == 3) {
-                *(pDst++) = *(pSrc++);    //B Channel
-                *(pDst++) = *(pSrc++);    //G Channel
-                *(pDst++) = *(pSrc++);    //R Channel
-                *(pDst++) = 0;            //Alpha Channel (fixed to 0)
-            } else if (imageChannel == 4) {
-                *(pDst++) = *(pSrc++);    //B Channel
-                *(pDst++) = *(pSrc++);    //G Channel
-                *(pDst++) = *(pSrc++);    //R Channel
-                *(pDst++) = *(pSrc++);    //Alpha Channel (fixed to 0)
-            }
-        }
-    }
-    return pBmpBits;
-}
-
+/*
+ * 'BitmapToRgba()' - 把一张 24/32 位 BMP 解成 RGBA（自上而下，alpha 不透明）。
+ *
+ * 成功时 prop.blSize > 0（= 宽*高*4），*pRgba 指向 malloc 出来的缓冲，由调用方 free。
+ * 失败时 blSize 为负： -1 打不开 / -2 不是 BMP / -3 尺寸非法 /
+ *                    -4 压缩格式不支持 / -5 位深不支持 / -6 读不满 / -7 内存不足。
+ *
+ * 解码时一步做完三件事：BGR(A) → RGBA、bottom-up 翻转、alpha 补成不透明。
+ * 行步进按 4 字节对齐算（stride），行末的 padding 不参与像素读取。
+ */
 BITMAPPROP BitmapToRgba(const char *filename, unsigned char **pRgba)
 {
     BITMAPPROP prop;
-    FILE *fpBmp;
-    if ((fpBmp = fopen(filename, "rb")) == NULL) {
-        LOGE("the bmp file can not open!");
-        prop.blSize = -1;
+    prop.biWidth = 0;
+    prop.biHeight = 0;
+    prop.blSize = -1;
+
+    if (filename == NULL || pRgba == NULL) {
+        return prop;
+    }
+    *pRgba = NULL;
+
+    FILE *fpBmp = fopen(filename, "rb");
+    if (fpBmp == NULL) {
+        LOGE("the bmp file can not open: %s", filename);
         return prop;
     }
 
-    unsigned short fileType;
-    fread(&fileType,1, sizeof (unsigned short), fpBmp);
-    if (fileType != BF_TYPE)
-    {
-        LOGE("file type(0x%x) error!", fileType);
+    unsigned short fileType = 0;
+    if (fread(&fileType, 1, sizeof(unsigned short), fpBmp) != sizeof(unsigned short)) {
+        prop.blSize = -2;
+        fclose(fpBmp);
+        return prop;
+    }
+    if (fileType != BF_TYPE) {
+        LOGE("file type(0x%x) error, not a BMP!", fileType);
         prop.blSize = -2;
         fclose(fpBmp);
         return prop;
     }
 
     BITMAPFILEHEADER bmpHeader;
-    //read the BITMAPFILEHEADER
-    fread(&bmpHeader, 1, sizeof(BITMAPFILEHEADER), fpBmp);
-
-    BITMAPINFOHEADER bmpInfHeader;
-    //read the BITMAPINFOHEADER
-    fread(&bmpInfHeader, 1, sizeof(BITMAPINFOHEADER), fpBmp);
-
-    if (bmpInfHeader.biWidth % 4 != 0) {
-        bmpInfHeader.biWidth = (bmpInfHeader.biWidth / 4 + 1) * 4;
+    if (fread(&bmpHeader, 1, sizeof(BITMAPFILEHEADER), fpBmp) != sizeof(BITMAPFILEHEADER)) {
+        LOGE("bmp file header truncated");
+        prop.blSize = -2;
+        fclose(fpBmp);
+        return prop;
     }
-    if ((int)bmpInfHeader.biHeight <= 0 || (int)bmpInfHeader.biWidth <= 0) {
-        LOGE("the bmp size invalid: [%d]x[%d]!", bmpInfHeader.biHeight, bmpInfHeader.biWidth);
+
+    /* BITMAPINFOHEADER 里 biXPelsPerMeter/biYPelsPerMeter 是 long，在 64 位上被撑到 8 字节，
+       整个结构 sizeof 变成 48 —— 而文件里的信息头只有 40 字节。
+       按 sizeof 读会多啃掉 8 个字节，头小的文件直接读不满就失败了。
+       这里按标准的 40 字节读，前 24 字节（biSize..biSizeImage）的偏移与结构体一致，
+       直接拷进去就够用。 */
+    unsigned char ih[40];
+    BITMAPINFOHEADER bmpInfHeader;
+    memset(&bmpInfHeader, 0, sizeof(bmpInfHeader));
+    if (fread(ih, 1, sizeof(ih), fpBmp) != sizeof(ih)) {
+        LOGE("bmp info header truncated");
+        prop.blSize = -2;
+        fclose(fpBmp);
+        return prop;
+    }
+    memcpy(&bmpInfHeader, ih, 24);
+
+    int width = (int) bmpInfHeader.biWidth;
+    int height = (int) bmpInfHeader.biHeight;   /* 负数表示自上而下存储 */
+    if (width <= 0 || height == 0) {
+        LOGE("the bmp size invalid: [%d]x[%d]!", height, width);
         prop.blSize = -3;
         fclose(fpBmp);
         return prop;
-    } else {
-        prop.biWidth = bmpInfHeader.biWidth;
-        prop.biHeight = bmpInfHeader.biHeight;
+    }
+    int topDown = (height < 0);
+    if (topDown) height = -height;
+
+    /* BI_BITFIELDS 只是多了 3 个掩码，像素排布与 BI_RGB 一致，可以按 BI_RGB 读 */
+    if (bmpInfHeader.biCompression != BI_RGB && bmpInfHeader.biCompression != BI_BITFIELDS) {
+        LOGE("bmp compression %u not supported (only BI_RGB)", bmpInfHeader.biCompression);
+        prop.blSize = -4;
+        fclose(fpBmp);
+        return prop;
+    }
+    int bpp = bmpInfHeader.biBitCount;
+    if (bpp != 24 && bpp != 32) {
+        LOGE("bmp bit count %d not supported (only 24/32)", bpp);
+        prop.blSize = -5;
+        fclose(fpBmp);
+        return prop;
     }
 
-    // read bmp data
-    prop.blSize = (int)bmpInfHeader.biHeight * bmpInfHeader.biWidth * 3;
-    *pRgba = (unsigned char *) malloc(prop.blSize);
-    fseek(fpBmp, bmpHeader.bfOffBits, SEEK_SET);
-
-    size_t len;
-    if ((len = fread(*pRgba, 1, prop.blSize, fpBmp)) != prop.blSize) {
-        LOGE("bmp size not match: [%zu][%ld]", len, prop.blSize);
+    /* 每行按 4 字节对齐补齐，这个 padding 不能当成像素读 */
+    size_t stride = (((size_t) width * (size_t) (bpp / 8)) + 3u) & ~((size_t) 3u);
+    size_t rawSize = stride * (size_t) height;
+    unsigned char *raw = (unsigned char *) malloc(rawSize);
+    if (raw == NULL) {
+        LOGE("malloc %zu bytes for bmp raw failed", rawSize);
+        prop.blSize = -7;
+        fclose(fpBmp);
+        return prop;
     }
 
-    *pRgba = channelChange(3, *pRgba, prop.biWidth, prop.biHeight);
-
+    if (fseek(fpBmp, (long) bmpHeader.bfOffBits, SEEK_SET) != 0) {
+        LOGE("bmp seek to %u failed", bmpHeader.bfOffBits);
+        free(raw);
+        prop.blSize = -6;
+        fclose(fpBmp);
+        return prop;
+    }
+    size_t got = fread(raw, 1, rawSize, fpBmp);
     fclose(fpBmp);
+    if (got != rawSize) {
+        LOGE("bmp size not match: [%zu][%zu]", got, rawSize);
+        free(raw);
+        prop.blSize = -6;
+        return prop;
+    }
+
+    size_t outSize = (size_t) width * (size_t) height * 4u;
+    unsigned char *rgba = (unsigned char *) malloc(outSize);
+    if (rgba == NULL) {
+        LOGE("malloc %zu bytes for rgba failed", outSize);
+        free(raw);
+        prop.blSize = -7;
+        return prop;
+    }
+
+    /* 边读边做 BGR(A)→RGBA 和上下翻转，不再经由中间那份 3 通道缓冲 */
+    for (int y = 0; y < height; y++) {
+        const unsigned char *src = raw + (size_t) (topDown ? y : (height - 1 - y)) * stride;
+        unsigned char *dst = rgba + (size_t) y * (size_t) width * 4u;
+        for (int x = 0; x < width; x++) {
+            unsigned char b = src[0];
+            unsigned char g = src[1];
+            unsigned char r = src[2];
+            dst[0] = r;
+            dst[1] = g;
+            dst[2] = b;
+            /* 24 位 BMP 不带 alpha：不补成 FF 的话整张图就是全透明的 */
+            dst[3] = (bpp == 32) ? src[3] : 0xFF;
+            src += bpp / 8;
+            dst += 4;
+        }
+    }
+    free(raw);
+
+    prop.biWidth = (unsigned int) width;
+    prop.biHeight = (unsigned int) height;
+    prop.blSize = (long) outSize;
+    *pRgba = rgba;
+    LOGI("bmp [%s] decoded %dx%d, %ld bytes", filename, width, height, prop.blSize);
     return prop;
 }
 

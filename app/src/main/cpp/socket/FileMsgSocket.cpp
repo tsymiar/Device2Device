@@ -560,9 +560,8 @@ void FileMsgSocket::fileServerProcess()
 
 void FileMsgSocket::fileClientProcess()
 {
-    // 客户端模式下此线程原本只做空转 sleep，无实际接收逻辑。
-    // 响应和超时均由 postLocalFile 所在的调用线程同步处理。
-    // 此函数保留以兼容头文件声明，connectToServer 不再启动此线程。
+    // 客户端模式下不需要后台接收：响应和超时都由 postLocalFile 所在的调用线程同步处理。
+    // 此函数保留以兼容头文件声明，connectToServer 不启动它。
     LOGI("fileClientProcess: stub — no background receive needed in client mode");
 }
 

@@ -98,7 +98,9 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- 价格行：最新价 + 涨跌幅（相对上一根收盘），整块用涨跌色统一染色 -->
+    <!-- 价格行：最新价 + 涨跌幅（相对当天开盘），整块用涨跌色统一染色。
+         这一行只放这两个：涨跌幅末尾的 % 不能被别的 TextView 挤掉，
+         区间高低和更新时间挪到下面那行去 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -115,6 +117,7 @@
             android:textSize="23sp"
             android:textStyle="bold" />
 
+        <!-- 涨跌幅：不带 ellipsize、不参与权重分配，末尾的 % 宁可让价格换行也不能被截 -->
         <TextView
             android:id="@+id/widget_change"
             android:layout_width="wrap_content"
@@ -124,20 +127,6 @@
             android:text=""
             android:textColor="@color/market_widget_text_dim"
             android:textSize="12sp" />
-
-        <!-- 吃掉剩余宽度把自己顶到最右。别用 Space 占位：RemoteViews 只认它自己那份
-             View 白名单，<Space> 不在里面，部件会直接 inflate 失败 -->
-        <TextView
-            android:id="@+id/widget_range"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:gravity="end"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="@color/market_widget_text_hint"
-            android:textSize="9sp" />
     </LinearLayout>
 
     <!-- 黄金专用的一行：标注对应的人民币价（元/克）。默认 GONE，只有黄金标的才显示，
@@ -153,15 +142,38 @@
         android:textSize="9sp"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/widget_meta"
+    <!-- 底部一行：左边是周期 + 区间高低，右边是更新时间。
+         两个挤在同一行是为了不各占一行：各占一行等于从曲线高度里抠掉十几 dp。别用 Space 撑开：RemoteViews 只认它自己那份
+         View 白名单，<Space> 不在里面，部件会直接 inflate 失败 -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="1dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="@string/market_widget_loading"
-        android:textColor="@color/market_widget_text_hint"
-        android:textSize="9sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_range"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="start|center_vertical"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="@color/market_widget_text_hint"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/widget_meta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:gravity="end|center_vertical"
+            android:maxLines="1"
+            android:text="@string/market_widget_loading"
+            android:textColor="@color/market_widget_text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
 
 </LinearLayout>
