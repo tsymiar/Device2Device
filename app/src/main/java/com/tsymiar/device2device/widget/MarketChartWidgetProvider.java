@@ -207,8 +207,8 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
                 return;
             }
 
-            fetch(context, item, interval, (quotes, error) -> {
-                final Row row = rowOf(item, quotes, error, interval);
+            fetch(context, item, interval, (quotes, error, prevClose) -> {
+                final Row row = rowOf(item, quotes, error, interval, prevClose);
                 sRow.put(widgetId, row);
                 if (row.needFx()) {
                     // 国际金报的是美元/盎司，等汇率回来换成元/克再落一次界面
@@ -262,7 +262,15 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     // ------------------------------------------------------------------
 
     private interface FetchCallback {
-        void onDone(List<Quote> quotes, String error);
+        /**
+         * @param prevClose 分时的昨收（作基准用）；不是分时周期时给 0
+         */
+        void onDone(List<Quote> quotes, String error, float prevClose);
+    }
+
+    /** 这一档周期画的是当日分时（跟着 QuoteSource 的口径走，见 {@code QuoteSource.intervalLabel}） */
+    private static boolean isIntradayInterval(String interval) {
+        return "1m".equals(interval);
     }
 
     /** 输入的可能是名称/拼音，先搜索成代码再取数 */
@@ -273,7 +281,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
                 @Override
                 public void onResult(List<Symbol> items) {
                     if (items == null || items.isEmpty()) {
-                        callback.onDone(null, "未找到标的");
+                        callback.onDone(null, "未找到标的", 0f);
                         return;
                     }
                     load(context, item.source, items.get(0).code, interval, callback);
@@ -281,7 +289,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
 
                 @Override
                 public void onError(String message) {
-                    callback.onDone(null, message);
+                    callback.onDone(null, message, 0f);
                 }
             });
             return;
@@ -291,15 +299,30 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
 
     private static void load(Context context, String source, String code, String interval,
                              final FetchCallback callback) {
+        // 分时这一档要的就是「今天到现在的走势 + 昨收」，K线接口给的是最近几百根分钟线，画不出那个形状
+        if (isIntradayInterval(interval)) {
+            QuoteSource.fetchIntraday(source, code, new QuoteSource.IntradayCallback() {
+                @Override
+                public void onResult(List<Quote> quotes, float prevClose) {
+                    callback.onDone(quotes, null, prevClose);
+                }
+
+                @Override
+                public void onError(String message) {
+                    callback.onDone(null, message, 0f);
+                }
+            });
+            return;
+        }
         QuoteSource.load(source, code, interval, BARS, new QuoteSource.Callback() {
             @Override
             public void onLoaded(String src, String code, List<Quote> quotes) {
-                callback.onDone(quotes, null);
+                callback.onDone(quotes, null, 0f);
             }
 
             @Override
             public void onFailed(String message) {
-                callback.onDone(null, message);
+                callback.onDone(null, message, 0f);
             }
         });
     }
@@ -368,15 +391,20 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return "≈ " + MarketWidgetProvider.fmtPrice(last * rate / QuoteSource.OUNCE_GRAMS) + " 元/克";
     }
 
+    /**
+     * @param prevClose 分时昨收（>0 时用它做基准，涨跌幅也是相对它的）；
+     *                  K线周期给 0 —— 那时基准是当天第一根的开盘（见 {@link #dayOpen}）
+     */
     private static Row rowOf(MarketWidgetProvider.Item item, List<Quote> quotes, String error,
-                             String interval) {
+                             String interval, float prevClose) {
         if (quotes == null || quotes.isEmpty()) {
             if (error != null) Log.w(TAG, "chart fetch failed: " + item.symbol + " " + error);
             return new Row(item, false, "--", error == null ? "无数据" : error,
                     R.color.market_flat, error, interval, null, 0f, 0f, 0f, 0f, null);
         }
         Quote last = quotes.get(quotes.size() - 1);
-        float base = dayOpen(quotes);
+        // 分时图（行情软件的规矩）一律以昨收为 0%，其余周期才用当日开盘
+        float base = prevClose > 0f ? prevClose : dayOpen(quotes);
         float percent = last.changePercent(base);
         int color = percent > 0f ? R.color.market_up
                 : (percent < 0f ? R.color.market_down : R.color.market_flat);

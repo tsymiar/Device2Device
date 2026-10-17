@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 排版树的一个「横着排」的内部节点：孩子们左右各占一段宽度。
+
+     它自己是 wrap_content：里面每个孩子的宽度都由 setWidth 写死，
+     一段一段加起来正好是这个节点的宽度，用不着谁来替它指定宽度。
+     方向写死在 XML 里是因为 RemoteViews 没有能设 orientation 的远程调用，
+     于是横排 / 竖排各给一个布局文件。
+
+     clipChildren 明写着 true：格子的宽高是写死的像素值，TextView 自己不会把格子撑大，
+     但文字画到格子外面去是画得出去的（ViewGroup 只是默认裁，宿主改了就不裁）。
+     写上它，「字绝不跑到旁边的色块上」就是结构性的保证，不依赖字号算得准不准。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_heat_row"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:clipChildren="true"
+    android:orientation="horizontal" />

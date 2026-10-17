@@ -94,6 +94,8 @@ public class KLineView extends View {
     private int mPanelLocked = -1;
     /** true = 折线（分时）模式：1分钟这种超短周期蜡烛会糊成一片，改画收盘价折线 */
     private boolean mLineMode = false;
+    /** 分时图的昨收（基准价）：<=0 表示没给，按数据里回溯（见 {@code prevClose}） */
+    private float mPrevClose = 0f;
     private QuoteInfoListener mListener;
     /** 实时盘口快照（市值等 K 线里没有的数据），没有时为 null */
     private Snapshot mSnapshot;
@@ -193,6 +195,17 @@ public class KLineView extends View {
         invalidate();
     }
 
+    /**
+     * 分时图那条基准线 —— 昨收（见 {@code prevClose}）。
+     *
+     * 分时数据只有当天这一段，昨收不在里面，原先那套「回溯上一个交易日的最后一根」
+     * 这时候推不出来；换标的时必须 caller 给就给了，没给（或给了 0）才回退到推算。
+     */
+    public void setPrevClose(float prevClose) {
+        mPrevClose = prevClose;
+        invalidate();
+    }
+
     /** 设置当前周期：季/年线的时间轴按周期出标签，避免长跨度下退化成年份刷屏 */
     public void setInterval(String interval) {
         mInterval = interval == null || interval.isEmpty() ? "1d" : interval;
@@ -232,7 +245,7 @@ public class KLineView extends View {
         int keepStart = mStart;
         int keepSelected = mSelected;
 
-        mData = quotes == null ? new ArrayList<Quote>() : new ArrayList<>(quotes);
+        mData = sanitize(quotes);
         mPendingTail = atTail;
         // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）；
         // 用户手动切过副图后就一直用他选的那个，刷新不再覆盖（锁了成交量但该源没量才回落 MACD）
@@ -249,6 +262,30 @@ public class KLineView extends View {
         clampStart();
         publishSelection();
         invalidate();
+    }
+
+    /**
+     * 入库前把不该参与绘图的行滤掉。这类数据混进去没有异常、日志干净，图上却是错的：
+     *  - null / 无时间戳：坐标与时间标签会踩空；
+     *  - 四价出现 NaN 或 Infinity：混进极值计算后整幅图的量程被拉坏，所有K线叠在一起；
+     *  - 四价全 0：行情接口缺字段时解析层会把价兜成 0，落成一根"地板价"假K线，
+     *    纵轴被拉到 0，真实的K线被压成一条平线。
+     *    注意只判"全 0"而不是"<=0"：负油价这类真实负价格不能被误伤。
+     */
+    private static List<Quote> sanitize(List<Quote> quotes) {
+        List<Quote> out = new ArrayList<>();
+        if (quotes == null) return out;
+        for (Quote q : quotes) {
+            if (q == null || q.time == null) continue;
+            if (!isFinite(q.open) || !isFinite(q.high) || !isFinite(q.low) || !isFinite(q.close)) continue;
+            if (q.open == 0f && q.high == 0f && q.low == 0f && q.close == 0f) continue;
+            out.add(q);
+        }
+        return out;
+    }
+
+    private static boolean isFinite(float value) {
+        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
     /** 循环切换底部副图，返回当前副图名；手动切过之后记下来，刷新不再被重置 */
@@ -362,30 +399,55 @@ public class KLineView extends View {
 
     private void drawHeader(Canvas canvas) {
         float left = dp(10);
-        // 第一行：标的名称（股票名 / 商品中文名），未解析到名称时退回标题
-        String label = mName.isEmpty() ? mTitle : mName;
+        float right = getWidth() - dp(10);
+        // 总市值挂在代码那一行：它是「这只票有多大」的口径，K 线本身没有这个字段，
+        // 只有 A股 / 港股那类标的拿得到（见 Snapshot），拿不到就不占位
+        String cap = mSnapshot != null && mSnapshot.totalCap > 0d
+                ? "  市值 " + Snapshot.cap(mSnapshot.totalCap) : "";
+        // 第一行：标的名称（股票名 / 商品中文名）；没解析到名称时第一行就是代码那一行
+        String label = mName.isEmpty() ? mTitle + cap : mName;
         mTextPaint.setColor(mText);
         mTextPaint.setTextSize(sp(15));
         mTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
-        canvas.drawText(label, left, sp(17), mTextPaint);
+        canvas.drawText(fit(label, right - left), left, sp(17), mTextPaint);
         mTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
 
-        // 第二行：代码 / 数据源 / 周期（有名称时才另起一行，避免重复）+ 最新价与涨跌
+        // 第二行：代码 / 周期 + 总市值（有名称时才另起一行，避免重复）+ 最新价与涨跌
         mTextPaint.setTextSize(sp(11));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
-        if (!mName.isEmpty()) {
-            mTextPaint.setColor(mTextDim);
-            canvas.drawText(mTitle, left, sp(32), mTextPaint);
-        }
+        String code = mName.isEmpty() ? "" : mTitle + cap;
         if (!mData.isEmpty()) {
             Quote last = mData.get(mData.size() - 1);
             float base = mData.size() > 1 ? mData.get(mData.size() - 2).close : last.open;
+            String price = String.format(Locale.US, "%s  %+.2f%%",
+                    fmt(last.close), last.changePercent(base));
+            if (!code.isEmpty()) {
+                mTextPaint.setColor(mTextDim);
+                // 右边那串价格是右对齐的，代码这一行只用到它左边为止，别让市值撞上去
+                canvas.drawText(fit(code, right - left - mTextPaint.measureText(price) - dp(8)),
+                        left, sp(32), mTextPaint);
+            }
             mTextPaint.setColor(last.isUp() ? mUp : mDown);
             mTextPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText(String.format(Locale.US, "%s  %+.2f%%", fmt(last.close), last.changePercent(base)),
-                    getWidth() - dp(10), sp(32), mTextPaint);
+            canvas.drawText(price, right, sp(32), mTextPaint);
+        } else if (!code.isEmpty()) {
+            mTextPaint.setColor(mTextDim);
+            canvas.drawText(fit(code, right - left), left, sp(32), mTextPaint);
         }
+    }
+
+    /** 把这一行截到 availPx 之内，截了就在末尾补个省略号：加长过的那一行不能撞到右边的价 */
+    private String fit(String text, float availPx) {
+        if (text.isEmpty() || availPx <= 0f) return "";
+        if (mTextPaint.measureText(text) <= availPx) return text;
+        String ell = "…";
+        float ellWidth = mTextPaint.measureText(ell);
+        int end = text.length();
+        while (end > 1 && mTextPaint.measureText(text.substring(0, end)) + ellWidth > availPx) {
+            end--;
+        }
+        return end > 1 ? text.substring(0, end) + ell : "";
     }
 
     private void drawEmpty(Canvas canvas) {
@@ -415,6 +477,14 @@ public class KLineView extends View {
         if (min == Float.MAX_VALUE) {
             mRange = null;
             return new float[]{0f, 1f};
+        }
+        if (mLineMode) {
+            // 分时图要保证昨收这条基准线落在可视范围内，否则它会被画到框外
+            float base = prevClose();
+            if (base > 0f) {
+                min = Math.min(min, base);
+                max = Math.max(max, base);
+            }
         }
         float pad = (max - min) * 0.06f;
         if (pad <= 0) pad = Math.max(Math.abs(max) * 0.01f, 0.5f);
@@ -525,6 +595,56 @@ public class KLineView extends View {
 
         mPaint.setColor(mTrend);
         canvas.drawCircle(xs[n - 1], ys[n - 1], dp(2.2f), mPaint);
+        drawPrevCloseAxis(canvas, range);
+    }
+
+    /**
+     * 分时图的骨架：昨收基准线 + 右侧百分比刻度。
+     *
+     * 分时图与普通折线的区别就在这一条线 —— 中国市场习惯以「昨收」为 0%，
+     * 线上是多少百分比一目了然；没有它，一条飘着的折线看不出今天是涨是跌。
+     * 百分比只标上/中/下三档，画在绘图区内侧，避免和右侧价格刻度打架。
+     */
+    private void drawPrevCloseAxis(Canvas canvas, float[] range) {
+        float base = prevClose();
+        if (base <= 0f) return;
+        float y = yOf(base, range);
+        drawDashedLine(canvas, mMainRect.left, y, mMainRect.right, y, mGrid);
+        mTextPaint.setTextSize(sp(8));
+        mTextPaint.setTextAlign(Paint.Align.RIGHT);
+        mTextPaint.setColor(mTextDim);
+        float right = mMainRect.right - dp(2);
+        canvas.drawText(percentAt(base, base), right, y - dp(2), mTextPaint);
+        canvas.drawText(percentAt(priceAt(mMainRect.top, range), base),
+                right, mMainRect.top + sp(9), mTextPaint);
+        canvas.drawText(percentAt(priceAt(mMainRect.bottom, range), base),
+                right, mMainRect.bottom - dp(2), mTextPaint);
+    }
+
+    /** 相对昨收的涨跌幅文本 */
+    private static String percentAt(float price, float base) {
+        if (base <= 0f) return "";
+        return String.format(Locale.US, "%+.2f%%", (price - base) / base * 100f);
+    }
+
+    /**
+     * 昨收：最后一根往前回溯到前一天的最后一根，取它的收盘。
+     * 分钟数据在库里通常也不只一天，这条线要拿的就是「今天从哪儿起步」那个价格。
+     */
+    private float prevClose() {
+        if (mPrevClose > 0f) return mPrevClose;
+        if (mData.isEmpty()) return 0f;
+        String lastDay = dayOf(mData.get(mData.size() - 1).time);
+        if (lastDay == null) return 0f;
+        int i = mData.size() - 1;
+        while (i > 0 && lastDay.equals(dayOf(mData.get(i - 1).time))) i--;
+        return i > 0 ? mData.get(i - 1).close : mData.get(i).open;
+    }
+
+    /** K线时间的前 10 位就是日期 "YYYY-MM-DD"；格式不对（或数据源没给时间）返回 null */
+    private static String dayOf(String time) {
+        if (time == null || time.length() < 10) return null;
+        return time.substring(0, 10);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 行情曲线小部件（MarketChartWidgetProvider）的布局：只盯一个标的，
-     主体是最近 N 根K线连成的走势图。列表版那一个用的是 widget_market.xml。
+     主体是最近 N 根K线连成的走势图。列表版那一个用的是 widget_market_list.xml。
 
      注意 RemoteViews 只认它自己那份 View 白名单：能用 LinearLayout / FrameLayout /
      TextView / ImageView，但 Space、自定义 View 都会让整个部件 inflate 失败，

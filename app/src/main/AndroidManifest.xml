@@ -107,6 +107,25 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <!-- 行情热力图小部件：4x4，沪深京 A 股市值 的 treemap。
+             主体是一整片马赛克：MarketTreemap 按市值之比把矩形一刀刀切开，
+             Provider 再按这棵树用 addView 铺成嵌套的 LinearLayout + TextView，
+             格子的宽高用 setWidth/setHeight 摆成「面积=市值」，点某一格进该标的行情页。
+             面积之和就是那块矩形，所以不需要 RemoteViewsService 那套滚动容器。
+             榜单范围就是它自己，所以没有配置页 -->
+        <receiver
+            android:name=".widget.MarketHeatWidgetProvider"
+            android:exported="true"
+            android:label="@string/market_heat_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_market_heat" />
+        </receiver>
         <activity android:name=".activity.WaveActivity" android:label="@string/title_wave" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
         <activity android:name=".activity.GraphActivity"
             android:label="@string/title_sensor_dashboard" />

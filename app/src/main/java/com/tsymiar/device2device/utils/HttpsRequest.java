@@ -30,6 +30,21 @@ public class HttpsRequest {
             HashMap<String, String> headers,
             String requestBody,
             HttpsRequestCallback callback) {
+        executeRequest(urlString, method, headers, requestBody, "utf-8", callback);
+    }
+
+    /**
+     * @param charset 响应正文的编码。绝大多数接口是 utf-8；腾讯 / 新浪那几条老接口给的是 GBK
+     *                —— 不按 GBK 解，中文字段（名称那类）就是一堆乱码，
+     *                数字字段虽不受影响，但靠它拿名称的那条路就废了。
+     */
+    public static void executeRequest(
+            String urlString,
+            String method,
+            HashMap<String, String> headers,
+            String requestBody,
+            String charset,
+            HttpsRequestCallback callback) {
 
         executor.execute(() -> {
             HttpURLConnection connection = null;
@@ -74,7 +89,7 @@ public class HttpsRequest {
                 // 读取响应内容
                 InputStream inputStream = (responseCode >= 400) ?
                         connection.getErrorStream() : connection.getInputStream();
-                String response = convertStreamToString(inputStream);
+                String response = convertStreamToString(inputStream, charset);
 
                 // 成功回调
                 mainHandler.post(() ->
@@ -91,9 +106,9 @@ public class HttpsRequest {
         });
     }
 
-    private static String convertStreamToString(InputStream is) throws IOException {
+    private static String convertStreamToString(InputStream is, String charset) throws IOException {
         if (is == null) return "";
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, charset))) {
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {

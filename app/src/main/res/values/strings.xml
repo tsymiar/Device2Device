@@ -40,7 +40,7 @@
     <string name="section_files">💬 Services</string>
     <string name="section_game">🎮 Games</string>
     <string name="market_quote">📈 行情 K线 · Market</string>
-    <string name="market_widget_label">📈 多行情</string>
+    <string name="market_widget_label">📈 行情列表</string>
     <string name="market_widget_desc">一个部件可放多个自选标的的最新价与涨跌幅，小字标出市场代码，超出高度可上下滚动。</string>
     <string name="market_widget_config">行情列表设置</string>
     <string name="market_widget_loading">加载中…</string>
@@ -53,6 +53,12 @@
     <string name="market_widget_chart_interval">曲线周期</string>
     <string name="market_widget_chart_wait">等待数据…</string>
     <string name="market_widget_chart_none">暂无曲线数据</string>
+    <!-- 行情热力图小部件：4x4，按市值分面积、按涨跌幅染色的沪深京 A 股 -->
+    <string name="market_heat_widget_label">📊 市值热力图</string>
+    <string name="market_heat_widget_desc">一屏摆开当天沪深京 A 股市值最大的一批（部件越大摆的格子越多）：每格面积按市值分，颜色按涨跌幅染（红涨绿跌，越浓涨跌越大）。点整块进行情页，点右上角「刷新」立即取数据。</string>
+    <string name="market_heat_widget_title">市值热力图</string>
+    <string name="market_heat_widget_legend">面积=市值 · 颜色=涨跌 · 沪深京 A股 @30</string>
+    <string name="market_heat_widget_none">暂无市值数据</string>
     <string name="avatar_3d">🧍 人物 3D 模型 · Avatar</string>
     <string name="deduction_board">🧩 声纹推演盘 · Deduction Board</string>
     <string name="sensor">传感器</string>

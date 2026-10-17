@@ -1,28 +1,52 @@
+# ==========================================================
+# Device2Device —— Android App(AGP) + NDK/CMake + Python 工具
+# ==========================================================
+
+# ---------- IDE / 编辑器 ----------
 *.iml
-.gradle
-local.properties
-.idea
+.idea/
+.vscode/
 .DS_Store
-app/build
-captures
-.externalNativeBuild
-.cxx
-.tmp
-app/src/main/jniLibs
+
+# ---------- Gradle / Android Studio ----------
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+.tmp/
+
+# ---------- 构建产物 ----------
+*.apk
+*.aab
+*.ap_
 *.zip
 *.dylib
-.codebuddy
-received
-jniLibs
-libs
-pic
-.vs*
 *.log
-test
-# 上面那条 test 会把 cpp/test/ 整个目录也忽略掉（里面的源码本来是提交的），单独放开。
-# 注意：父目录被排除时无法再用 !文件路径 把它下面的文件捞回来，必须先放开目录本身。
-!app/src/main/cpp/test/
 
-# Python
+# ---------- 签名 ----------
+*.jks
+*.keystore
+*.p12
+
+# ---------- NDK / 原生构建 ----------
+app/jniLibs/
+
+# ---------- 仓库根的临时 / 个人目录 ----------
+/dist/
+/test/
+/received/
+/pic/
+/libs/
+
+# ---------- Python 工具（tools/*.py） ----------
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+
+# ---------- AI / Copilot 辅助目录 ----------
+.github/**/*.md
+.codebuddy/

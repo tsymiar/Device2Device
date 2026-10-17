@@ -302,7 +302,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
                 return;
             }
 
-            fetchAll(context, items, rows -> {
+            fetchAll(context, manager, widgetId, items, rows -> {
                 cacheRows(widgetId, rows);
                 sPending.remove(widgetId);
                 try {
@@ -317,7 +317,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
             Log.w(TAG, "widget update failed", t);
             sPending.remove(widgetId);
             try {
-                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market);
+                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market_list);
                 views.setOnClickPendingIntent(R.id.widget_root, openMarket(context, widgetId));
                 views.setTextViewText(R.id.widget_meta, "加载失败：" + t.getClass().getSimpleName());
                 manager.updateAppWidget(widgetId, views);
@@ -450,7 +450,15 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     }
 
     /** 多个标的并发取数，按原顺序回填 */
-    private static void fetchAll(Context context, List<Item> items, final RowsCallback callback) {
+    /**
+     * 各标的并行取数，谁先回来就先把谁画上去。
+     *
+     * 原来是等最后一个回来才统一刷一次：标的越多等待感越明显（一个慢接口能把整块拖住几十秒），
+     * 而且用户看到的是「卡住 → 忽然全部跳出来」。现在每回来一个就把缓存里那一行换掉、
+     * 再 notify 一次列表，界面就是「一条条按获取顺序跳出来」，没回来的那几行还是「加载中」。
+     */
+    private static void fetchAll(Context context, AppWidgetManager manager, int widgetId,
+                                 List<Item> items, final RowsCallback callback) {
         final Row[] rows = new Row[Math.max(1, items.size())];
         final AtomicInteger left = new AtomicInteger(items.size());
         for (int i = 0; i < items.size(); i++) {
@@ -459,6 +467,12 @@ public class MarketWidgetProvider extends AppWidgetProvider {
             rows[index] = Row.loading(item);
             fetch(context, item, (quotes, error) -> {
                 rows[index] = rowOf(item, quotes, error);
+                cacheRows(widgetId, rows);
+                try {
+                    manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_list);
+                } catch (Throwable t) {
+                    Log.w(TAG, "widget row notify failed", t);
+                }
                 if (left.decrementAndGet() <= 0) callback.onDone(rows);
             });
         }
@@ -521,7 +535,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     // ------------------------------------------------------------------
 
     private static RemoteViews baseViews(Context context, int widgetId, List<Item> items, String meta) {
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market);
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market_list);
         String title = context.getString(R.string.market_widget_title)
                 + (items.size() > 1 ? " · " + items.size() : "");
         views.setTextViewText(R.id.widget_title, title);

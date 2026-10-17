@@ -7,7 +7,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.tsymiar.device2device.widget.MarketWidgetConfigActivity"
     android:description="@string/market_widget_desc"
-    android:initialLayout="@layout/widget_market"
+    android:initialLayout="@layout/widget_market_list"
     android:maxResizeHeight="420dp"
     android:maxResizeWidth="420dp"
     android:minHeight="110dp"

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 热力图的一个格子：这条排版树的叶子。
+
+     它只是一片 TextView，没别的。作为布局根节点，Provider 可以用 addView 把它塞进
+     任意一层 group（widget_heat_row / widget_heat_col）里，那些 group 再往上嵌套，
+     一棵子树就拼成了 —— RemoteViews 支持把一个 RemoteViews 加进另一个 RemoteViews，
+     这是能摆出「小块穿插在大块之间」而不是一排排条带的前提。
+
+     宽高不在 XML 里写，由 setInt(id, "setWidth" / "setHeight", px) 逐个设：
+     TextView.setWidth/setHeight 同时写死最小与最大那个像素值，量出来正是要的尺寸，
+     于是「面积 = 市值」落在真的 View 上，每一格还能各自挂一个点击进入行情页。
+
+     宽高由 setInt(id, "setWidth"/"setHeight", px) 逐个设，于是文字能占的地方就只有
+     扣掉留白后那一块；字号也是照它算的（见 tileLabel）。但算归算，真排版的是桌面那个
+     TextView —— 它默认会把一行撑到「用到的所有字体」里最高的那个（fallbackLineSpacing，
+     API 28 起默认开）：名称是中文、默认字体是拉丁字体时，中文字要回退到中文字体，
+     一行就比 Paint 量出来的高两成，竖排几行叠起来直接顶出格子。关掉它，行高才与
+     Paint 的字体度量一致（汉字本身的高在拉丁字体的 ascent/descent 之内，关了也不会被切）。
+
+     注意 RemoteViews 的白名单：别加自定义 View，也别给格子写 background XML
+     （既要动态染色又要圆角做不到），底色一律由代码写进去。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_heat_tile"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:fallbackLineSpacing="false"
+    android:gravity="center"
+    android:includeFontPadding="false"
+    android:maxLines="2"
+    android:text=""
+    android:textColor="@color/market_widget_text"
+    android:textSize="9sp" />

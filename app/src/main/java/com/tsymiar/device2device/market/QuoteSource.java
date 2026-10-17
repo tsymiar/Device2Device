@@ -95,6 +95,12 @@ public final class QuoteSource {
     private static final String TENCENT_KLINE_MIRROR = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get";
     private static final String TENCENT_MINUTE = "https://ifzq.gtimg.cn/appstock/app/kline/mkline";
     private static final String TENCENT_MINUTE_MIRROR = "https://web.ifzq.gtimg.cn/appstock/app/kline/mkline";
+    /**
+     * 腾讯当日分时：一口气给今天（休市时是最近那个交易日）每分钟一个点，
+     * 顺带在同级的 qt 里带着昨收 —— 分时图那条基准线要靠它，比再去问一次日线省。
+     */
+    private static final String TENCENT_INTRADAY = "https://ifzq.gtimg.cn/appstock/app/minute/query";
+    private static final String TENCENT_INTRADAY_MIRROR = "https://web.ifzq.gtimg.cn/appstock/app/minute/query";
     private static final String EAST_KLINE = "https://push2his.eastmoney.com/api/qt/stock/kline/get";
     private static final String BINANCE_KLINE = "https://data-api.binance.vision/api/v3/klines";
     private static final String BINANCE_KLINE_MIRROR = "https://api.binance.com/api/v3/klines";
@@ -104,6 +110,31 @@ public final class QuoteSource {
     private static final String EAST_SEARCH = "https://searchapi.eastmoney.com/api/suggest/get";
     /** 东财实时盘口：市值 / 市盈率 / 换手率（K线接口不给这些） */
     private static final String EAST_SNAPSHOT = "https://push2.eastmoney.com/api/qt/stock/get";
+    /**
+     * 腾讯实时盘口（GBK 文本）：东财那条 push2 常常整段不回包，而市值现在显示在 K 线的
+     * 代码行上（见 KLineView），只靠一条线路的话那一行就常常是空的 —— 它来兜底。
+     */
+    private static final String TENCENT_SNAPSHOT = "https://qt.gtimg.cn/q=";
+    /** 东财行情榜单：按某个字段排序取一批标的，市值热力图以前用它拉「市值 Top N」 */
+    private static final String EAST_CLIST = "https://push2.eastmoney.com/api/qt/clist/get";
+    /**
+     * 新浪行情榜单：同样的「按字段排序取一批标的」，市值热力图现在以它为主。
+     *
+     * 只问东财那一家撑不住：clist 这台常常整段不回包（同一时刻它的 push2his K 线接口又是好的），
+     * 而「一屏榜单」这种场景换的那家线路整个环节都要换（见 {@link #fetchTopCaps}）。
+     */
+    private static final String SINA_CLIST =
+            "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData";
+    /**
+     * 上面那个接口的简版：字段少一半，但一次能给整套板块（普通版单页最多 100 行）。
+     * 全市场涨跌家数用它 —— 一次请求换几千只票的涨跌幅。
+     */
+    private static final String SINA_CLIST_ALL =
+            "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple";
+    /** 沪深京 A 股在新浪的板块名（含深主板 / 创业板 / 沪主板 / 科创板 / 北交所，约 5500 只） */
+    private static final String SINA_HS_A = "hs_a";
+    /** 沪深京 A 股（深主板 / 创业板 / 沪主板 / 科创板 / 北交所），不含 B 股、基金与新股申购 */
+    private static final String EAST_CLIST_FS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048";
     /** 新浪国内期货（沪金/沪银）：var%20_ 用拼接而非格式化，避免 % 被当作格式符 */
     private static final String SINA_INNER = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_";
     /** 新浪国际期货（伦敦金/纽约金） */
@@ -326,46 +357,79 @@ public final class QuoteSource {
     }
 
     /**
-     * 实时盘口：只问东财一家，拿到就回传市值等字段，拿不到回传 null——
-     * 这是锦上添花的信息，失败不影响 K 线本身。回调在主线程（HttpsRequest 已切回）。
+     * 实时盘口：东财为主、腾讯兜底，拿到就回传市值等字段，都拿不到回传 null ——
+     * 失败不影响 K 线本身。回调在主线程（HttpsRequest 已切回）。
+     *
+     * 市值要摆在 K 线的代码行上（见 KLineView），只问东财那一条就不够稳：
+     * push2 这阵子常常整段不回包，一行请求换不回数，那一行就一直空着。
      */
-    public static void fetchSnapshot(String code, SnapshotCallback cb) {
+    public static void fetchSnapshot(final String code, final SnapshotCallback cb) {
+        final Runnable fallback = () -> fetchTencentSnapshot(code, cb);
         String secid = toEastSecid(code);
         if (secid == null) {
-            cb.onSnapshot(null);
+            fallback.run();
             return;
         }
         String url = EAST_SNAPSHOT + "?secid=" + secid
                 + "&fields=f43,f57,f58,f59,f116,f117,f162,f168,f170"
                 + "&_=" + System.currentTimeMillis();
         request(url, headersFor(EAST), body -> {
-            JSONObject root = new JSONObject(body);
-            JSONObject data = root.optJSONObject("data");
-            if (data == null) {
-                cb.onSnapshot(null);
-                return;
+            Snapshot snapshot = parseEastSnapshot(body);
+            // 通了却没给市值也算没拿到：换腾讯那条再问一次，不留一行空的市值
+            if (snapshot == null || snapshot.totalCap <= 0d) {
+                throw new IllegalArgumentException("盘口无市值");
             }
-            // 东财价量字段是整数：价格按 f59 给的小数位还原，比率类统一 /100
-            double div = Math.pow(10, data.optInt("f59", 2));
-            cb.onSnapshot(new Snapshot(
-                    data.optString("f58", ""),
-                    data.optDouble("f43", 0) / div,
-                    data.optDouble("f170", 0) / 100.0,
-                    data.optDouble("f116", 0),
-                    data.optDouble("f117", 0),
-                    data.optDouble("f162", 0) / 100.0,
-                    data.optDouble("f168", 0) / 100.0));
-        }, () -> cb.onSnapshot(null), new StepCallback() {
-            @Override
-            public void onResult(List<Quote> quotes) {
-                cb.onSnapshot(null);
-            }
+            cb.onSnapshot(snapshot);
+        }, fallback, sink());
+    }
 
-            @Override
-            public void onError(String message) {
-                cb.onSnapshot(null);
-            }
-        });
+    private static Snapshot parseEastSnapshot(String body) throws Exception {
+        JSONObject data = new JSONObject(body).optJSONObject("data");
+        if (data == null) return null;
+        // 东财价量字段是整数：价格按 f59 给的小数位还原，比率类统一 /100
+        double div = Math.pow(10, data.optInt("f59", 2));
+        return new Snapshot(
+                data.optString("f58", ""),
+                data.optDouble("f43", 0) / div,
+                data.optDouble("f170", 0) / 100.0,
+                data.optDouble("f116", 0),
+                data.optDouble("f117", 0),
+                data.optDouble("f162", 0) / 100.0,
+                data.optDouble("f168", 0) / 100.0);
+    }
+
+    /** 腾讯盘口：只有 A股 / 港股这类「有股本」的标的有市值，商品 / 加密 / 外汇没有这一说 */
+    private static void fetchTencentSnapshot(final String code, final SnapshotCallback cb) {
+        String symbol = tencentCode(code);
+        if (!symbol.startsWith("sh") && !symbol.startsWith("sz")
+                && !symbol.startsWith("bj") && !symbol.startsWith("hk")) {
+            cb.onSnapshot(null);
+            return;
+        }
+        requestGbk(TENCENT_SNAPSHOT + symbol, headersFor(TENCENT),
+                body -> cb.onSnapshot(parseTencentSnapshot(body)),
+                () -> cb.onSnapshot(null));
+    }
+
+    /**
+     * 腾讯盘口是一行 GBK 文本：v_sh600519="1~名称~代码~现价~昨收~…"，字段以 ~ 分隔。
+     * 用得上的几处：现价 3、昨收 4、涨跌% 32、换手率 38、市盈率 39、流通市值 44、总市值 45
+     * —— 市值单位是「亿」，{@link Snapshot} 一律按「元」记，这里折过去。
+     */
+    private static Snapshot parseTencentSnapshot(String body) {
+        if (body == null) return null;
+        int at = body.indexOf('"');
+        int end = body.lastIndexOf('"');
+        if (at < 0 || end <= at) return null;
+        String[] f = body.substring(at + 1, end).split("~");
+        if (f.length < 46) return null;
+        double price = number(f[3]);
+        double prev = number(f[4]);
+        double percent = prev > 0d ? (price - prev) / prev * 100d : number(f[32]);
+        double totalCap = number(f[45]) * 1e8;
+        if (price <= 0d && totalCap <= 0d) return null;
+        return new Snapshot(f.length > 1 ? f[1] : "", price, percent, totalCap,
+                number(f[44]) * 1e8, number(f[39]), number(f[38]));
     }
 
     /**
@@ -395,6 +459,322 @@ public final class QuoteSource {
             market = (c == '6' || c == '9') ? "1" : "0";
         }
         return market + "." + s;
+    }
+
+    // ------------------------------------------------------------------
+    // 对外：沪深京 A 股市值榜（桌面热力图小部件用）
+    // ------------------------------------------------------------------
+
+    public interface CapListCallback {
+        void onResult(List<CapRow> rows);
+
+        void onError(String message);
+    }
+
+    /**
+     * 沪深京 A 股按总市值倒序的头几名（当天该时点的快照）。
+     *
+     * 新浪榜单为主，东财 clist 兜底。两家是两套字段口径，整份榜单都得来自同一家 ——
+     * 拼着用会把"半份错误的数据"摊到每一格里，看着还挺正常，比直接失败更难发现。
+     * 回调在主线程（HttpsRequest 已切回）。
+     *
+     * @param limit 要几条（夹到 1..100：桌面格子放不下更多，请求也会跟着变慢）
+     */
+    public static void fetchTopCaps(final int limit, final CapListCallback cb) {
+        final int rows = Math.max(1, Math.min(limit, 100));
+        fetchSinaCaps(rows, cb, () -> loadClist(eastCapUrl(rows), rows, cb, true));
+    }
+
+    /** 东财那条市值榜地址（现在是兜底线路） */
+    private static String eastCapUrl(int rows) {
+        // po=1 倒序、fid=f20 按总市值排、fltt=2 让比率字段直接给小数
+        return EAST_CLIST + "?pn=1&pz=" + rows + "&po=1&np=1&fltt=2&invt=2&fid=f20"
+                + "&fs=" + Uri.encode(EAST_CLIST_FS)
+                + "&fields=f12,f13,f14,f3,f20,f21"
+                + "&_=" + System.currentTimeMillis();
+    }
+
+    /**
+     * 新浪那份市值榜：sort=mktcap + asc=0 就是总市值倒序，单页最多 100 行。
+     * 一份响应里就有代码 / 名称 / 涨跌 / 市值，不必再像东财那样问两遍。
+     */
+    private static void fetchSinaCaps(int limit, final CapListCallback cb, Runnable retry) {
+        String url = SINA_CLIST + "?page=1&num=" + limit + "&sort=mktcap&asc=0&node=" + SINA_HS_A
+                + "&_=" + System.currentTimeMillis();
+        request(url, sinaHeaders(), new TextConsumer() {
+            @Override
+            public void accept(String body) throws Exception {
+                cb.onResult(finishCapList(parseSinaCaps(body), limit));
+            }
+        }, retry, sink());
+    }
+
+    /**
+     * 新浪榜单行：symbol=sh600519 / code=600519 / name=名称（\\uXXXX 转义，JSONObject 会还原）
+     * / changepercent=涨跌幅% / mktcap=总市值（单位：万元）/ nmc=流通市值。
+     */
+    private static List<CapRow> parseSinaCaps(String body) throws Exception {
+        JSONArray rows = new JSONArray(body);
+        List<CapRow> out = new ArrayList<>();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject item = rows.optJSONObject(i);
+            if (item == null) continue;
+            String symbol = item.optString("symbol", "").trim();
+            String name = item.optString("name", "").trim();
+            String code = item.optString("code", "").trim();
+            if (code.isEmpty()) code = digitsOf(symbol);
+            if (code.isEmpty() && name.isEmpty()) continue;
+            // 新浪的市值单位是万元，榜单一律折成「元」，与 Snapshot 口径一致
+            double cap = number(item.opt("mktcap")) * 1e4;
+            if (cap <= 0d) cap = number(item.opt("nmc")) * 1e4;      // 总市值没给就用流通市值
+            double percent = number(item.opt("changepercent"));
+            out.add(new CapRow(code, name, percent, cap, toEastSecid(symbol)));
+        }
+        return out;
+    }
+
+    /**
+     * 榜单收尾（两家源共用）：给没市值的行补兜底值 → 按市值倒序 → 截断到 limit。
+     * 顺序这一关不能省：接口按给定域排序，中间插了停牌 / 没取到值的行时不一定严格倒序，
+     * 而热力图的面积全靠这个顺序，乱序会画成歪的。
+     */
+    private static List<CapRow> finishCapList(List<CapRow> rows, int limit) {
+        if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("市值榜单无数据");
+        List<CapRow> filled = fillMissingCap(rows);
+        Collections.sort(filled, (a, b) -> Double.compare(b.totalCap, a.totalCap));
+        Log.i(TAG, "市值榜取到 " + filled.size() + " 行");
+        return filled.size() > limit ? new ArrayList<>(filled.subList(0, limit)) : filled;
+    }
+
+    /**
+     * 沪深京全市场的涨跌家数。
+     *
+     * 这不能拿市值榜来数：榜单是按市值取的前几十只，照它统计出来的家数只代表头部，
+     * 全市场会被数成「只有三十来只在动」。所以单独拉一次全市场快照，
+     * 字段只要代码与涨跌幅，五千多行也就几十 KB。
+     */
+    public static void fetchMarketBreadth(final BreadthCallback cb) {
+        fetchSinaBreadth(cb, () -> fetchEastBreadth(cb));
+    }
+
+    /**
+     * 新浪那份整套板块的行情（一次五千多行）：行里只有涨跌幅用得上，逐条累加出家数。
+     * gzip 之后三百多 KB —— 一次请求换几千只票的涨跌，比挨个问划算得多。
+     */
+    private static void fetchSinaBreadth(final BreadthCallback cb, Runnable retry) {
+        String url = SINA_CLIST_ALL + "?page=1&num=" + BREADTH_ROWS + "&sort=changepercent&asc=0"
+                + "&node=" + SINA_HS_A + "&_=" + System.currentTimeMillis();
+        request(url, sinaHeaders(), new TextConsumer() {
+            @Override
+            public void accept(String body) throws Exception {
+                cb.onResult(parseSinaBreadth(body));
+            }
+        }, retry, sink());
+    }
+
+    /** 东财那条全市场行情（现在的兜底线路） */
+    private static void fetchEastBreadth(final BreadthCallback cb) {
+        String url = EAST_CLIST + "?pn=1&pz=" + BREADTH_ROWS + "&po=1&np=1&fltt=2&invt=2&fid=f3"
+                + "&fs=" + Uri.encode(EAST_CLIST_FS)
+                + "&fields=f12,f3"
+                + "&_=" + System.currentTimeMillis();
+        request(url, headersFor(EAST), new TextConsumer() {
+            @Override
+            public void accept(String body) throws Exception {
+                cb.onResult(parseBreadth(body));
+            }
+        }, new Runnable() {
+            @Override
+            public void run() {
+                cb.onError("全市场家数不可用");
+            }
+        }, sink());
+    }
+
+    /** 新浪那份涨跌幅字段叫 changepercent（有时是字符串），与东财的 f3 只是名字不同 */
+    private static Breadth parseSinaBreadth(String body) throws Exception {
+        JSONArray rows = new JSONArray(body);
+        int[] tally = new int[3];
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject item = rows.optJSONObject(i);
+            if (item == null) continue;
+            count(number(item.opt("changepercent")), tally);
+        }
+        return logBreadth(tally);
+    }
+
+    /** 沪深京 A 股现在的总数略多于五千，留些余量给新股 */
+    private static final int BREADTH_ROWS = 6000;
+
+    /** 全市场涨跌家数 */
+    public static final class Breadth {
+        public final int up;
+        public final int down;
+        public final int flat;
+
+        Breadth(int up, int down, int flat) {
+            this.up = up;
+            this.down = down;
+            this.flat = flat;
+        }
+    }
+
+    public interface BreadthCallback {
+        void onResult(Breadth breadth);
+
+        void onError(String message);
+    }
+
+    private static Breadth parseBreadth(String body) throws Exception {
+        JSONObject root = new JSONObject(body);
+        JSONObject data = root.optJSONObject("data");
+        if (data == null) throw new IllegalArgumentException("全市场家数无数据");
+        int[] tally = new int[3];
+        JSONArray diff = data.optJSONArray("diff");
+        if (diff != null) {
+            for (int i = 0; i < diff.length(); i++) tally(diff.optJSONObject(i), tally);
+        } else {
+            JSONObject map = data.optJSONObject("diff");
+            if (map != null) {
+                Iterator<String> keys = map.keys();
+                while (keys.hasNext()) tally(map.optJSONObject(keys.next()), tally);
+            }
+        }
+        return logBreadth(tally);
+    }
+
+    private static Breadth logBreadth(int[] tally) {
+        if (tally[0] + tally[1] + tally[2] == 0) throw new IllegalArgumentException("全市场家数无数据");
+        Breadth breadth = new Breadth(tally[0], tally[1], tally[2]);
+        Log.i(TAG, "全市场家数 涨" + breadth.up + " 跌" + breadth.down + " 平" + breadth.flat);
+        return breadth;
+    }
+
+    /**
+     * 归个类：涨 / 跌 / 平。停牌与接口漏给的是「-」或空，
+     * 取不到值按 0 走，落到平盘 —— 它确实也没动。
+     */
+    private static void tally(JSONObject item, int[] tally) {
+        if (item == null) return;
+        count(item.optDouble("f3", 0d), tally);
+    }
+
+    private static void count(double percent, int[] tally) {
+        if (percent > 0.0001) tally[0]++;
+        else if (percent < -0.0001) tally[1]++;
+        else tally[2]++;
+    }
+
+    /** {@code request} 要一个 StepCallback 才给调，实际上它只走 consumer / retry 两条路 */
+    private static StepCallback sink() {
+        return new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+            }
+
+            @Override
+            public void onError(String message) {
+            }
+        };
+    }
+
+    /** push2 那台不通就换 82 这台再试一次（东财自己的分机），两次都挂才算失败 */
+    private static void loadClist(String url, int limit, CapListCallback cb, boolean retry) {
+        request(url, headersFor(EAST), body -> {
+            List<CapRow> rows = parseClist(body, limit);
+            if (rows.isEmpty()) throw new IllegalArgumentException("市值榜单无数据");
+            cb.onResult(rows);
+        }, () -> {
+            if (retry) loadClist(url.replace("push2.", "82.push2."), limit, cb, false);
+            else cb.onError("市值榜单接口不可用");
+        }, new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+            }
+
+            @Override
+            public void onError(String message) {
+                cb.onError(message);
+            }
+        });
+    }
+
+    /**
+     * clist 响应：{@code {rc:0, data:{total:…, diff:[{f12:代码, f13:市场, f14:名称,
+     * f3:涨跌幅, f20:市值}]}}}。老版本 diff 是按下标做 key 的对象，两种形态都收。
+     */
+    private static List<CapRow> parseClist(String body, int limit) throws Exception {
+        JSONObject root = new JSONObject(body);
+        JSONObject data = root.optJSONObject("data");
+        if (data == null) throw new IllegalArgumentException("市值榜单无数据");
+        List<CapRow> rows = new ArrayList<>();
+        JSONArray diff = data.optJSONArray("diff");
+        if (diff != null) {
+            for (int i = 0; i < diff.length(); i++) {
+                CapRow row = capRow(diff.optJSONObject(i));
+                if (row != null) rows.add(row);
+            }
+        } else {
+            JSONObject map = data.optJSONObject("diff");
+            if (map != null) {
+                Iterator<String> keys = map.keys();
+                while (keys.hasNext()) {
+                    CapRow row = capRow(map.optJSONObject(keys.next()));
+                    if (row != null) rows.add(row);
+                }
+            }
+        }
+        return finishCapList(rows, limit);
+    }
+
+    /** 没有市值（新股未上市 / 接口漏给了 f20 f21）的行补兜底值，保证它还能占一格 */
+    private static List<CapRow> fillMissingCap(List<CapRow> rows) {
+        double min = 0d;
+        for (CapRow row : rows) {
+            if (row.totalCap > 0d && (min <= 0d || row.totalCap < min)) min = row.totalCap;
+        }
+        if (min <= 0d) return rows;
+        List<CapRow> filled = new ArrayList<>(rows.size());
+        for (CapRow row : rows) {
+            filled.add(row.totalCap > 0d ? row
+                    : new CapRow(row.code, row.name, row.changePercent, min / 8d, row.secid));
+        }
+        return filled;
+    }
+
+    /** 单榜行；连代码和名称都没有的行没法认，丢掉（市值缺失由 fillMissingCap 兜底） */
+    private static CapRow capRow(JSONObject item) {
+        if (item == null) return null;
+        String code = item.optString("f12", "").trim();
+        String name = item.optString("f14", "").trim();
+        if (code.isEmpty() && name.isEmpty()) return null;
+        double cap = number(item.opt("f20"));
+        if (cap <= 0d) cap = number(item.opt("f21"));       // 总市值没给就用流通市值，热力图只要相对比例
+        double percent = number(item.opt("f3"));
+        // fltt=2 没生效时东财给的是百分比×100；这些大市值票单日不可能走到 ±100%，据此兜回来
+        if (Math.abs(percent) > 100.0) percent /= 100.0;
+        String secid = code.isEmpty() ? ""
+                : (((int) number(item.opt("f13")) == 1 ? "1." : "0.") + code);
+        return new CapRow(code, name, percent, cap, secid);
+    }
+
+    /**
+     * 东财的数值字段是三种形态：Number、纯数字字符串、带单位的格式化字符串
+     * （"3.25万亿" / "123,456,789"），缺值给 "-"。一律换算成「元」。
+     */
+    private static double number(Object raw) {
+        if (raw instanceof Number) return ((Number) raw).doubleValue();
+        if (!(raw instanceof String)) return 0.0;
+        String text = ((String) raw).trim().replace(",", "");
+        if (text.isEmpty() || "-".equals(text)) return 0.0;
+        try {
+            if (text.endsWith("万亿")) return safe(text.substring(0, text.length() - 2)) * 1e12;
+            if (text.endsWith("亿")) return safe(text.substring(0, text.length() - 1)) * 1e8;
+            if (text.endsWith("万")) return safe(text.substring(0, text.length() - 1)) * 1e4;
+            return safe(text);
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -433,9 +813,9 @@ public final class QuoteSource {
     public static String symbolHint(String source) {
         switch (source == null ? AUTO : source) {
             case TENCENT:
-                return "A股名称或代码：贵州茅台 / 茅台 / gzmt / sh600519";
+                return "A股名称或代码：紫金矿业 / zjky / sh601899";
             case EAST:
-                return "A股/期货/港股：1.600519 / 600519 / 0.000001";
+                return "A股/期货/港股：1.601899 / 601899 / 0.000001";
             case GOLD:
                 return "沪金沪银：AU0 / 沪金 / 黄金 / AG0 / 白银";
             case XAU:
@@ -453,16 +833,16 @@ public final class QuoteSource {
             case BINANCE:
                 return "加密货币：BTCUSDT / ETHUSDT";
             default:
-                return "自动识别：茅台 / 600519 / BTCUSDT / 沪金 / 伦敦金";
+                return "自动识别：紫金矿业 / 601899 / BTCUSDT / 沪金 / 伦敦金";
         }
     }
 
     public static String defaultSymbol(String source) {
         switch (source == null ? AUTO : source) {
             case TENCENT:
-                return "sh600519";
+                return "sh601899";
             case EAST:
-                return "1.600519";
+                return "1.601899";
             case GOLD:
                 return "AU0";
             case XAU:
@@ -515,6 +895,9 @@ public final class QuoteSource {
     public static String intervalLabel(String interval) {
         if (interval == null) return "";
         switch (interval) {
+            // 1m 现在是当日分时图（见 fetchIntraday），叫「分时」才不至于让人以为是一分钟一根的蜡烛
+            case "1m":
+                return "分时";
             case "1Q":
                 return "季K";
             case "60m":
@@ -540,6 +923,249 @@ public final class QuoteSource {
     public static void load(String source, String symbol, String interval, int limit, Callback callback) {
         List<String> names = candidates(source, symbol);
         step(new ArrayDeque<>(names), symbol, interval, limit, callback, new ArrayList<String>());
+    }
+
+    // ------------------------------------------------------------------
+    // 对外：当日分时
+    // ------------------------------------------------------------------
+
+    /**
+     * 当日分时：今天（休市时是最近那个交易日）每分钟一个点，外加昨收 —— 那条基准线的前提。
+     *
+     * 它不能用 1m K 线顶替：1m K 线是「最近几百根分钟线」，一天就有 240 根，
+     * 取 320 根画出来是跨天的一串，与行情软件里那条从左边开盘价画到现在的分时完全不是一回事。
+     * 每条线路都自带昨收（腾讯在 qt 里、东财在 preSettlement 里），退到最后那条路线也能从
+     * 「上一天最后一根」推出来 —— 昨收不在数据里就只能另外给它。
+     */
+    public interface IntradayCallback {
+        void onResult(List<Quote> quotes, float prevClose);
+
+        void onError(String message);
+    }
+
+    public static void fetchIntraday(String source, String symbol, IntradayCallback cb) {
+        stepIntraday(new ArrayDeque<>(candidates(source, symbol)), symbol,
+                new ArrayList<String>(), cb);
+    }
+
+    private static void stepIntraday(final Queue<String> pending, final String symbol,
+                                     final List<String> errors, final IntradayCallback cb) {
+        if (pending.isEmpty()) {
+            cb.onError(errors.isEmpty() ? "分时接口不可用" : join(errors));
+            return;
+        }
+        final String name = pending.poll();
+        final String code = normalizeSymbol(name, symbol);
+        // 这一路没取到就换下一个源，别把"取不到"当成结果回给上层
+        final Runnable next = new Runnable() {
+            @Override
+            public void run() {
+                errors.add(name + ": 无分时数据");
+                stepIntraday(pending, symbol, errors, cb);
+            }
+        };
+        if (TENCENT.equals(name)) {
+            loadTencentIntraday(code, next, cb);
+            return;
+        }
+        if (EAST.equals(name)) {
+            loadEastIntraday(code, next, cb);
+            return;
+        }
+        loadMinuteIntraday(name, code, next, cb);
+    }
+
+    /** 腾讯分时：一天一个请求给全部点位，昨收在同级的 qt 里（省掉再问一次日线） */
+    private static void loadTencentIntraday(final String code, Runnable retry,
+                                            final IntradayCallback cb) {
+        fetchIntradayUrl(new ArrayDeque<>(Arrays.asList(
+                        TENCENT_INTRADAY + "?code=" + code,
+                        TENCENT_INTRADAY_MIRROR + "?code=" + code)),
+                headersFor(TENCENT), new BodyHandler() {
+                    @Override
+                    public void accept(String body) throws Exception {
+                        List<Quote> quotes = parseTencentIntraday(body, code);
+                        if (quotes.isEmpty()) throw new IllegalArgumentException("分时无数据");
+                        cb.onResult(quotes, tencentPrevClose(body, code));
+                    }
+                }, retry);
+    }
+
+    /**
+     * 东财分时（trends2）：trends 自带开高低，比腾讯那份细；作为腾讯之外的第二条线路。
+     * 它的昨收（data.preSettlement）有时给 0（这台机器近期的毛病），那种情况下
+     * 基准线退回 KLineView 自己的推算 —— 分时照样出图，只是那条线按当日开盘画。
+     */
+    private static void loadEastIntraday(String code, Runnable retry, final IntradayCallback cb) {
+        final String secid = toEastSecid(code);
+        if (secid == null) {
+            retry.run();
+            return;
+        }
+        String url = EAST_TRENDS + "?secid=" + secid
+                + "&fields1=f1,f2,f3,f4,f5"
+                + "&fields2=f51,f52,f53,f54,f55,f56,f57,f58"
+                + "&iscr=0&ndays=1&_=" + System.currentTimeMillis();
+        request(url, headersFor(EAST), new TextConsumer() {
+            @Override
+            public void accept(String body) throws Exception {
+                JSONObject data = new JSONObject(body).optJSONObject("data");
+                List<Quote> quotes = parseEastIntraday(data);
+                if (quotes.isEmpty()) throw new IllegalArgumentException("分时无数据");
+                cb.onResult(quotes, (float) (data == null ? 0d : data.optDouble("preSettlement", 0d)));
+            }
+        }, retry, sink());
+    }
+
+    /**
+     * 没有分时接口的品类（加密 / 外盘商品）：顺着自己的线路取 1m K 线，
+     * 再按日期切出「最后一天」那一段 —— 一段 Segment 能还原出同样的分时形状。
+     */
+    private static void loadMinuteIntraday(final String name, final String code, final Runnable retry,
+                                           final IntradayCallback cb) {
+        loadOne(name, code, "1m", INTRADAY_BARS, new StepCallback() {
+            @Override
+            public void onResult(List<Quote> quotes) {
+                List<Quote> clean = dropFuturePoints(sanitize(quotes));
+                List<Quote> today = lastDayOnly(clean);
+                if (today.isEmpty()) {
+                    retry.run();
+                    return;
+                }
+                cb.onResult(today, lastCloseBefore(clean, dayPart(today.get(0).time)));
+            }
+
+            @Override
+            public void onError(String message) {
+                retry.run();
+            }
+        });
+    }
+
+    /** 兜底那条路要取多少根 1m 才够覆盖一天：A股 240，加密 1440（各源单请求上限由 buildUrls 再夹一次） */
+    private static final int INTRADAY_BARS = 1440;
+
+    /** 分时专用取数：主 / 镜像依次尝试，响应整份交给 handler（昨收和点位在同一个包里） */
+    private static void fetchIntradayUrl(final Queue<String> urls, HashMap<String, String> headers,
+                                         final BodyHandler handler, final Runnable fail) {
+        if (urls.isEmpty()) {
+            fail.run();
+            return;
+        }
+        final String url = urls.poll();
+        request(url, headers, new TextConsumer() {
+            @Override
+            public void accept(String body) throws Exception {
+                handler.accept(body);
+            }
+        }, () -> fetchIntradayUrl(urls, headers, handler, fail), sink());
+    }
+
+    private interface BodyHandler {
+        void accept(String body) throws Exception;
+    }
+
+    /**
+     * 腾讯分时：data[code].data = {date:'20261016', data:['0930 1311.57 335 43937595.00', …]}。
+     * 一行只有那一分钟的价格（没有开高低），按相邻两点连成K线：开取上一点、高低取两极值。
+     */
+    private static List<Quote> parseTencentIntraday(String body, String code) throws Exception {
+        JSONObject root = new JSONObject(body);
+        JSONObject data = root.optJSONObject("data");
+        JSONObject block = data == null ? null : data.optJSONObject(code);
+        if (block == null && data != null) {
+            Iterator<String> keys = data.keys();
+            if (keys.hasNext()) block = data.optJSONObject(keys.next());
+        }
+        JSONObject minute = block == null ? null : block.optJSONObject("data");
+        JSONArray rows = minute == null ? null : minute.optJSONArray("data");
+        if (rows == null || rows.length() == 0) throw new IllegalArgumentException("分时接口无数据");
+        String day = dayFromCompact(minute.optString("date", ""));
+        List<Quote> quotes = new ArrayList<>(rows.length());
+        float previous = 0f;
+        double cumulative = 0d;
+        for (int i = 0; i < rows.length(); i++) {
+            String[] parts = String.valueOf(rows.opt(i)).trim().split("\\s+");
+            if (parts.length < 2) continue;
+            float price = (float) safe(parts[1]);
+            if (price <= 0f) continue;
+            // 成交量是开盘至今的累计值，差分出来的才是这一分钟的量
+            double volume = parts.length > 2 ? safe(parts[2]) : 0d;
+            float open = previous > 0f ? previous : price;
+            quotes.add(new Quote(day + " " + clockOf(parts[0]) + ":00", open,
+                    Math.max(open, price), Math.min(open, price), price,
+                    (float) Math.max(0d, volume - cumulative), price));
+            cumulative = volume;
+            previous = price;
+        }
+        return sanitize(quotes);
+    }
+
+    /** 腾讯 qt 数组里的第 5 项就是昨收（0=市场 1=名称 2=代码 3=现价 4=昨收 5=今开） */
+    private static float tencentPrevClose(String body, String code) throws Exception {
+        JSONObject data = new JSONObject(body).optJSONObject("data");
+        JSONObject block = data == null ? null : data.optJSONObject(code);
+        JSONObject qt = block == null ? null : block.optJSONObject("qt");
+        JSONArray row = qt == null ? null : qt.optJSONArray(code);
+        return row == null || row.length() < 5 ? 0f : (float) row.optDouble(4, 0d);
+    }
+
+    /** 东财分时：data.trends 每行 "2026-10-16 09:30,开,收,高,低,量,额,均价"（自带开高低，比腾讯那份细） */
+    private static List<Quote> parseEastIntraday(JSONObject data) throws Exception {
+        JSONArray rows = data == null ? null : data.optJSONArray("trends");
+        if (rows == null || rows.length() == 0) throw new IllegalArgumentException("分时接口无数据");
+        List<Quote> quotes = new ArrayList<>(rows.length());
+        for (int i = 0; i < rows.length(); i++) {
+            String[] parts = String.valueOf(rows.opt(i)).split(",");
+            if (parts.length < 6) continue;
+            quotes.add(new Quote(normalizeDay(parts[0].trim()),
+                    (float) safe(parts[1]), (float) safe(parts[3]), (float) safe(parts[4]),
+                    (float) safe(parts[2]), (float) safe(parts[5]),
+                    parts.length > 6 ? (float) safe(parts[6]) : (float) safe(parts[2])));
+        }
+        return sanitize(quotes);
+    }
+
+    /** 只留最后一个交易日那一段（24 小时市场里就是最后一个自然日） */
+    private static List<Quote> lastDayOnly(List<Quote> quotes) {
+        List<Quote> out = new ArrayList<>();
+        if (quotes == null || quotes.isEmpty()) return out;
+        String day = dayPart(quotes.get(quotes.size() - 1).time);
+        if (day == null) return quotes;
+        for (Quote quote : quotes) {
+            if (day.equals(dayPart(quote.time))) out.add(quote);
+        }
+        return out;
+    }
+
+    /** 这批数据里某一天之前最后一根的收盘价 —— 分时图要的「昨收」 */
+    private static float lastCloseBefore(List<Quote> quotes, String day) {
+        if (quotes == null || day == null) return 0f;
+        float previous = 0f;
+        for (Quote quote : quotes) {
+            if (day.equals(dayPart(quote.time))) return previous;
+            if (quote.close > 0f) previous = quote.close;
+        }
+        return previous;
+    }
+
+    private static String dayPart(String time) {
+        return time == null || time.length() < 10 ? null : time.substring(0, 10);
+    }
+
+    /** '20261016' -> '2026-10-16'（写不出来就退回原样，时间戳乱了一段点而已，不值得失败） */
+    private static String dayFromCompact(String text) {
+        String digits = digitsOf(text == null ? "" : text);
+        return digits.length() >= 8
+                ? digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6, 8)
+                : text;
+    }
+
+    /** '0930' -> '09:30' */
+    private static String clockOf(String text) {
+        String digits = digitsOf(text == null ? "" : text);
+        if (digits.length() < 4) return text == null ? "" : text;
+        return digits.substring(0, 2) + ":" + digits.substring(2, 4);
     }
 
     // ------------------------------------------------------------------
@@ -890,7 +1516,8 @@ public final class QuoteSource {
         loadOne(name, code, norm, limit, new StepCallback() {
             @Override
             public void onResult(List<Quote> quotes) {
-                List<Quote> tail = tail(dropFuturePoints(quotes), limit);
+                // 出货前统一清洗一次，脏K线在这里就被丢掉，不往调用方传
+                List<Quote> tail = tail(dropFuturePoints(sanitize(quotes)), limit);
                 if (tail.isEmpty()) {
                     errors.add(name + ": 无K线数据");
                     step(pending, symbol, interval, limit, callback, errors);
@@ -1153,6 +1780,29 @@ public final class QuoteSource {
                 retry.run();
             }
         });
+    }
+
+    /** 与 {@link #request} 同样的回退套路，只是正文按 GBK 解（腾讯 / 新浪那几条老接口） */
+    private static void requestGbk(String url, HashMap<String, String> headers, TextConsumer consumer,
+                                   Runnable retry) {
+        HttpsRequest.executeRequest(url, "GET", headers, null, "GBK",
+                new HttpsRequest.HttpsRequestCallback() {
+                    @Override
+                    public void onSuccess(int responseCode, String response,
+                                          java.util.Map<String, String> respHeaders) {
+                        try {
+                            consumer.accept(response);
+                        } catch (Exception e) {
+                            Log.w(TAG, "解析失败 " + url + " -> " + e.getMessage());
+                            retry.run();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        retry.run();
+                    }
+                });
     }
 
     // ------------------------------------------------------------------
@@ -1465,31 +2115,52 @@ public final class QuoteSource {
     /** 分时/快照聚合器，按源保留（脚本 AGGREGATORS）：刷新时逐笔累积出分钟K线 */
     private static final Map<String, MinuteAggregator> AGGREGATORS = new HashMap<>();
 
+    /**
+     * 聚合器的最长空窗期，超过就丢弃重建。
+     *
+     * 它是静态的（跨多次取数累积同一交易日的分钟K线），但行情页关掉之后它还在：
+     * 隔天再进来，上次那批K线会和这次的数据按时间混排在同一张图上，看着像"多出一堆昨天的K线"。
+     * 这里给一个远大于 15 秒自动刷新间隔的窗口，正常累积不受影响。
+     */
+    private static final long AGGREGATOR_IDLE_MS = 20 * 60 * 1000L;
+
     /** 把分时/快照价格按 step 分钟聚合成K线（该品类没有分钟K线接口） */
     private static List<Quote> aggregateSnapshot(String source, List<Tick> ticks, int step, String name) {
-        MinuteAggregator aggregator = AGGREGATORS.get(source);
-        if (aggregator == null) {
-            aggregator = new MinuteAggregator(1000);
-            AGGREGATORS.put(source, aggregator);
+        // 行情页和桌面小部件可能同时调到这里，这张静态表的所有读写都要串行
+        synchronized (AGGREGATORS) {
+            long now = System.currentTimeMillis();
+            MinuteAggregator aggregator = AGGREGATORS.get(source);
+            if (aggregator == null || aggregator.expired(now)) {
+                aggregator = new MinuteAggregator(1000, now);
+                AGGREGATORS.put(source, aggregator);
+            }
+            for (Tick tick : ticks) {
+                aggregator.push(floorMinute(tick.time, step), tick.price);
+            }
+            if (aggregator.isEmpty()) throw new IllegalArgumentException(name + " 暂无有效价格");
+            return aggregator.quotes();
         }
-        for (Tick tick : ticks) {
-            aggregator.push(floorMinute(tick.time, step), tick.price);
-        }
-        if (aggregator.isEmpty()) throw new IllegalArgumentException(name + " 暂无有效价格");
-        return aggregator.quotes();
     }
 
     /** 单根K线内部结构 [开, 高, 低, 收]；超过 maxBars 时丢掉最早的（脚本 MinuteAggregator） */
     private static final class MinuteAggregator {
         private final LinkedHashMap<String, float[]> bars = new LinkedHashMap<>();
         private final int maxBars;
+        private volatile long lastPushAt;
 
-        MinuteAggregator(int maxBars) {
+        MinuteAggregator(int maxBars, long now) {
             this.maxBars = maxBars;
+            this.lastPushAt = now;
+        }
+
+        /** 长时间没有新的分时数据进来：多半是隔次 / 隔天会话，重开一个 */
+        boolean expired(long now) {
+            return now - lastPushAt > AGGREGATOR_IDLE_MS;
         }
 
         void push(String when, float price) {
             if (price <= 0) return;
+            lastPushAt = System.currentTimeMillis();
             float[] bar = bars.get(when);
             if (bar == null) {
                 bars.put(when, new float[]{price, price, price, price});
@@ -1684,6 +2355,30 @@ public final class QuoteSource {
             if (stamp == null || stamp <= horizon) kept.add(quote);
         }
         return kept.size() == quotes.size() ? quotes : kept;
+    }
+
+    /**
+     * 丢掉不该出现在图上的K线。
+     *
+     * 各解析器遇到 "-" / null / 非数字一律兜成 0，于是接口某一字段缺失时会产出一根
+     * 四价全 0 的合法 Quote：不报错、不丢行，但会把价格轴拉伸到 0。这里在出货前统一滤掉，
+     * 同时也挡住 NaN / Infinity（超大数值转 float 上溢）。
+     * 只判"四价全 0"，不判 "<=0"——2020 年那种真实负油价不能被误伤。
+     */
+    private static List<Quote> sanitize(List<Quote> quotes) {
+        List<Quote> out = new ArrayList<>();
+        if (quotes == null) return out;
+        for (Quote q : quotes) {
+            if (q == null || q.time == null) continue;
+            if (!isFinite(q.open) || !isFinite(q.high) || !isFinite(q.low) || !isFinite(q.close)) continue;
+            if (q.open == 0f && q.high == 0f && q.low == 0f && q.close == 0f) continue;
+            out.add(q);
+        }
+        return out.size() == quotes.size() ? quotes : out;
+    }
+
+    private static boolean isFinite(float value) {
+        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
     /** 'YYYY-MM-DD HH:MM:SS' -> 毫秒；解析失败返回 null（日线等无时间的日期串） */
