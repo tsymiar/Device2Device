@@ -31,6 +31,7 @@ public class PublishService extends Service {
 
     EditText editTopic = null;
     EditText editPayload = null;
+    EditText editTarget = null;
 
     @Override
     public void onCreate() {
@@ -74,6 +75,7 @@ public class PublishService extends Service {
 
         editTopic = floatView.findViewById(R.id.edit_pub_topic);
         editPayload = floatView.findViewById(R.id.edit_payload);
+        editTarget = floatView.findViewById(R.id.edit_pub_target);
 
         floatView.findViewById(R.id.btn_pub_finish).setOnClickListener(v -> closeWindow());
         floatView.findViewById(R.id.btn_pub_confirm).setOnClickListener(
@@ -82,6 +84,9 @@ public class PublishService extends Service {
                         PubSubSetting.setTopic(editTopic.getText().toString());
                     if (editPayload != null)
                         PubSubSetting.setPayload(editPayload.getText().toString());
+                    // 一对一目标：对端设备 IP 或其订阅端 id，留空则按 topic 广播
+                    if (editTarget != null)
+                        PubSubSetting.setTarget(editTarget.getText().toString());
                     Intent data = new Intent();
                     data.putExtra("Publish", "SUCCESS");
                     data.setAction(BROADCAST_ACTION);
@@ -97,6 +102,11 @@ public class PublishService extends Service {
     }
 
     public void closeWindow() {
-        windowManager.removeView(floatView);
+        // 窗可能已经不在 WindowManager 上（最小化过、服务重建过）：直接 removeView 会抛
+        // IllegalArgumentException，把点关闭的那个手势一起崩掉
+        if (floatView != null && floatView.isAttachedToWindow()) {
+            windowManager.removeView(floatView);
+        }
+        floatView = null;
     }
 }

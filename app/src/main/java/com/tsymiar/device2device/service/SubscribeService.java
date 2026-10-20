@@ -58,6 +58,9 @@ public class SubscribeService extends Service {
         connecting = false;
         // 服务被收掉时悬浮窗必须一起撤：留着就是一个点不动的坏窗，还会拖住 WindowManager
         removeFloatView();
+        // 订阅线程跟着一起收：只关窗不 quit 的话，native 那一路还在跑，
+        // 再次「订阅」会被 native 的「上一路未退出」挡掉，表现就是第二次订阅永远没反应
+        CallbackWrapper.QuitSubscribe();
     }
 
     /**

@@ -19,7 +19,7 @@ public class CallbackWrapper {
 
     public static native int StartSubscribe(String address, int port, String topic, String viewId, int id);
 
-    public static native void Publish(String topic, String message, String address, int port);
+    public static native void Publish(String topic, String message, String address, int port, String target);
 
     public static native void QuitSubscribe();
 }

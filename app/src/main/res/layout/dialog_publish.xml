@@ -57,6 +57,24 @@
         app:layout_constraintTop_toBottomOf="@id/edit_payload"
         tools:ignore="LabelFor" />
 
+    <!-- 一对一目标输入（留空表示按 topic 广播） -->
+    <EditText
+        android:id="@+id/edit_pub_target"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/pub_target"
+        android:inputType="text"
+        android:maxLines="1"
+        android:minHeight="48dp"
+        android:selectAllOnFocus="true"
+        android:textColor="@color/dialog_text_primary"
+        android:textColorHint="@color/dialog_text_secondary"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/edit_pub_topic"
+        tools:ignore="LabelFor" />
+
     <!-- 确认按钮 -->
     <Button
         android:id="@+id/btn_pub_confirm"
@@ -70,6 +88,6 @@
         android:textSize="14sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/edit_pub_topic" />
+        app:layout_constraintTop_toBottomOf="@id/edit_pub_target" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
