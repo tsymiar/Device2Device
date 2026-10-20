@@ -3,6 +3,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <cstdlib>
 #include <queue>
 #include <future>
 #include <sys/socket.h>
@@ -20,6 +21,7 @@
 #include <socket/KcpSocket.h>
 #include <socket/TcpSocket.h>
 #include <socket/FileMsgSocket.h>
+#include <socket/LanMessenger.h>
 #include <display/gles/EglShader.h>
 #include <display/gles/EglTexture.h>
 #include <display/gles/EglGpuRender.h>
@@ -28,7 +30,6 @@
 #include <bitmap/bitmap.h>
 #include "../jni/jniInc.h"
 #include "callback/JavaFuncCalls.h"
-#include "utils/statics.h"
 
 extern JavaVM* g_jniJVM;
 extern std::string g_className;
@@ -36,7 +37,7 @@ extern std::string Jstring2Cstring(JNIEnv* env, jstring jstr);
 extern void SetTextView(JNIEnv* env, jclass thiz, const std::string& viewId, const std::string& text);
 extern void SetActivityViewText(JNIEnv* env, int viewId, const char* text);
 
-/** EGL 状态（display/context/surface/program）是 EglGpuRender.cpp 里那一全局份 */
+/** EGL 状态（display/context/surface/program）是 EglGpuRender.cpp 里那一份全局状态 */
 extern EGL2 EGL2;
 
 namespace {
@@ -58,12 +59,6 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(
     jobject /* this */)
 {
     std::string hello = "C++ string of JNI!";
-    char text[16] = {
-            0x1a, 0x13, 0x00, 0x07,
-            static_cast<char>(0xcc), static_cast<char>(0xff),
-            static_cast<char>(0xe0), static_cast<char>(0x88)
-    };
-    Statics::printBuffer(text, 32);
     return env->NewStringUTF(hello.c_str());
 }
 
@@ -136,11 +131,15 @@ struct SubscribeGuard {
 
 void RecvHook(const Scadup::Message& msg)
 {
+    // payload.length 才是正文长度：零长度正文时 content 是空指针，按 C 字符串拼会崩；
+    // 正文里允许嵌 NUL，按 strlen 读又会短一截
+    const Scadup::Message::Payload& pl = msg.payload;
+    const std::string body = (pl.content != nullptr && pl.length > 0)
+            ? std::string(pl.content, pl.length) : std::string();
     std::stringstream ss;
     ss << std::hex << msg.head.topic;
-    std::string message = "Recv topic:\t[0x" + ss.str()
-        + "]\tsize=" + std::to_string(msg.head.size) + "\nPayload:\t[" + msg.payload.status
-        + "]\t[ " + msg.payload.content + " ].";
+    std::string message = "Recv topic:\t[0x" + ss.str() + "]\tsize=" + std::to_string(body.size())
+        + "\nPayload:\t[" + pl.status + "]\t[ " + body + " ].";
     Message::instance().setMessage(message, MSG_STAT);
 }
 
@@ -148,9 +147,9 @@ void RecvHook(const Scadup::Message& msg)
  * 订阅线程的任务体。
  *
  * 工程按 -std=c++11 编译，写不了 `[addr = std::move(address), ...]` 这种 lambda
- * 初始化捕获（那是 C++14 扩展，会报 -Wc++14-extensions）。改成「普通函数 + std::thread
- * 变参构造」：线程构造时把实参逐个 move / 拷贝到线程内部存储再回调，生命周期与原写法
- * 完全一致（detach 之后也不依赖调用栈）。
+ * 初始化捕获（那是 C++14 扩展，会报 -Wc++14-extensions）。所以用「普通函数 + std::thread
+ * 变参构造」：线程构造时把实参逐个 move / 拷贝到线程内部存储再回调，detach 之后
+ * 也不依赖调用栈。
  */
 static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RECV_CALLBACK hook)
 {
@@ -166,9 +165,9 @@ static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RE
     }
 
     {
-        char content[128];
-        snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x",
-            addr.c_str(), port, topic);
+        char content[160];
+        snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x (one-to-one id 0x%llx)",
+            addr.c_str(), port, topic, static_cast<unsigned long long>(sub.dstId()));
         Message::instance().setMessage(content, TOAST);
     }
 
@@ -180,31 +179,102 @@ static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RE
     Message::instance().setMessage(content, SUBSCRIBER);
 }
 
-/** 发布线程的任务体，同样是为避开 C++14 的 lambda 初始化捕获 */
-static void PublishTask(std::string pubAddr, int pubPort, uint32_t topic, std::string payload)
+/**
+ * 解析十六进制 topic；空串或解析不出来返回 false（topic 0 是合法值，
+ * 但不能由一串乱码悄悄变成 0，否则订阅/发布到错误的 topic 上还看不出原因）。
+ */
+static bool parseTopicHex(const std::string& hex, uint32_t& topic)
 {
-    Scadup::Publisher pub{};
-    int ret = pub.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
+    if (hex.empty()) {
+        return false;
+    }
+    char* end = nullptr;
+    const long value = strtol(hex.c_str(), &end, 16);
+    if (end == hex.c_str() || value < 0 || value > 0xFFFFFFFFL) {
+        return false;
+    }
+    topic = static_cast<uint32_t>(value);
+    return true;
+}
+
+/**
+ * 发布线程的任务体，同样是为避开 C++14 的 lambda 初始化捕获。
+ *
+ * Publisher 连接是持久的：整个进程共用一个实例（串行化访问），发布之间不再重复
+ * TCP 握手。上一次发布若把连接发坏了（broker 重启等），先重连再重试一次。
+ */
+static void PublishTask(std::string pubAddr, int pubPort, uint32_t topic, std::string payload, uint64_t dst)
+{
+    static std::mutex s_publishMutex;
+    static Scadup::Publisher s_publisher;
+    std::lock_guard<std::mutex> lock(s_publishMutex);
+
+    // 空正文 broker 收不到：Publisher::publish 对空串直接返回 0，什么都不发
+    if (payload.empty()) {
+        Message::instance().setMessage("Publish failed: payload is empty", TOAST);
+        return;
+    }
+
+    int ret = s_publisher.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
     if (ret < 0) {
         Message::instance().setMessage(
             "Publish connect failed: " + pubAddr + ":" + std::to_string(pubPort), TOAST);
         return;
     }
-    ssize_t stat = pub.publish(topic, payload);
+    int stat = s_publisher.publish(topic, payload, dst);
+    if (stat < 0) {
+        // 连接可能已被 broker 断开：重建连接后重试一次
+        s_publisher.quit();
+        ret = s_publisher.setup(pubAddr.c_str(), static_cast<unsigned short>(pubPort));
+        if (ret == 0)
+            stat = s_publisher.publish(topic, payload, dst);
+    }
     if (stat < 0) {
         Message::instance().setMessage("Publish send failed!", TOAST);
-    } else {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Published to 0x%x (%zd bytes)", topic, stat);
-        Message::instance().setMessage(buf, MSG_HINT);
+        return;
     }
+    char buf[192];
+    const int delivered = s_publisher.delivered();
+    if (delivered < 0) {
+        snprintf(buf, sizeof(buf), "Published to 0x%x (%d bytes, no delivery report)",
+            topic, stat);
+    } else if (delivered == 0) {
+        snprintf(buf, sizeof(buf),
+            "Published to 0x%x (%d bytes, 0 subscriber: nobody is listening)", topic, stat);
+    } else {
+        snprintf(buf, sizeof(buf), "Published to 0x%x (%d bytes, %d subscriber(s))",
+            topic, stat, delivered);
+    }
+    Message::instance().setMessage(buf, MSG_HINT);
+}
+
+/**
+ * 解析一对一目标：形如 "192.168.1.5" 的 IP（与订阅端注册的本地 IP 对应，
+ * 见 Subscriber::setup），或十六进制的订阅端 ssid / 自定义 dstId。
+ * 空字符串或无法解析时返回 0，即按 topic 广播。
+ */
+static uint64_t parsePublishTarget(const std::string& target)
+{
+    if (target.empty())
+        return 0;
+    if (target.find('.') != std::string::npos) {
+        const unsigned int ip = inet_addr(target.c_str());
+        if (ip == INADDR_NONE)
+            return 0;
+        return static_cast<uint64_t>(ip);
+    }
+    return strtoull(target.c_str(), nullptr, 16);
 }
 
 JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, jint port, jstring topic, jstring, jint)
 {
     std::string address = Jstring2Cstring(env, addr);
     const std::string topicHex = Jstring2Cstring(env, topic);
-    uint32_t iTopic = strtol(topicHex.c_str(), nullptr, 16);
+    uint32_t iTopic = 0;
+    if (!parseTopicHex(topicHex, iTopic)) {
+        Message::instance().setMessage("Subscribe failed: topic is empty or not hex", TOAST);
+        return -1;
+    }
 
     if (address.empty() || port <= 0) {
         Message::instance().setMessage("Subscribe failed: invalid address or port", TOAST);
@@ -220,7 +290,7 @@ JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv* env, jclass, jstring addr, 
     }
 
     if (g_subscribing.exchange(true)) {
-        // 上一路还没退出，先把这路挡回去：不是失败，只是没必要再开一路
+        // 上一路尚未退出，先将本路拒绝：并非失败，仅无需再启动一路
         Message::instance().setMessage("Subscribe is already running", TOAST);
         return 0;
     }
@@ -241,13 +311,17 @@ JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv*, jclass)
     Scadup::Subscriber::exit();
 }
 
-JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring message, jstring addr, jint port)
+JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstring message,
+                                      jstring addr, jint port, jstring target)
 {
     std::string topicHex = Jstring2Cstring(env, topic);
     std::string payload = Jstring2Cstring(env, message);
+    // target 为空表示按 topic 广播，非空时按 IP 或 ssid 单播（见 parsePublishTarget）
+    const std::string targetStr = (target != nullptr) ? Jstring2Cstring(env, target) : "";
 
-    if (topicHex.empty()) {
-        Message::instance().setMessage("Publish failed: topic is empty", TOAST);
+    uint32_t iTopic = 0;
+    if (!parseTopicHex(topicHex, iTopic)) {
+        Message::instance().setMessage("Publish failed: topic is empty or not hex", TOAST);
         return;
     }
 
@@ -255,26 +329,23 @@ JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv* env, jclass, jstring topic, jstrin
     int pubPort;
     {
         std::lock_guard<std::mutex> lock(g_paramMutex);
-        if (g_pubSubParam.addr.empty() || g_pubSubParam.port == 0) {
-            std::string ip = Jstring2Cstring(env, addr);
-            if (!ip.empty() && port > 0) {
-                g_pubSubParam.addr = ip;
-                g_pubSubParam.port = port;
-                pubAddr = std::move(ip);
-                pubPort = port;
-            } else {
-                Message::instance().setMessage("Publish failed: no address or port", TOAST);
-                return;
-            }
-        } else {
+        // 发布框里填的地址优先，订阅时留下的那份只作兜底：否则先订阅过一次之后，
+        // 再改发布框的地址永远不生效，包还是发到上一台上
+        pubAddr = Jstring2Cstring(env, addr);
+        pubPort = (pubAddr.empty() || port <= 0) ? 0 : port;
+        if (pubAddr.empty() || pubPort <= 0) {
             pubAddr = g_pubSubParam.addr;
             pubPort = g_pubSubParam.port;
         }
     }
+    if (pubAddr.empty() || pubPort <= 0) {
+        Message::instance().setMessage("Publish failed: no address or port", TOAST);
+        return;
+    }
 
-    uint32_t iTopic = strtol(topicHex.c_str(), nullptr, 16);
+    const uint64_t dst = parsePublishTarget(targetStr);
 
-    std::thread task(PublishTask, std::move(pubAddr), pubPort, iTopic, std::move(payload));
+    std::thread task(PublishTask, std::move(pubAddr), pubPort, iTopic, std::move(payload), dst);
     task.detach();
 }
 
@@ -336,7 +407,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateEglSurface)(JNIEnv* env, jclass, jobj
             EglGpuRender::CloseGLSurface();
             return -2;
         }
-        // FrameRender 用 EGL2.glProgram 拿着色器程序，没赋值的话 glUseProgram(0) 等于什么都没画
+        // FrameRender 通过 EGL2.glProgram 持有着色器程序，未赋值时 glUseProgram(0) 不会绘制任何内容
         EGL2.glProgram = program;
         EglTexture::SetTextureBuffers(program);
         if (EGL2.width == 0 || EGL2.height == 0) {
@@ -378,7 +449,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_VIEW(updateCpuTexture)(JNIEnv* env, jclass, jobj
 {
     switch (item) {
     case 0:
-        LOGD("No-implementation");
+        // 这一档没有实现
         return -1;
     case 3: {
         if (CpuRenderView::setupSurfaceView(env, texture) <= 0) {
@@ -527,7 +598,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startUdpServer)(JNIEnv*, jclass, jint po
 
 int tcp_callback(uint8_t* data, size_t size)
 {
-    Statics::printBuffer((char*)data, size);
+    /** 这里不打日志：每包一次太密，而且 LOGD 不输出时参数照旧求值，格式化照样白跑一遍。 */
+    (void)data;
+    (void)size;
     return 0;
 }
 
@@ -615,7 +688,7 @@ static std::thread* g_kcpServerThread = nullptr;
 static KcpSocket* g_kcpClient = nullptr;
 static std::thread* g_kcpClientThread = nullptr;
 
-/** 去掉尾部的 '\0' / 换行，免得拼到 UI 上出现空行 */
+/** 移除尾部的 '\0' 与换行，以免拼接至 UI 时出现空行 */
 static std::string trimTail(const char* data, int len)
 {
     std::string body(data, len);
@@ -625,8 +698,11 @@ static std::string trimTail(const char* data, int len)
     return body;
 }
 
-/** KCP 服务端收到一条消息：剥掉 8 字节头，把真正的载荷推给页面底部 hint 区（KCP_HINT） */
-static void KcpServerRecv(const char* data, int len, void*)
+/**
+ * KCP 服务端收到一条消息：剥掉 8 字节头，把真正的载荷连同来源一起推给页面（KCP_HINT）。
+ * 服务端同时接着局域网里多个对端，不带上来路就分不清该报文是谁发的。
+ */
+static void KcpServerRecv(const char* data, int len, const char* peerIp, int peerPort, void*)
 {
     unsigned int sn = 0;
     const char* payload = data;
@@ -637,13 +713,15 @@ static void KcpServerRecv(const char* data, int len, void*)
         payloadLen = len - KCP_ECHO_HDR;
     }
     std::string body = trimTail(payload, payloadLen);
+    std::string from = (peerIp != nullptr ? peerIp : "?");
+    from += ":" + std::to_string(peerPort);
     Message::instance().setMessage(
-        "KCP server recv sn=" + std::to_string(sn) + " " + std::to_string((int)body.size())
+        "KCP recv ← " + from + " sn=" + std::to_string(sn) + " " + std::to_string((int)body.size())
         + "B: " + body, KCP_HINT);
 }
 
 /**
- * KCP 客户端收到服务端回射的那包：按包头里的时间戳算 RTT，推给页面 status 区（KCP_CLIENT）。
+ * KCP 客户端收到服务端回射的报文：按包头里的时间戳算 RTT，推给页面 status 区（KCP_CLIENT）。
  */
 static void KcpClientEcho(unsigned int sn, unsigned int rttMs, const char* data, int len, void*)
 {
@@ -766,7 +844,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(stopKcpClient)(JNIEnv*, jclass)
  * 客户端发一条数据（页面传进来的是十六进制随机数）：带上 sn + 时间戳的 8 字节头，
  * 服务端会原样回射，客户端收到后算 RTT。返回 ikcp_send 的结果，<0 为失败。
  */
-JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstring text, jint len)
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstring text, jint)
 {
     std::string data = Jstring2Cstring(env, text);
     KcpSocket* sock = nullptr;
@@ -778,7 +856,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstrin
         Message::instance().setMessage("KCP client not started yet", KCP_CLIENT);
         return -1;
     }
-    int size = (len > 0 && len < (int)data.size()) ? len : (int)data.size();
+    int size = (int)data.size();
     int ret = sock->sendEcho(data.c_str(), size);
     if (ret < 0) {
         Message::instance().setMessage("KCP send failed(" + std::to_string(ret) + ")", KCP_CLIENT);
@@ -929,4 +1007,73 @@ JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass)
         return g_fileMsg->isConnected() ? JNI_TRUE : JNI_FALSE;
     }
     return JNI_FALSE;
+}
+
+// ============ 局域网文本消息（发现 + 收发，全部在 C++ 侧） ============
+
+static std::mutex g_lanMutex;
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startLanMessenger)(JNIEnv* env, jclass,
+                                                            jstring name, jstring selfIp, jint port)
+{
+    std::string device = Jstring2Cstring(env, name);
+    std::string address = Jstring2Cstring(env, selfIp);
+    std::lock_guard<std::mutex> lock(g_lanMutex);
+    int ret = LanMessenger::instance().start(device, address, port);
+    if (ret < 0) {
+        Message::instance().setMessage(
+            "LAN: start failed(" + std::to_string(ret) + ")", LAN_MESSAGE);
+    }
+    return ret;
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopLanMessenger)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_lanMutex);
+    LanMessenger::instance().stop();
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryPort)(JNIEnv*, jclass, jint port)
+{
+    std::lock_guard<std::mutex> lock(g_lanMutex);
+    // 发现与收发各占一个端口：收发是 39001 的 KCP 会话，发现是 39000 的广播，
+    // 两者互不相干，改发现端口不会动到收发
+    LanMessenger::instance().setDiscoveryPort(port);
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanMessage)(JNIEnv* env, jclass,
+                                                         jstring ip, jint port, jstring text)
+{
+    std::string address = Jstring2Cstring(env, ip);
+    std::string body = Jstring2Cstring(env, text);
+    if (address.empty() || port <= 0 || body.empty()) {
+        return -1;
+    }
+    if (!LanMessenger::instance().isRunning()) {
+        return -2;
+    }
+    // sendText() 只入队 + 发一条 SENDING 事件，publish 由 LanMessenger 自己的发送线程做，
+    // 所以这里不会卡住调用方
+    return LanMessenger::instance().sendText(address, port, body);
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanImage)(JNIEnv* env, jclass,
+                                                       jstring ip, jint port, jstring base64)
+{
+    std::string address = Jstring2Cstring(env, ip);
+    std::string body = Jstring2Cstring(env, base64);
+    if (address.empty() || port <= 0 || body.empty()) {
+        return -1;
+    }
+    if (!LanMessenger::instance().isRunning()) {
+        return -2;
+    }
+    // 超过 LAN_MAX_IMAGE_CHARS 会返回 -4
+    return LanMessenger::instance().sendImage(address, port, body);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(refreshLanPeers)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_lanMutex);
+    LanMessenger::instance().refresh();
 }

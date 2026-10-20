@@ -79,6 +79,14 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv*, jclass, jstring ip
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileSavePath)(JNIEnv*, jclass, jstring path);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass);
 JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass);
+
+// 局域网文本消息（C++ 实现：UDP 广播做设备发现，KCP over UDP 做收发，一个 socket 同时是客户端与服务端）
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startLanMessenger)(JNIEnv*, jclass, jstring name, jstring selfIp, jint port);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopLanMessenger)(JNIEnv*, jclass);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanMessage)(JNIEnv*, jclass, jstring ip, jint port, jstring text);
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanImage)(JNIEnv*, jclass, jstring ip, jint port, jstring base64);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(refreshLanPeers)(JNIEnv*, jclass);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryPort)(JNIEnv*, jclass, jint port);
 #ifdef __cplusplus
 }
 #endif
