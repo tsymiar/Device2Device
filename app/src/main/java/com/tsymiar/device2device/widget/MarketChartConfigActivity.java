@@ -40,8 +40,8 @@ import java.util.List;
  * 是两个不同的组件：那边一次可以收多个标的，这里只收一个 —— 曲线只有一条，收多了也没处画。
  *
  * 标的列表用列表版那套读写（{@link MarketWidgetProvider#readItems} / {@code saveItems}）：
- * AppWidget id 全局唯一，按 id 存的 key 天然不会串；这里取列表里的第一个、也只有那一个。
- * 周期存 {@link MarketChartWidgetProvider#readInterval} 那份。
+ * AppWidget id 全局唯一，按 id 存的 key 天然不会串；这里取列表里的第一个标的（曲线部件只看一个）。
+ * 周期存 {@link MarketChartWidgetProvider#readInterval}。
  *
  * 排版与列表版配置页一致（同样的配色表、圆角卡片、40dp 控件高度），
  * 内容放 ScrollView 里，「取消 / 添加到桌面」固定在底部。
@@ -135,10 +135,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         return new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, mAppWidgetId);
     }
 
-    // ------------------------------------------------------------------
-    // 界面
-    // ------------------------------------------------------------------
-
+    // ===== 界面 =====
     private View buildUi() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -349,10 +346,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         return row;
     }
 
-    // ------------------------------------------------------------------
-    // 添加 / 保存
-    // ------------------------------------------------------------------
-
+    // ===== 添加 / 保存 =====
     private void resolveSymbol() {
         if (mSearching) return;
         final String input = mSymbolEdit.getText() == null
@@ -434,11 +428,8 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 小工具（背景一律代码生成，不新增 drawable XML）
-    // ------------------------------------------------------------------
-
-    /** 周期候选跟着数据源：数据源不支持的周期不给选，省得部件上一直刷着报错 */
+    // ===== 小工具（背景一律代码生成，不新增 drawable XML） =====
+    /** 周期候选随数据源变化：数据源不支持的周期不提供选择，以免部件持续显示错误 */
     private void refreshIntervals() {
         if (mIntervalSpinner == null) return;
         mIntervals = QuoteSource.intervals(mSource);

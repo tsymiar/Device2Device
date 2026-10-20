@@ -2,19 +2,19 @@
 <!-- 行情热力图小部件：头部「市值热力图 · 更新时间 + 刷新」→ 中间一整片马赛克
      （一棵排版树铺成的 treemap，每个格子一只股票，面积=市值、颜色=涨跌幅）→ 底部一行图例。
 
-     与列表版 widget_market_list.xml 同一个套路，区别只在主体那一块：
+     与列表版 widget_market_list.xml 同一个套路，区别只在主体的马赛克区域：
      - 排版在 MarketTreemap 里算好一棵树，这里按树用 addView 铺成嵌套的
-       LinearLayout + TextView（见 widget_heat_row / widget_heat_col / widget_heat_tile）；
+       LinearLayout + TextView（见 widget_market_heat_row / widget_market_heat_col / widget_market_heat_tile）；
      - 格子宽高用 setInt(id, "setWidth" / "setHeight", px) 逐个设，于是「面积 = 市值」
-       落在真的 View 上，每一格还能各自挂一个点击进入行情页（位图做不到逐格点击）；
-     - 不需要滚动容器：各格面积之和等于这块矩形，treemap 天然摆得下整份榜单，
-       省掉了 AdapterView 那一套回调，也不用 RemoteViewsService；
+       落在真实的 View 上，每一格可各自绑定点击进入行情页（位图无法实现逐格点击）；
+     - 不需要滚动容器：各格面积之和等于马赛克区域，treemap 天然摆得下整份榜单，
+       省掉了 AdapterView 的回调，也不用 RemoteViewsService；
      - 主体 0dp + weight 1 吃掉剩余空间；没数据时空态占位顶上。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_market_bg"
+    android:background="@drawable/bg_widget_market"
     android:clipChildren="true"
     android:orientation="vertical"
     android:padding="9dp">
@@ -54,27 +54,40 @@
                 android:textSize="9sp" />
         </LinearLayout>
 
-        <TextView
+        <!-- 只放图标：跟 ChatBox 的模型刷新按钮一个路子，行内不再被"刷新"两个字占掉一截宽度。
+             文字挪到 contentDescription，无障碍朗读照旧 -->
+        <ImageView
             android:id="@+id/widget_refresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:paddingStart="6dp"
             android:paddingEnd="2dp"
             android:paddingTop="2dp"
             android:paddingBottom="2dp"
-            android:text="@string/market_widget_refresh"
-            android:textColor="@color/market_widget_text_dim"
-            android:textSize="10sp" />
+            android:contentDescription="@string/market_widget_refresh"
+            android:src="@drawable/ic_refresh"
+            android:tint="@color/market_widget_text_dim" />
+
+        <!-- 取数时在图标原位换成转圈，与 ChatBox「思考中…」那个 ProgressBar 同一套路：
+             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响 -->
+        <ProgressBar
+            android:id="@+id/widget_refresh_spin"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:indeterminateTint="@color/market_widget_text_dim"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 热力图主体：一整片马赛克，由 Provider 按排版树用 addView 一层层铺进来
          （排版见 MarketTreemap，格子的宽高用 setInt(id, "setWidth"/"setHeight", px) 逐个设）。
-         每一刀都按市值分账，所以铺出来的格子面积之和就是这块矩形 —— 既不超出边框，
+         每一刀都按市值分账，所以铺出来的格子面积之和就等于马赛克区域 —— 既不超出边框，
          也不需要滚动：面积比例这一份信息整个摆得进来，用不着把一部分藏到屏幕外边。
          主体按 0dp + weight 吃掉剩余空间，Provider 那边拿 {@code MAP_SAFETY_DP} 往里收一点再摆，
-         免得格子（宽高都是写死的像素值）压到下面的图例上 -->
+         以免格子（宽高为固定像素值）遮挡下图例 -->
     <LinearLayout
-        android:id="@+id/widget_heat_map"
+        android:id="@+id/widget_market_heat_map"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="3dp"
@@ -86,7 +99,7 @@
 
     <!-- 列表为空（还没取到数据 / 榜单取空）时的占位：setEmptyView 挂在列表上 -->
     <TextView
-        android:id="@+id/widget_heat_empty"
+        android:id="@+id/widget_market_heat_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
@@ -98,7 +111,7 @@
         android:visibility="gone" />
 
     <!-- 底部一行：左边图例（面积与颜色各自代表什么，实际画了几只），右边取数时间。
-         时间放这里而不是标题下：标题下面那行留给全市场涨跌家数，时间与图例同属「这一屏是哪批数据」 -->
+         时间放这里而不是标题下：标题下面一行留给全市场涨跌家数，时间与图例同属「当前这屏是哪批数据」 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -116,7 +129,7 @@
             android:textSize="9sp" />
 
         <TextView
-            android:id="@+id/widget_heat_time"
+            android:id="@+id/widget_market_heat_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"

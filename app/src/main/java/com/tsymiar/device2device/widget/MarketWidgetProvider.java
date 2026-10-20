@@ -62,7 +62,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     /** 每个小部件实例的配置 */
     private static final String PREF_WIDGET = "market_widget_prefs";
     private static final String K_ITEMS = "items_";       // 多标的：一行一条，字段用 \t 分隔
-    private static final String K_SOURCE = "source_";     // 旧版单标的（读不到列表时回退用）
+    private static final String K_SOURCE = "source_";     // 单标的回退键（读不到列表时用）
     private static final String K_SYMBOL = "symbol_";
     private static final String K_NAME = "name_";
 
@@ -92,17 +92,14 @@ public class MarketWidgetProvider extends AppWidgetProvider {
      */
     private static final Map<Integer, List<Row>> sRows = new ConcurrentHashMap<>();
     private static final Map<Integer, Long> sStamp = new ConcurrentHashMap<>();
-    /** 正在取数的部件：列表重新绑定很频繁，别把同一批请求发出去好几遍 */
+    /** 正在取数的部件：列表重新绑定频繁，避免同一批请求被重复发送 */
     private static final Set<Integer> sPending = Collections.newSetFromMap(new ConcurrentHashMap<Integer, Boolean>());
     /** 缓存多久算过期：列表重新绑定时据此补一次取数 */
     private static final long STALE_MS = 60000L;
 
     // 与小部件布局 / 行情页一致：文字色与涨跌色都取 color 资源，日间夜间自动切换
 
-    // ------------------------------------------------------------------
-    // 配置读写
-    // ------------------------------------------------------------------
-
+    // ===== 配置读写 =====
     /** 一个标的 */
     public static final class Item {
         public final String source;
@@ -157,11 +154,11 @@ public class MarketWidgetProvider extends AppWidgetProvider {
             if (i > 0) sb.append('\n');
             sb.append(it.source).append('\t').append(it.symbol).append('\t').append(it.name);
         }
-        // 配置变了：旧的价格缓存和正在跑的那批取数都作废，下次按新列表来
+        // 配置变了：旧的价格缓存和正在跑的取数请求都作废，下次按新列表来
         sPending.remove(appWidgetId);
         sRows.remove(appWidgetId);
         Item first = keep.get(0);
-        // 旧键同步写一份首项：老版本 / 其它读取点仍能拿到一个标的
+        // 单标的键同步写一份首项：其它读取点仍能拿到一个标的
         context.getSharedPreferences(PREF_WIDGET, Context.MODE_PRIVATE).edit()
                 .putString(K_ITEMS + appWidgetId, sb.toString())
                 .putString(K_SOURCE + appWidgetId, first.source)
@@ -230,7 +227,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
      * 清掉某几个部件的配置。
      *
      * 两个部件共用一份 prefs（key 都按 widgetId 区分）：曲线部件删掉自己时也走这里，
-     * 见 {@link MarketChartWidgetProvider#onDeleted} —— 不然它的 {@code items_} 会残留在文件里。
+     * 见 {@link MarketChartWidgetProvider#onDeleted} —— 否则其 {@code items_} 将残留在文件中。
      */
     static void clearPrefs(Context context, int[] appWidgetIds) {
         if (appWidgetIds == null) return;
@@ -250,10 +247,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         onUpdate(context, manager, new int[]{appWidgetId});
     }
 
-    // ------------------------------------------------------------------
-    // 广播入口
-    // ------------------------------------------------------------------
-
+    // ===== 广播入口 =====
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);      // 系统广播（APPWIDGET_UPDATE 等）按默认分发
@@ -266,6 +260,9 @@ public class MarketWidgetProvider extends AppWidgetProvider {
             ids = new int[]{id};
         } else {
             ids = manager.getAppWidgetIds(new ComponentName(context, MarketWidgetProvider.class));
+        }
+        for (int widgetId : ids) {
+            WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_list);
         }
         onUpdate(context, manager, ids);
     }
@@ -333,7 +330,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         refreshOne(context, AppWidgetManager.getInstance(context), appWidgetId, null);
     }
 
-    /** 列表重新绑定时缓存已经凉了才补取一次，避免每次滚动都去请求网络 */
+    /** 列表重新绑定时仅缓存过期才补取一次，避免每次滚动都去请求网络 */
     static void refreshIfStale(Context context, int widgetId) {
         if (context == null || widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return;
         Long stamp = sStamp.get(widgetId);
@@ -344,7 +341,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
 
     /**
      * 列表要用的行数据：有缓存就用缓存，没有（进程刚起来）就按标的列表摆「加载中」。
-     * 配置改过之后按代码把旧价格对回来，免得顺序一变价格就串到别的标的上。
+     * 配置变更后按代码将旧价格对齐，以免顺序变化导致价格错位至其它标的。
      */
     static List<Row> rowsFor(Context context, int widgetId) {
         List<Item> items = readItems(context, widgetId);
@@ -407,10 +404,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         context.sendBroadcast(intent);
     }
 
-    // ------------------------------------------------------------------
-    // 取数
-    // ------------------------------------------------------------------
-
+    // ===== 取数 =====
     /** 一个标的的取数结果（包可见：列表 Factory 要按位置取行） */
     static final class Row {
         final Item item;
@@ -453,9 +447,9 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     /**
      * 各标的并行取数，谁先回来就先把谁画上去。
      *
-     * 原来是等最后一个回来才统一刷一次：标的越多等待感越明显（一个慢接口能把整块拖住几十秒），
-     * 而且用户看到的是「卡住 → 忽然全部跳出来」。现在每回来一个就把缓存里那一行换掉、
-     * 再 notify 一次列表，界面就是「一条条按获取顺序跳出来」，没回来的那几行还是「加载中」。
+     * 等最后一个回来才统一刷一次时，标的越多等待感越明显（一个慢接口能把整块拖住几十秒），
+     * 而且用户看到的是「卡住 → 忽然全部跳出来」。所以每回来一个就把缓存里对应那一行的数据换掉、
+     * 再 notify 一次列表，界面是「一条条按获取顺序跳出来」，没回来的那几行还是「加载中」。
      */
     private static void fetchAll(Context context, AppWidgetManager manager, int widgetId,
                                  List<Item> items, final RowsCallback callback) {
@@ -530,10 +524,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
                 String.format(Locale.US, "%+.2f%%", percent), color, null);
     }
 
-    // ------------------------------------------------------------------
-    // 渲染 RemoteViews
-    // ------------------------------------------------------------------
-
+    // ===== 渲染 RemoteViews =====
     private static RemoteViews baseViews(Context context, int widgetId, List<Item> items, String meta) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market_list);
         String title = context.getString(R.string.market_widget_title)
@@ -541,7 +532,6 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_title, title);
         // 布局里的默认色已随深浅模式，这里按当前模式再显式覆盖一次，避免桌面端缓存旧配色
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
-        views.setTextColor(R.id.widget_refresh, color(context, R.color.market_widget_text_dim));
         views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
         views.setTextColor(R.id.widget_empty, color(context, R.color.market_widget_text_hint));
         views.setTextViewText(R.id.widget_meta, meta == null ? "" : meta);
@@ -627,7 +617,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     /**
      * 列表项的 fillIn 模板：具体标的由 rowViews 的 fillInIntent 补。
      *
-     * requestCode 必须带 widgetId：多个部件共用 0 的话，FLAG_UPDATE_CURRENT 会让它们
+     * requestCode 必须带 widgetId：多个部件共用 0 时，FLAG_UPDATE_CURRENT 会让它们
      * 互相覆盖 extras，点第二个部件也会跳到第一个部件（或第一个标的）上去。
      */
     private static PendingIntent openMarket(Context context, int widgetId) {

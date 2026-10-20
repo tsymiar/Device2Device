@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 排版树的一个「竖着排」的内部节点：孩子们上下各占一段高度。
-     与 widget_heat_row 成对使用，区别只在 orientation，原因见那里的注释。 -->
+     与 widget_market_heat_row 成对使用，区别只在 orientation，原因见那里的注释。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_heat_col"
+    android:id="@+id/widget_market_heat_col"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:clipChildren="true"

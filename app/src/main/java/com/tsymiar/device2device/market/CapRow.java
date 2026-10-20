@@ -4,7 +4,7 @@ package com.tsymiar.device2device.market;
  * 市值榜里的一行（桌面热力图小部件用）。
  *
  * 比 {@link Snapshot} 少些字段：热力图只要「代码 / 名称 / 涨跌幅 / 总市值」，
- * 市盈率、换手率用不上，榜单接口也不给；反过来复用 Snapshot 会让「哪些字段一定有」变模糊 ——
+ * 市盈率、换手率用不上，榜单接口也不给。复用 Snapshot 会让「哪些字段一定有」不明确 ——
  * 榜单与个股快照是两种取数场景，各留一份结构更清楚。
  *
  * 金额单位与 Snapshot 对齐：统一「元」，展示前用 {@link Snapshot#cap(double)} 压成万亿 / 亿。

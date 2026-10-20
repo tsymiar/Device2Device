@@ -88,9 +88,7 @@ public final class QuoteSource {
         SINGLE_REQUEST_MAX.put(BINANCE, 1000);
     }
 
-    // ------------------------------------------------------------------
-    // 各数据源地址（脚本 SOURCES 配置）
-    // ------------------------------------------------------------------
+    // ===== 各数据源地址（脚本 SOURCES 配置） =====
     private static final String TENCENT_KLINE = "https://ifzq.gtimg.cn/appstock/app/fqkline/get";
     private static final String TENCENT_KLINE_MIRROR = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get";
     private static final String TENCENT_MINUTE = "https://ifzq.gtimg.cn/appstock/app/kline/mkline";
@@ -112,15 +110,15 @@ public final class QuoteSource {
     private static final String EAST_SNAPSHOT = "https://push2.eastmoney.com/api/qt/stock/get";
     /**
      * 腾讯实时盘口（GBK 文本）：东财那条 push2 常常整段不回包，而市值现在显示在 K 线的
-     * 代码行上（见 KLineView），只靠一条线路的话那一行就常常是空的 —— 它来兜底。
+     * 代码行上（见 KLineView），只靠一条线路时该行就常常是空的 —— 它来兜底。
      */
     private static final String TENCENT_SNAPSHOT = "https://qt.gtimg.cn/q=";
-    /** 东财行情榜单：按某个字段排序取一批标的，市值热力图以前用它拉「市值 Top N」 */
+    /** 东财行情榜单：按某个字段排序取一批标的，市值热力图用它拉「市值 Top N」 */
     private static final String EAST_CLIST = "https://push2.eastmoney.com/api/qt/clist/get";
     /**
      * 新浪行情榜单：同样的「按字段排序取一批标的」，市值热力图现在以它为主。
      *
-     * 只问东财那一家撑不住：clist 这台常常整段不回包（同一时刻它的 push2his K 线接口又是好的），
+     * 只问东财一家撑不住：clist 这台常常整段不回包（同一时刻它的 push2his K 线接口又是好的），
      * 而「一屏榜单」这种场景换的那家线路整个环节都要换（见 {@link #fetchTopCaps}）。
      */
     private static final String SINA_CLIST =
@@ -153,9 +151,7 @@ public final class QuoteSource {
     private static final String USDX_CURRENCIES = "EUR,JPY,GBP,CAD,SEK,CHF";
     private static final double USDX_BASE = 50.14348112;
 
-    // ------------------------------------------------------------------
-    // 周期映射与各源支持的周期
-    // ------------------------------------------------------------------
+    // ===== 周期映射与各源支持的周期 =====
     private static final Map<String, String> INTERVAL_ALIAS = new HashMap<>();
     private static final Map<String, Integer> MINUTE_STEP = new HashMap<>();
     private static final Map<String, String> TENCENT_DAILY_KEY = new HashMap<>();
@@ -212,7 +208,7 @@ public final class QuoteSource {
 
         // 1h 与 60m 同为 60 分钟，统一用 60m 表示「小时线」，避免下拉里出现重复项
         // 1Q=季线，1Y=年线，两者没有现成接口，由月线（或日线）聚合出来
-        // 15m 之前漏在列表外（MINUTE_STEP / TENCENT_MINUTE_KEY / EAST_KLT 都支持它），补回来
+        // 15m 也在列表里：MINUTE_STEP / TENCENT_MINUTE_KEY / EAST_KLT 都支持它
         String[] cn = {"1m", "5m", "15m", "30m", "60m", "1d", "1w", "1M", "1Q", "1Y"};
         // 新浪期货（国内/国际）只到日线；美元指数仅有东财分时，无免费日线
         String[] futures = {"1m", "5m", "30m", "60m", "1d"};
@@ -234,9 +230,7 @@ public final class QuoteSource {
         SUPPORTED.put(AUTO, cn);
     }
 
-    // ------------------------------------------------------------------
-    // 标的形态识别（auto 模式据此挑源）
-    // ------------------------------------------------------------------
+    // ===== 标的形态识别（auto 模式据此挑源） =====
     private static final Pattern CRYPTO = Pattern.compile("^[A-Za-z0-9]{2,12}[-/]?(?:USDT|USDC|USD|BTC|ETH)$");
     private static final Pattern DOMESTIC = Pattern.compile("^(?:sh|sz|bj|hk|us|nf_|hf_|[0-9]{6})",
             Pattern.CASE_INSENSITIVE);
@@ -347,10 +341,7 @@ public final class QuoteSource {
     private QuoteSource() {
     }
 
-    // ------------------------------------------------------------------
-    // 对外：实时盘口快照（市值 / 市盈率 / 换手率）
-    // ------------------------------------------------------------------
-
+    // ===== 对外：实时盘口快照（市值 / 市盈率 / 换手率） =====
     public interface SnapshotCallback {
         /** 取不到快照时回传 null（代码换不出 secid、接口失败、加密货币等） */
         void onSnapshot(Snapshot snapshot);
@@ -360,8 +351,8 @@ public final class QuoteSource {
      * 实时盘口：东财为主、腾讯兜底，拿到就回传市值等字段，都拿不到回传 null ——
      * 失败不影响 K 线本身。回调在主线程（HttpsRequest 已切回）。
      *
-     * 市值要摆在 K 线的代码行上（见 KLineView），只问东财那一条就不够稳：
-     * push2 这阵子常常整段不回包，一行请求换不回数，那一行就一直空着。
+     * 市值要摆在 K 线的代码行上（见 KLineView），只问东财一条线路不够稳：
+     * push2 这阵子常常整段不回包，一行请求换不回数，该行就一直空着。
      */
     public static void fetchSnapshot(final String code, final SnapshotCallback cb) {
         final Runnable fallback = () -> fetchTencentSnapshot(code, cb);
@@ -398,7 +389,7 @@ public final class QuoteSource {
                 data.optDouble("f168", 0) / 100.0);
     }
 
-    /** 腾讯盘口：只有 A股 / 港股这类「有股本」的标的有市值，商品 / 加密 / 外汇没有这一说 */
+    /** 腾讯盘口：只有 A股 / 港股这类「有股本」的标的有市值，商品 / 加密 / 外汇没有市值一说 */
     private static void fetchTencentSnapshot(final String code, final SnapshotCallback cb) {
         String symbol = tencentCode(code);
         if (!symbol.startsWith("sh") && !symbol.startsWith("sz")
@@ -461,10 +452,7 @@ public final class QuoteSource {
         return market + "." + s;
     }
 
-    // ------------------------------------------------------------------
-    // 对外：沪深京 A 股市值榜（桌面热力图小部件用）
-    // ------------------------------------------------------------------
-
+    // ===== 对外：沪深京 A 股市值榜（桌面热力图小部件用） =====
     public interface CapListCallback {
         void onResult(List<CapRow> rows);
 
@@ -495,7 +483,7 @@ public final class QuoteSource {
     }
 
     /**
-     * 新浪那份市值榜：sort=mktcap + asc=0 就是总市值倒序，单页最多 100 行。
+     * 新浪的市值榜：sort=mktcap + asc=0 就是总市值倒序，单页最多 100 行。
      * 一份响应里就有代码 / 名称 / 涨跌 / 市值，不必再像东财那样问两遍。
      */
     private static void fetchSinaCaps(int limit, final CapListCallback cb, Runnable retry) {
@@ -535,7 +523,7 @@ public final class QuoteSource {
 
     /**
      * 榜单收尾（两家源共用）：给没市值的行补兜底值 → 按市值倒序 → 截断到 limit。
-     * 顺序这一关不能省：接口按给定域排序，中间插了停牌 / 没取到值的行时不一定严格倒序，
+     * 顺序这一校验不能省：接口按给定域排序，中间插了停牌 / 没取到值的行时不一定严格倒序，
      * 而热力图的面积全靠这个顺序，乱序会画成歪的。
      */
     private static List<CapRow> finishCapList(List<CapRow> rows, int limit) {
@@ -558,7 +546,7 @@ public final class QuoteSource {
     }
 
     /**
-     * 新浪那份整套板块的行情（一次五千多行）：行里只有涨跌幅用得上，逐条累加出家数。
+     * 新浪的整套板块行情（一次五千多行）：行里只有涨跌幅用得上，逐条累加出家数。
      * gzip 之后三百多 KB —— 一次请求换几千只票的涨跌，比挨个问划算得多。
      */
     private static void fetchSinaBreadth(final BreadthCallback cb, Runnable retry) {
@@ -591,7 +579,7 @@ public final class QuoteSource {
         }, sink());
     }
 
-    /** 新浪那份涨跌幅字段叫 changepercent（有时是字符串），与东财的 f3 只是名字不同 */
+    /** 新浪的涨跌幅字段叫 changepercent（有时是字符串），与东财的 f3 只是名字不同 */
     private static Breadth parseSinaBreadth(String body) throws Exception {
         JSONArray rows = new JSONArray(body);
         int[] tally = new int[3];
@@ -701,7 +689,7 @@ public final class QuoteSource {
 
     /**
      * clist 响应：{@code {rc:0, data:{total:…, diff:[{f12:代码, f13:市场, f14:名称,
-     * f3:涨跌幅, f20:市值}]}}}。老版本 diff 是按下标做 key 的对象，两种形态都收。
+     * f3:涨跌幅, f20:市值}]}}}。diff 也可能是按下标做 key 的对象，两种形态都收。
      */
     private static List<CapRow> parseClist(String body, int limit) throws Exception {
         JSONObject root = new JSONObject(body);
@@ -777,10 +765,7 @@ public final class QuoteSource {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 对外：UI 用的元信息
-    // ------------------------------------------------------------------
-
+    // ===== 对外：UI 用的元信息 =====
     /** 下拉标题：源名 + 覆盖范围 */
     public static String label(String source) {
         switch (source == null ? AUTO : source) {
@@ -864,7 +849,7 @@ public final class QuoteSource {
         }
     }
 
-    /** 输入框里已填的标的形态是否属于该数据源（切换数据源时用于决定要不要换成默认代码） */
+    /** 输入框里已填的标的形态是否属于该数据源（切换数据源时用于判断是否替换为默认代码） */
     public static boolean accepts(String source, String symbol) {
         String text = symbol == null ? "" : symbol.trim();
         if (text.isEmpty()) return true;
@@ -916,26 +901,20 @@ public final class QuoteSource {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 对外：取数
-    // ------------------------------------------------------------------
-
+    // ===== 对外：取数 =====
     public static void load(String source, String symbol, String interval, int limit, Callback callback) {
         List<String> names = candidates(source, symbol);
         step(new ArrayDeque<>(names), symbol, interval, limit, callback, new ArrayList<String>());
     }
 
-    // ------------------------------------------------------------------
-    // 对外：当日分时
-    // ------------------------------------------------------------------
-
+    // ===== 对外：当日分时 =====
     /**
      * 当日分时：今天（休市时是最近那个交易日）每分钟一个点，外加昨收 —— 那条基准线的前提。
      *
      * 它不能用 1m K 线顶替：1m K 线是「最近几百根分钟线」，一天就有 240 根，
      * 取 320 根画出来是跨天的一串，与行情软件里那条从左边开盘价画到现在的分时完全不是一回事。
      * 每条线路都自带昨收（腾讯在 qt 里、东财在 preSettlement 里），退到最后那条路线也能从
-     * 「上一天最后一根」推出来 —— 昨收不在数据里就只能另外给它。
+     * 「上一天最后一根」推出来 —— 昨收不在数据中时只能另行提供。
      */
     public interface IntradayCallback {
         void onResult(List<Quote> quotes, float prevClose);
@@ -956,7 +935,7 @@ public final class QuoteSource {
         }
         final String name = pending.poll();
         final String code = normalizeSymbol(name, symbol);
-        // 这一路没取到就换下一个源，别把"取不到"当成结果回给上层
+        // 该数据源未取到时切换至下一个源，避免将「取不到」作为结果返回上层
         final Runnable next = new Runnable() {
             @Override
             public void run() {
@@ -992,7 +971,7 @@ public final class QuoteSource {
     }
 
     /**
-     * 东财分时（trends2）：trends 自带开高低，比腾讯那份细；作为腾讯之外的第二条线路。
+     * 东财分时（trends2）：trends 自带开高低，比腾讯的接口细；作为腾讯之外的第二条线路。
      * 它的昨收（data.preSettlement）有时给 0（这台机器近期的毛病），那种情况下
      * 基准线退回 KLineView 自己的推算 —— 分时照样出图，只是那条线按当日开盘画。
      */
@@ -1019,7 +998,7 @@ public final class QuoteSource {
 
     /**
      * 没有分时接口的品类（加密 / 外盘商品）：顺着自己的线路取 1m K 线，
-     * 再按日期切出「最后一天」那一段 —— 一段 Segment 能还原出同样的分时形状。
+     * 再按日期切出「最后一天」对应的那一段 —— 一段 Segment 能还原出同样的分时形状。
      */
     private static void loadMinuteIntraday(final String name, final String code, final Runnable retry,
                                            final IntradayCallback cb) {
@@ -1067,7 +1046,7 @@ public final class QuoteSource {
 
     /**
      * 腾讯分时：data[code].data = {date:'20261016', data:['0930 1311.57 335 43937595.00', …]}。
-     * 一行只有那一分钟的价格（没有开高低），按相邻两点连成K线：开取上一点、高低取两极值。
+     * 一行只有该分钟的价格（没有开高低），按相邻两点连成K线：开取上一点、高低取两极值。
      */
     private static List<Quote> parseTencentIntraday(String body, String code) throws Exception {
         JSONObject root = new JSONObject(body);
@@ -1089,7 +1068,7 @@ public final class QuoteSource {
             if (parts.length < 2) continue;
             float price = (float) safe(parts[1]);
             if (price <= 0f) continue;
-            // 成交量是开盘至今的累计值，差分出来的才是这一分钟的量
+            // 成交量是开盘至今的累计值，差分出来的才是该分钟的量
             double volume = parts.length > 2 ? safe(parts[2]) : 0d;
             float open = previous > 0f ? previous : price;
             quotes.add(new Quote(day + " " + clockOf(parts[0]) + ":00", open,
@@ -1110,7 +1089,7 @@ public final class QuoteSource {
         return row == null || row.length() < 5 ? 0f : (float) row.optDouble(4, 0d);
     }
 
-    /** 东财分时：data.trends 每行 "2026-10-16 09:30,开,收,高,低,量,额,均价"（自带开高低，比腾讯那份细） */
+    /** 东财分时：data.trends 每行 "2026-10-16 09:30,开,收,高,低,量,额,均价"（自带开高低，比腾讯的接口细） */
     private static List<Quote> parseEastIntraday(JSONObject data) throws Exception {
         JSONArray rows = data == null ? null : data.optJSONArray("trends");
         if (rows == null || rows.length() == 0) throw new IllegalArgumentException("分时接口无数据");
@@ -1126,7 +1105,7 @@ public final class QuoteSource {
         return sanitize(quotes);
     }
 
-    /** 只留最后一个交易日那一段（24 小时市场里就是最后一个自然日） */
+    /** 只留最后一个交易日对应的那一段（24 小时市场里就是最后一个自然日） */
     private static List<Quote> lastDayOnly(List<Quote> quotes) {
         List<Quote> out = new ArrayList<>();
         if (quotes == null || quotes.isEmpty()) return out;
@@ -1168,10 +1147,7 @@ public final class QuoteSource {
         return digits.substring(0, 2) + ":" + digits.substring(2, 4);
     }
 
-    // ------------------------------------------------------------------
-    // 对外：黄金的人民币价（元/克）
-    // ------------------------------------------------------------------
-
+    // ===== 对外：黄金的人民币价（元/克） =====
     /** 1 金衡盎司 = 31.1034768 克：国际金（美元/盎司）换算成元/克要除它 */
     public static final float OUNCE_GRAMS = 31.1034768f;
 
@@ -1223,7 +1199,7 @@ public final class QuoteSource {
 
     /**
      * 美元兑人民币：新浪外汇实时快照为主，欧洲央行参考汇率兜底（免密钥，日频工作日）。
-     * 只用来把国际金的「美元/盎司」标注成「元/克」，取不到就回 0 —— 界面那边不显示这一栏即可。
+     * 只用来把国际金的「美元/盎司」标注成「元/克」，取不到就回 0 —— 界面不显示该栏即可。
      */
     public static void loadUsdCny(final RateCallback cb) {
         float cached = sUsdCny;
@@ -1289,10 +1265,7 @@ public final class QuoteSource {
         return cny > 3f && cny < 15f ? (float) cny : 0f;
     }
 
-    // ------------------------------------------------------------------
-    // 对外：标的搜索（名称 / 拼音 / 代码 -> 代码 + 中文名）
-    // ------------------------------------------------------------------
-
+    // ===== 对外：标的搜索（名称 / 拼音 / 代码 -> 代码 + 中文名） =====
     /** 搜索命中的标的：code 可直接喂给 load()，name 用于主图标题 */
     public static final class Symbol {
         public final String code;
@@ -1732,10 +1705,7 @@ public final class QuoteSource {
         return headers;
     }
 
-    // ------------------------------------------------------------------
-    // HTTP：主/镜像地址依次尝试
-    // ------------------------------------------------------------------
-
+    // ===== HTTP：主/镜像地址依次尝试 =====
     private static void fetchAny(Queue<String> urls, HashMap<String, String> headers,
                                  Parser parser, StepCallback cb) {
         if (urls.isEmpty()) {
@@ -1805,10 +1775,7 @@ public final class QuoteSource {
                 });
     }
 
-    // ------------------------------------------------------------------
-    // 解析器：各接口 -> 统一结构
-    // ------------------------------------------------------------------
-
+    // ===== 解析器：各接口 -> 统一结构 =====
     private static List<Quote> parseKline(String name, String code, String interval, String body)
             throws Exception {
         if (TENCENT.equals(name)) return parseTencent(body, code, interval);
@@ -2119,8 +2086,8 @@ public final class QuoteSource {
      * 聚合器的最长空窗期，超过就丢弃重建。
      *
      * 它是静态的（跨多次取数累积同一交易日的分钟K线），但行情页关掉之后它还在：
-     * 隔天再进来，上次那批K线会和这次的数据按时间混排在同一张图上，看着像"多出一堆昨天的K线"。
-     * 这里给一个远大于 15 秒自动刷新间隔的窗口，正常累积不受影响。
+     * 隔天再进来，上次累积的K线会和这次的数据按时间混排在同一张图上，
+     * 多出一段不属于当日的K线。这里给一个远大于 15 秒自动刷新间隔的窗口，正常累积不受影响。
      */
     private static final long AGGREGATOR_IDLE_MS = 20 * 60 * 1000L;
 
@@ -2219,10 +2186,7 @@ public final class QuoteSource {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 标的与时间归一化
-    // ------------------------------------------------------------------
-
+    // ===== 标的与时间归一化 =====
     /** 周期写法归一化（day/d/week/hour...） */
     public static String normalizeInterval(String interval) {
         String text = (interval == null ? "" : interval).trim();

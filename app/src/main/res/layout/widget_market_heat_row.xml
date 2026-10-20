@@ -10,7 +10,7 @@
      但文字画到格子外面去是画得出去的（ViewGroup 只是默认裁，宿主改了就不裁）。
      写上它，「字绝不跑到旁边的色块上」就是结构性的保证，不依赖字号算得准不准。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_heat_row"
+    android:id="@+id/widget_market_heat_row"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:clipChildren="true"

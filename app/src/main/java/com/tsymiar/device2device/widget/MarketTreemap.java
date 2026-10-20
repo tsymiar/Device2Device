@@ -10,25 +10,16 @@ import java.util.List;
 /**
  * treemap 排版器：把一串市值行按「面积 = 市值」摆成一片互相贴合、尽量方的马赛克。
  *
- * 摆法是 squarified（Bruls / Huizing / van Wijk 那套）：按市值降序，一行一行地填 ——
- * 每一行都铺满当前矩形的一条边，行里每只票沿这条边占「自己市值 ÷ 这一行市值」那么多，
- * 剩下的矩形接着分行，直到分完。格子的面积天生等于市值占比，各格加起来的面积就是
- * 这块矩形本身，画出来既不超出边框、又正好铺满。
+ * 摆法是 squarified（Bruls / Huizing / van Wijk）：按市值降序一行行填，每行铺满当前矩形的
+ * 一条边，行里每只票沿另一条边占「自己市值 ÷ 这一行市值」，剩下的矩形接着分行。
+ * 各格面积之和因此恰好等于这块矩形 —— 既不超出边框，也正好铺满。
  *
- * 为什么不是「按市值对半分」：那样切出来的形状是碎片 —— 份额小的票被挤成一列一像素宽的
- * 细条，面积虽然对，看着就是「不紧凑」，名字也塞不进去。同一份数据实测：
- * 对半切的长宽比中位 1.8、最差 11、最瘦的格子只有 20px 宽；squarified 是中位 1.1、
- * 最差 2.8、最瘦 30px 以上。正方形是面积一定时周长最小的形状，也是最好读的形状。
+ * 不用「按市值对半分」：那样份额小的票被挤成一列一像素宽的细条，面积虽对却「不紧凑」，
+ * 名字也塞不进去。同一份数据实测：对半切长宽比中位 1.8、最差 11、最瘦 20px；
+ * squarified 中位 1.1、最差 2.8、最瘦 30px 以上。正方形是面积一定时最好读的形状。
  *
- * 顺序就只能老老实实按市值降序了（squarified 的前提：大的先排，行才方得起来）。
- * 早先为了让小票散在大票之间做过一次交错重排，那是配合对半切用的 —— 对半切把小票
- * 全挤到一角，交错能打散它；squarified 本身就会把小票摊在边上，不需要了。
- *
- * 树只有两层：根是一行行（沿较长的那条边排开），每一行是里面的票（沿另一条边排开）。
- * 层数浅不只是好看：每深一层就多一层嵌套的 LinearLayout，而 RemoteViews 的嵌套是有代价的。
- *
- * 渲染见 {@code MarketHeatWidgetProvider}：一个内部节点是一个 LinearLayout
- * （沿宽度排就横着、沿高度排就竖着），叶子是一片写着名字的 TextView 格子。
+ * 树只有两层（行 → 行里的票）：每深一层就多一层嵌套 LinearLayout，RemoteViews 的嵌套有代价。
+ * 渲染见 {@code MarketHeatWidgetProvider}。
  */
 public final class MarketTreemap {
 
@@ -37,7 +28,7 @@ public final class MarketTreemap {
 
     /** 排版树上的一个节点：叶子是一片格子，内部节点是一行（或一列）容器 */
     public static final class Node {
-        /** 叶子才有：这一格是哪只票 */
+        /** 叶子才有：该格对应哪只票 */
         public final CapRow row;
         /** 内部节点才有：这一行（列）里的孩子，按摆放顺序排列 */
         public final List<Node> children;
@@ -87,12 +78,8 @@ public final class MarketTreemap {
         return sorted;
     }
 
-    /**
-     * 把这块矩形切成一行行：每行铺满一条边，剩下的矩形接着分行。
-     *
-     * 一行的厚度 = 这一行的面积 ÷ 铺满那条边的长度，所以各行之厚相加恰好是整块矩形；
-     * 各行的 weight 按市值给，画的时候面积预算再按 weight 分下去 —— 面积仍然只由市值决定。
-     */
+    /** 把这块矩形切成一行行：每行铺满一条边，剩下的矩形接着分行。一行的厚度 = 它的面积 ÷
+        铺满那条边的长度，各行之厚相加恰好是整块矩形 */
     private static Node rows(List<CapRow> items, float weight, float wPx, float hPx) {
         boolean along = wPx >= hPx;       // 竖条（左右并排）还是横条（上下堆叠）
         double total = sum(items, items.size());
@@ -158,9 +145,9 @@ public final class MarketTreemap {
     }
 
     /**
-     * 这一行放几只：从 {@code from} 开始取几个前缀，哪个前缀里「最瘦的那个格子」长宽比最小就要哪个。
+     * 这一行放几只：从 {@code from} 开始取前缀，哪个前缀里「最瘦的那个格子」长宽比最小就要哪个。
      *
-     * @param total 整块矩形的市值和（条带厚度 = 两侧长度 × 这一行的市值占比）
+     * @param total 整块矩形的市值和
      * @param side  这一行铺满的那条边有多长（行里每只票沿它排开）
      * @param cross 行厚度的方向有多长（这一行占多厚，从这条边里扣）
      */
@@ -177,7 +164,7 @@ public final class MarketTreemap {
             float worst = 0f;
             for (int i = from; i < from + n; i++) {
                 float ext = side * (float) (Math.max(0d, items.get(i).totalCap) / run);
-                if (ext < 1f) {                          // 这一只已经瘦成一条线
+                if (ext < 1f) {                          // 该标的已经瘦成一条线
                     worst = Float.MAX_VALUE;
                     break;
                 }

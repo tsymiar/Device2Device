@@ -41,7 +41,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 行情(K线)页面 —— 原「余音回响」入口改为此页面。
+ * 行情(K线)页面。
  *
  * 功能对应 MyAutomatic/toolset/matkline.py：
  *  - --source：数据源下拉（按代码形态分类：A股 / 东方财富 / 沪金 / 伦敦金 / 纽约金 /
@@ -68,7 +68,7 @@ public class MarketActivity extends AppCompatActivity {
     private static final String K_AUTO = "auto_refresh";
     /**
      * 代码 → 名称的小本本（多行 CATALOG 形式）。
-     * 名称只在少数路径拿得到（搜索结果、热力图点击），以前缺了就得靠网络反查，
+     * 名称只在少数路径拿得到（搜索结果、热力图点击），其余靠网络反查，
      * 反查挂掉标题上就只剩一行代码。查到过的记住，下次进页面先把名字显示出来。
      */
     private static final String K_NAMES = "names";
@@ -166,7 +166,7 @@ public class MarketActivity extends AppCompatActivity {
 
         // 屏幕常亮：自动刷新时不希望熄屏中断行情查看
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        // 数据源下拉选中上次那一档（false 表示不要触发 onItemSelected 里的重复加载）
+        // 数据源下拉选中上次选中的那一档（false 表示不要触发 onItemSelected 里的重复加载）
         int sourceIndex = Arrays.asList(QuoteSource.SOURCES).indexOf(mSource);
         mSourceSpinner.setSelection(Math.max(0, sourceIndex), false);
 
@@ -246,10 +246,7 @@ public class MarketActivity extends AppCompatActivity {
         mHandler.removeCallbacks(mRefreshRunnable);
     }
 
-    // ------------------------------------------------------------------
-    // 记忆上次选择
-    // ------------------------------------------------------------------
-
+    // ===== 记忆上次选择 =====
     private void restorePrefs() {
         SharedPreferences prefs = getSharedPreferences(PREF, MODE_PRIVATE);
         mSource = prefs.getString(K_SOURCE, QuoteSource.AUTO);
@@ -296,11 +293,8 @@ public class MarketActivity extends AppCompatActivity {
         C_EDIT_HINT = mPalette.textHint;
     }
 
-    // ------------------------------------------------------------------
-    // 界面构建
-    // ------------------------------------------------------------------
-
-    /** 1 分钟这种超短周期改画折线（分时）：同屏几百根蜡烛会糊成一片，折线更好读趋势 */
+    // ===== 界面构建 =====
+    /** 1 分钟这种超短周期改画折线（分时）：同屏几百根蜡烛过密，折线更易读趋势 */
     private boolean isMinuteInterval() {
         return "1m".equals(mInterval);
     }
@@ -514,10 +508,7 @@ public class MarketActivity extends AppCompatActivity {
         if (reload) load();
     }
 
-    // ------------------------------------------------------------------
-    // 取数
-    // ------------------------------------------------------------------
-
+    // ===== 取数 =====
     /** 周期显示文本：1d 之类原始值看不出是什么线，日K/周K 更直观，两者都给出来便于核对 */
     private String intervalText() {
         String label = QuoteSource.intervalLabel(mInterval);
@@ -536,12 +527,12 @@ public class MarketActivity extends AppCompatActivity {
         return !isFinishing() && !isDestroyed();
     }
 
-    /** 回调所属轮次是否还是最新的那一轮 */
+    /** 回调所属轮次是否仍是最新一轮 */
     private boolean isCurrent(int seq) {
         return seq == mLoadSeq;
     }
 
-    /** 状态行走这一个出口，顺带记下基准文案（市值到货时按它重拼） */
+    /** 状态行只走这一个出口，顺带记下基准文案（市值到货时按它重拼） */
     private void setStatus(String text) {
         mStatusBase = text == null ? "" : text;
         if (mStatus != null) mStatus.setText(mStatusBase);
@@ -684,7 +675,7 @@ public class MarketActivity extends AppCompatActivity {
     /**
      * 取到数据之后的共同流程：代码回填 → 画到图上 → 反查名称 → 顺带刷新桌面那几个部件。
      *
-     * 分时与K线唯一的差别是昨收：分时数据只有当天这一段，昨收在它之外，得另外给
+     * 分时与K线唯一的差别是昨收：分时数据只含当天这一段，昨收在其之外，需另行给出
      * （见 {@code KLineView.setPrevClose}）；K线自己带着上一天，传 0 让它照旧回溯。
      */
     private void applyQuotes(String source, String wanted, String code, List<Quote> bars,
@@ -732,7 +723,7 @@ public class MarketActivity extends AppCompatActivity {
     /**
      * 主图名称，按「已经知道 → 内置商品名 → 名字本本 → 网络反查」逐级兜底（异步，失败不影响K线）。
      *
-     * 以前是上来就发一次反查，反查挂了标题上就只剩一行代码 —— 从热力图、列表点进来时
+     * 直接发一次反查时，反查挂了标题上就只剩一行代码 —— 从热力图、列表点进来时
      * 那些地方本来就有名称，白白可惜；也不能因为代码形态特殊（带后缀、非 A 股）
      * 就把已经知道的名字清掉，那是"有时只显示代码"的来源。
      */

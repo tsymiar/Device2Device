@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 行情曲线小部件（MarketChartWidgetProvider）的布局：只盯一个标的，
-     主体是最近 N 根K线连成的走势图。列表版那一个用的是 widget_market_list.xml。
+     主体是最近 N 根K线连成的走势图。列表版 widget_market_list.xml 用的就是这个结构。
 
-     注意 RemoteViews 只认它自己那份 View 白名单：能用 LinearLayout / FrameLayout /
+     注意 RemoteViews 只认自己的 View 白名单：能用 LinearLayout / FrameLayout /
      TextView / ImageView，但 Space、自定义 View 都会让整个部件 inflate 失败，
      加了却什么都看不到。缺「弹性空格」时用 0dp + weight 1 的 TextView 顶。
 
@@ -18,7 +18,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_market_bg"
+    android:background="@drawable/bg_widget_market"
     android:orientation="vertical"
     android:padding="9dp">
 
@@ -57,17 +57,29 @@
                 android:textSize="9sp" />
         </LinearLayout>
 
-        <TextView
+        <!-- 只放图标：见 widget_market_heat.xml 里的同款说明 -->
+        <ImageView
             android:id="@+id/widget_refresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:paddingStart="6dp"
             android:paddingEnd="2dp"
             android:paddingTop="2dp"
             android:paddingBottom="2dp"
-            android:text="@string/market_widget_refresh"
-            android:textColor="@color/market_widget_text_dim"
-            android:textSize="10sp" />
+            android:contentDescription="@string/market_widget_refresh"
+            android:src="@drawable/ic_refresh"
+            android:tint="@color/market_widget_text_dim" />
+
+        <!-- 取数时在图标原位换成转圈，与 ChatBox「思考中…」那个 ProgressBar 同一套路：
+             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响 -->
+        <ProgressBar
+            android:id="@+id/widget_refresh_spin"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:indeterminateTint="@color/market_widget_text_dim"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 曲线主体：吃掉上部标题与下部价格行之间的全部剩余空间。
@@ -143,7 +155,7 @@
         android:visibility="gone" />
 
     <!-- 底部一行：左边是周期 + 区间高低，右边是更新时间。
-         两个挤在同一行是为了不各占一行：各占一行等于从曲线高度里抠掉十几 dp。别用 Space 撑开：RemoteViews 只认它自己那份
+         两个挤在同一行是为了不各占一行：各占一行等于从曲线高度里抠掉十几 dp。别用 Space 撑开：RemoteViews 只认自己的
          View 白名单，<Space> 不在里面，部件会直接 inflate 失败 -->
     <LinearLayout
         android:layout_width="match_parent"

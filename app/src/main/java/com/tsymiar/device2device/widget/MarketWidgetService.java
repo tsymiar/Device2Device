@@ -15,8 +15,8 @@ import java.util.List;
  * 小部件里放 ScrollView 会直接 inflate 失败，所以标的行交给 ListView + RemoteViewsService。
  *
  * 数据由 Provider 取好后放在进程内缓存（见 {@link MarketWidgetProvider#rowsFor}），
- * 这里只负责「按位置给一行」；缓存过期时顺手补一次取数，
- * 免得进程被回收后重新绑定时列表一直空着。
+ * 此处仅负责「按位置提供一行」；缓存过期时同时补一次取数，
+ * 以免进程被回收后重新绑定时列表为空。
  */
 public class MarketWidgetService extends RemoteViewsService {
 
@@ -73,7 +73,7 @@ public class MarketWidgetService extends RemoteViewsService {
         @Override
         public RemoteViews getViewAt(int position) {
             MarketWidgetProvider.Row row = position < mRows.size() ? mRows.get(position) : null;
-            // 只放一个标的时那一行把价格撑大
+            // 只放一个标的时该行把价格撑大
             return MarketWidgetProvider.rowViews(mContext, row, mRows.size() == 1);
         }
 

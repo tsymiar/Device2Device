@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 行情热力图小部件的 AppWidget 配置：默认 4x4 格（按 Android 的格子换算 70*N-30），
-     拉伸后热力图会按新尺寸重画（onAppWidgetOptionsChanged）。
+<!-- 行情热力图小部件的 AppWidget 配置：固定 5 格宽 × 2 格高，不可拉伸。
+
+     尺寸按 Android 的格子换算 70*N-30：5 格 = 320dp，2 格 = 110dp。
+     targetCellWidth/Height 给启动器当默认占位（API 31+），minWidth/minHeight 是
+     API 31 以下的启动器读的是 minWidth/minHeight，两边必须一致，
+     否则不同桌面上落下来的大小不一样。
+
+     resizeMode="none" 之后 min/maxResize* 都不再起作用，一并移除，以免残留造成误导。
      另两个行情部件是 widget_market_list.xml / widget_market_chart.xml。
      注意：这里是 res/xml，与同名的布局 res/layout/widget_market_heat.xml 是两种资源类型。
      整屏只有一个榜单可看，没有配置页，所以不写 android:configure。 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/market_heat_widget_desc"
     android:initialLayout="@layout/widget_market_heat"
-    android:maxResizeHeight="420dp"
-    android:maxResizeWidth="420dp"
-    android:minHeight="250dp"
-    android:minResizeHeight="110dp"
-    android:minResizeWidth="110dp"
-    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minWidth="320dp"
     android:previewLayout="@layout/widget_market_heat"
-    android:resizeMode="horizontal|vertical"
-    android:targetCellHeight="4"
-    android:targetCellWidth="4"
+    android:resizeMode="none"
+    android:targetCellHeight="2"
+    android:targetCellWidth="5"
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen" />

@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 曲线是把最近 N 根收盘价画成位图（{@link MarketSparkline}）后贴上去的，
  * RemoteViews 不支持自定义 View，桌面那边只认它自己能 inflate 的东西，没有别的路可走。
  *
- * 标的那份配置（{@link MarketWidgetProvider#readItems}）与列表版共用：
+ * 标的配置（{@link MarketWidgetProvider#readItems}）与列表版共用：
  * AppWidget id 全局唯一，按 id 存的 key 天然不会串；只是这里只用列表里的第一个。
  */
 public class MarketChartWidgetProvider extends AppWidgetProvider {
@@ -66,7 +66,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     /**
      * 曲线位图之外被占掉的高度 / 宽度（dp）：根布局 padding + 标题行 + 价格行 + 底部一行。
      *
-     * 更新时间不再自己占一行（和周期/高低并排、靠右），这里也就比原来少算十来 dp，
+     * 更新时间与周期/高低并排靠右、不再自己占一行，所以这里少算十来 dp，
      * 曲线相应拿到更多高度。估小一点没关系：ImageView 是 weight=1 的，多出来的空间
      * 由 fitXY 铺满，不会把曲线裁掉。
      */
@@ -83,11 +83,8 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     private static final Set<Integer> sPending =
             Collections.newSetFromMap(new ConcurrentHashMap<Integer, Boolean>());
 
-    // ------------------------------------------------------------------
-    // 配置读写
-    // ------------------------------------------------------------------
-
-    /** 曲线周期；没配过用日线。数据源不支持的周期退回默认，免得每次刷新都报错 */
+    // ===== 配置读写 =====
+    /** 曲线周期；未配置时使用日线。数据源不支持的周期回退为默认值，以免每次刷新均报错 */
     public static String readInterval(Context context, int appWidgetId, String source) {
         SharedPreferences w = context.getSharedPreferences(PREF_WIDGET, Context.MODE_PRIVATE);
         String saved = w.getString(K_CINTERVAL + appWidgetId, DEFAULT_INTERVAL);
@@ -101,7 +98,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
                 .putString(K_CINTERVAL + appWidgetId,
                         TextUtils.isEmpty(interval) ? DEFAULT_INTERVAL : interval)
                 .apply();
-        // 周期换了，之前那批点数不能再拿来画
+        // 周期已变更，缓存的点数不可再用于绘制
         sPending.remove(appWidgetId);
         sRow.remove(appWidgetId);
     }
@@ -110,14 +107,11 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return MarketWidgetProvider.readItems(context, appWidgetId).get(0);
     }
 
-    // ------------------------------------------------------------------
-    // 生命周期
-    // ------------------------------------------------------------------
-
+    // ===== 生命周期 =====
     @Override
     public void onDeleted(Context context, int[] appWidgetIds) {
         super.onDeleted(context, appWidgetIds);
-        // 标的列表那份配置也要跟着清：它存在 MarketWidgetProvider 那份 prefs 里
+        // 标的列表配置也要跟着清：它与 MarketWidgetProvider 共用同一份 prefs
         MarketWidgetProvider.clearPrefs(context, appWidgetIds);
         if (appWidgetIds == null) return;
         SharedPreferences.Editor editor =
@@ -151,6 +145,9 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         } else {
             ids = manager.getAppWidgetIds(new ComponentName(context, MarketChartWidgetProvider.class));
         }
+        for (int widgetId : ids) {
+            WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_chart);
+        }
         onUpdate(context, manager, ids);
     }
 
@@ -169,10 +166,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 刷新
-    // ------------------------------------------------------------------
-
+    // ===== 刷新 =====
     /** 配置页 / 行情页直接刷新某个部件：不走广播，部分 ROM 会拦静态广播导致部件一直空着 */
     public static void refreshNow(Context context, int appWidgetId) {
         if (context == null || appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return;
@@ -187,7 +181,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 刷新单个部件：先 rendering 骨架（用缓存里的那一行）→ 取数 → 带着曲线位图再刷一次。
+     * 刷新单个部件：先 rendering 骨架（用缓存的行数据）→ 取数 → 带着曲线位图再刷一次。
      * 任何一步出错都要把原因写在部件上，不能让桌面那边崩掉（崩了的表现就是"加不上小部件"）。
      */
     private static void refreshOne(Context context, AppWidgetManager manager, int widgetId,
@@ -242,7 +236,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    /** 把缓存里那一行画到部件上；batch 非空时结尾收一次广播（不等它的话 goAsync 会挂到超时） */
+    /** 把缓存的行数据画到部件上；batch 非空时结尾收一次广播（不等它时 goAsync 会挂到超时） */
     private static void publish(Context context, AppWidgetManager manager, int widgetId,
                                 Batch batch) {
         Row row = sRow.get(widgetId);
@@ -257,10 +251,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         if (batch != null) batch.tick();
     }
 
-    // ------------------------------------------------------------------
-    // 取数
-    // ------------------------------------------------------------------
-
+    // ===== 取数 =====
     private interface FetchCallback {
         /**
          * @param prevClose 分时的昨收（作基准用）；不是分时周期时给 0
@@ -341,7 +332,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         final float high;
         final float low;
         final float last;
-        /** 黄金那一行的补充标注（人民币价 / 单位），非黄金为 null */
+        /** 黄金那一行（人民币价 / 单位）的补充标注，非黄金为 null */
         final String note;
 
         Row(MarketWidgetProvider.Item item, boolean ok, String price, String change, int color,
@@ -382,7 +373,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
 
     /**
      * 黄金的人民币标注：沪金报价本来就是元/克，只补个单位；伦敦金 / 纽约金是美元/盎司，
-     * 乘汇率再除以盎司克重换成元/克。汇率取不到就返回 null（界面上不显示这一行）。
+     * 乘汇率再除以盎司克重换成元/克。汇率取不到就返回 null（界面上不显示该行）。
      */
     private static String goldNote(MarketWidgetProvider.Item item, float last, float rate) {
         if (item == null || !QuoteSource.isGold(item.source, item.symbol)) return null;
@@ -457,10 +448,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return 0f;
     }
 
-    // ------------------------------------------------------------------
-    // 渲染 RemoteViews
-    // ------------------------------------------------------------------
-
+    // ===== 渲染 RemoteViews =====
     /**
      * 整块 RemoteViews：标题 / 代码 → 占满剩余空间的曲线位图 → 最新价 + 涨跌幅
      * → 底部一行（周期 / 区间高低靠左，更新时间靠右）。
@@ -476,7 +464,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_change,
                 row.error != null && !row.ok ? row.error : row.change);
         views.setTextViewText(R.id.widget_range, rangeText(row));
-        // 黄金才多这一行（人民币价 / 单位），非黄金收起来，别白占一格高度
+        // 黄金才多这一行标注（人民币价 / 单位），非黄金收起来，别白占一格高度
         boolean note = !TextUtils.isEmpty(row.note);
         views.setViewVisibility(R.id.widget_note, note ? View.VISIBLE : View.GONE);
         if (note) views.setTextViewText(R.id.widget_note, row.note);
@@ -484,7 +472,6 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         // 布局里的默认色随深浅模式，这里按当前模式显式覆盖一次，避免桌面缓存了旧配色
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
         views.setTextColor(R.id.widget_symbol, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_refresh, color(context, R.color.market_widget_text_dim));
         views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
         views.setTextColor(R.id.widget_range, color(context, R.color.market_widget_text_hint));
         views.setTextColor(R.id.widget_chart_empty, color(context, R.color.market_widget_text_hint));
@@ -515,7 +502,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         // fitXY 拉伸到发虚。尺寸变了由 onAppWidgetOptionsChanged 再刷一次。
         // 2x2 高度有限，固定的 CHART_CHROME_DP 会把曲线挤没，这里按高度比例给曲线留地儿
         int chrome = size[1] <= 170 ? Math.round(size[1] * 0.52f) : CHART_CHROME_DP;
-        if (note) chrome += NOTE_DP;    // 黄金多出一行标注，别把曲线压掉
+        if (note) chrome += NOTE_DP;    // 黄金多一行标注，避免曲线被压缩
         int chartW = Math.max(1, size[0] - CHART_SIDE_DP);
         int chartH = Math.max(1, size[1] - chrome);
         android.graphics.Bitmap bitmap = MarketSparkline.render(context, row.series, row.base,
@@ -537,7 +524,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return views;
     }
 
-    /** 底部一行左侧：周期 + 区间高低（曲线没画出来时不显示高低，免得误导） */
+    /** 底部一行左侧：周期 + 区间高低（曲线未绘制时不显示高低，以免误导） */
     private static String rangeText(Row row) {
         StringBuilder sb = new StringBuilder(QuoteSource.intervalLabel(row.interval));
         if (row.ok && row.high > 0f && row.low > 0f) {

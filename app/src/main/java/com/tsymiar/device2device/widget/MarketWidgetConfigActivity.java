@@ -51,7 +51,7 @@ import java.util.List;
  * 单个标的看走势的那种部件是另一个组件，有自己的配置页（MarketChartConfigActivity）。
  *
  * 排版：上半屏是「数据源 + 标的输入框 + 添加」，固定不动；下半屏是已选标的列表，
- * 自己占剩下的高度并滚动 —— 标的一多也不会把输入框顶出可视区（原来整页一个 ScrollView 会）。
+ * 自己占剩下的高度并滚动 —— 标的一多也不会把输入框顶出可视区（整页一个 ScrollView 就会）。
  *
  * 注意两点兼容性：
  * - 桌面不一定把 EXTRA_APPWIDGET_ID 带过来（个别第三方桌面只在 Intent 里放 IDS），
@@ -144,10 +144,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         return new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, mAppWidgetId);
     }
 
-    // ------------------------------------------------------------------
-    // 界面：内容可滚动，「添加到桌面」固定在底部
-    // ------------------------------------------------------------------
-
+    // ===== 界面：内容可滚动，「添加到桌面」固定在底部 =====
     private View buildUi() {
         // 整页包一层 ScrollView 兜底：列表高度写死（见 listHeight()）后，屏矮 / 字号大时
         // 可能放不下，这时靠滚动补齐，而不是把某一块压扁、让内容溢出盖住下面的控件
@@ -163,7 +160,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         scroll.addView(root);
 
         // 上：标题 / 说明 / 数据源 / 输入框+添加 —— 这一块不参与滚动。
-        // 原来整页是一个 ScrollView，标的一多列表把页面撑长，输入框和「添加」就被挤出可视区了。
+        // 整页若是一个 ScrollView，标的一多列表把页面撑长，输入框和「添加」就被挤出可视区了。
         // 同样不铺底色，也不加 elevation：阴影会正好落在它和列表之间那条间隙上，
         // 看着就像列表顶部压住了输入框（布局上并没有重叠，是阴影的锅）
         LinearLayout header = new LinearLayout(this);
@@ -183,7 +180,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // 状态提示放回输入区和卡片之间（原来这行在卡片里）：回执出现时顺手把这块空白用上，
+        // 状态提示放在输入区和卡片之间：回执出现时顺手把这块空白用上，
         // 没回执时整行收掉（见 setStatus()），间距回到下面的紧凑值
         root.addView(buildStatus());
 
@@ -206,7 +203,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
     private View buildSourceRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        // 同 buildSymbolRow：不用 CENTER_VERTICAL，防止以后加垂直 margin 再踩同一个坑
+        // 同 buildSymbolRow：不用 CENTER_VERTICAL，避免以后加垂直 margin 时再次错位
         // 也不裁子控件：行高一旦小于内容（系统字号放大时）就把下沿切掉一小条
         row.setClipChildren(false);
         row.setClipToPadding(false);
@@ -245,7 +242,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
-        // 整页按紧凑排版：输入类控件和底部按钮统一 40dp（原来 50/52 偏高，屏小的时候挤）。
+        // 整页按紧凑排版：输入类控件和底部按钮统一 40dp（50/52 偏高，屏小的时候挤）。
         // 40dp 是「下限」而不是死值：系统字号放大后，收起态那行文字（见
         // item_market_spinner_selected）会顶满内容区、下沿被切掉一小条，所以高度按内容量，
         // item 里同时去掉字体自带留白，保证 40dp 装得下；行也不裁子控件，双保险。
@@ -293,7 +290,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         mSymbolEdit.setTextSize(14);
         mSymbolEdit.setPadding(dp(10), dp(8), dp(10), dp(8));
         // 显式垂直居中 + 去掉字体自带的额外留白：不然 14sp 在系统字体放大时会顶满
-        // 内容区，汉字下沿和光标底部就先被切掉（看着像控件下半截没了）
+        // 内容区，汉字下沿和光标底部会先被切掉
         mSymbolEdit.setGravity(Gravity.CENTER_VERTICAL);
         mSymbolEdit.setIncludeFontPadding(false);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
@@ -578,10 +575,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         return row;
     }
 
-    // ------------------------------------------------------------------
-    // 添加 / 保存
-    // ------------------------------------------------------------------
-
+    // ===== 添加 / 保存 =====
     private void addSymbol() {
         if (mSearching) return;
         final String input = mSymbolEdit.getText().toString().trim();
@@ -669,10 +663,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 小工具（背景一律代码生成，不新增 drawable XML）
-    // ------------------------------------------------------------------
-
+    // ===== 小工具（背景一律代码生成，不新增 drawable XML） =====
     private Drawable rounded(int fill, int stroke) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fill);
