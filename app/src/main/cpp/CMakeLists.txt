@@ -21,6 +21,8 @@ include_directories(
 if(${BUILD_SCADUP_LIB} EQUAL 1)
     add_subdirectory(scadup)
 endif()
+# kcp（github.com/skywind3000/kcp）作为上游仓库整份放在 socket/kcp/，由 socket/CMakeLists.txt
+# 静态链进来，不走 add_subdirectory、也不产 .so
 set(BUILD_SUB 1)
 set(build_list time bitmap convert socket callback display test)
 foreach(item IN LISTS build_list)
@@ -51,6 +53,9 @@ add_library( # Sets the name of the library.
         # Provides a relative path to your source file(s).
         message/Message.cpp
         utils/FileUtils.cpp
+        # 视频渲染直接编进 jniComm：做成静态库的话，里面的 JNI 符号没人引用，
+        # 链接时整个 object 会被丢掉，运行时就是 UnsatisfiedLinkError
+        codec/NativeCodec.cpp
         JniMethods.cpp)
 
 set(LIBS_DIR ${CMAKE_SOURCE_DIR}/../../../libs)
@@ -85,6 +90,8 @@ find_library(android android)
 find_library(SLES OpenSLES)
 find_library(EGL EGL)
 find_library(GLESv2 GLESv2)
+# AMediaCodec / AMediaExtractor（codec/NativeCodec.cpp）
+find_library(mediandk mediandk)
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
@@ -97,4 +104,4 @@ target_link_libraries( # Specifies the target library.
         Network converter callback timestamp texture
         # Links the target library to the log library
         # included in the NDK.
-        ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2})
+        ${log-lib} ${android} ${SLES} ${EGL} ${GLESv2} ${mediandk})

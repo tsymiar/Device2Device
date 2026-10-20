@@ -191,10 +191,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
     private volatile boolean mCapture;
     private CaptureCallback mCaptureCb;
 
-    // ------------------------------------------------------------------
-    // 外部接口
-    // ------------------------------------------------------------------
-
+    // ===== 外部接口 =====
     public void setMesh(HumanMesh.Result r) {
         if (r == null) return;
         mVertexBuf = toFloat(r.positions);
@@ -232,10 +229,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
         mCapture = true;
     }
 
-    // ------------------------------------------------------------------
-    // Renderer
-    // ------------------------------------------------------------------
-
+    // ===== Renderer =====
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         GLES20.glClearColor(0.055f, 0.067f, 0.086f, 1f);
@@ -344,7 +338,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
         finishCapture();
     }
 
-    /** 脚下的接触阴影，让模型"踩"在地面上 */
+    /** 脚下的接触阴影，使模型与地面有贴合感 */
     private void drawShadow() {
         if (mShadowBuf == null || mShadowCount == 0) return;
         GLES20.glUseProgram(mShadowProgram);
@@ -396,10 +390,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(mLabelOffsetHandle);
     }
 
-    // ------------------------------------------------------------------
-    // 场景辅助几何
-    // ------------------------------------------------------------------
-
+    // ===== 场景辅助几何 =====
     private void buildGrid() {
         int steps = Math.round(GRID_HALF / GRID_STEP);
         float[] v = new float[(steps * 2 + 1) * 4 * 3];
@@ -559,10 +550,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 截图
-    // ------------------------------------------------------------------
-
+    // ===== 截图 =====
     private void finishCapture() {
         if (!mCapture) return;
         mCapture = false;
@@ -596,10 +584,7 @@ public class AvatarRenderer implements GLSurfaceView.Renderer {
         cb.onCaptured(bmp);
     }
 
-    // ------------------------------------------------------------------
-    // GL 小工具
-    // ------------------------------------------------------------------
-
+    // ===== GL 小工具 =====
     private static int program(String vs, String fs) {
         int v = shader(GLES20.GL_VERTEX_SHADER, vs);
         int f = shader(GLES20.GL_FRAGMENT_SHADER, fs);

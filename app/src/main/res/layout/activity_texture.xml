@@ -11,15 +11,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- 渲染控制：居中压在纹理之上。
+         底板用半透明黑，渲染出亮图时控件仍可辨认 -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:id="@+id/control_panel"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="8dp">
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_texture_panel"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
 
-        <!-- 渲染类型选择 -->
+        <!-- 渲染类型选择（菜单项与实际渲染通道一一对应） -->
         <Spinner
             android:id="@+id/spinner"
             style="@style/Text"
@@ -58,7 +63,7 @@
                 android:textColor="@android:color/white" />
         </LinearLayout>
 
-        <!-- 渲染模式 -->
+        <!-- 渲染模式：只决定 spinner 里给出哪些项，以及 GPU 失败时是否回退 CPU -->
         <RadioGroup
             android:id="@+id/mode_group"
             android:layout_width="wrap_content"
@@ -73,6 +78,7 @@
                 android:layout_height="wrap_content"
                 android:checked="true"
                 android:text="@string/mode_auto"
+                android:textColor="@android:color/white"
                 android:textSize="12sp" />
 
             <RadioButton
@@ -80,6 +86,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/mode_gpu"
+                android:textColor="@android:color/white"
                 android:textSize="12sp" />
 
             <RadioButton
@@ -87,6 +94,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/mode_cpu"
+                android:textColor="@android:color/white"
                 android:textSize="12sp" />
         </RadioGroup>
 
@@ -102,36 +110,48 @@
             android:marqueeRepeatLimit="marquee_forever"
             android:scrollHorizontally="true"
             android:singleLine="true"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="#EEEEEE"
             android:textSize="12sp" />
 
     </LinearLayout>
 
-    <!-- 日志区，底部层叠 -->
-    <TextView
-        android:id="@+id/log0"
-        style="@style/Text"
-        android:layout_width="wrap_content"
+    <!-- 日志区：贴底竖排，由远及近（最上面最旧、最下面最新），
+         每条单行截断，长日志也不会把上面/下面的条目顶出框外 -->
+    <LinearLayout
+        android:id="@+id/log_panel"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="15dp" />
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_texture_panel"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/log1"
-        style="@style/Text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="43dp"
-        android:alpha=".8" />
+        <TextView
+            android:id="@+id/log2"
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha=".6"
+            android:ellipsize="end"
+            android:maxLines="1" />
 
-    <TextView
-        android:id="@+id/log2"
-        style="@style/Text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="71dp"
-        android:alpha=".6" />
+        <TextView
+            android:id="@+id/log1"
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha=".8"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/log0"
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+    </LinearLayout>
 
 </FrameLayout>

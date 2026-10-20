@@ -7,8 +7,11 @@ import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
+import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -60,6 +63,8 @@ public class TextureActivity extends AppCompatActivity
     private static final int CPU_TEXTURE_FILE = 3;
     private static final int CPU_SURFACE_FILE = 4;
     private static final int DISCONNECT_WINDOW = 5;
+    /** 视频走 MediaCodec 硬解直出，不经过上面那几条 YUV/RGBA 通道 */
+    private static final int VIDEO_MEDIACODEC = 6;
 
     /** 用户选择的文件路径 */
     private String mPickedPath = null;
@@ -69,11 +74,13 @@ public class TextureActivity extends AppCompatActivity
     private String mBmpSrc = null;
     /** Surface 还没建好时先记下"待渲染"，onSurfaceTextureAvailable 里补一次 */
     private boolean mPendingRender = false;
+    /** 视频播放期间持有的 Surface：解码器要用，播完/换文件才放 */
+    private Surface mVideoSurface = null;
     private TextView mPathView = null;
     private RadioGroup mModeGroup = null;
     private int mRenderMode = MODE_AUTO;
     /** Spinner position → item-constant 映射，根据当前模式变化 */
-    private int[] mItemMapping = {0, 1, 2, 3, 4, 5};
+    private int[] mItemMapping = {0, 1, 2, 3, 4, 6, 5};
     private ArrayAdapter<CharSequence> mAdapterAuto, mAdapterGpu, mAdapterCpu;
 
     private int mDisplayHeight = 0;
@@ -97,12 +104,12 @@ public class TextureActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_texture);
         ensureDataDir();
-        // 先量一次屏幕：进页面就选文件的话，等 onResume 再设渲染尺寸已经晚了
+        // 先量一次屏幕：进页面就选文件时，等 onResume 再设渲染尺寸已经晚了
         measureDisplay();
         initViews();
         flushPendingLog();
-        log("Auto 模式：点 Pick 选一张图片或一段视频即可渲染；"
-                + "也可以先在 spinner 里指定渲染方式");
+        log("点 Pick 选一张图片或一段视频；先在 spinner 里指定渲染方式，"
+                + "停在 None 则按文件类型自动挑通道");
     }
 
     /** 取屏幕像素尺寸（getMetrics 已废弃但各版本通用，这里只是给渲染一个上限） */
@@ -145,15 +152,15 @@ public class TextureActivity extends AppCompatActivity
             mModeGroup.setOnCheckedChangeListener((group, checkedId) -> {
                 if (checkedId == R.id.mode_auto) {
                     mRenderMode = MODE_AUTO;
-                    mItemMapping = new int[]{0, 1, 2, 3, 4, 5};
+                    mItemMapping = new int[]{0, 1, 2, 3, 4, 6, 5};
                     setSpinnerAdapter(mAdapterAuto);
                 } else if (checkedId == R.id.mode_gpu) {
                     mRenderMode = MODE_GPU;
-                    mItemMapping = new int[]{0, 1, 2, 5};
+                    mItemMapping = new int[]{0, 1, 2, 6, 5};
                     setSpinnerAdapter(mAdapterGpu);
                 } else if (checkedId == R.id.mode_cpu) {
                     mRenderMode = MODE_CPU;
-                    mItemMapping = new int[]{0, 3, 4, 5};
+                    mItemMapping = new int[]{0, 3, 4, 6, 5};
                     setSpinnerAdapter(mAdapterCpu);
                 }
                 renderWithMode();
@@ -184,16 +191,8 @@ public class TextureActivity extends AppCompatActivity
 
     @Override
     public void onItemSelected(@NonNull AdapterView<?> parent, @NonNull View view, int position, long id) {
-        int item = (position >= 0 && position < mItemMapping.length) ? mItemMapping[position] : 0;
-        if (mRenderMode == MODE_AUTO) {
-            if (mPickedPath != null) {
-                renderWithMode();
-            } else {
-                updateSurfaceView(item);
-            }
-        } else {
-            renderWithMode();
-        }
+        // 菜单选了什么就渲染什么：spinner 是唯一入口，模式只影响可选项与失败回退
+        renderWithMode();
     }
 
     @Override
@@ -212,13 +211,13 @@ public class TextureActivity extends AppCompatActivity
         mLog[0] = null;
         mLog[1] = null;
         mLog[2] = null;
+        // 页面没了，解码线程不能继续往已经销毁的 surface 上出帧
+        stopVideo();
     }
 
     @Override
     public void onNothingSelected(@NonNull AdapterView<?> parent) {
-        if (mRenderMode == MODE_AUTO) {
-            updateSurfaceView(0);
-        }
+        renderWithMode();
     }
 
     // ---------- SurfaceTextureListener ----------
@@ -231,7 +230,7 @@ public class TextureActivity extends AppCompatActivity
         mDisplayWidth = width;
         ViewWrapper.setRenderSize(height, width);
         log(String.format(Locale.ROOT, "Texture created (%d×%d)", width, height));
-        // 进页面后马上选文件的话，那一笔渲染请求落在了 surface 建好之前，这里补上
+        // 进页面后马上选文件时，那一笔渲染请求落在了 surface 建好之前，这里补上
         if (mPendingRender) {
             mPendingRender = false;
             renderWithMode();
@@ -249,6 +248,8 @@ public class TextureActivity extends AppCompatActivity
 
     @Override
     public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+        // surface 没了，解码器再往里出帧就是往一个死掉的 window 上写
+        stopVideo();
         ViewWrapper.unloadSurfaceView();
         log("Texture destroy");
         return true;
@@ -264,7 +265,9 @@ public class TextureActivity extends AppCompatActivity
     private void openFilePicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
+        // 图片走纹理/原始通道，视频走 MediaCodec 硬解，两类都放出来
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
         startActivityForResult(intent, REQUEST_CODE_PICK_FILE);
     }
 
@@ -276,6 +279,8 @@ public class TextureActivity extends AppCompatActivity
             if (uri != null) {
                 String path = copyUriToFile(uri);
                 if (path != null) {
+                    // 换了文件：上一个视频还在播时先收掉，不然两个解码器抢同一个 surface
+                    stopVideo();
                     mPickedPath = path;
                     // 清除旧的 BMP 缓存：换图之后不能拿上一张的转换结果顶着
                     if (mBmpPath != null) {
@@ -350,207 +355,261 @@ public class TextureActivity extends AppCompatActivity
             case "image/x-bmp": return ".bmp";
             case "image/gif":   return ".gif";
             case "image/webp":  return ".webp";
+            case "video/mp4":
+            case "video/mp4v-es": return ".mp4";
+            case "video/3gpp":
+            case "video/3gpp2":  return ".3gp";
+            case "video/x-matroska": return ".mkv";
+            case "video/webm":   return ".webm";
+            case "video/avi":
+            case "video/x-msvideo": return ".avi";
+            case "video/quicktime": return ".mov";
             default:            return null;
         }
     }
 
     // ---------- 核心渲染调度 ----------
 
+    /** 当前 spinner 选中的菜单项（已按模式映射回 item 常量）；没选 / 选了 None 时为 0 */
+    private int selectedItem() {
+        if (mSpinner == null) return 0;
+        int pos = mSpinner.getSelectedItemPosition();
+        if (pos < 0 || pos >= mItemMapping.length) return 0;
+        return mItemMapping[pos];
+    }
+
     /**
-     * 根据当前模式（CPU / GPU / Auto）调度渲染。
-     * CPU 模式：图片 → 转 BMP → updateCpuTexture；视频 → updateCpuSurface
-     * GPU 模式：图片 → updateEglTexture；视频 → updateEglSurface
-     * Auto 模式：走 spinner 选择的路径
+     * 菜单停在「None」时的自动路由。
+     * 视频走 MediaCodec；图片走纹理通道，其余（原始 yuv / rgba）走 surface 通道；
+     * Auto / GPU 模式下非视频的走 EGL，CPU 模式下走 CPU。
+     */
+    private int autoItem(boolean isImage, boolean isVideo) {
+        if (isVideo) {
+            return VIDEO_MEDIACODEC;
+        }
+        if (mRenderMode == MODE_CPU) {
+            return isImage ? CPU_TEXTURE_FILE : CPU_SURFACE_FILE;
+        }
+        return isImage ? EGL_TEXTURE_FILE : EGL_SURFACE_FILE;
+    }
+
+    /** 同一渲染家族里的另一条通道：菜单选的与文件类型对不上时改走它 */
+    private static int siblingItem(int item) {
+        switch (item) {
+            case EGL_TEXTURE_FILE:  return EGL_SURFACE_FILE;
+            case EGL_SURFACE_FILE:  return EGL_TEXTURE_FILE;
+            case CPU_TEXTURE_FILE:  return CPU_SURFACE_FILE;
+            case CPU_SURFACE_FILE:  return CPU_TEXTURE_FILE;
+            default:                return item;
+        }
+    }
+
+    private static boolean isTextureItem(int item) {
+        return item == EGL_TEXTURE_FILE || item == CPU_TEXTURE_FILE;
+    }
+
+    /** 菜单项 → 名字，日志里用（与 strings.xml 的 types 数组一一对应） */
+    private static String itemName(int item) {
+        switch (item) {
+            case EGL_TEXTURE_FILE:  return "GPU-OpenGL";
+            case EGL_SURFACE_FILE:  return "GPU-Surface";
+            case CPU_TEXTURE_FILE:  return "CPU-image";
+            case CPU_SURFACE_FILE:  return "CPU-video";
+            case DISCONNECT_WINDOW: return "Disconnect";
+            case VIDEO_MEDIACODEC:  return "Video";
+            default:                return "None";
+        }
+    }
+
+    /**
+     * 渲染调度：菜单说什么就做什么。
+     *
+     * spinner 是唯一入口：选了具体项就走那一项，停在 None 才由 autoItem()
+     * 按文件类型自动挑一条通道（Auto 模式下 GPU 失败还会退到 CPU）。
+     * 菜单选了什么就走什么，行为不对着菜单走会让人看不懂。
      */
     private void renderWithMode() {
         if (mTextureView == null) return;
-        SurfaceTexture texture = mTextureView.getSurfaceTexture();
-        if (texture == null) {
-            // TextureView 的 SurfaceTexture 是异步建好的：刚进页面就选文件的话这里还是 null。
-            // 记下来等 surface 就绪补渲染，直接 return 的话就是"选了文件什么都没发生"。
-            mPendingRender = getInputPath(null) != null;
-            log("等待 Surface 就绪…");
-            return;
-        }
-
         String inputPath = getInputPath(null);
         if (inputPath == null) {
             log("没有选中文件：先点 Pick 选一张图片 / 一段视频");
             return;
         }
-
-        boolean isImage = isImageFile(inputPath);
-        ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
-        int state = 0;
-        String label;
-
-        switch (mRenderMode) {
-            case MODE_GPU:
-                if (!checkFileValid(inputPath, "GPU")) break;
-                if (isImage) {
-                    // cpp 那边的图片解码器只有 BMP（bitmap.c），jpg/png 先转一手再交给它
-                    String bmpFile = ensureBmpCopy(inputPath);
-                    if (bmpFile == null) {
-                        log("BMP conversion failed");
-                        return;
-                    }
-                    ViewWrapper.setLocalFile(bmpFile);
-                    state = ViewWrapper.updateEglTexture(texture);
-                    label = "GPU-OpenGL (image)";
-                } else {
-                    ViewWrapper.setLocalFile(inputPath);
-                    state = ViewWrapper.updateEglSurface(texture);
-                    label = "GPU-surface (video)";
-                }
-                break;
-
-            case MODE_CPU:
-                if (isImage) {
-                    // CPU 渲染图片需要 BMP 格式，自动转换
-                    String bmpFile = ensureBmpCopy(inputPath);
-                    if (bmpFile == null) {
-                        log("BMP conversion failed");
-                        return;
-                    }
-                    ViewWrapper.setLocalFile(bmpFile);
-                    state = ViewWrapper.updateCpuTexture(texture, CPU_TEXTURE_FILE);
-                    label = "CPU-image (BMP)";
-                } else {
-                    if (!checkFileValid(inputPath, "CPU")) break;
-                    ViewWrapper.setLocalFile(inputPath);
-                    state = ViewWrapper.updateCpuSurface(texture);
-                    label = "CPU-video";
-                }
-                break;
-
-            case MODE_AUTO:
-            default:
-                // Auto 模式：有用户文件时按类型路由；无则回退到 spinner 预设
-                if (mPickedPath != null) {
-                    if (!checkFileValid(inputPath, "Auto")) return;
-                    if (isImage) {
-                        String bmpFile = ensureBmpCopy(inputPath);
-                        if (bmpFile == null) {
-                            log("BMP conversion failed");
-                            return;
-                        }
-                        ViewWrapper.setLocalFile(bmpFile);
-                        state = ViewWrapper.updateEglTexture(texture);
-                        label = "Auto-EGL (image)";
-                    } else {
-                        ViewWrapper.setLocalFile(inputPath);
-                        state = ViewWrapper.updateEglSurface(texture);
-                        label = "Auto-EGL (video)";
-                    }
-                    break;
-                }
-                if (mSpinner != null) {
-                    int pos = mSpinner.getSelectedItemPosition();
-                    updateSurfaceView((pos >= 0 && pos < mItemMapping.length) ? mItemMapping[pos] : 0);
-                }
-                return;
-        }
-        log(String.format(Locale.ROOT, "[%s] %s → stat=%d",
-                modeName(), new File(inputPath).getName(), state));
-    }
-
-    /** 获取输入文件路径（优先用户选择），defaultName 为 null 时只返回用户选择 */
-    private String getInputPath(String defaultName) {
-        if (mPickedPath != null && new File(mPickedPath).exists()) {
-            return mPickedPath;
-        }
-        if (defaultName != null) {
-            String def = mDataDirectory + defaultName;
-            if (new File(def).exists()) return def;
-        }
-        return null;
-    }
-
-    // ---------- Auto 模式的 spinner 路由 ----------
-
-    public void updateSurfaceView(@IntRange(from = 0) int item) {
-        String[] selValue = getResources().getStringArray(R.array.types);
-        if (mTextureView == null) return;
         SurfaceTexture texture = mTextureView.getSurfaceTexture();
         if (texture == null) {
-            // 同 renderWithMode：surface 还没建好就把这一笔记下来，建好后重放
+            // TextureView 的 SurfaceTexture 是异步建好的：刚进页面就选文件时这里还是 null。
+            // 记下来等 surface 就绪补渲染，直接 return 时就是"选了文件什么都没发生"。
             mPendingRender = true;
             log("等待 Surface 就绪…");
             return;
         }
 
-        ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
-        int state = 0;
-        String msg = null;
-
-        // 内置素材（test.jpg / test.yuv…）没有打进包里，没选文件的时候这几个分支
-        // 必然是 file not found —— 直接说清楚，别让人以为选了没生效
-        if (mPickedPath == null && item != 0 && item != DISCONNECT_WINDOW
-                && !new File(mDataDirectory + sampleName(item)).exists()) {
-            log("没有内置素材（" + sampleName(item) + "）：先点 Pick 选一个文件");
+        boolean isImage = isImageFile(inputPath);
+        boolean isVideo = !isImage && isVideoFile(inputPath);
+        int item = selectedItem();
+        if (item == DISCONNECT_WINDOW) {
+            doDisconnect();
             return;
+        }
+        if (item == 0) {
+            item = autoItem(isImage, isVideo);
+        } else if (item != VIDEO_MEDIACODEC && isVideo) {
+            log(itemName(item) + " 需要图片或原始数据，当前是视频 → 改走 Video");
+            item = VIDEO_MEDIACODEC;
+        } else if (item == VIDEO_MEDIACODEC && !isVideo) {
+            log("Video 需要视频文件，当前是" + (isImage ? "图片" : "原始数据")
+                    + " → 改走 " + itemName(autoItem(isImage, false)));
+            item = autoItem(isImage, false);
+        } else if (isTextureItem(item) != isImage) {
+            int fixed = siblingItem(item);
+            log(itemName(item) + " 需要" + (isTextureItem(item) ? "图片" : "原始数据")
+                    + "，当前是" + (isImage ? "图片" : "原始数据") + " → 改走 " + itemName(fixed));
+            item = fixed;
+        }
+        renderItem(item, inputPath, texture);
+    }
+
+    /** 按菜单项走对应的 native 通道 */
+    private void renderItem(int item, String path, SurfaceTexture texture) {
+        ViewWrapper.setRenderSize(mDisplayHeight, mDisplayWidth);
+        int state;
+        String label = itemName(item);
+        if (item != VIDEO_MEDIACODEC) {
+            // 视频还占着 surface 时，其它通道是画不上去的
+            stopVideo();
         }
 
         switch (item) {
+            case VIDEO_MEDIACODEC: {
+                if (!checkFileValid(path, label)) return;
+                state = startVideo(texture, path);
+                break;
+            }
             case EGL_TEXTURE_FILE: {
-                String filePath = resolvePath("test.jpg");
-                if (!checkFileValid(filePath, "EGL_TEXTURE")) break;
-                // cpp 侧只有 BMP 解码器，选到 jpg/png 先转一手再交给它
-                String bmpFile = ensureBmpCopy(filePath);
+                if (!checkFileValid(path, label)) return;
+                // cpp 那边的图片解码器只认 BMP（bitmap.c），jpg/png 先转一手再交给它
+                String bmpFile = ensureBmpCopy(path);
                 if (bmpFile == null) {
                     log("BMP conversion failed");
-                    break;
+                    return;
                 }
                 ViewWrapper.setLocalFile(bmpFile);
                 state = ViewWrapper.updateEglTexture(texture);
-                msg = selValue[item];
+                if (state < 0 && mRenderMode == MODE_AUTO) {
+                    // Auto 的意义就在这一下：GPU 通道起不来就退到 CPU，别让用户对着黑屏
+                    state = ViewWrapper.updateCpuTexture(texture, CPU_TEXTURE_FILE);
+                    label = "Auto→CPU-image";
+                }
                 break;
             }
             case EGL_SURFACE_FILE: {
-                String filePath = resolvePath("test.yuv");
-                if (!checkFileValid(filePath, "EGL_SURFACE")) break;
-                ViewWrapper.setLocalFile(filePath);
+                if (!checkFileValid(path, label)) return;
+                ViewWrapper.setLocalFile(path);
                 state = ViewWrapper.updateEglSurface(texture);
-                msg = selValue[item];
+                if (state < 0 && mRenderMode == MODE_AUTO) {
+                    state = ViewWrapper.updateCpuSurface(texture);
+                    label = "Auto→CPU-video";
+                }
                 break;
             }
             case CPU_TEXTURE_FILE: {
-                String filePath = resolvePath("test.bmp");
-                if (!checkFileValid(filePath, "CPU_TEXTURE")) break;
-                String bmpFile = ensureBmpCopy(filePath);
+                if (!checkFileValid(path, label)) return;
+                String bmpFile = ensureBmpCopy(path);
                 if (bmpFile == null) {
                     log("BMP conversion failed");
-                    break;
+                    return;
                 }
                 ViewWrapper.setLocalFile(bmpFile);
-                state = ViewWrapper.updateCpuTexture(texture, item);
-                msg = selValue[item];
+                state = ViewWrapper.updateCpuTexture(texture, CPU_TEXTURE_FILE);
                 break;
             }
             case CPU_SURFACE_FILE: {
-                String filePath = resolvePath("test.h264");
-                if (!checkFileValid(filePath, "CPU_SURFACE")) break;
-                ViewWrapper.setLocalFile(filePath);
+                if (!checkFileValid(path, label)) return;
+                ViewWrapper.setLocalFile(path);
                 state = ViewWrapper.updateCpuSurface(texture);
-                msg = selValue[item];
                 break;
             }
-            case DISCONNECT_WINDOW:
-                // 断开 / 重连窗口：GONE→VISIBLE 会让 TextureView 重建 surface
-                mTextureView.setVisibility(View.GONE);
-                mTextureView.setVisibility(View.VISIBLE);
-                msg = selValue[item];
-                break;
             default:
-                if (item == 0) {
-                    // 「None」本来就是不渲染，但得说出来，否则看着像选了没反应
-                    log("已选 None：画面保持当前内容（想渲染请先 Pick 一个文件）");
-                    return;
-                }
-                msg = "Not implement: " + item;
-                break;
+                log("已选 None：画面保持当前内容（渲染请先 Pick 一个文件）");
+                return;
         }
-        log(String.format(Locale.ROOT, "(%s: item=%d stat=%d)", msg, item, state));
+        log(String.format(Locale.ROOT, "[%s] %s → stat=%d",
+                label, new File(path).getName(), state));
+    }
+
+    /**
+     * 起视频播放。
+     *
+     * MediaCodec 是往 surface 里直接出帧的，EGL / CPU 通道还挂在同一个 SurfaceTexture 上
+     * 时两边会抢缓冲区，所以先把 CPU 那侧的 window 收掉，再新建一个 Surface 交出去。
+     */
+    private int startVideo(SurfaceTexture texture, String path) {
+        stopVideo();
+        ViewWrapper.unloadSurfaceView();
+        mVideoSurface = new Surface(texture);
+        int ret = ViewWrapper.startVideoRender(mVideoSurface, path);
+        if (ret < 0) {
+            mVideoSurface.release();
+            mVideoSurface = null;
+        }
+        return ret;
+    }
+
+    /** 停视频播放并放掉 Surface（不管当前有没有在播） */
+    private void stopVideo() {
+        ViewWrapper.stopVideoRender();
+        if (mVideoSurface != null) {
+            mVideoSurface.release();
+            mVideoSurface = null;
+        }
+    }
+
+    /** 断开 / 重连窗口：先释放 native 侧的 window，再让 TextureView 重建 surface */
+    private void doDisconnect() {
+        stopVideo();
+        ViewWrapper.unloadSurfaceView();
+        if (mTextureView == null) {
+            log("Disconnect: 没有 TextureView");
+            return;
+        }
+        ViewParent parent = mTextureView.getParent();
+        if (!(parent instanceof ViewGroup)) {
+            log("Disconnect: TextureView 没有父容器，无法重建");
+            return;
+        }
+        /**
+         * 摘下来再挂回去，这才是真的"断开再连上"：TextureView 从窗口移除会走
+         * onSurfaceTextureDestroyed（返回 true，旧的 SurfaceTexture 被释放），
+         * 重新挂上再走 onSurfaceTextureAvailable 拿一张新的。
+         *
+         * 只切 GONE → VISIBLE 是不行的：同一帧里来回切，不会触发上面那两个回调，
+         * 渲染窗口从头到尾没动过，等于什么都没做。
+         */
+        /**
+         * Disconnect 是一次性动作，不是一种渲染方式：先把菜单静默拨回 None。
+         * 不拨时菜单停在这一项，窗口重建后 onSurfaceTextureAvailable →
+         * renderWithMode() 又会读到 Disconnect 再断一次 —— 无限递归。
+         */
+        if (mSpinner != null) {
+            mSpinner.setOnItemSelectedListener(null);
+            mSpinner.setSelection(0);
+            mSpinner.setOnItemSelectedListener(this);
+        }
+        ViewGroup group = (ViewGroup) parent;
+        int index = group.indexOfChild(mTextureView);
+        // 重建后按当前文件再画一次，否则窗口是空的，看不出断没断
+        mPendingRender = mPickedPath != null;
+        group.removeView(mTextureView);
+        group.addView(mTextureView, index);
+        log("Disconnect: 渲染窗口已断开，等待重建");
+    }
+
+    /** 获取输入文件路径（只有用户 Pick 的这一个来源） */
+    private String getInputPath(String defaultName) {
+        if (mPickedPath != null && new File(mPickedPath).exists()) {
+            return mPickedPath;
+        }
+        return null;
     }
 
     /** 校验文件存在且非空，避免传无效路径导致 native 崩溃 */
@@ -569,35 +628,6 @@ public class TextureActivity extends AppCompatActivity
             return false;
         }
         return true;
-    }
-
-    /** 优先返回用户选择的路径，否则用默认文件 */
-    private String resolvePath(String defaultName) {
-        if (mPickedPath != null && new File(mPickedPath).exists()) {
-            return mPickedPath;
-        }
-        return mDataDirectory + defaultName;
-    }
-
-    /**
-     * 各渲染项对应的内置素材文件名（放在外部 cache 目录）。
-     *
-     * 这几个文件并没有打进 apk，所以没选文件时这些分支必然是 file not found；
-     * 名字集中在这里，也好让人一眼看出该往 cache 目录放什么。
-     */
-    private static String sampleName(int item) {
-        switch (item) {
-            case EGL_TEXTURE_FILE:
-                return "test.jpg";
-            case EGL_SURFACE_FILE:
-                return "test.yuv";
-            case CPU_TEXTURE_FILE:
-                return "test.bmp";
-            case CPU_SURFACE_FILE:
-                return "test.h264";
-            default:
-                return "";
-        }
     }
 
     public void reload(@NonNull View view) {
@@ -700,6 +730,36 @@ public class TextureActivity extends AppCompatActivity
         return checkImageMagic(path);
     }
 
+    /** 判断文件是否为视频（先按扩展名，失败时检测文件头） */
+    private static boolean isVideoFile(String path) {
+        if (path == null) return false;
+        String lower = path.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".mp4") || lower.endsWith(".m4v") || lower.endsWith(".3gp")
+                || lower.endsWith(".mkv") || lower.endsWith(".webm") || lower.endsWith(".avi")
+                || lower.endsWith(".mov")) {
+            return true;
+        }
+        return checkVideoMagic(path);
+    }
+
+    /**
+     * 检测文件头：mp4 / mov / m4v / 3gp 这些 ISO-BMFF 容器都是
+     * 4 字节长度 + "ftyp" + 品牌，靠偏移 4 的 ftyp 基本能认出来。
+     */
+    private static boolean checkVideoMagic(String path) {
+        try {
+            byte[] header = new byte[12];
+            int n;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(path)) {
+                n = fis.read(header);
+            }
+            if (n < 12) return false;
+            return header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79
+                    && header[7] == 0x70;   // "ftyp"
+        } catch (Exception ignored) { }
+        return false;
+    }
+
     /** 检测文件头 magic bytes 是否为常见图片格式 */
     private static boolean checkImageMagic(String path) {
         try {
@@ -726,15 +786,6 @@ public class TextureActivity extends AppCompatActivity
                     && header[10] == 0x42 && header[11] == 0x50) return true;
         } catch (Exception ignored) { }
         return false;
-    }
-
-    /** 当前渲染模式的名称 */
-    private String modeName() {
-        switch (mRenderMode) {
-            case MODE_GPU:  return "GPU";
-            case MODE_CPU:  return "CPU";
-            default:        return "Auto";
-        }
     }
 
     // ---------- 日志 ----------

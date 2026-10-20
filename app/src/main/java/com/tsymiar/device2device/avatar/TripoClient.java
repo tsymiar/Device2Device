@@ -209,10 +209,7 @@ public final class TripoClient {
         }
     }
 
-    // ------------------------------------------------------------------
-    // HTTP 工具
-    // ------------------------------------------------------------------
-
+    // ===== HTTP 工具 =====
     private static HttpURLConnection open(String url, String apiKey) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(CONNECT_MS);

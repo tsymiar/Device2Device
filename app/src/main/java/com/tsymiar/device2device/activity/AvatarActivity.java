@@ -205,10 +205,7 @@ public class AvatarActivity extends AppCompatActivity {
         mBuildExecutor.shutdownNow();
     }
 
-    // ------------------------------------------------------------------
-    // 界面
-    // ------------------------------------------------------------------
-
+    // ===== 界面 =====
     private void buildUi() {
         // ---- 建模引擎 ----
         mControls.addView(caption("⓪ 建模引擎"));
@@ -588,7 +585,7 @@ public class AvatarActivity extends AppCompatActivity {
         };
         adapter.setDropDownViewResource(R.layout.item_market_spinner);
         sp.setAdapter(adapter);
-        // 存档里的下标可能比现在的选项表长（选项改过），夹一下，免得下拉框显示空白
+        // 存档中的下标可能超出当前选项表长度（选项已变更），需限制范围，以免下拉框显示空白
         sp.setSelection(clampIndex(selection, items.length), false);
         sp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -787,10 +784,7 @@ public class AvatarActivity extends AppCompatActivity {
         return (int) (value * getResources().getDisplayMetrics().density);
     }
 
-    // ------------------------------------------------------------------
-    // 交互
-    // ------------------------------------------------------------------
-
+    // ===== 交互 =====
     private void setGender(int gender) {
         mProfile.gender = gender;
         linkWaistHip(0);        // 男女的腰臀比区间不同，换性别时重新协调一次
@@ -838,7 +832,7 @@ public class AvatarActivity extends AppCompatActivity {
         if (mCupRow != null) {
             mCupRow.setVisibility(cupVisible() ? View.VISIBLE : View.GONE);
         }
-        // 这几项只有原生引擎真的接了：高分的身体是 Anny 网格，臂长没有对应的形变
+        // 上述几项仅原生引擎已实现：高分身体为 Anny 网格，臂长无对应形变
         // （AnnyModel 里只有腿长 / 躯干长 / 颈长），鼻子是那颗真脸上自带的（没有鼻宽 / 鼻长
         // 这两个参数）。与其留着拖不动的滑块，不如整块收起
         // 刘海不在此列：高分这边的头发也是按实测头壳表搭出来的（AnnyModel.addHair →
@@ -1024,10 +1018,7 @@ public class AvatarActivity extends AppCompatActivity {
         }).start();
     }
 
-    // ------------------------------------------------------------------
-    // Tripo3D：照片 → 云端生成 3D 模型（需要自己的 API Key）
-    // ------------------------------------------------------------------
-
+    // ===== Tripo3D：照片 → 云端生成 3D 模型（需要自己的 API Key） =====
     /** 填 API Key / 面数上限的对话框 */
     private void showTripoDialog() {
         LinearLayout box = new LinearLayout(this);
@@ -1182,7 +1173,7 @@ public class AvatarActivity extends AppCompatActivity {
         mProfile.chestR = r.chestR;
         mProfile.waistR = r.waistR;
         mProfile.hipR = r.hipR;
-        linkWaistHip(0);            // 照片量出来的腰臀比一般是真人的，越界的顺手夹回来
+        linkWaistHip(0);            // 照片测得的腰臀比通常来自真实人体，越界时需限制范围
         mChest.set(mProfile.chestR);
         mWaist.set(mProfile.waistR);
         mHip.set(mProfile.hipR);
@@ -1268,10 +1259,7 @@ public class AvatarActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 建模 / 导出
-    // ------------------------------------------------------------------
-
+    // ===== 建模 / 导出 =====
     private void scheduleRebuild() {
         mHandler.removeCallbacks(mRebuildTask);
         mHandler.postDelayed(mRebuildTask, 150);
@@ -1467,10 +1455,7 @@ public class AvatarActivity extends AppCompatActivity {
         });
     }
 
-    // ------------------------------------------------------------------
-    // 记忆上次选择
-    // ------------------------------------------------------------------
-
+    // ===== 记忆上次选择 =====
     private void restorePrefs() {
         SharedPreferences p = getSharedPreferences(PREF, MODE_PRIVATE);
         // anny.mhb 已内置进 assets，所以默认直接上高分引擎；没打包数据时才退回原生

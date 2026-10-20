@@ -45,10 +45,7 @@ public final class MeshBuilder {
     private String partName = "part";
     private float[] partColor = new float[]{1f, 1f, 1f};
 
-    // ------------------------------------------------------------------
-    // 部件
-    // ------------------------------------------------------------------
-
+    // ===== 部件 =====
     public void beginPart(String name, int argb) {
         endPart();
         partName = name;
@@ -74,10 +71,7 @@ public final class MeshBuilder {
         return indices.size();
     }
 
-    // ------------------------------------------------------------------
-    // 图元
-    // ------------------------------------------------------------------
-
+    // ===== 图元 =====
     /**
      * 沿 p0→p1 放样一条管体，横截面为椭圆。
      *
@@ -242,10 +236,7 @@ public final class MeshBuilder {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 输出
-    // ------------------------------------------------------------------
-
+    // ===== 输出 =====
     public float[] positions() {
         float[] out = new float[positions.size()];
         for (int i = 0; i < out.length; i++) out[i] = positions.get(i);
@@ -281,10 +272,7 @@ public final class MeshBuilder {
         return new ArrayList<>(parts);
     }
 
-    // ------------------------------------------------------------------
-    // 内部
-    // ------------------------------------------------------------------
-
+    // ===== 内部 =====
     private int addVertex(float x, float y, float z, float nx, float ny, float nz) {
         if (vertexCount() >= MAX_VERTICES) return MAX_VERTICES - 1;
         positions.add(x);

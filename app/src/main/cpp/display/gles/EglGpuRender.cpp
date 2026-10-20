@@ -9,7 +9,6 @@
 #endif
 #include <utils/logging.h>
 #include <cerrno>
-#include <utils/statics.h>
 #include <utils/FileUtils.h>
 #include <unistd.h>
 #include <message/Message.h>
@@ -182,7 +181,6 @@ int EglGpuRender::MakeGLTexture()
         LOGE("surface is nullptr");
         return -1;
     }
-    //编译着色器代码并链接到着色器程序
     EGL2.glProgram = EglShader::CreateProgram((char*)vShaderStr, (char*)fShaderStr, g_vertexShader, g_fragmentShader);
     if (EGL2.glProgram == 0) {
         LOGE("CreateProgram failed");
@@ -202,7 +200,7 @@ int EglGpuRender::MakeGLTexture()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ALIGNMENT, GL_ONE);
-    // GLES2 里没有 glEnable(GL_TEXTURE_2D)，这一句只会留下一条 GL_INVALID_ENUM
+    // GLES2 里没有 glEnable(GL_TEXTURE_2D)，该调用只会留下一条 GL_INVALID_ENUM
 
     // Use the program object
     glUseProgram(EGL2.glProgram);
@@ -225,13 +223,51 @@ void setUniforms(int uTextureUnitLocation, int textureId) {
     glUniform1i(uTextureUnitLocation, 0);
 }
 
+/**
+ * 取 EGL surface 的实际像素尺寸。
+ *
+ * 画面按原始尺寸画，不拉伸铺满，所以 viewport 用的是图片尺寸；但需使其位于左上角，
+ * 就得知道 surface 有多高 —— GL 的视口原点在左下，不顶上去画面会贴在左下角。
+ *
+ * @return 取到了返回 true；取不到保持入参不变，由调用方按自己的尺寸兜底
+ */
+bool querySurfaceSize(int& width, int& height)
+{
+    if (EGL2.eglDisplay == nullptr || EGL2.eglSurface == nullptr) {
+        return false;
+    }
+    EGLint w = 0;
+    EGLint h = 0;
+    if (!eglQuerySurface(EGL2.eglDisplay, EGL2.eglSurface, EGL_WIDTH, &w)
+        || !eglQuerySurface(EGL2.eglDisplay, EGL2.eglSurface, EGL_HEIGHT, &h)
+        || w <= 0 || h <= 0) {
+        return false;
+    }
+    width = (int)w;
+    height = (int)h;
+    return true;
+}
+
 void pixelRender(unsigned char* pixel, size_t, int width, int height)
 {
     if (pixel == nullptr || width <= 0 || height <= 0) {
         LOGE("pixelRender: bad argument [%dx%d] %p", width, height, pixel);
         return;
     }
-    glViewport(0, 0, width, height);
+    // 按原始尺寸画，不铺满：viewport 就是图片尺寸。
+    // 视口原点在左下，要让画面从左上角开始，得把 y 顶到 surface 顶部
+    int surfW = width;
+    int surfH = height;
+    if (querySurfaceSize(surfW, surfH)) {
+        int x = 0;
+        int y = surfH - height;
+        // 图比 surface 还高时没法再往上顶，贴着原点画，多出来的部分被裁掉
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        glViewport(x, y, width, height);
+    } else {
+        glViewport(0, 0, width, height);
+    }
     // RGBA format needed: pixel
     glTexImage2D(GL_TEXTURE_2D,
                  0, GL_RGBA,
@@ -352,7 +388,7 @@ int EglGpuRender::DrawRGBTexture(const char* filename)
 
     free(rgba);
     // program 和纹理是每次现建的，用完就还回去：
-    // 不回收的话反复 Re-fresh 会一路涨到 GL 报 OUT_OF_MEMORY。
+    // 不回收时反复 Re-fresh 会一路涨到 GL 报 OUT_OF_MEMORY。
     EglShader::DeleteProgram(EGL2.glProgram);
     if (EGL2.mTextureID != 0) {
         glDeleteTextures(1, &EGL2.mTextureID);
@@ -378,11 +414,20 @@ void EglGpuRender::FrameRender(unsigned char* frameData, size_t size)
     const size_t chromaSize = ySize / 4;
     const size_t frameSize = ySize + chromaSize * 2;
     if (size < frameSize) {
-        // 回调里要读满 w*h*1.5，切片不够就得跳过这一帧，否则越过缓冲末尾
+        // 回调里要读满 w*h*1.5，切片不够就得跳过该帧，否则越过缓冲末尾
         LOGW("incomplete YUV frame (%zu/%zu), skip", size, frameSize);
         return;
     }
-    glViewport(0, 0, EGL2.width, EGL2.height);
+    // 同样按 surface 的实际尺寸设 viewport：setRenderSize 给的是纹理尺寸，
+    // 与 surface 不一致时画面会偏在视口的一角
+    int viewW = (int)EGL2.width;
+    int viewH = (int)EGL2.height;
+    querySurfaceSize(viewW, viewH);
+    if (viewW <= 0 || viewH <= 0) {
+        LOGE("FrameRender: viewport size invalid [%dx%d]", viewW, viewH);
+        return;
+    }
+    glViewport(0, 0, viewW, viewH);
     glClearColor(0.8f, 0.8f, 1.0f, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 

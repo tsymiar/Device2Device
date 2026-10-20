@@ -12,7 +12,6 @@
 #endif
 #include <utils/logging.h>
 #include <message/Message.h>
-#include <utils/statics.h>
 #include <bitmap/bitmap.h>
 
 extern ANativeWindow *g_nativeWindow;
@@ -329,7 +328,6 @@ void CpuRenderView::drawRGBColor(uint32_t color, const char* filename)
     if (ANativeWindow_unlockAndPost(g_nativeWindow) != 0) {
         LOGE("Unable to unlock and post to native window");
     }
-    LOGD("Draws %08x using Native Window", color);
     free(data);
 }
 

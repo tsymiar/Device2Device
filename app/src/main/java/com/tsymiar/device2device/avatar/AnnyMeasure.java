@@ -10,7 +10,7 @@ import java.util.ArrayList;
  *      于是 Anny 网格和原生网格一样是「等身比例」，可以直接和地面网格 / 身高标尺比对。
  *   2) 法线：三角面法线按顶点累加后归一化（平滑着色），并在整体朝内时统一翻转。
  *   3) 测量：把三角面与水平面相交得到的线段串成闭环，躯干 / 两臂 / 两腿各自成环，
- *      于是能按环心位置挑出该量的那一圈，量出胸围、腰围、臀围、腿围与裆高。
+ *      于是能按环心位置挑出目标尺寸对应的那一圈，量出胸围、腰围、臀围、腿围与裆高。
  */
 final class AnnyMeasure {
 
@@ -26,14 +26,11 @@ final class AnnyMeasure {
     private AnnyMeasure() {
     }
 
-    // ------------------------------------------------------------------
-    // 归一化
-    // ------------------------------------------------------------------
-
+    // ===== 归一化 =====
     /**
      * 脚底 y=0、头顶 y=身高、水平居中。
      *
-     * 横向 / 前后的「中心」取骨盆那一圈而不是整个包围盒：Anny 的静息姿态是手臂斜张的
+     * 横向 / 前后的「中心」取骨盆所在那一圈而不是整个包围盒：Anny 的静息姿态是手臂斜张的
      * A 字 pose，手掌在前后方向并不对称，按包围盒居中会把整个人挂到体轴一侧（实测偏
      * 出 13cm），追赶出来就是躯干歪在一边、头与追加的五官都对不上。
      */
@@ -76,7 +73,7 @@ final class AnnyMeasure {
         // ① 头 / 颈：头顶往下一个头高之内，平均 z 应在参考线之前
         float head = meanZ(v, b[4] - h / Math.max(4f, 7.5f), b[4], 0.09f * h) - ref;
         if (Math.abs(head) > 0.004f * h) vote += head > 0f ? 1 : -1;
-        // ② 胸 / 背：0.72H 那一层的躯干前极（胸）应比后极（肩胛）更远
+        // ② 胸 / 背：0.72H 高度处躯干前极（胸）应比后极（肩胛）更远
         float[] chest = poles(v, b[1] + 0.72f * h, 0.012f * h, 0.09f * h);
         if (chest != null && Math.abs(chest[0] - chest[1]) > 0.004f * h) {
             vote += chest[0] - ref > ref - chest[1] ? 1 : -1;
@@ -138,8 +135,8 @@ final class AnnyMeasure {
     }
 
     /**
-     * 骨盆那一圈（腰线以下、裆以上，排除两臂）的前后极点：{ 中心 z, 最前 z, 最后 z }；
-     * 采样不足返回 null。摆正朝向与水平居中都用这一段，两者的「中心」才是同一个。
+     * 骨盆所在那一圈（腰线以下、裆以上，排除两臂）的前后极点：{ 中心 z, 最前 z, 最后 z }；
+     * 采样不足返回 null。摆正朝向与水平居中都用这一圈，两者的「中心」才是同一个。
      */
     private static float[] pelvis(float[] v, float[] b, float h) {
         float cx = (b[0] + b[3]) * 0.5f;
@@ -178,10 +175,7 @@ final class AnnyMeasure {
         return b;
     }
 
-    // ------------------------------------------------------------------
-    // 法线
-    // ------------------------------------------------------------------
-
+    // ===== 法线 =====
     static void computeNormals(float[] v, short[] idx, float[] out) {
         for (int t = 0; t < idx.length; t += 3) {
             int a = idx[t] & 0xFFFF;
@@ -239,10 +233,7 @@ final class AnnyMeasure {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 测量
-    // ------------------------------------------------------------------
-
+    // ===== 测量 =====
     /** 某个高度上的一圈周长（米），取环心 x 最接近 targetX 的那个环；量不到返回 -1 */
     static float girthAt(float[] v, short[] idx, float y, float targetX) {
         ArrayList<Loop> loops = loopsAt(v, idx, y);
@@ -264,7 +255,7 @@ final class AnnyMeasure {
      *
      * 注意 Anny 的静息姿态是 A 字 pose（手臂斜向下张开），肩线以下的切片上可能同时
      * 出现「两臂 + 躯干」三个环，其中的两个手臂环会被误当成两条腿；这里用手臂必然
-     * 更靠外这一点把它们排除掉（见 {@link #isArm}）。
+     * 更靠外的点据此排除（见 {@link #isArm}）。
      */
     static float crotchHeight(float[] v, short[] idx, float h) {
         float lo = 0.30f * h;
@@ -396,7 +387,7 @@ final class AnnyMeasure {
         return (float) Math.hypot(tipX - jointX, tipY - jointY);
     }
 
-    /** 脚长：脚踝以下那批顶点在 z 方向的跨度 */
+    /** 脚长：脚踝以下各顶点在 z 方向的跨度 */
     static float footLength(float[] v, float h) {
         float[] b = bounds(v);
         float top = b[1] + 0.035f * h;
@@ -477,7 +468,7 @@ final class AnnyMeasure {
             while (true) {
                 // 接下一段要挑「最近的」而不是「先碰上的」：轮廓在腋下 / 乳下这类地方会
                 // 自己靠得很近，按先来后到接就会拐到另一条支路上去，闭出一个小圈 ——
-                // 实测丰满度 0.70 那一档胸围比 0.65 反而小 2.5cm，就是这么丢的。
+                // 实测丰满度 0.70 档胸围比 0.65 反而小 2.5cm，就是这么丢的。
                 // 取最近的一段，走的就是原来那条轮廓
                 int next = -1;
                 int end = -1;

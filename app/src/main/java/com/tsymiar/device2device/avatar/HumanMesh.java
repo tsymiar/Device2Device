@@ -152,7 +152,7 @@ public final class HumanMesh {
         // 原来 165/55 的女体大腿围 50.7cm（半径 8.25cm），比躯干看着粗一档：髋半宽 17.7cm、
         // 腰半宽 11.9cm，同一条腿的半径却到 8.25cm。收到 7.3cm 之后腿才比躯干细一档。
         // 小腿：0.0335 → 0.0310 → 0.0288（女）/ 0.0345 → 0.0320 → 0.0297（男），再收 7%。
-        // 腿真正显粗的地方其实在膝以下 —— 实测 165/55 女体膝 43.0 / 小腿肚 38.0 / 踝 25.4cm，
+        // 腿部实际最粗处位于膝以下 —— 实测 165/55 女体：膝 43.0 / 小腿肚 38.0 / 踝 25.4cm，
         // 而真人是 35 / 34 / 21cm：大腿那一段比真人还细，膝与踝却粗出一圈，整条腿于是
         // 像一根上下一样粗的管子。围度收掉之外，收口也要跟着加陡（见 buildBodyField）
         b.thighR = (b.male ? 0.0422f : 0.0440f) * H * (float) Math.pow(b.fat, 0.6f)
@@ -497,7 +497,7 @@ public final class HumanMesh {
 
     /**
      * 发壳：沿头部曲面外扩一层薄壳，发际线随方位角变化 ——
-     * 前额最高（露出额头）、两侧在太阳穴附近、后颈最低，因此长发也不会糊住脸。
+     * 前额最高（露出额头）、两侧在太阳穴附近、后颈最低，因此长发不会遮住面部。
      */
     private static void buildHairShell(MeshBuilder mb, BodyProfile p, Body b, float vol, float vEnd) {
         float hh = b.headH;
@@ -517,7 +517,7 @@ public final class HumanMesh {
         float[] nrm = new float[3];
         for (int i = 0; i <= nv; i++) {
             float t = i / (float) nv;
-            // 最后一排不是「刚好贴到头皮」而是再沉进去一点：只贴到表面的话，发际线那一圈
+            // 最后一排不是「刚好贴到头皮」而是再沉进去一点：只贴到表面时，发际线那一圈
             // 从侧面看是一条缝（壳的边缘和头皮之间能塞进一条线），沉进头皮就没有这道缝了
             float e = BodyProfile.clamp((t - 0.80f) / 0.20f, 0f, 1f);
             float fold = 1f - 1.95f * e * e * (3f - 2f * e);
@@ -545,7 +545,7 @@ public final class HumanMesh {
                 mb.addTriangle(a0, d0, c0);
             }
         }
-        // 颅顶收口：s=1 那一排是个半径两三厘米的圈而不是一个点，光有这一排的话头顶正中
+        // 颅顶收口：s=1 那一排是个半径两三厘米的圈而不是一个点，光有这一排时头顶正中
         // 是通的 —— 从上面 / 前面看就是头顶秃了一块。这里按这一排的实际位置补一个穹顶点
         int pole = mb.vertexCount();
         float cx = 0f, cz = 0f, cy = 0f, rr = 0f;
@@ -562,7 +562,7 @@ public final class HumanMesh {
         cy /= nu;
         cz /= nu;
         rr /= nu;
-        // 穹顶点抬多高按头顶那一圈的实际曲率算，不按固定比例抬：抬 rr*0.55 的话，真实头壳
+        // 穹顶点抬多高按头顶那一圈的实际曲率算，不按固定比例抬：抬 rr*0.55 时，真实头壳
         // （s=1 那一排的半径就有五厘米上下）上面会顶出一个两三厘米的包 —— 实测发壳的最高点
         // 比头壳高出 24.6mm，看着是头上又扣了一个壳。取 s=1 与 s=1−ds 两排的半径，反推过
         // 这两点的外接圆，圆心到圆顶就是该抬的高度
@@ -735,7 +735,7 @@ public final class HumanMesh {
 
     /**
      * 空气刘海：不是一整片，是几绺分开的薄发束 —— 绺与绺之间露出额头，长短还参差不齐。
-     * 齐刘海那一片整铺过去太厚实，看着像扣了顶假发；稀几绺才是「空气」。
+     * 齐刘海整片铺过去过于厚实，近似一整顶假发；分成几绺才是「空气感」。
      */
     private static void buildAirBangs(MeshBuilder mb, BodyProfile p, Body b, float off) {
         float hh = b.headH;
@@ -752,7 +752,7 @@ public final class HumanMesh {
             float jag = 0.050f * (float) Math.abs(Math.sin(3.1f * u + 0.6f));
             float mid = 1f - Math.abs(2f * u - 1f);
             float sEnd = 0.710f - 0.045f * mid - jag;
-            // 每绺略微斜着走，免得二十几绺平行得像梳子齿
+            // 每绺略带倾斜，避免二十余绺平行排列如梳齿
             float phiEnd = phi + 0.16f * (u - 0.5f);
             addStrand(mb, p, b, 0.90f, phi, sEnd, phiEnd,
                     hh * 0.0135f, hh * 0.0095f, hh * 0.006f, hh * 0.004f, 5, off, 6);
@@ -776,7 +776,7 @@ public final class HumanMesh {
 
     /**
      * 沿头皮铺一条发束：(s0, φ0) → (s1, φ1) 之间分几段取点，每段一小截锥形 tube 接起来。
-     * 头皮是曲面，一根直 tube 从头顶拉到下颌的话中段必然离开头皮 ——
+     * 头皮是曲面，一根直 tube 从头顶拉到下颌时中段必然离开头皮 ——
      * 那就是头发和头之间那道能塞进 finger 的空隙。
      */
     private static void addStrand(MeshBuilder mb, BodyProfile p, Body b,
@@ -818,10 +818,7 @@ public final class HumanMesh {
         out[2] += ROOT_N[2] * off;
     }
 
-    // ------------------------------------------------------------------
-    // OBJ 导出：按部件分组，另存同名 .mtl 记录部件颜色
-    // ------------------------------------------------------------------
-
+    // ===== OBJ 导出：按部件分组，另存同名 .mtl 记录部件颜色 =====
     public static boolean writeObj(File objFile, Result r) {
         if (r == null || objFile == null) return false;
         File parent = objFile.getParentFile();
@@ -892,10 +889,7 @@ public final class HumanMesh {
         return String.format(Locale.US, "%.5f", v);
     }
 
-    // ------------------------------------------------------------------
-    // 小工具
-    // ------------------------------------------------------------------
-
+    // ===== 小工具 =====
     /** rootAt 用的法线暂存（发束根部要沿法线让开发壳厚度） */
     private static final float[] ROOT_N = new float[3];
 
