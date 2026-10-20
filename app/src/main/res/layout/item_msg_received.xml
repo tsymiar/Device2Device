@@ -9,16 +9,33 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@drawable/bg_msg_recv"
+        android:background="@drawable/bg_msg_received"
         android:padding="12dp"
         tools:ignore="UselessParent">
 
-        <TextView
-            android:id="@+id/tv_content"
+        <!-- 转圈和正文同一行：分开摆时「思考中…」旁边空一大块，转圈又离得远远的 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@android:color/black"
-            android:textSize="16sp"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_content"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/black"
+                android:textSize="16sp"/>
+
+            <!-- 气泡底色是 #E0E0E0 浅灰，转圈用白色等于看不见，这里给个中灰 -->
+            <ProgressBar
+                android:id="@+id/progress_bar"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="8dp"
+                android:indeterminateTint="#757575"
+                android:visibility="gone"/>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_time"
@@ -27,20 +44,5 @@
             android:textSize="12sp"
             android:layout_gravity="end"
             android:textColor="#80000000"/>
-
-        <ProgressBar
-            android:id="@+id/progress_bar"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="8dp"
-            android:indeterminateTint="@android:color/white"
-            android:visibility="gone"/>
     </LinearLayout>
-
-    <View
-        android:id="@+id/mask_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#80FFFFFF"
-        android:visibility="gone"/>
 </LinearLayout>

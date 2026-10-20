@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -27,6 +28,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.text.TextUtils;
@@ -39,12 +41,14 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.widget.TextViewCompat;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.utils.HttpsRequest;
+import com.tsymiar.device2device.utils.MarkdownUtils;
 import com.tsymiar.device2device.utils.TimeUtils;
 
 import org.json.JSONArray;
@@ -58,6 +62,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -71,6 +79,8 @@ public class ChatBoxDialog extends Dialog {
     /** API Key 与 Ollama 地址的本地存放位置：填过一次之后下次打开自动带出 */
     private static final String CHAT_PREFS = "chat_prefs";
     private static final String KEY_API = "api_key";
+    /** 每个服务一份 Key：api_key_deepseek / api_key_openrouter / api_key_ollama_cloud … */
+    private static final String KEY_API_PREFIX = "api_key_";
     private static final String KEY_OLLAMA_HOST = "ollama_host";
     private static final String KEY_OLLAMA_CLOUD = "ollama_cloud";
     /** 手选的模型按档位分开存：档位名见 {@link #modelKey()} */
@@ -83,11 +93,19 @@ public class ChatBoxDialog extends Dialog {
     /** 自建 Ollama 的服务端口，地址里没写端口时补这个 */
     private static final int OLLAMA_PORT = 11434;
     private static final String DEFAULT_OLLAMA_HOST = "127.0.0.1";
+    /**
+     * 本地自建 Ollama 的读超时：5 分钟。
+     *
+     * 本地跑模型要先把权重载进内存（首次可能一两分钟），再逐 token 生成，几十秒到几分钟
+     * 均正常。默认的 15 秒未收到首字节即判定请求失败 —— 而此时服务端仍在计算，
+     * 界面上只看到一句"连接超时"。
+     */
+    private static final int OLLAMA_LOCAL_READ_MS = 5 * 60 * 1000;
 
     /**
      * 下拉里每一项对应的服务端。
      *
-     * url 与 model 必须成对：只换 model 不改 url 的话请求还是打到另一个服务上，
+     * url 与 model 必须成对：只换 model 不改 url 时请求还是打到另一个服务上，
      * 那边不认这个 model，返回的就是一串看不懂的错误。
      *
      * cloudUrl / cloudModel 为空表示该服务只有一种接入方式；
@@ -147,8 +165,8 @@ public class ChatBoxDialog extends Dialog {
     private EditText etMessage;
     private EditText etApiKey;
     private MaterialButton btnKeyMask;
-    /** Key 默认打码显示：聊天框常驻在屏幕上，明文挂着不合适 */
-    private boolean mKeyMasked = true;
+    /** Key 输入框默认收起：聊天框常驻在屏幕上，没必要让一行 Key 一直占着地方 */
+    private boolean mKeyVisible = false;
     private RecyclerView rvMessages;
     private MessageAdapter adapter;
     private Spinner spinnerOptions;
@@ -171,7 +189,7 @@ public class ChatBoxDialog extends Dialog {
     private EditText etOllamaHost;
     private LinearLayout modelRow;
     private Button btnModel;
-    private Button btnModelRefresh;
+    private ImageButton btnModelRefresh;
     /** 拉到的模型按服务端分档存：切回来不用再拉一次 */
     private final Map<String, List<String>> mModelCache = new HashMap<>();
     /** 正在拉哪一档；同档连点只提示一次，不刷出一串并发请求 */
@@ -183,7 +201,7 @@ public class ChatBoxDialog extends Dialog {
 
     public ChatBoxDialog(@NonNull Context context) {
         super(context);
-        // 后续要用 startActivityForResult，这里必须是 Activity；不是的话不强转，避免 ClassCastException
+        // 后续要用 startActivityForResult，这里必须是 Activity；否则不强转，避免 ClassCastException
         mActivity = context instanceof Activity ? (Activity) context : null;
         setContentView(R.layout.dialog_chat_box);
         setupViews();
@@ -236,7 +254,6 @@ public class ChatBoxDialog extends Dialog {
         }
     };
     private void setupViews() {
-        // 初始化视图
         spinnerOptions = findViewById(R.id.spinner_options);
         etMessage = findViewById(R.id.et_message);
         etApiKey = findViewById(R.id.et_api_key);
@@ -248,13 +265,12 @@ public class ChatBoxDialog extends Dialog {
         tvFileName = findViewById(R.id.tv_file_name);
         ImageView ivClearFile = findViewById(R.id.iv_clear_file);
 
-        // 设置下拉选项
         ArrayAdapter<CharSequence> spinnerAdapter = ArrayAdapter.createFromResource(
                 getContext(),
                 R.array.chat_options,
-                R.layout.spinner_selected_item
+                R.layout.item_spinner_selected
         );
-        spinnerAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        spinnerAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         if (spinnerOptions != null) {
             spinnerOptions.setAdapter(spinnerAdapter);
             spinnerOptions.setSelection(mModeIndex);
@@ -274,11 +290,11 @@ public class ChatBoxDialog extends Dialog {
         setupModelRow();
         autoFetchModels();
 
-        // 设置消息列表
         if (rvMessages != null) {
             rvMessages.setLayoutManager(new LinearLayoutManager(getContext()));
             adapter = new MessageAdapter(messageList);
             rvMessages.setAdapter(adapter);
+            setupSwipeToDelete();
         }
 
         // 深度思考 = 换成推理模型，三个服务端都支持
@@ -305,7 +321,6 @@ public class ChatBoxDialog extends Dialog {
 
         setupApiKey();
 
-        // 附件按钮点击
         Button btnAttach = findViewById(R.id.btn_attach);
         Button btnSend = findViewById(R.id.btn_send);
         if (btnAttach != null) {
@@ -315,12 +330,10 @@ public class ChatBoxDialog extends Dialog {
             etMessage.setHint(R.string.msg);
         }
 
-        // 清除附件预览
         if (ivClearFile != null) {
             ivClearFile.setOnClickListener(v -> clearFilePreview());
         }
 
-        // 发送按钮点击
         if (btnSend != null) {
             btnSend.setOnClickListener(v -> onSendClicked());
         }
@@ -328,15 +341,12 @@ public class ChatBoxDialog extends Dialog {
         if (messageList.isEmpty()) {
             appendMessage(new Message(
                     "选一个服务 → 填 API Key（留空沿用内置的）→ 输入内容发送。\n"
-                            + "文本文件附件会读进来一起发，其它文件只带文件名。",
+                            + "附件文本文件会发内容，其它文件只标注。",
                     Message.MessageType.RECEIVED_TEXT, Message.MessageStatus.RECEIVED));
         }
     }
 
-    // ------------------------------------------------------------------
-    // 服务端 / 模型
-    // ------------------------------------------------------------------
-
+    // ===== 服务端 / 模型 =====
     private void handleSpinnerSelection(int position) {
         String[] items = getContext().getResources().getStringArray(R.array.chat_options);
         // 下标来自外部恢复流程时可能越界，直接 items[position] 会数组越界闪退
@@ -344,13 +354,14 @@ public class ChatBoxDialog extends Dialog {
         mModeIndex = position;
         ChatTarget target = position < TARGETS.length ? TARGETS[position] : null;
         if (target == null) {
-            // 最后一项「…」还没接：沿用上一个服务端，别让界面变成一个发不出请求的空壳
+            // 最后一项「…」尚未接入：沿用上一个服务端，避免界面退化为无法发起请求的空壳
             Toast.makeText(getContext(),
                     "「" + items[position] + "」暂未接入，沿用 " + mTarget.name(),
                     Toast.LENGTH_SHORT).show();
         } else {
             mTarget = target;
         }
+        refreshApiKeyField();
         applyOllamaVisibility();
         applyMode();
         autoFetchModels();
@@ -363,19 +374,24 @@ public class ChatBoxDialog extends Dialog {
         saveOllamaPrefs();
         boolean think = checkBox != null && checkBox.isChecked();
         header.reqUrl = resolveUrl();
-        // 手选过的模型优先：勾深度思考不再把它换回推理模型
+        // 用户手选的模型优先：勾选深度思考时不再将其换回推理模型
         String chosen = loadModel();
         header.model = TextUtils.isEmpty(chosen) ? mTarget.modelOf(think, mOllamaCloud) : chosen;
         header.think = think;
         header.token = currentApiKey();
+        /**
+         * 本地自建 Ollama 才放宽读超时：模型在你自己机器上跑，慢是常态。
+         * 连接超时不动 —— 地址填错要在十几秒内就报错，不能让人干等几分钟。
+         * 官方云 / DeepSeek / OpenRouter 走默认：它们要么快，要么有自己的网关超时。
+         */
+        boolean localOllama = mTarget == ChatTarget.OLLAMA && !mOllamaCloud;
+        header.readMs = localOllama ? OLLAMA_LOCAL_READ_MS : 0;
+        header.connectMs = 0;
         request.setHeader(header);
         applyModelUi();
     }
 
-    // ------------------------------------------------------------------
-    // Ollama 接入方式（本地自建 / 官方云）
-    // ------------------------------------------------------------------
-
+    // ===== Ollama 接入方式（本地自建 / 官方云） =====
     private void setupOllamaPanel() {
         ollamaPanel = findViewById(R.id.ollama_panel);
         rgOllamaSource = findViewById(R.id.rg_ollama_source);
@@ -390,7 +406,7 @@ public class ChatBoxDialog extends Dialog {
                 if (!hasFocus) {
                     saveOllamaPrefs();
                     applyMode();
-                    // 换了服务地址，之前那份模型列表已经不是这一台上的了
+                    // 换了服务地址，缓存的那份模型列表已经不是这一台上的了
                     mModelCache.remove("ollama_local");
                     autoFetchModels();
                 }
@@ -400,6 +416,7 @@ public class ChatBoxDialog extends Dialog {
             rgOllamaSource.check(mOllamaCloud ? R.id.rb_ollama_cloud : R.id.rb_ollama_local);
             rgOllamaSource.setOnCheckedChangeListener((group, checkedId) -> {
                 mOllamaCloud = (checkedId == R.id.rb_ollama_cloud);
+                refreshApiKeyField();
                 applyOllamaVisibility();
                 applyMode();
                 autoFetchModels();
@@ -416,6 +433,20 @@ public class ChatBoxDialog extends Dialog {
         }
         if (etOllamaHost != null) {
             etOllamaHost.setVisibility(isOllama && !mOllamaCloud ? View.VISIBLE : View.GONE);
+        }
+        /**
+         * 自建地址默认填的是 127.0.0.1 —— 在手机上那是手机自己，上面不会有 Ollama 在跑。
+         * 不改时每条请求都只能得到"连接被拒绝"，看着就是"这个服务请求无效"，
+         * 所以切到自建这一档时先提醒一句。
+         */
+        if (isOllama && !mOllamaCloud) {
+            String host = normalizeHost(currentOllamaHost());
+            if (host.startsWith("127.0.0.1") || host.startsWith("localhost")) {
+                Toast.makeText(getContext(),
+                        "自建地址还是默认的 " + host + "（指手机自己），"
+                                + "要连电脑上的 Ollama 请改成那台机器的局域网 IP",
+                        Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -434,7 +465,7 @@ public class ChatBoxDialog extends Dialog {
      * 把填进来的地址补成 host:port。
      *
      * 只填 IP 时补默认端口 11434；写成 ip:port 就按填的走（换端口时用这个）。
-     * 顺手容忍误填进来的 http:// 前缀和末尾斜杠。
+     * 同时容忍误填的 http:// 前缀与末尾斜杠。
      */
     private static String normalizeHost(String raw) {
         String host = raw == null ? "" : raw.trim();
@@ -482,10 +513,7 @@ public class ChatBoxDialog extends Dialog {
                 .apply();
     }
 
-    // ------------------------------------------------------------------
-    // 模型：Ollama / OpenRouter 从服务端拉列表，选中哪个用哪个
-    // ------------------------------------------------------------------
-
+    // ===== 模型：Ollama / OpenRouter 从服务端拉列表，选中哪个用哪个 =====
     /** 当前服务端在模型缓存里的档位；null 表示模型固定，没有可拉的列表 */
     private String modelKey() {
         if (mTarget == ChatTarget.OLLAMA) {
@@ -677,9 +705,29 @@ public class ChatBoxDialog extends Dialog {
                 .edit().putString(KEY_MODEL_PREFIX + key, model == null ? "" : model).apply();
     }
 
-    // ------------------------------------------------------------------
-    // 发送
-    // ------------------------------------------------------------------
+    // ===== 发送 =====
+    /** 该服务是否必须有 API Key 才可能请求成功 */
+    private boolean requiresApiKey() {
+        if (mTarget == ChatTarget.DEEPSEEK || mTarget == ChatTarget.OPENROUTER) return true;
+        // 自建 Ollama 不需要鉴权；官方云要走账号
+        return mTarget == ChatTarget.OLLAMA && mOllamaCloud;
+    }
+
+    /**
+     * 发出去之前先查一遍：返回 null 表示可以发，否则是给用户看的原因。
+     * 能在本地判断的一律提前拦下 —— 缺 Key 的请求必然 401，发了只会在界面上
+     * 显示一句"请求失败"，看不出是 Key 没填、地址不对还是服务没起。
+     */
+    private String validateBeforeSend() {
+        if (mTarget == null) return "请先选一个可用的服务";
+        if (requiresApiKey() && currentApiKey().isEmpty()) {
+            return mTarget.name() + " 需要 API Key，请在上方填写";
+        }
+        if (TextUtils.isEmpty(header.model)) {
+            return "没有指定模型，请先在模型那一行选一个";
+        }
+        return null;
+    }
 
     private void onSendClicked() {
         if (mTarget == null) {
@@ -701,6 +749,17 @@ public class ChatBoxDialog extends Dialog {
             return;
         }
 
+        String problem = validateBeforeSend();
+        if (problem != null) {
+            // 缺少 Key 时同时展开 Key 输入框，无需再手动查找该按钮
+            if (requiresApiKey() && !mKeyVisible) {
+                mKeyVisible = true;
+                applyKeyVisibility();
+            }
+            Toast.makeText(getContext(), problem, Toast.LENGTH_LONG).show();
+            return;
+        }
+
         StringBuilder payload = new StringBuilder();
         if (!text.isEmpty()) payload.append(text);
         if (attachment != null) {
@@ -716,16 +775,25 @@ public class ChatBoxDialog extends Dialog {
         // 气泡上只显示用户自己敲的那段：附件正文可能几万字，铺满整屏就没法聊了
         String bubble = text.isEmpty()
                 ? ("[附件] " + (fileName == null ? "文件" : fileName)) : text;
-        sendChat(bubble, payload.toString());
+        // 正文和附件名分开传：气泡上要标出"带了这个附件"，只靠 bubble 那行看不出来
+        sendChat(bubble, payload.toString(),
+                pendingFileUri == null ? null : (fileName == null ? "未命名文件" : fileName),
+                attachment != null);
         if (etMessage != null) etMessage.setText("");
         clearFilePreview();
     }
 
     private void sendChat(String bubble, String payload) {
+        sendChat(bubble, payload, null, false);
+    }
+
+    /** attachment 非 null 时气泡上多一行附件标注 */
+    private void sendChat(String bubble, String payload,
+                          String attachment, boolean attachmentInlined) {
         appendMessage(new Message(bubble, Message.MessageType.SENT_TEXT,
-                Message.MessageStatus.SENT));
+                Message.MessageStatus.SENT, attachment, attachmentInlined));
         // 占位气泡：发出去之后界面上得有个"在等"的反馈，回复回来原地替换
-        mPending = new Message("正在思考…", Message.MessageType.RECEIVED_TEXT,
+        mPending = new Message("思考中…", Message.MessageType.RECEIVED_TEXT,
                 Message.MessageStatus.RECEIVING);
         appendMessage(mPending);
         mThinking = true;
@@ -765,10 +833,56 @@ public class ChatBoxDialog extends Dialog {
         scrollToBottom();
     }
 
-    // ------------------------------------------------------------------
-    // API Key
-    // ------------------------------------------------------------------
+    /**
+     * 气泡左右滑动删除。
+     *
+     * 用 ItemTouchHelper 而不是自己写手势：滑动的位移、松手后的回弹/移除动画
+     * 它都自带，RecyclerView 这边不用管。
+     */
+    private void setupSwipeToDelete() {
+        if (rvMessages == null) return;
+        ItemTouchHelper helper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                // 只开左右滑（删除），不开上下拖（不做排序）
+                0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
 
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int pos = viewHolder.getAdapterPosition();
+                // 动画还在跑的时候拿到的可能是 NO_POSITION(-1)，或者已经被删过了
+                if (pos == RecyclerView.NO_POSITION || pos < 0 || pos >= messageList.size()) {
+                    return;
+                }
+                removeMessageAt(pos);
+            }
+        });
+        helper.attachToRecyclerView(rvMessages);
+    }
+
+    private void removeMessageAt(int pos) {
+        Message gone = messageList.get(pos);
+        if (gone == mPending) {
+            /**
+             * 划掉的正是"思考中…"那条占位。请求还在路上，
+             * 不清这两个时后面 finishPending() 会往一条已经移除的气泡上写，
+             * 而且 mThinking 一直卡着会让之后的发送全被"上一条还在等回复"挡掉。
+             */
+            mPending = null;
+            mThinking = false;
+        }
+        messageList.remove(pos);
+        if (adapter != null) {
+            adapter.notifyItemRemoved(pos);
+        }
+    }
+
+    // ===== API Key =====
     /** 输入框 + 打码开关：填过一次就存在本地，下次打开自动带出 */
     private void setupApiKey() {
         if (etApiKey == null) return;
@@ -783,50 +897,72 @@ public class ChatBoxDialog extends Dialog {
         });
         if (btnKeyMask != null) {
             btnKeyMask.setOnClickListener(v -> {
-                mKeyMasked = !mKeyMasked;
-                applyKeyMask();
+                mKeyVisible = !mKeyVisible;
+                applyKeyVisibility();
+                if (mKeyVisible) {
+                    // 展开就直接给焦点，省一次点击
+                    etApiKey.requestFocus();
+                } else {
+                    // 收起前先落盘：刚改完可能还没失焦，焦点监听不会触发
+                    saveApiKey();
+                    applyMode();
+                }
             });
         }
-        applyKeyMask();
+        applyKeyVisibility();
+    }
+
+    /**
+     * Key 输入框的显隐：收起时整个框不在界面上（比打码更彻底，也不占地方），
+     * 展开时是明文（布局里的 inputType 是 textVisiblePassword），
+     * 方便核对到底填的是哪一家的 Key。
+     */
+    private void applyKeyVisibility() {
+        if (etApiKey == null) return;
+        etApiKey.setVisibility(mKeyVisible ? View.VISIBLE : View.GONE);
+        if (btnKeyMask != null) {
+            btnKeyMask.setText(mKeyVisible ? R.string.chat_api_key_hide : R.string.chat_api_key_show);
+        }
+    }
+
+    /**
+     * API Key 按服务分开存哪一档。三家的 Key 互不相通，共用一份时
+     * 在 A 服务下填的会被原样带到 B，B 那边只能回 401。
+     */
+    private String keyPref() {
+        if (mTarget == null) return KEY_API;
+        if (mTarget == ChatTarget.OLLAMA) {
+            return KEY_API_PREFIX + (mOllamaCloud ? "ollama_cloud" : "ollama_local");
+        }
+        return KEY_API_PREFIX + mTarget.name().toLowerCase(Locale.ROOT);
     }
 
     private String loadApiKey() {
-        return getContext().getSharedPreferences(CHAT_PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_API, "");
+        SharedPreferences prefs = getContext().getSharedPreferences(CHAT_PREFS, Context.MODE_PRIVATE);
+        // 取不到本档自己的 Key 时回退到共享的那份：已经填好的 Key 不至于弄丢
+        return prefs.getString(keyPref(), prefs.getString(KEY_API, ""));
     }
 
     private void saveApiKey() {
         if (etApiKey == null) return;
         String key = etApiKey.getText() == null ? "" : etApiKey.getText().toString().trim();
         getContext().getSharedPreferences(CHAT_PREFS, Context.MODE_PRIVATE)
-                .edit().putString(KEY_API, key).apply();
+                .edit().putString(keyPref(), key).apply();
     }
 
-    /** 切换明文 / 打码；改 inputType 会丢光标位置，这里手动放回去 */
-    private void applyKeyMask() {
-        if (etApiKey == null || etApiKey.getText() == null) return;
-        // 没聚焦过的 EditText，getSelectionStart() 会返回 -1；
-        // API 28+ 的 Selection.setSelection 不再自动裁剪，越界直接抛 IndexOutOfBoundsException。
-        int len = etApiKey.getText().length();
-        int start = clampTo(etApiKey.getSelectionStart(), len);
-        int end = clampTo(etApiKey.getSelectionEnd(), len);
-        etApiKey.setInputType(mKeyMasked
-                ? (android.text.InputType.TYPE_CLASS_TEXT
-                   | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
-                : (android.text.InputType.TYPE_CLASS_TEXT
-                   | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD));
-        etApiKey.setSelection(start, end);
-        if (btnKeyMask != null) {
-            btnKeyMask.setText(mKeyMasked ? R.string.chat_api_key_mask : R.string.chat_api_key_show);
-        }
+    /**
+     * 切换服务 / 切换 Ollama 接入方式时，将当前档位自身的 Key 回填至输入框。
+     *
+     * 必须在 applyMode() 之前调用：applyMode() 里会 saveApiKey()，
+     * 晚一步就会把上一家留下的 Key 存到这一家的名下。
+     */
+    private void refreshApiKeyField() {
+        if (etApiKey == null) return;
+        etApiKey.setText(loadApiKey());
+        etApiKey.setSelection(etApiKey.getText().length());
     }
 
-    /** 把可能为负的光标下标夹到 [0, len] */
-    private static int clampTo(int value, int len) {
-        return Math.max(0, Math.min(value, len));
-    }
-
-    /** 当前生效的 Key：空串表示沿用内置的那一个 */
+    /** 当前生效的 Key：空串表示该服务不需要 / 没填 */
     private String currentApiKey() {
         if (etApiKey == null || etApiKey.getText() == null) return "";
         return etApiKey.getText().toString().trim();
@@ -863,7 +999,6 @@ public class ChatBoxDialog extends Dialog {
         mActivity.startActivityForResult(choose, CHAT_FILE_REQUEST);
     }
 
-    // 处理文件选择结果
     public void handleFileResult(Uri fileUri) {
         if (fileUri == null) return;
         String fileName = getFileNameFromUri(fileUri);
@@ -955,13 +1090,11 @@ public class ChatBoxDialog extends Dialog {
         return result;
     }
 
-    // 自动滚动到底部
     private void scrollToBottom() {
         if (rvMessages == null || adapter == null || messageList.isEmpty()) return;
         final int last = messageList.size() - 1;
         rvMessages.post(() -> {
             rvMessages.smoothScrollToPosition(last);
-            // 或者使用以下代码确保完全滚动到底部
             RecyclerView.LayoutManager lm = rvMessages.getLayoutManager();
             if (lm instanceof LinearLayoutManager) {
                 ((LinearLayoutManager) lm).scrollToPositionWithOffset(last, 0);
@@ -969,7 +1102,6 @@ public class ChatBoxDialog extends Dialog {
         });
     }
 
-    // 消息适配器
     public static class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         private int lastPosition = -1;
         private static final int TYPE_SENT = 1;
@@ -1008,19 +1140,29 @@ public class ChatBoxDialog extends Dialog {
                 SentMessageHolder sentHolder = (SentMessageHolder) holder;
                 sentHolder.tvContent.setText(message.getContent());
                 sentHolder.tvTime.setText(TimeUtils.smartTimeFormat(message.getTimestamp()));
+                String attachment = message.getAttachment();
+                if (attachment != null && sentHolder.tvAttachment != null) {
+                    sentHolder.tvAttachment.setVisibility(View.VISIBLE);
+                    sentHolder.tvAttachment.setText(message.isAttachmentInlined()
+                            ? holder.itemView.getContext().getString(
+                                    R.string.chat_attach_with_content, attachment)
+                            : holder.itemView.getContext().getString(
+                                    R.string.chat_attach_name_only, attachment));
+                } else if (sentHolder.tvAttachment != null) {
+                    sentHolder.tvAttachment.setVisibility(View.GONE);
+                }
             } else if (holder instanceof ReceivedMessageHolder) {
                 ReceivedMessageHolder receivedHolder = (ReceivedMessageHolder) holder;
-                receivedHolder.tvContent.setText(message.getContent());
+                // 模型回复按 Markdown 渲染；自己发出去的保持原样
+                receivedHolder.tvContent.setText(MarkdownUtils.render(message.getContent()));
                 receivedHolder.tvTime.setText(TimeUtils.smartTimeFormat(message.getTimestamp()));
-                // 进度条：只有"正在思考…"那条占位气泡转，收到回复后收起来
+                // 进度条：只有"思考中…"那条占位气泡转，收到回复后收起来
                 if (message.getStatus() == Message.MessageStatus.RECEIVING) {
                     receivedHolder.progressBar.setVisibility(View.VISIBLE);
-                    receivedHolder.maskView.setVisibility(View.VISIBLE);
                     startProgressAnimation(receivedHolder.progressBar);
                 } else {
                     receivedHolder.progressBar.clearAnimation();
                     receivedHolder.progressBar.setVisibility(View.GONE);
-                    receivedHolder.maskView.setVisibility(View.GONE);
                 }
             }
             if (position > lastPosition) {
@@ -1061,30 +1203,28 @@ public class ChatBoxDialog extends Dialog {
         }
 
         static class SentMessageHolder extends RecyclerView.ViewHolder {
-            TextView tvContent, tvTime;
+            TextView tvContent, tvTime, tvAttachment;
 
             SentMessageHolder(View itemView) {
                 super(itemView);
                 tvContent = itemView.findViewById(R.id.tv_content);
                 tvTime = itemView.findViewById(R.id.tv_time);
+                tvAttachment = itemView.findViewById(R.id.tv_attachment);
             }
         }
 
         static class ReceivedMessageHolder extends RecyclerView.ViewHolder {
             TextView tvContent, tvTime;
             ProgressBar progressBar;
-            View maskView;
             ReceivedMessageHolder(View itemView) {
                 super(itemView);
                 tvContent = itemView.findViewById(R.id.tv_content);
                 tvTime = itemView.findViewById(R.id.tv_time);
                 progressBar = itemView.findViewById(R.id.progress_bar);
-                maskView = itemView.findViewById(R.id.mask_view);
             }
         }
     }
 
-    // 消息数据类
     public static class Message {
         public enum MessageType {
             SENT_TEXT,   // 发送的文本
@@ -1105,27 +1245,40 @@ public class ChatBoxDialog extends Dialog {
         String content;
         private final MessageType type;
         private final long timestamp;
+        /** 这条消息带了哪个附件；气泡上要标出来，否则过一会儿看不出来发过附件 */
+        private final String attachment;
+        /** 附件正文是否也一起发了（非文本只带文件名） */
+        private final boolean attachmentInlined;
 
         public Message(String content, MessageType type) {
             this(content, type, MessageStatus.RECEIVING);
         }
 
         public Message(String content, MessageType type, MessageStatus status) {
+            this(content, type, status, null, false);
+        }
+
+        public Message(String content, MessageType type, MessageStatus status,
+                       String attachment, boolean attachmentInlined) {
             this.content = content;
             this.type = type;
             this.status = status;
+            this.attachment = attachment;
+            this.attachmentInlined = attachmentInlined;
             this.timestamp = System.currentTimeMillis();
         }
 
-        // Getters
         public String getContent() { return content; }
         public MessageType getType() { return type; }
         public long getTimestamp() { return timestamp; }
+        public String getAttachment() { return attachment; }
+        public boolean isAttachmentInlined() { return attachmentInlined; }
     }
 
 
+
     public static class Request {
-        private final String TOKEN = "sk-66xxxx";
+        /** 不给空 Key 兜底：需要 Key 的服务在发送前就拦下（validateBeforeSend()）。 */
         private final String REQ_URL = "https://api.deepseek.com/chat/completions";
         private final HashMap<String, String> headers = new HashMap<>();
         public static class Header {
@@ -1135,6 +1288,9 @@ public class ChatBoxDialog extends Dialog {
             Handler handler = null;
             boolean isPost = true;
             boolean think = false;
+            /** 超时，毫秒；<=0 表示沿用 HttpsRequest 的默认值 */
+            int connectMs = 0;
+            int readMs = 0;
         }
         Header mHeader = new Header();
         public void setHeader(Header header) {
@@ -1146,11 +1302,21 @@ public class ChatBoxDialog extends Dialog {
                     ? REQ_URL : header.reqUrl;
             mHeader.model = (header.model == null || header.model.isEmpty())
                     ? "deepseek-chat" : header.model;
-            // 空 Key 回落内置的那一个；不回写 header.token，否则输入框里会凭空多出一串字符
-            String token = (header.token == null || header.token.isEmpty())
-                    ? TOKEN : header.token;
+            mHeader.token = (header.token == null || header.token.isEmpty())
+                    ? null : header.token;
+            mHeader.connectMs = header.connectMs;
+            mHeader.readMs = header.readMs;
             headers.put("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15");
-            headers.put("Authorization", "Bearer " + token);
+            /**
+             * 只在真填了 Key 时才带 Authorization：
+             *  - 自建 Ollama 不需要鉴权，带一串空的/假的反而可能被中间的代理拒掉；
+             *  - headers 是这个对象里复用的 Map，切到不需要 Key 的服务时必须把旧的摘掉，
+             *    否则上一个服务的密钥会被带到这一家去。
+             */
+            headers.remove("Authorization");
+            if (mHeader.token != null) {
+                headers.put("Authorization", "Bearer " + mHeader.token);
+            }
         }
 
         private String buildChatBody(String userText) throws JSONException {
@@ -1202,15 +1368,41 @@ public class ChatBoxDialog extends Dialog {
                     return -1;
                 }
             }
+            /**
+             * 打一条请求自身的信息：发到哪个地址、用哪个模型、带没带鉴权头。
+             * 排查 401 / 连不上时第一个要看的就是这个。
+             * 只记"带没带"，不记 Key 本身 —— 密钥不该进日志。
+             */
+            Log.d("HTTPS", method + " " + mHeader.reqUrl
+                    + " model=" + mHeader.model
+                    + " auth=" + (headers.containsKey("Authorization") ? "yes" : "no"));
             HttpsRequest.executeRequest(
                     mHeader.reqUrl,
                     method,
                     headers,
                     body,
+                    "utf-8",
+                    mHeader.connectMs,
+                    mHeader.readMs,
                     new HttpsRequest.HttpsRequestCallback() {
                         @Override
                         public void onSuccess(int responseCode, String response, Map<String, String> headers) {
                             String content = response == null ? "" : response;
+                            /**
+                             * 先看状态码：只看内容是否为空时，网关的 502 页、CDN 的 403 页
+                             * 这类"有内容但确实是错的"响应会被当成正常回复直接显示出来 ——
+                             * 看着就是一条莫名其妙的回复。
+                             */
+                            if (responseCode >= 400) {
+                                String msg = "HTTP " + responseCode + "：" + errorDetail(content);
+                                // 401/403 几乎都是 Key 本身的问题：无效、过期，
+                                // 或者填的是别家的 Key
+                                if (responseCode == 401 || responseCode == 403) {
+                                    msg += "（Key 无效、过期，或属于别的服务）";
+                                }
+                                deliver(MSG_FAILED, msg);
+                                return;
+                            }
                             try {
                                 JSONObject jsonObject = new JSONObject(content);
                                 JSONArray choices = jsonObject.optJSONArray("choices");
@@ -1232,25 +1424,83 @@ public class ChatBoxDialog extends Dialog {
                                 // 非预期格式（多数是网关错误页）直接整段回显示，方便排查
                                 Log.w("HTTPS", "unexpected response format", e);
                             }
-                            if ((content == null || content.trim().isEmpty()) && responseCode >= 400) {
-                                deliver(MSG_FAILED, "HTTP " + responseCode + "，无返回内容");
+                            if (content.trim().isEmpty()) {
+                                deliver(MSG_FAILED, "返回内容为空");
                                 return;
                             }
                             deliver(MSG_RECEIVED, content);
-                            Log.d("HTTPS", "Response: " + response);
+                            // 不记响应体：长回复刷屏，正文内容也不该进日志
                         }
                         @Override
                         public void onFailure(Exception e) {
                             // e.getMessage() 经常是 null，直接塞进 msg.obj 会让 Handler 里 toString() 空指针闪退
-                            String reason = e == null ? null : e.getMessage();
-                            if (reason == null || reason.isEmpty()) {
-                                reason = e == null ? "未知错误" : (e.getClass().getSimpleName());
-                            }
-                            deliver(MSG_FAILED, reason);
+                            deliver(MSG_FAILED, friendlyError(e));
                             Log.e("HTTPS", "Error: " + (e == null ? "" : e.getMessage()));
                         }
                     });
             return 0;
+        }
+
+        /**
+         * 从错误响应体里摘一句人能看的说明。
+         *
+         * OpenAI 兼容的服务一般回 {"error":{"message":...}}，但也可能是一整页 HTML
+         * （网关、CDN 拦下来的），那就压成一行截一段，避免整页内容塞进气泡。
+         */
+        private static String errorDetail(String body) {
+            if (body == null || body.trim().isEmpty()) return "无返回内容";
+            try {
+                JSONObject json = new JSONObject(body);
+                JSONObject err = json.optJSONObject("error");
+                if (err != null) {
+                    String msg = err.optString("message", "");
+                    if (!msg.isEmpty()) return msg;
+                }
+                String msg = json.optString("message", "");
+                if (!msg.isEmpty()) return msg;
+            } catch (JSONException ignored) {
+                // 不是 JSON：下面按纯文本处理
+            }
+            String flat = body.replaceAll("\\s+", " ").trim();
+            return flat.length() > 200 ? flat.substring(0, 200) + "…" : flat;
+        }
+
+        /**
+         * 把 HttpURLConnection 抛的异常翻成人话。
+         *
+         * IOException 的 getMessage() 多数时候是 null 或者一长串内部描述（比如
+         * "Cleartext HTTP traffic to 192.168.1.5 not permitted"），直接显示出去
+         * 用户看不懂；按最常见的几种归类，至少能知道该去改哪里。
+         */
+        private static String friendlyError(Exception e) {
+            if (e == null) return "未知错误";
+            String raw = e.getMessage();
+            String m = raw == null ? "" : raw.toLowerCase(Locale.ROOT);
+            String name = e.getClass().getSimpleName();
+            if (m.contains("cleartext")) {
+                return "明文 HTTP 被系统拦截，请改用 https 的地址";
+            }
+            if (e instanceof UnknownHostException || m.contains("unknownhost")
+                    || m.contains("unable to resolve")) {
+                return "地址解析失败：主机名或 IP 写错了";
+            }
+            if (m.contains("econnrefused") || m.contains("connection refused")) {
+                return "连接被拒绝：该地址上没有服务在听，检查服务是否启动、端口是否正确";
+            }
+            if (e instanceof SocketTimeoutException || m.contains("timed out") || m.contains("timeout")) {
+                return "连接超时：服务没响应，检查网络与服务状态";
+            }
+            if (m.contains("enetunreach") || m.contains("network is unreachable")) {
+                return "网络不可达：本机没连上目标所在的网络";
+            }
+            if (m.contains("ehostunreach") || m.contains("no route to host")) {
+                return "主机不可达：同网段里找不到这台机器（对端 WiFi 断了或 IP 变了）";
+            }
+            if (e instanceof MalformedURLException) {
+                return "地址格式不对：" + raw;
+            }
+            if (raw == null || raw.isEmpty()) return name;
+            return name + "：" + raw;
         }
     }
 }

@@ -7,21 +7,73 @@
     android:orientation="vertical"
     android:padding="10dp">
 
-    <!-- 顶部下拉选择 -->
-    <Spinner
-        android:id="@+id/spinner_options"
+    <!-- 顶部：服务选择 + API Key 展开按钮。
+         这个按钮放在底部输入卡片里会紧贴消息输入框上方 —— 手往输入框去的时候
+         易发生误触，一旦触及即弹出 Key 输入框。故移至顶部与服务选择并排：
+         Key 本来就是服务级别的配置，跟选哪家服务放一起也说得通，
+         离打字区域远了，误触不到。 -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:background="@drawable/bg_spinner"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Spinner
+            android:id="@+id/spinner_options"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_spinner"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="#212121"
+            android:textSize="14sp"
+            android:dropDownVerticalOffset="4dp"
+            android:dropDownWidth="match_parent"
+            android:popupBackground="@android:color/white"
+            android:popupElevation="4dp" />
+
+        <!-- 描边和文字取同一个色：OutlinedButton 的描边默认跟着 colorAccent（粉 #D81B60），
+             文字却默认跟 colorPrimary（青绿 #008577），一小块按钮上两个色相撞在一起。
+             统一用 colorPrimary，跟页面里的小节标题、气泡描边一个色系。 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_key_mask"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:minWidth="0dp"
+            android:text="@string/chat_api_key_show"
+            android:textColor="@color/colorPrimary"
+            android:textSize="11sp"
+            app:cornerRadius="18dp"
+            app:rippleColor="#26008577"
+            app:strokeColor="@color/colorPrimary"
+            app:strokeWidth="1dp" />
+    </LinearLayout>
+
+    <!-- API Key 输入框：默认收起，点上面那个按钮展开/收起
+         （ChatBoxDialog.applyKeyVisibility() 控制） -->
+    <EditText
+        android:id="@+id/et_api_key"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone"
+        android:background="@drawable/bg_edit"
+        android:hint="@string/chat_api_key_hint"
+        android:imeOptions="actionDone"
+        android:importantForAutofill="no"
+        android:inputType="textVisiblePassword"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="7dp"
+        android:paddingBottom="7dp"
         android:textColor="#212121"
-        android:textSize="14sp"
-        android:dropDownVerticalOffset="4dp"
-        android:dropDownWidth="match_parent"
-        android:popupBackground="@android:color/white"
-        android:popupElevation="4dp" />
+        android:textColorHint="#B0B0B0"
+        android:textSize="12sp" />
 
     <!-- Ollama 接入方式：自建服务（地址可填）或官方云。选到 Ollama 时才出现 -->
     <LinearLayout
@@ -123,16 +175,18 @@
             android:text="@string/chat_model_pick"
             android:textSize="12sp" />
 
-        <Button
+        <!-- 只留图标。文字挪到 contentDescription：无障碍朗读和长按提示都还用得上，
+             但行内不再占宽度 -->
+        <ImageButton
             android:id="@+id/btn_model_refresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_marginStart="6dp"
-            android:minHeight="36dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="@string/chat_model_refresh"
-            android:textSize="12sp" />
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="@string/chat_model_refresh"
+            android:padding="8dp"
+            android:src="@drawable/ic_refresh"
+            android:tint="?attr/colorControlNormal" />
     </LinearLayout>
 
     <!-- 消息显示区域 (占据剩余空间) -->
@@ -202,47 +256,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-
-            <!-- API Key：填了就用它调 LLM，留空沿用内置 Key；值存在本地，下次打开自动带出 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <EditText
-                    android:id="@+id/et_api_key"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_edit"
-                    android:hint="@string/chat_api_key_hint"
-                    android:imeOptions="actionDone"
-                    android:importantForAutofill="no"
-                    android:inputType="textVisiblePassword"
-                    android:maxLines="1"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="7dp"
-                    android:paddingBottom="7dp"
-                    android:textColor="#212121"
-                    android:textColorHint="#B0B0B0"
-                    android:textSize="12sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_key_mask"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
-                    android:minWidth="0dp"
-                    android:text="@string/chat_api_key_mask"
-                    android:textSize="11sp"
-                    app:cornerRadius="18dp"
-                    app:strokeColor="@color/colorAccent"
-                    app:strokeWidth="1dp" />
-            </LinearLayout>
 
             <!-- 消息输入框 -->
             <EditText

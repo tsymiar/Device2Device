@@ -20,6 +20,17 @@
             android:textColor="@android:color/white"
             android:textSize="16sp"/>
 
+        <!-- 带附件发出的那条在这里标出附件名，否则过一会儿看不出这条发过附件 -->
+        <TextView
+            android:id="@+id/tv_attachment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="12sp"
+            android:textStyle="italic"
+            android:visibility="gone"
+            android:textColor="#CCFFFFFF"/>
+
         <TextView
             android:id="@+id/tv_time"
             android:layout_width="wrap_content"

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自建 Ollama 走的是 http://局域网IP:11434，而 targetSdk 31 起 Android 默认禁止明文 HTTP ——
+     不配这项，明文 HTTP 请求会被系统在建连前就拦掉（IOException: Cleartext HTTP traffic ... not permitted），
+     界面上只看到"请求失败"，根本不知道是系统拦的。
+
+     domain-config 里没法枚举用户自己填的局域网 IP，所以只能整体放行明文。
+     对外那些服务端（DeepSeek / OpenRouter / Ollama 官方云）都是 https，不受影响。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

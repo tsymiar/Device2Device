@@ -21,6 +21,14 @@ public class HttpsRequest {
         void onFailure(Exception e);
     }
 
+    /**
+     * 默认超时。行情 / 翻译这类接口几秒内就该回来，15 秒足够。
+     *
+     * 本地跑的大模型不适用：见下面带超时参数的重载。
+     */
+    public static final int DEFAULT_CONNECT_MS = 10000;
+    public static final int DEFAULT_READ_MS = 15000;
+
     private static final ExecutorService executor = Executors.newCachedThreadPool();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -30,7 +38,8 @@ public class HttpsRequest {
             HashMap<String, String> headers,
             String requestBody,
             HttpsRequestCallback callback) {
-        executeRequest(urlString, method, headers, requestBody, "utf-8", callback);
+        executeRequest(urlString, method, headers, requestBody, "utf-8",
+                DEFAULT_CONNECT_MS, DEFAULT_READ_MS, callback);
     }
 
     /**
@@ -45,6 +54,28 @@ public class HttpsRequest {
             String requestBody,
             String charset,
             HttpsRequestCallback callback) {
+        executeRequest(urlString, method, headers, requestBody, charset,
+                DEFAULT_CONNECT_MS, DEFAULT_READ_MS, callback);
+    }
+
+    /**
+     * 带超时参数的版本。
+     *
+     * @param connectMs >0 时生效，否则用 {@link #DEFAULT_CONNECT_MS}
+     * @param readMs    >0 时生效，否则用 {@link #DEFAULT_READ_MS}。
+     *                  读超时管的是"等多久还没等到下一个字节"，本地大模型一次生成
+     *                  几十秒到几分钟都正常，默认的 15 秒会把还在跑的请求掐掉，
+     *                  所以慢接口由调用方自己定，不统一加长。
+     */
+    public static void executeRequest(
+            String urlString,
+            String method,
+            HashMap<String, String> headers,
+            String requestBody,
+            String charset,
+            int connectMs,
+            int readMs,
+            HttpsRequestCallback callback) {
 
         executor.execute(() -> {
             HttpURLConnection connection = null;
@@ -54,19 +85,16 @@ public class HttpsRequest {
                 URL url = new URL(urlString);
                 connection = (HttpURLConnection) url.openConnection();
 
-                // 设置基本参数
                 connection.setRequestMethod(method);
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(15000);
+                connection.setConnectTimeout(connectMs > 0 ? connectMs : DEFAULT_CONNECT_MS);
+                connection.setReadTimeout(readMs > 0 ? readMs : DEFAULT_READ_MS);
 
-                // 添加请求头
                 if (headers != null) {
                     for (Map.Entry<String, String> entry : headers.entrySet()) {
                         connection.setRequestProperty(entry.getKey(), entry.getValue());
                     }
                 }
 
-                // 处理请求体
                 if (requestBody != null && (method.equals("POST") || method.equals("PUT"))) {
                     connection.setDoOutput(true);
                     try (OutputStream os = connection.getOutputStream()) {
@@ -75,10 +103,8 @@ public class HttpsRequest {
                     }
                 }
 
-                // 获取响应
                 int responseCode = connection.getResponseCode();
 
-                // 读取响应头
                 Map<String, String> responseHeaders = new HashMap<>();
                 for (Map.Entry<String, java.util.List<String>> header : connection.getHeaderFields().entrySet()) {
                     if (header.getKey() != null && header.getValue() != null) {
@@ -86,17 +112,14 @@ public class HttpsRequest {
                     }
                 }
 
-                // 读取响应内容
                 InputStream inputStream = (responseCode >= 400) ?
                         connection.getErrorStream() : connection.getInputStream();
                 String response = convertStreamToString(inputStream, charset);
 
-                // 成功回调
                 mainHandler.post(() ->
                         callback.onSuccess(responseCode, response, responseHeaders));
 
             } catch (Exception e) {
-                // 失败回调
                 mainHandler.post(() -> callback.onFailure(e));
             } finally {
                 if (connection != null) {
