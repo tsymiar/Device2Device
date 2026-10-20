@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选图按钮的文字：它是描边按钮，底是透明的，压在卡片白底上。
+     不能复用 sel_lan_send_text（那个是白字压在青绿实心底上），白字在白底上等于隐形。
+     启用态用 lan_accent（日间深青绿、夜间浅青绿，values-night 里已换色），
+     禁用态和其它按钮一样压成灰字。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lan_btn_off_text" android:state_enabled="false" />
+    <item android:color="@color/lan_accent" />
+</selector>

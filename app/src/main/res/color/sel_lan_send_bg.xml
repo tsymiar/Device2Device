@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 发送按钮底色：没选目标 / 没启动时是灰的，可用了才点亮 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lan_send_on_pressed" android:state_pressed="true" />
+    <item android:color="@color/lan_btn_off" android:state_enabled="false" />
+    <item android:color="@color/lan_send_on" />
+</selector>

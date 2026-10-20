@@ -205,7 +205,7 @@
                         android:textSize="10sp" />
                 </LinearLayout>
 
-                <!-- UDP：server 绿框 / client 橙框 -->
+                <!-- 设备发现：复用局域网消息的 UDP 广播发现，只列设备，不做后续操作 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -213,82 +213,59 @@
                     android:orientation="vertical"
                     android:padding="10dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="6dp"
-                            android:text="@string/group_udp"
-                            android:textColor="@color/colorPrimary"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:text="@string/group_discover"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_discover"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:text="@string/discover_btn"
+                            android:textColor="#4CAF50"
                             android:textSize="12sp"
-                            android:textStyle="bold" />
+                            app:cornerRadius="18dp"
+                            app:strokeColor="#4CAF50"
+                            app:strokeWidth="1dp" />
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_discover_stop"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:text="@string/discover_end"
+                            android:textColor="#9E9E9E"
+                            android:textSize="12sp"
+                            app:cornerRadius="18dp"
+                            app:strokeColor="#9E9E9E"
+                            app:strokeWidth="1dp" />
+                    </LinearLayout>
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_udp_server"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="36dp"
-                                android:layout_marginEnd="6dp"
-                                android:layout_weight="1"
-                                android:paddingStart="8dp"
-                                android:paddingEnd="8dp"
-                                android:text="@string/udp_listen"
-                                android:textColor="#4CAF50"
-                                android:textSize="12sp"
-                                app:cornerRadius="18dp"
-                                app:strokeColor="#4CAF50"
-                                app:strokeWidth="1dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_udp_client"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="36dp"
-                                android:layout_weight="1"
-                                android:paddingStart="8dp"
-                                android:paddingEnd="8dp"
-                                android:text="@string/udp_send"
-                                android:textSize="12sp"
-                                app:cornerRadius="18dp"
-                                app:strokeColor="#FF9800"
-                                app:strokeWidth="1dp" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:id="@+id/txt_udp_server"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginEnd="6dp"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:gravity="center"
-                                android:maxLines="1"
-                                android:text="@string/dftHint"
-                                android:textColor="#9E9E9E"
-                                android:textSize="10sp" />
-
-                            <TextView
-                                android:id="@+id/txt_udp_client"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:gravity="center"
-                                android:maxLines="1"
-                                android:text="@string/dftHint"
-                                android:textColor="#9E9E9E"
-                                android:textSize="10sp" />
-                        </LinearLayout>
+                    <!-- 设备列表：外层 ScrollView 负责滚动，这里直接加行，省掉 ListView 的高度测算 -->
+                    <LinearLayout
+                        android:id="@+id/ll_discover_peers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="vertical" />
                 </LinearLayout>
 
                 <!-- KCP：server 绿框 / client 橙框 -->
@@ -339,6 +316,58 @@
                                 app:strokeColor="#FF9800"
                                 app:strokeWidth="1dp" />
                         </LinearLayout>
+
+                        <!-- 对端地址与要发的消息同一行：各占一半，与上方两个按钮一一对齐，
+                             同网段另一台设备填这个就能跨机收发（服务端绑 0.0.0.0） -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <EditText
+                                android:id="@+id/et_kcp_addr"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_edit"
+                                android:hint="@string/kcp_peer_hint"
+                                android:imeOptions="actionDone"
+                                android:inputType="textUri"
+                                android:maxLines="1"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:text="@string/address"
+                                android:textColor="@color/dark_grey"
+                                android:textSize="12sp" />
+
+                            <EditText
+                                android:id="@+id/et_kcp_msg"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_edit"
+                                android:hint="@string/kcp_msg_hint"
+                                android:imeOptions="actionSend"
+                                android:inputType="text"
+                                android:maxLines="1"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:textColor="@color/dark_grey"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/txt_kcp_self"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/kcp_self_unknown"
+                            android:textColor="@color/hint_text"
+                            android:textSize="10sp" />
 
                         <!-- KCP 状态行：start 显示，stop 收回 -->
                         <LinearLayout
@@ -483,12 +512,19 @@
                     app:cornerRadius="20dp" />
             </LinearLayout>
 
-            <!-- HTTP 服务操作：复制访问地址 + 停止 -->
+            <!-- HTTP 服务操作：复制访问地址 + 停止。
+                 服务没起来时整行隐藏（SelectActivity.showHttpState() 控制），
+                 起来了才显示 -->
             <LinearLayout
+                android:id="@+id/ll_http_ops"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:visibility="gone">
 
+                <!-- 按钮只有 36dp 高，字体自带的 ascent/descent 留白会把文字顶得偏上，
+                     去掉才能在垂直方向居中；gravity / textAlignment 需显式声明居中，
+                     以免继承到 start 的默认样式 -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_http_copy"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -497,7 +533,13 @@
                     android:layout_marginEnd="4dp"
                     android:layout_weight="1"
                     android:enabled="false"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     android:text="@string/http_server_copy"
+                    android:textAlignment="center"
+                    android:textAllCaps="false"
                     app:cornerRadius="20dp"
                     app:strokeColor="#1976D2" />
 
@@ -509,53 +551,116 @@
                     android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:enabled="false"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
                     android:text="@string/http_server_stop"
+                    android:textAlignment="center"
+                    android:textAllCaps="false"
                     app:cornerRadius="20dp"
                     app:strokeColor="#FF5722" />
             </LinearLayout>
 
-            <!-- SSH 服务：启动 -->
+            <!-- 局域网文本消息：C++ 实现的设备发现 + 收发，一个实例同时是客户端和服务端 -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_ssh_server"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:layout_marginTop="8dp"
-                android:text="@string/ssh_server"
-                app:backgroundTint="#00897B"
-                app:cornerRadius="20dp" />
-
-            <!-- SSH 服务操作：复制连接信息 + 停止（默认折叠，启动成功后展开） -->
-            <LinearLayout
-                android:id="@+id/ssh_actions"
+                android:id="@+id/btn_lan_msg"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/lan_msg"
+                app:cornerRadius="20dp"
+                app:strokeColor="#00897B"
+                app:strokeWidth="1dp" />
+
+            <!-- ============ SSH 服务（默认折叠，点标题栏展开） ============ -->
+            <LinearLayout
+                android:id="@+id/ssh_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="18dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="#00897B" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ssh_server"
+                    android:textColor="#00897B"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/ssh_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="▼"
+                    android:textColor="#00897B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ssh_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
                 android:visibility="gone">
 
+                <!-- SSH 服务：启动 -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_ssh_copy"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
+                    android:id="@+id/btn_ssh_server"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="match_parent"
                     android:layout_height="36dp"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:enabled="false"
-                    android:text="@string/ssh_server_copy"
-                    app:cornerRadius="20dp"
-                    app:strokeColor="#00897B" />
+                    android:text="@string/ssh_server"
+                    app:backgroundTint="#00897B"
+                    app:cornerRadius="20dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_ssh_stop"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:enabled="false"
-                    android:text="@string/ssh_server_stop"
-                    app:cornerRadius="20dp"
-                    app:strokeColor="#FF5722" />
+                <!-- SSH 服务操作：复制连接信息 + 停止（默认折叠，启动成功后展开） -->
+                <LinearLayout
+                    android:id="@+id/ssh_actions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ssh_copy"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:text="@string/ssh_server_copy"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="#00897B" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ssh_stop"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:text="@string/ssh_server_stop"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="#FF5722" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- 行情 K线（归入 Services 组） -->
@@ -661,6 +766,22 @@
                         android:textSize="12sp"
                         android:textStyle="italic"
                         tools:ignore="RtlHardcoded" />
+
+                    <!-- hint / status 清空入口 -->
+                    <TextView
+                        android:id="@+id/btn_clear_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="8dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:text="@string/status_clear"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -676,7 +797,7 @@
         android:gravity="center"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
-        android:text="@string/hello_world"
+        android:text=""
         android:textColor="#BDBDBD"
         android:textSize="12sp" />
 

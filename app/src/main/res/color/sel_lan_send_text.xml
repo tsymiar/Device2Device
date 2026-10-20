@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 发送按钮文字：白字压在青绿底上，禁用时压在灰底上要换成灰字才看得清 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lan_btn_off_text" android:state_enabled="false" />
+    <item android:color="@color/white" />
+</selector>

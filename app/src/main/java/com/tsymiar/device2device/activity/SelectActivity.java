@@ -23,8 +23,11 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.LayoutInflater;
+import android.view.ViewGroup;
 import android.text.TextUtils;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -37,6 +40,7 @@ import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.dialog.ChatBoxDialog;
 import com.tsymiar.device2device.dialog.FileMsgDialog;
 import com.tsymiar.device2device.dialog.GameDialog;
+import com.tsymiar.device2device.dialog.LanMsgDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
@@ -55,6 +59,8 @@ import com.tsymiar.device2device.wrapper.NetworkWrapper;
 import com.tsymiar.device2device.wrapper.TimeWrapper;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class SelectActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = SelectActivity.class.getCanonicalName();
@@ -73,7 +79,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private int mGValue = 1;
     Intent mPublisherIntent;
     Intent mSubscribeIntent;
-    /** 原 KCP 按钮：现在是「客户端发一串随机数」 */
+    /** KCP 客户端按钮：把消息框里的内容（留空则随机串）发给「对端地址」那一台 */
     Button mKcpBtn;
     /** 原 TCP 按钮：现在是「KCP 服务启停」 */
     Button mKcpServerBtn;
@@ -88,10 +94,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private long mCurTime;
     ChatBoxDialog mChatBoxDialog;
     FileMsgDialog mFileMsgDialog;
+    /** 局域网文本消息对话框：复用同一个实例，事件转发才有稳定的落点 */
+    LanMsgDialog mLanMsgDialog;
     /** SSH 正在启动（还没收到服务广播）：这段时间置灰启动按钮，避免连点 */
     private boolean mSshStarting = false;
     /** 最近一次 SSH 启动失败的原因：显示在状态卡片里，直到下次启动成功或手动再启动 */
     private String mSshError = null;
+    /** SSH 折叠区的内容与箭头：服务在跑时由 showSshState() 强制展开 */
+    private LinearLayout mSshContent = null;
+    private TextView mSshArrow = null;
     private final Runnable mSshStartTimeout = new Runnable() {
         @Override
         public void run() {
@@ -104,10 +115,20 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     };
 
-    /** KCP 用同一个端口收（服务端）发（客户端，走 127.0.0.1 回环） */
+    /** KCP 服务端绑 0.0.0.0 收局域网报文；客户端按页面上填的对端 IP 发 */
     private static final int KCP_PORT = 8090;
-    /** UDP 状态与收到的数据共用一路，靠「第一条是状态」区分落点 */
-    private boolean mUdpStatusShown = false;
+    /** 对端地址输入框：默认是本机局域网 IP，跨机互发时填对方的 */
+    private EditText mKcpAddrEdit = null;
+    /** 要发的消息输入框：send 按钮正下方，留空时回退到随机串自测 */
+    private EditText mKcpMsgEdit = null;
+    /** 客户端当前连着的对端地址：改了地址要按新地址重建会话 */
+    private String mKcpTarget = null;
+    /** 设备发现的 multicast 锁：部分 ROM 不持锁收不到广播 */
+    private WifiManager.MulticastLock mDiscoverLock = null;
+    /** 本次发现是否由本页拉起：若由本页拉起，退出页面时负责收掉，别人（消息对话框）拉起的不管 */
+    private boolean mDiscoverStarted = false;
+    /** 已发现设备：key = ip:port，value = {name, ip, port}，按发现顺序排 */
+    private final Map<String, String[]> mDiscoverPeers = new LinkedHashMap<>();
 
     public static SelectActivity getInstance() {
         return mainActivity;
@@ -183,15 +204,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     publishReceived(data);
                     break;
                 }
-                case Receiver.UDP_SERVER:
-                    // 第一条是启动状态 → server 文字，之后是收到的数据 → client 文字
-                    setTextSafely(mUdpStatusShown ? R.id.txt_udp_client : R.id.txt_udp_server,
-                            msg.obj.toString());
-                    mUdpStatusShown = true;
-                    break;
-                case Receiver.UDP_CLIENT:
-                    setTextSafely(R.id.txt_udp_client, msg.obj.toString());
-                    break;
                 case Receiver.TOAST:
                 case Receiver.KAI_SUBSCRIBE:
                 case Receiver.KAI_PUBLISHER:
@@ -206,7 +218,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     }
                     break;
                 case Receiver.KCP_HINT:
-                    // 服务端收到什么
                     appendKcpLog(msg.obj.toString());
                     break;
                 case Receiver.KCP_CLIENT:
@@ -216,9 +227,67 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 case Receiver.MSG_HINT:
                     setTextSafely(R.id.txt_hint, msg.obj.toString());
                     break;
+                case Receiver.LAN_PEER: {
+                    String peerEvent = msg.obj.toString();
+                    // 设备发现列表：不管对话框开不开都维护，点「发现设备」才看得到
+                    onDiscoverPeerEvent(peerEvent);
+                    // 对话框开着就再交给它维护自己那份
+                    if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
+                        mLanMsgDialog.onPeerEvent(peerEvent);
+                    }
+                    break;
+                }
+                case Receiver.LAN_MESSAGE: {
+                    String lanEvent = msg.obj.toString();
+                    if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
+                        mLanMsgDialog.onMessageEvent(lanEvent);
+                    } else if (mLanMsgDialog != null) {
+                        // 对话框收起了但监听还在跑。两类事件要分开对待：
+                        //  - 对端发来的内容：把界面弹回来，不然只落到状态卡片上很容易漏看；
+                        //  - 自己发消息的回执（DELIVERED / UNDELIVERED / SENDFAIL / SENDINGIMG）：
+                        //    照旧转给对话框，那些气泡行还在它里面，不转时回执就落到状态卡片上
+                        //    被丢掉，重新打开对话框看到的一直是"发送中"。
+                        boolean incoming = isIncomingLanMessage(lanEvent);
+                        if (incoming && !SelectActivity.this.isFinishing()
+                                && !SelectActivity.this.isDestroyed()) {
+                            mLanMsgDialog.show();
+                        }
+                        mLanMsgDialog.onMessageEvent(lanEvent);
+                    } else {
+                        setTextSafely(R.id.txt_hint, lanEvent);
+                    }
+                    break;
+                }
                 default:
                     break;
             }
+        }
+    };
+
+    /**
+     * 只有对端发来的消息才配把对话框弹回来。
+     *
+     * 自己发消息的那些回执（SENT / DELIVERED / SENDFAIL）每发一条都来一次，
+     * 跟着弹界面等于自己打断自己。
+     */
+    private static boolean isIncomingLanMessage(String event) {
+        return event != null && (event.startsWith("RECV|") || event.startsWith("RECVIMG|"));
+    }
+
+    /**
+     * 退到后台多久自动收掉局域网收发。
+     *
+     * 关对话框不停监听是为了还能收到消息，但人走了就没必要让端口和那几个 native 线程
+     * 一直挂着。太短时来回收拾一下又启停一次，5 分钟是个不打扰又不白占的档。
+     */
+    private static final long LAN_IDLE_STOP_MS = 5 * 60 * 1000;
+
+    private final Runnable mLanIdleStop = new Runnable() {
+        @Override
+        public void run() {
+            if (mLanMsgDialog == null || !mLanMsgDialog.isMessengerStarted()) return;
+            // 传 true 记一笔：回到前台据此自动恢复，不会让"随手切走一下"变成永远收不到
+            mLanMsgDialog.stopMessenger(true);
         }
     };
 
@@ -260,7 +329,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
 
             @Override
             public void onServiceDisconnected(ComponentName name) {
-                Log.d(TAG, name.toString() + " is disconnected");
+                // 服务被杀/崩了才会走到这里，不是正常解绑：提到 W 级，D 级根本注意不到
+                Log.w(TAG, name + " service disconnected unexpectedly");
             }
         });
 
@@ -311,23 +381,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             TextView tv = findViewById(R.id.txt_event);
             tv.setText(event.getEvent().toString() + ", value = " + mGValue);
         });
-        WifiManager manager = (WifiManager)this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        assert manager != null;
-        WifiManager.MulticastLock wifiLock = manager.createMulticastLock("localWifi");
-        findViewById(R.id.btn_udp_server).setOnClickListener(v -> {
-            wifiLock.acquire();
-            // 下一条 UDP_SERVER 是启动状态
-            mUdpStatusShown = false;
-            NetworkWrapper.startUdpServer(8899);
-        });
-        findViewById(R.id.btn_udp_client).setOnClickListener(v -> {
-            String text = Utils.MD5(mGValue + "").substring(0, 6);
-            NetworkWrapper.sendUdpData(text, text.length());
-            mGValue++;
-            if (wifiLock.isHeld()) {
-                wifiLock.release();
-            }
-        });
+        // 设备发现：复用局域网消息的 UDP 广播发现，只列设备，不做后续操作
+        findViewById(R.id.btn_discover).setOnClickListener(v -> startDiscovery());
+        findViewById(R.id.btn_discover_stop).setOnClickListener(v -> stopDiscovery());
         findViewById(R.id.btn_subscribe).setOnClickListener(v -> {
             if (!Settings.canDrawOverlays(this)) {
                 String title = getString(R.string.subscribe) + " " + getString(R.string.permission_required);
@@ -368,10 +424,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         mKcpServerBtn = findViewById(R.id.btn_kcp_server);
         mKcpServerBtn.setText(R.string.kcp_server);
         mKcpServerBtn.setOnClickListener(v -> toggleKcpServer());
-        // KCP 客户端：点一次发一串随机数
+        // KCP 客户端：把消息框内容（留空则随机串）发给「对端地址」那一台
         mKcpBtn = findViewById(R.id.btn_kcp_client);
         mKcpBtn.setText(R.string.kcp_client);
-        mKcpBtn.setOnClickListener(v -> sendKcpRandom());
+        mKcpBtn.setOnClickListener(v -> sendKcpMessage());
+        // 对端地址：默认填本机局域网 IP，方便另一台设备照抄过来互发
+        mKcpAddrEdit = findViewById(R.id.et_kcp_addr);
+        mKcpMsgEdit = findViewById(R.id.et_kcp_msg);
+        refreshKcpSelfAddress();
         findViewById(R.id.btn_market).setOnClickListener(v ->
                 startActivity(new Intent(SelectActivity.this, MarketActivity.class)));
         findViewById(R.id.btn_avatar).setOnClickListener(v -> showAvatarEnginePicker());
@@ -401,7 +461,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_http_server).setOnClickListener(v ->
         {
             Toast.makeText(SelectActivity.this, R.string.http_server_select_hint, Toast.LENGTH_SHORT).show();
-            // 打开系统文件夹选择器
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(intent, RequestHttpFolder);
@@ -411,12 +470,34 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 HttpServerService.stop(SelectActivity.this));
         // 复制 HTTP 访问地址到剪贴板
         findViewById(R.id.btn_http_copy).setOnClickListener(v -> copyHttpAccessUrl());
+        findViewById(R.id.btn_clear_status).setOnClickListener(v -> clearStatusCard());
+
+        // 局域网文本消息对话框（发现 + 收发都在 C++ 侧）
+        findViewById(R.id.btn_lan_msg).setOnClickListener(v -> {
+            if (SelectActivity.this.isFinishing() || SelectActivity.this.isDestroyed()) return;
+            if (mLanMsgDialog == null) {
+                mLanMsgDialog = new LanMsgDialog(SelectActivity.this);
+            }
+            if (!mLanMsgDialog.isShowing()) {
+                mLanMsgDialog.show();
+            }
+        });
 
         // SSH 服务同样交给前台服务：启动 / 复制连接信息 / 停止
         findViewById(R.id.btn_ssh_server).setOnClickListener(v -> startSshServer());
         findViewById(R.id.btn_ssh_stop).setOnClickListener(v ->
                 SshServerService.stop(SelectActivity.this));
         findViewById(R.id.btn_ssh_copy).setOnClickListener(v -> copySshConnectionInfo());
+
+        // SSH 区域折叠/展开：默认收起，点标题栏展开
+        final LinearLayout sshContent = findViewById(R.id.ssh_content);
+        final TextView sshArrow = findViewById(R.id.ssh_arrow);
+        findViewById(R.id.ssh_header).setOnClickListener(v -> {
+            boolean open = sshContent.getVisibility() == View.VISIBLE;
+            setSshExpanded(!open, sshContent, sshArrow);
+        });
+        mSshContent = sshContent;
+        mSshArrow = sshArrow;
 
         // 网络服务区域折叠/展开
         final LinearLayout networkContent = findViewById(R.id.network_content);
@@ -531,7 +612,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     if (topic == null || topic.isEmpty()) {
                         Toast.makeText(SelectActivity.this, "publish topic is empty", Toast.LENGTH_SHORT).show();
                     } else {
-                        CallbackWrapper.Publish(topic, PubSubSetting.getPayload(), PubSubSetting.getAddr(), PubSubSetting.getPort());
+                        CallbackWrapper.Publish(topic, PubSubSetting.getPayload(), PubSubSetting.getAddr(),
+                                PubSubSetting.getPort(), PubSubSetting.getTarget());
                     }
                 }
             } else if (publish != null) {
@@ -541,8 +623,33 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        handler.removeCallbacks(mLanIdleStop);
+        // 上一轮是被"退到后台超时"停掉的：回到前台直接恢复，不用再点一次「启动」
+        if (mLanMsgDialog != null && mLanMsgDialog.isAutoStopped()) {
+            mLanMsgDialog.startMessenger();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // 退到后台：到点还没回来就把监听收掉。回前台由 onStart 撤掉这个定时
+        handler.removeCallbacks(mLanIdleStop);
+        handler.postDelayed(mLanIdleStop, LAN_IDLE_STOP_MS);
+    }
+
+    @Override
     public void onDestroy() {
         handler.removeCallbacks(mSshStartTimeout);
+        handler.removeCallbacks(mLanIdleStop);
+        // dismiss() 已经不停监听了（关对话框后还要继续收消息），所以退出页面得在这里
+        // 显式收掉：不然 39001 端口和那几个 native 线程会一直挂在后台
+        if (mLanMsgDialog != null) {
+            mLanMsgDialog.stopMessenger();
+            mLanMsgDialog.dismiss();
+        }
         SelectActivity.this.unregisterReceiver(mBroadcastReceiverClass);
         stopService(mSubscribeIntent);
         stopService(mPublisherIntent);
@@ -559,7 +666,144 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             mKcpClientStart = false;
         }
         // HTTP 文件服务由前台服务托管：退出页面不停止，后台继续运行
+        // 本页自己拉起的设备发现要在这里收掉：不然 39001 端口和那几个 native 线程会一直挂在后台
+        stopDiscovery();
         super.onDestroy();
+    }
+
+    /** 局域网消息默认端口，与 LanMsgDialog 一致，发现机制复用同一套 */
+    private static final int LAN_DISCOVER_PORT = 39001;
+    /** 发现广播自己的端口（默认 39000，与收发的 39001 分开，可单独改） */
+    private static final int DISCOVERY_PORT = 39000;
+
+    /**
+     * 点「发现设备」：把局域网消息那套发现拉起来（已经有人在用就复用），
+     * 再广播一轮喊话。结果只落到本页的设备列表里，不做选中 / 发送。
+     */
+    private void startDiscovery() {
+        acquireDiscoverLock();
+        String selfIp = Utils.getLocalWifiIp(this);
+        // 发现用广播地址 + 自己的端口，与收发（KCP 会话端口）分开设：改这一个不动那一个
+        NetworkWrapper.setLanDiscoveryPort(DISCOVERY_PORT);
+        int ret = NetworkWrapper.startLanMessenger(android.os.Build.MODEL, selfIp, LAN_DISCOVER_PORT);
+        // ret==1 表示已经在跑（消息对话框先拉起的），那份不由本页负责收
+        if (ret == 0) {
+            mDiscoverStarted = true;
+        }
+        if (ret < 0) {
+            setTextSafely(R.id.txt_hint, getString(R.string.discover_failed, ret));
+            releaseDiscoverLock();
+            return;
+        }
+        mDiscoverPeers.clear();
+        updateDiscoverList();
+        NetworkWrapper.refreshLanPeers();
+        setTextSafely(R.id.txt_hint, getString(R.string.discover_started,
+                discoveryAddress(selfIp), DISCOVERY_PORT));
+    }
+
+    /** 停止发现：只收本页自己拉起的那一轮，消息对话框那份留给对话框自己管 */
+    private void stopDiscovery() {
+        if (mDiscoverStarted) {
+            NetworkWrapper.stopLanMessenger();
+            mDiscoverStarted = false;
+        }
+        releaseDiscoverLock();
+        mDiscoverPeers.clear();
+        updateDiscoverList();
+        setTextSafely(R.id.txt_hint, getString(R.string.discover_stopped));
+    }
+
+    /** 发现喊话的两个目标地址：全局广播 + 本机 /24 广播，两者都写进 hint 才看得出用的是哪个 */
+    private String discoveryAddress(String selfIp) {
+        String subnet = "255.255.255.255";
+        if (!TextUtils.isEmpty(selfIp) && selfIp.contains(".")) {
+            String[] seg = selfIp.split("\\.");
+            if (seg.length == 4) {
+                subnet += " / " + seg[0] + "." + seg[1] + "." + seg[2] + ".255";
+            }
+        }
+        return subnet;
+    }
+
+    /**
+     * 设备发现事件：CLEAR 清空、ADD|ip|port|name 加入或改名、DEL|ip|port|name 下线。
+     * 只维护列表展示，解析规则与 LanMsgDialog.onPeerEvent 一致。
+     */
+    private void onDiscoverPeerEvent(String event) {
+        if (event == null || event.isEmpty()) return;
+        String[] p = event.split("\\|");
+        if (p.length == 0) return;
+        if ("CLEAR".equals(p[0])) {
+            mDiscoverPeers.clear();
+            updateDiscoverList();
+            return;
+        }
+        if (p.length < 4) return;
+        int port;
+        try {
+            port = Integer.parseInt(p[2]);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        String key = p[1] + ":" + port;
+        if ("ADD".equals(p[0])) {
+            mDiscoverPeers.put(key, new String[]{p[3], p[1], String.valueOf(port)});
+            updateDiscoverList();
+        } else if ("DEL".equals(p[0])) {
+            mDiscoverPeers.remove(key);
+            updateDiscoverList();
+        }
+    }
+
+    /** 按当前发现结果重画列表：一台一行（名字在左、ip:端口在右），一台都没有时给占位 */
+    private void updateDiscoverList() {
+        LinearLayout box = findViewById(R.id.ll_discover_peers);
+        if (box == null) return;
+        box.removeAllViews();
+        if (mDiscoverPeers.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText(R.string.discover_empty);
+            empty.setTextColor(0xFF9E9E9E);
+            empty.setTextSize(10);
+            empty.setPadding(dp(4), dp(6), dp(4), dp(6));
+            box.addView(empty);
+            return;
+        }
+        for (String[] peer : mDiscoverPeers.values()) {
+            View row = LayoutInflater.from(this).inflate(R.layout.item_lan_peer, box, false);
+            TextView name = row.findViewById(R.id.tv_peer_name);
+            TextView addr = row.findViewById(R.id.tv_peer_addr);
+            if (name != null) name.setText(peer[0]);
+            if (addr != null) addr.setText(peer[1] + ":" + peer[2]);
+            box.addView(row);
+        }
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /** 广播接收在部分 ROM 上要持有 MulticastLock 才不被过滤掉 */
+    private void acquireDiscoverLock() {
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wm == null) return;
+            if (mDiscoverLock == null) {
+                mDiscoverLock = wm.createMulticastLock("device2device:discover");
+                mDiscoverLock.setReferenceCounted(false);
+            }
+            if (!mDiscoverLock.isHeld()) mDiscoverLock.acquire();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void releaseDiscoverLock() {
+        try {
+            if (mDiscoverLock != null && mDiscoverLock.isHeld()) mDiscoverLock.release();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -567,6 +811,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         super.onResume();
         showHttpState();
         showSshState();
+        // 换过 WiFi 时本机 IP 会变，每次回前台重新同步一次对端地址提示
+        refreshKcpSelfAddress();
         // HTTP / SSH 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && (HttpServerService.isRunning() || SshServerService.isRunning())) {
@@ -595,7 +841,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         if (requestCode == RequestHttpFolder && resultCode == RESULT_OK) {
             if (data != null && data.getData() != null) {
                 Uri treeUri = data.getData();
-                // 持久化读取权限
                 getContentResolver().takePersistableUriPermission(treeUri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
@@ -615,6 +860,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 if (mChatBoxDialog != null) {
                     mChatBoxDialog.handleFileResult(uri);
                 }
+            }
+        }
+        if (requestCode == LanMsgDialog.LAN_IMAGE_REQUEST && resultCode == RESULT_OK) {
+            if (data != null && mLanMsgDialog != null) {
+                mLanMsgDialog.handleImageResult(data.getData());
             }
         }
     }
@@ -659,7 +909,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 .show();
     }
 
-    /** KCP 服务启停：收 UDP 8090，收到的内容打到 server 下方文字区 */
     /**
      * 进入 avatar 之前先选建模引擎：原生（程序化）/ 高分（Anny）。
      * 选择会记在 avatar_prefs 里，下次打开默认选中上一次的。
@@ -686,13 +935,31 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 .show();
     }
 
+    /** 把本机局域网 IP 填进「对端地址」并显示出来：跨机互发时对方照抄这个就行 */
+    private void refreshKcpSelfAddress() {
+        String self = Utils.getLocalWifiIp(this);
+        TextView tv = findViewById(R.id.txt_kcp_self);
+        if (tv != null) {
+            tv.setText(getString(R.string.kcp_self, self, KCP_PORT));
+        }
+        if (mKcpAddrEdit != null) {
+            String cur = mKcpAddrEdit.getText() == null ? "" : mKcpAddrEdit.getText().toString().trim();
+            // 只在用户还没改过（仍留着 layout 里的默认占位）时替他填本机地址
+            if (cur.isEmpty() || getString(R.string.address).equals(cur)) {
+                mKcpAddrEdit.setText(self);
+            }
+        }
+    }
+
     private void toggleKcpServer() {
         if (!mKcpServerStart) {
             int ret = NetworkWrapper.startKcpServer(KCP_PORT);
             if (ret == 0 || ret == 1) {
                 mKcpServerStart = true;
-                mKcpServerBtn.setText(R.string.kcp_server_stop);
+                mKcpServerBtn.setText(R.string.kcp_stop);
                 updateKcpTextVisibility();
+                // 服务端是绑 0.0.0.0 的，说清楚本机地址，局域网里另一台才知道往哪发
+                appendKcpLog(getString(R.string.kcp_listen, KCP_PORT, Utils.getLocalWifiIp(this)));
             }
         } else {
             NetworkWrapper.stopKcpServer();
@@ -744,29 +1011,51 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private static final int KCP_RANDOM_CHARS = 16;
 
     /**
-     * KCP 客户端：首次点击顺带把客户端拉起来，之后每次发一串十六进制随机数给本机服务端。
-     * 服务端会原样回射，客户端收到后把 sn / RTT 打到 client 下方的文字区。
+     * KCP 客户端：首次点击顺带把客户端拉起来，之后每次把消息框里的文字发给「对端地址」那一台；
+     * 框里留空则发一串「8 字符时间戳 + 16 字符随机数」做自测。填本机 IP 是回环自测，
+     * 填同网段另一台的 IP 走局域网。服务端会原样回射，客户端收到后把 sn / RTT 打到文字区。
      */
     @SuppressLint("SetTextI18n")
-    private void sendKcpRandom() {
+    private void sendKcpMessage() {
+        // 目标地址来自页面上的输入框：默认本机（回环自测），填对方 IP 就走局域网
+        String target = mKcpAddrEdit != null && mKcpAddrEdit.getText() != null
+                ? mKcpAddrEdit.getText().toString().trim() : "";
+        if (target.isEmpty()) {
+            appendKcpStatus(getString(R.string.kcp_target_empty));
+            return;
+        }
+        // 换了对端就把客户端重连过去：会话是建在地址上的，不重建还是发给旧的那台
+        if (mKcpClientStart && !target.equals(mKcpTarget)) {
+            NetworkWrapper.stopKcpClient();
+            mKcpClientStart = false;
+            mKcpTarget = null;
+        }
         if (!mKcpClientStart) {
-            int ret = NetworkWrapper.startKcpClient("127.0.0.1", KCP_PORT);
+            int ret = NetworkWrapper.startKcpClient(target, KCP_PORT);
             mKcpClientStart = (ret == 0 || ret == 1);
             if (!mKcpClientStart) {
                 appendKcpStatus("KCP client start failed(" + ret + ")");
                 return;
             }
+            mKcpTarget = target;
             updateKcpTextVisibility();
         }
         if (!mKcpServerStart) {
             appendKcpStatus("KCP server not running, start it first");
         }
-        // 随机数用十六进制：一眼能看出有没有被截断或错位
-        String random = randomHex(KCP_RANDOM_CHARS);
-        int ret = NetworkWrapper.sendKcpData(random, random.length());
+        // 消息框有内容就发内容；留空时退回到随机十六进制串（一眼能看出有没有被截断或错位）
+        String msg = mKcpMsgEdit != null && mKcpMsgEdit.getText() != null
+                ? mKcpMsgEdit.getText().toString() : "";
+        String payload = msg.isEmpty() ? (timeHex() + randomHex(KCP_RANDOM_CHARS)) : msg;
+        int ret = NetworkWrapper.sendKcpData(payload, payload.length());
         if (ret < 0) {
-            appendKcpStatus("KCP send failed(" + ret + "): " + random);
+            appendKcpStatus("KCP send failed(" + ret + "): " + payload);
         }
+    }
+
+    /** 时间戳取当前毫秒的低 32 位，固定 8 位十六进制，不足补 0 */
+    private static String timeHex() {
+        return String.format(java.util.Locale.US, "%08x", System.currentTimeMillis() & 0xFFFFFFFFL);
     }
 
     /** 生成十六进制随机串（小写），charCount 是要的字符数（奇数时按 (charCount+1)/2 字节生成后截断） */
@@ -803,7 +1092,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     /**
      * 收到完整文件后：把 native 暂存目录里的文件搬到公共下载目录。
      * 与对话框是否在场无关 —— 服务端现在跑在前台服务里，对话框关着照样收文件，
-     * 不搬的话文件会一直躺在应用私有目录（用户看不到）。
+     * 不搬时文件会一直躺在应用私有目录（用户看不到）。
      */
     private void publishReceived(String data) {
         // data 形如 "status[|落盘路径]|current|total"：末两段固定是 current/total，
@@ -881,9 +1170,25 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
     }
 
-    /** 根据前台服务快照同步 HTTP 状态：地址卡片与复制/停止按钮可用性 */
+    /** hint 那份是滚动追加的：缓冲不清掉，下一条会把旧的一起带回来 */
+    private void clearStatusCard() {
+        mFileMsgHintLog.clear();
+        setTextSafely(R.id.txt_hint, getString(R.string.dftHint));
+        setTextSafely(R.id.txt_status, getString(R.string.dftHint));
+    }
+
+    /**
+     * 根据前台服务快照同步 HTTP 状态：复制/停止这两个按钮整行显示或隐藏。
+     *
+     * 没起来就整行 GONE：常驻 + setEnabled() 时，服务没起时也杵着两个灰按钮，
+     * 占地方又没得点。只有服务真的起来了（ACTION_STATE 回执 STATE_STARTED）才显示出来。
+     */
     private void showHttpState() {
         boolean running = HttpServerService.isRunning();
+        View ops = findViewById(R.id.ll_http_ops);
+        if (ops != null) {
+            ops.setVisibility(running ? View.VISIBLE : View.GONE);
+        }
         Button stopBtn = findViewById(R.id.btn_http_stop);
         if (stopBtn != null) {
             stopBtn.setEnabled(running);
@@ -909,9 +1214,22 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
+    private void setSshExpanded(boolean expanded, LinearLayout content, TextView arrow) {
+        if (content != null) {
+            content.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        if (arrow != null) {
+            arrow.setText(expanded ? "▲" : "▼");
+        }
+    }
+
     /** 根据前台服务快照同步 SSH 状态：连接信息卡片与启动/复制/停止按钮可用性 */
     private void showSshState() {
         boolean running = SshServerService.isRunning();
+        // 服务还在跑就把折叠区摊开：否则状态卡片有 SSH 信息，按钮却收着，状态不一致
+        if (running) {
+            setSshExpanded(true, mSshContent, mSshArrow);
+        }
         // 复制/停止这两个操作默认折叠，服务跑起来后才展开
         View actions = findViewById(R.id.ssh_actions);
         if (actions != null) {

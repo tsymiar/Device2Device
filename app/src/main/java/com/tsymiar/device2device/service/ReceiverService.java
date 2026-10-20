@@ -17,6 +17,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -32,6 +33,21 @@ import java.lang.ref.WeakReference;
 
 public class ReceiverService extends Service {
     private static final String CHANNEL_ID = "receiver_channel";
+
+    /**
+     * 关掉这个悬浮窗服务。
+     *
+     * 它是 startForeground + START_STICKY 的，光 finish 掉拉起它的 Activity 并不会停，
+     * 那块浮在屏幕上的文字会一直留着，所以外部要关它得显式 stopService。
+     */
+    public static void stop(Context context) {
+        if (context == null) return;
+        try {
+            context.stopService(new Intent(context, ReceiverService.class));
+        } catch (Exception e) {
+            Log.w("ReceiverService", "stop failed: " + e.getMessage());
+        }
+    }
     private WindowManager wm;
     private WindowManager.LayoutParams wmParams;
     private View view;

@@ -1,3 +1,6 @@
 [submodule "app/src/main/cpp/scadup"]
 	path = app/src/main/cpp/scadup
 	url = https://github.com/tsymiar/scadup.git
+[submodule "app/src/main/cpp/socket/kcp"]
+	path = app/src/main/cpp/socket/kcp
+	url = https://github.com/skywind3000/kcp.git

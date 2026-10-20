@@ -15,7 +15,6 @@
     <color name="switch_selected">#009900</color>
     <color name="menu_menu">#ccffff</color>
     <!-- 对话框颜色（浅色模式） -->
-    <color name="dialog_background">#FFFFFF</color>
     <color name="dialog_text_primary">#212121</color>
     <color name="dialog_text_secondary">#757575</color>
     <color name="dialog_error">#B71C1C</color>
@@ -65,6 +64,38 @@
     <!-- 详情小窗文字：日间的小窗底仍是深色，文字必须取浅色，不能复用页面正文色（深灰压深底看不清） -->
     <color name="market_tooltip_text">#FFF9FAFB</color>
     <color name="market_tooltip_text_dim">#FFCBD5E1</color>
+
+    <!-- ===== 局域网消息对话框（浅色卡片） =====
+         主色沿用 colorPrimary 的青绿；自己发的用蓝、对方来的用青绿，
+         系统提示压到蓝灰，错误取 dialog_error，一屏里靠色相区分说话方 -->
+    <color name="lan_card">#FFFFFF</color>
+    <color name="lan_panel">#FFF4F7F8</color>
+    <color name="lan_stroke">#FFB0BEC5</color>
+    <color name="lan_text">#FF212121</color>
+    <color name="lan_text_dim">#FF607D8B</color>
+    <color name="lan_error">#FFB71C1C</color>
+    <color name="lan_online">#FF00897B</color>
+    <color name="lan_idle">#FF607D8B</color>
+    <color name="lan_chip">#FFE0F2F1</color>
+    <!-- 发送按钮：启用时是主色系里亮一档的青绿，禁用时是灰蓝底 + 灰字，两态一眼能分开 -->
+    <color name="lan_send_on">#FF009688</color>
+    <color name="lan_send_on_pressed">#FF00796B</color>
+    <color name="lan_btn_off">#FFCFD8DC</color>
+    <color name="lan_btn_off_text">#FF78909C</color>
+    <!-- 设备列表行：按下浅灰蓝、选中淡青，和卡片底色拉开但不刺眼 -->
+    <color name="lan_row_pressed">#FFECEFF1</color>
+    <!-- 气泡：自己发的淡蓝、对端来的淡青、报错淡红。
+         底色都取浅的，文字才能统一用深灰保证对比度；说话方靠底色 + 左右对齐区分 -->
+    <!-- 局域网消息窗口的强调色：日间跟 colorPrimaryDark 同色，夜间由 values-night 换成浅青绿。
+         不用 colorPrimaryDark 直接写死在布局里，就是因为它在深底上太暗 -->
+    <color name="lan_accent">#FF00574B</color>
+    <!-- 输入框底板：日间白底灰边，夜间由 values-night 换成深底 -->
+    <color name="lan_field_bg">#FFFFFFFF</color>
+    <color name="lan_field_stroke">#FFBDBDBD</color>
+    <color name="lan_bubble_self">#FFE3F2FD</color>
+    <color name="lan_bubble_peer">#FFE0F2F1</color>
+    <color name="lan_bubble_error">#FFFDECEA</color>
+    <color name="lan_bubble_stroke">#FFCFD8DC</color>
 
     <!-- 行情桌面小部件（浅色）：白卡片 + 深色文字 -->
     <color name="market_widget_bg">#FFFFFFFF</color>

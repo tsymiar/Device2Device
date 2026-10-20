@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 局域网消息窗口里的输入框底板（名字 / 端口 / 消息）。
+     不用通用的 bg_edit：bg_edit 把底色写死成 #F2F3F5，夜间模式卡片变深了它还是一块浅灰，
+     跟周围脱节。这里走颜色资源，日夜间各自取值。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <solid android:color="@color/lan_field_bg" />
+
+    <corners android:radius="6dp" />
+
+    <stroke
+        android:width="1dp"
+        android:color="@color/lan_field_stroke" />
+</shape>

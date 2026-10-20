@@ -45,7 +45,8 @@ app/src/main/
 │   ├── utils/ view/    # Utilities (Atom, SoundRecord, HttpsRequest …), custom views (KLineView …)
 │   └── wrapper/        # JNI bridge: callback, network, view, media, time
 └── cpp/                # JniMethods, bitmap, callback, convert, display,
-                        #   message, socket, scadup (submodule), test, time, utils
+                        #   message, socket (kcp submodule), scadup (submodule),
+                        #   test, time, utils
 ```
 
 ---
@@ -87,7 +88,7 @@ Requirements: SDK 31 + Build Tools 30.0.3, NDK 23.0.7599858, CMake 3.18.1, Gradl
 ABIs: `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 
 ```bash
-git submodule update --init --recursive   # app/src/main/cpp/scadup
+git submodule update --init --recursive   # app/src/main/cpp/scadup, app/src/main/cpp/socket/kcp
 ./build.sh                                # or: ./build.sh release | clean | cleanall
 # BUILD_OFFLINE=1 ./build.sh
 ```

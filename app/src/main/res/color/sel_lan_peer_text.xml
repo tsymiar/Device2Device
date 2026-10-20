@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设备名文字色：选中时压到主色深一档，跟淡青底配套；未选中是常规正文色。
+     行被 setActivated 之后 ViewGroup 会把激活态传给子控件，这里才生效。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lan_accent" android:state_activated="true" />
+    <item android:color="@color/lan_text" />
+</selector>

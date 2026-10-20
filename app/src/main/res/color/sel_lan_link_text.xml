@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「清空」这类文字按钮：可用时主色深一档，禁用时灰，两态一眼能分开 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lan_accent" android:state_enabled="true" />
+    <item android:color="@color/lan_btn_off_text" />
+</selector>

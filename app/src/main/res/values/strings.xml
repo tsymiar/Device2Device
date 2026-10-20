@@ -2,7 +2,6 @@
 
     <!-- ===== App ===== -->
     <string name="app_name">Device2Device</string>
-    <string name="hello_world">Hello World!</string>
     <string name="developing">开发中</string>
 
     <!-- ===== Render Mode Arrays ===== -->
@@ -12,18 +11,21 @@
         <item>GPU-Surface</item>
         <item>CPU-image</item>
         <item>CPU-video</item>
+        <item>Video (MediaCodec)</item>
         <item>Disconnect</item>
     </string-array>
     <string-array name="types_gpu">
         <item>None</item>
         <item>GPU-OpenGL</item>
         <item>GPU-Surface</item>
+        <item>Video (MediaCodec)</item>
         <item>Disconnect</item>
     </string-array>
     <string-array name="types_cpu">
         <item>None</item>
         <item>CPU-image</item>
         <item>CPU-video</item>
+        <item>Video (MediaCodec)</item>
         <item>Disconnect</item>
     </string-array>
 
@@ -35,6 +37,24 @@
     <string name="chat">💬 Chat Box</string>
     <string name="file_trans">📁 File Transfer</string>
     <string name="http_server">🌐 HTTP Server</string>
+
+    <!-- ===== 文件传输对话框（dialog_file_msg.xml）===== -->
+    <string name="file_msg_title">File Message</string>
+    <string name="file_msg_ip_hint">IP Address</string>
+    <string name="file_msg_port_hint">Port</string>
+    <!-- 默认值不是文案，不参与翻译 -->
+    <string name="file_msg_default_ip" translatable="false">192.168.1.1</string>
+    <string name="file_msg_default_port" translatable="false">8800</string>
+    <string name="file_msg_receiver">接收端（对端主动连接）</string>
+    <string name="file_msg_start_server">Start Server</string>
+    <string name="file_msg_sender">发送端（主动连接对端）</string>
+    <string name="file_msg_connect">Connect</string>
+    <string name="file_msg_no_file">No file selected</string>
+    <string name="file_msg_select">Select</string>
+    <string name="file_msg_disconnect">Disconnect</string>
+    <string name="file_msg_send">Send File</string>
+    <string name="file_msg_log">LOG</string>
+    <string name="file_msg_clear">清空</string>
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
     <string name="section_files">💬 Services</string>
@@ -81,7 +101,6 @@
     <string name="close">Close</string>
 
     <!-- ===== About / Feedback ===== -->
-    <string name="viewGithub">View on GitHub</string>
     <string name="email">mailto:909006258@qq.com</string>
     <string name="github">https://github.com/tsymiar/Device2Device/tree/main/Device2Device</string>
     <string name="thank_text">\n📧请呼出菜单通过邮件反馈建议。\n\n</string>
@@ -108,18 +127,16 @@
     <string name="none_type">未输入</string>
     <string name="window">数据发送窗口</string>
     <string name="received">显示接收数据</string>
-    <string name="click2begin">点击按钮开始操作</string>
     <string name="entry">点击进入</string>
-    <string name="double_click">双击退出界面</string>
     <string name="file_local">/SerialConn/signal.dat</string>
     <string name="sdcard_device2device">数据将存于Device2Device目录下</string>
     <string name="ill_reply">请输入你要说的话,我应该会很快回复的。</string>
     <string name="msg">请输入要发送的消息</string>
     <string name="pkg">📎</string>
     <string name="commit">发送</string>
-    <string name="chat_api_key_hint">API Key（留空用内置 Key）</string>
-    <string name="chat_api_key_mask">●●●</string>
-    <string name="chat_api_key_show">sk-*****</string>
+    <string name="chat_api_key_hint">API Key（按服务缓存）</string>
+    <string name="chat_api_key_show">key</string>
+    <string name="chat_api_key_hide">隐藏</string>
     <string name="chat_ollama_local">本地</string>
     <string name="chat_ollama_cloud">在线</string>
     <string name="chat_ollama_host_hint">服务地址，如 127.0.0.1 / 192.168.1.20:11434</string>
@@ -134,34 +151,40 @@
 
     <!-- ===== Serial Command Buttons ===== -->
     <string name="is_0">❨0❩</string>
-    <string name="cmd_0">A00</string>
     <string name="cmd_hu">Q00</string>
     <string name="cmd_hr">R00</string>
     <string name="cmd_hl">L00</string>
     <string name="cmd_hd">H00</string>
 
     <!-- ===== Network / MQTT ===== -->
-    <string name="server">server</string>
-    <string name="client">client</string>
     <string name="event">event</string>
     <string name="time">time</string>
     <string name="subscribe">Subscribe</string>
     <string name="publish">Publish</string>
     <string name="tcp">TCP</string>
-    <string name="tcp_stop">STOP</string>
-    <string name="kcprun">Kcp</string>
     <!-- 按钮一律英文：不写 server / client，由分组框 + 边框颜色区分 -->
     <string name="kcp_server">KCP 8090</string>
-    <string name="kcp_server_stop">KCP stop</string>
-    <string name="kcp_client">KCP send 16B</string>
-    <string name="group_udp">UDP</string>
+    <string name="kcp_client">KCP send</string>
+    <string name="kcp_stop">KCP stop</string>
+    <string name="kcp_msg_hint">填写消息（留空发随机串）</string>
+    <string name="kcp_peer_hint">对端 IP（局域网）</string>
+    <string name="kcp_self_unknown">本机 IP 未知</string>
+    <string name="kcp_self">本机 %1$s:%2$d</string>
+    <string name="kcp_listen">KCP 监听 0.0.0.0:%1$d（本机 %2$s）</string>
+    <string name="kcp_target_empty">先填对端 IP</string>
     <string name="group_kcp">KCP</string>
-    <string name="udp_listen">UDP 8899</string>
-    <string name="udp_send">UDP send 6B</string>
+    <string name="group_discover">discovery</string>
+    <string name="discover_btn">discover</string>
+    <string name="discover_end">end</string>
+    <string name="discover_empty">未发现设备</string>
+    <string name="discover_started">已开始发现：%1$s:%2$d</string>
+    <string name="discover_stopped">已停止发现</string>
+    <string name="discover_failed">启动发现失败(%1$d)</string>
     <string name="address">192.168.0.1</string>
     <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
     <string name="pub_payload">some message</string>
+    <string name="pub_target">empty = broadcast</string>
     <string name="hint_address">address</string>
     <string name="hint_port">port</string>
     <string name="minimum">-</string>
@@ -171,24 +194,13 @@
     <!-- ===== Chart / Wave / Sensor ===== -->
     <string name="start_chart">Start Chart</string>
     <string name="draw">Draw</string>
-    <string name="testing">测试测试</string>
-    <string name="begin">开始</string>
     <string name="pause">暂停</string>
     <string name="resume">继续</string>
     <string name="hide">隐藏</string>
     <string name="show">显示</string>
     <string name="restore">还原</string>
-    <string name="range">幅度</string>
-    <string name="legend">图例：</string>
     <string name="pull">拖动</string>
     <string name="min">最小化</string>
-    <string name="notify">返回</string>
-    <string name="CH0">CH0</string>
-    <string name="CH1">CH1</string>
-    <string name="arrows">⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂     ⇂</string>
-    <string name="ngravity">Gravity:</string>
-    <string name="accelerator">Accelerator:</string>
-    <string name="nliner_accelerator">Liner-accelerator:</string>
     <string name="ncompass">指南针（方向）</string>
     <string name="naltitude">海拔</string>
     <string name="nlevel">水平仪</string>
@@ -217,12 +229,49 @@
 
     <!-- ===== HTTP Server ===== -->
     <string name="http_server_select_hint">请选择一个本地文件夹作为 HTTP 服务的根目录。</string>
+    <string name="http_server_copy">📋 复制HTTP地址</string>
     <string name="http_server_stop">⏹ 停止 HTTP</string>
-    <string name="http_server_copy">📋 复制访问地址</string>
     <string name="http_copy_done">访问地址已复制：\n%1$s</string>
 
-    <!-- ===== SSH Server ===== -->
-    <string name="ssh_server">🔐 SSH Server</string>
+    <!-- ===== LAN Text Messenger ===== -->
+    <string name="lan_msg">💬 局域网消息</string>
+    <string name="lan_msg_title">💬 局域网消息 · LAN Messenger</string>
+    <string name="lan_msg_name_hint">本机名</string>
+    <string name="lan_msg_default_name">Android</string>
+    <string name="lan_msg_port">39001</string>
+    <string name="lan_msg_start">▶ 启动收发</string>
+    <string name="lan_msg_stop">⏹ 停止</string>
+    <string name="lan_msg_discover">🔍 发现设备</string>
+    <string name="lan_msg_peers">已发现设备</string>
+    <string name="lan_msg_idle">未启动 · 点「启动收发」开始</string>
+    <string name="lan_msg_no_peer">先在上方列表里选一个设备</string>
+    <string name="lan_msg_empty">说点什么再发送</string>
+    <string name="lan_msg_listening">已启动 · %1$s:%2$d · %3$s</string>
+    <string name="lan_msg_bad_port">端口需在 1025–65535 之间</string>
+    <string name="lan_msg_peer_none">（暂未发现其它设备，点「发现设备」再试）</string>
+    <string name="lan_msg_chat">消息</string>
+    <string name="lan_msg_clear">清空</string>
+    <string name="lan_msg_cleared">已清空历史消息</string>
+    <string name="lan_msg_chat_hint">收发历史会记录在这里</string>
+    <string name="lan_msg_stopped">已停止收发</string>
+    <string name="lan_msg_stopping">正在停止…</string>
+    <string name="lan_msg_sending">发送中</string>
+    <string name="lan_msg_delivered">已送达</string>
+    <string name="lan_msg_undelivered">未送达</string>
+    <string name="lan_msg_pick_image">选择图片</string>
+    <string name="lan_msg_encoding">正在处理图片…</string>
+    <string name="lan_msg_image_failed">图片读取失败</string>
+    <string name="lan_msg_image_too_large">图片压缩后仍超出上限，未发送</string>
+
+    <!-- ===== 聊天框附件 ===== -->
+    <string name="chat_attach_with_content">附件：%1$s（正文已附）</string>
+    <string name="chat_attach_name_only">附件：%1$s（仅文件名）</string>
+
+    <!-- ===== 主页面底部状态卡片 ===== -->
+    <string name="status_clear">清空</string>
+
+    <!-- ===== SSH ===== -->
+    <string name="ssh_server">🔐 SSH</string>
     <string name="ssh_server_running">🔐 SSH 服务运行中</string>
     <string name="ssh_server_stop">⏹ 停止 SSH</string>
     <string name="ssh_server_copy">📋 复制连接信息</string>
@@ -235,5 +284,13 @@
     <!-- ===== Misc ===== -->
     <string name="item" tools:ignore="ExtraTranslation" />
     <string name="dftHint">" "</string>
+
+    <!-- ===== 数组（原 values/arrays.xml，合并进来） ===== -->
+    <string-array name="chat_options">
+        <item>DeepSeek</item>
+        <item>Ollama</item>
+        <item>OpenRouter</item>
+        <item>…</item>
+    </string-array>
 
 </resources>

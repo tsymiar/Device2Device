@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 暗色模式颜色 -->
-    <color name="dialog_background">#1E1E1E</color>
     <color name="dialog_text_primary">#E0E0E0</color>
     <color name="dialog_text_secondary">#9E9E9E</color>
     <color name="dialog_error">#FF5252</color>
@@ -11,7 +10,7 @@
     <color name="status_text">#80CBC4</color>
     <color name="card_divider">#546E7A</color>
 
-    <!-- ===== 行情配色（夜间 / 深色）：沿用行情页原先的暗色盘 ===== -->
+    <!-- ===== 行情配色（夜间 / 深色）：与行情页同一套暗色盘 ===== -->
     <color name="market_bg">#FF0E1116</color>
     <color name="market_panel">#FF151A21</color>
     <color name="market_panel_pressed">#FF223040</color>
@@ -52,4 +51,35 @@
     <color name="market_widget_text">#FFE8EAED</color>
     <color name="market_widget_text_dim">#FF9AA4B2</color>
     <color name="market_widget_text_hint">#FF6B7280</color>
+
+    <!-- ===== 局域网消息窗口（深色） =====
+         这套 lan_* 若只在 values/colors.xml 里放一份浅色值、不做夜间覆盖，
+         设备进夜间模式后整屏都暗下来了，局域网消息还是一张白卡片。
+         下面按同一个角色逐个取深色版本：卡片与日间对话框底色同档，
+         面板比卡片再亮一点分层，正文/次级文字跟 dialog_text_* 对齐，
+         气泡改成深色带色相（蓝=我发的、青=对端来的、红=报错），文字统一浅色保证对比度。 -->
+    <color name="lan_card">#FF1E1E1E</color>
+    <color name="lan_panel">#FF252A2E</color>
+    <color name="lan_stroke">#FF455A64</color>
+    <color name="lan_text">#FFE0E0E0</color>
+    <color name="lan_text_dim">#FF9E9E9E</color>
+    <color name="lan_error">#FFFF8A80</color>
+    <color name="lan_online">#FF4DB6AC</color>
+    <color name="lan_idle">#FF90A4AE</color>
+    <color name="lan_chip">#FF1F3A36</color>
+    <color name="lan_send_on">#FF00897B</color>
+    <color name="lan_send_on_pressed">#FF00695C</color>
+    <color name="lan_btn_off">#FF37474F</color>
+    <color name="lan_btn_off_text">#FF90A4AE</color>
+    <color name="lan_row_pressed">#FF2A3238</color>
+    <color name="lan_bubble_self">#FF1B3550</color>
+    <color name="lan_bubble_peer">#FF143B36</color>
+    <color name="lan_bubble_error">#FF4A2422</color>
+    <color name="lan_bubble_stroke">#FF455A64</color>
+    <!-- 标题 / 小节标签 / 选中行文字用的强调色：日间是深青绿，
+         夜间必须换成浅的，深青绿压在深色卡片上根本看不清 -->
+    <color name="lan_accent">#FF80CBC4</color>
+    <!-- 输入框底板：比卡片亮一档，好和卡片分开 -->
+    <color name="lan_field_bg">#FF2A3238</color>
+    <color name="lan_field_stroke">#FF546E7A</color>
 </resources>

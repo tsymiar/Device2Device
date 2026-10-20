@@ -17,6 +17,10 @@ public class Receiver {
     public static final int KCP_VIEW = 9;
     public static final int KCP_HINT = 10;
     public static final int KCP_CLIENT = 11;
+    /** 局域网文本消息：发现到的对端（CLEAR / ADD|ip|port|name / DEL|...） */
+    public static final int LAN_PEER = 12;
+    /** 局域网文本消息：收到的内容与发送结果（RECV / SENT / SENDFAIL / LISTEN） */
+    public static final int LAN_MESSAGE = 13;
     public int receiver;
     public String message;
     public Receiver() {

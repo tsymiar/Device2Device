@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_lan_card"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <!-- 标题栏：左边标题，右边关闭 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/lan_msg_title"
+            android:textColor="@color/lan_accent"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_lan_close"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:text="@string/close"
+            android:textColor="@color/lan_text_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 状态行：一个小圆点 + 状态文字，跑起来变青绿 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/v_lan_dot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_lan_dot" />
+
+        <!-- 状态行：字小一号、始终单行。
+             maxLines=2 时状态一长就换行，对话框高度跟着一跳一跳的 -->
+        <TextView
+            android:id="@+id/tv_lan_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/lan_msg_idle"
+            android:textColor="@color/lan_idle"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- 本机身份：名字 + 端口 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/et_lan_name"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="2"
+            android:background="@drawable/bg_lan_field"
+            android:hint="@string/lan_msg_name_hint"
+            android:imeOptions="actionDone"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/lan_msg_default_name"
+            android:textColor="@color/lan_text"
+            android:textColorHint="@color/lan_text_dim"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/et_lan_port"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_lan_field"
+            android:hint="@string/hint_port"
+            android:imeOptions="actionDone"
+            android:inputType="number"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/lan_msg_port"
+            android:textColor="@color/lan_text"
+            android:textColorHint="@color/lan_text_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 启动/停止 + 发现设备 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_lan_start"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/lan_msg_start"
+            android:textSize="12sp"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="19dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_lan_refresh"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:enabled="false"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/lan_msg_discover"
+            android:textColor="@color/lan_accent"
+            android:textSize="12sp"
+            app:cornerRadius="19dp"
+            app:strokeColor="@color/colorPrimary" />
+    </LinearLayout>
+
+    <!-- 设备列表 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:text="@string/lan_msg_peers"
+        android:textColor="@color/lan_accent"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- 高度由 LanMsgDialog.updatePeersHeight() 按设备数算：一台 42dp，最多三行 112dp。
+         这里给的是"未发现设备"占位行时的高度 -->
+    <ListView
+        android:id="@+id/lv_lan_peers"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_lan_panel"
+        android:choiceMode="singleChoice"
+        android:divider="@color/lan_stroke"
+        android:dividerHeight="1dp"
+        android:listSelector="@android:color/transparent" />
+
+    <!-- 消息区标题 + 清空（没有消息时清空按钮是禁用的） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/lan_msg_chat"
+            android:textColor="@color/lan_accent"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_lan_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:enabled="false"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:text="@string/lan_msg_clear"
+            android:textColor="@color/sel_lan_link_text"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/sv_lan_chat"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_lan_panel"
+        android:fillViewport="false"
+        android:padding="8dp">
+
+        <!-- 上面是空态提示，有第一条消息就隐藏；下面是气泡容器 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_lan_chat_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/lan_msg_chat_hint"
+                android:textColor="@color/lan_text_dim"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:id="@+id/ll_lan_chat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 输入与发送 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/et_lan_msg"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_lan_field"
+            android:hint="@string/msg"
+            android:imeOptions="actionSend"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/lan_text"
+            android:textColorHint="@color/lan_text_dim"
+            android:textSize="13sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_lan_image"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="6dp"
+            android:enabled="false"
+            android:insetLeft="0dp"
+            android:insetRight="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="@string/lan_msg_pick_image"
+            android:textColor="@color/sel_lan_image_text"
+            android:textSize="12sp"
+            app:cornerRadius="20dp"
+            app:rippleColor="?attr/colorControlHighlight"
+            app:strokeColor="@color/lan_btn_stroke"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_lan_send"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:enabled="false"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="@string/commit"
+            android:textColor="@color/sel_lan_send_text"
+            android:textSize="12sp"
+            app:backgroundTint="@color/sel_lan_send_bg"
+            app:cornerRadius="20dp"
+            app:rippleColor="#33FFFFFF" />
+    </LinearLayout>
+
+</LinearLayout>

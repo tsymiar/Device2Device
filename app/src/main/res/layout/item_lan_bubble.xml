@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一条消息：气泡 + 下面的时间戳。
+     左右对齐、气泡底色、文字色都由代码按说话方（我 / 对端 / 系统 / 报错）改。
+     textIsSelectable 让长按能选中文字并复制。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/bubble_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:background="@drawable/bg_lan_bubble_chat"
+        android:maxWidth="250dp"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp"
+        android:textColor="@color/lan_text"
+        android:textIsSelectable="true"
+        android:textSize="13sp" />
+
+    <!-- 图片消息用它顶替 bubble_text；adjustViewBounds 让高度跟着图片的宽高比走 -->
+    <ImageView
+        android:id="@+id/bubble_image"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:adjustViewBounds="true"
+        android:maxWidth="200dp"
+        android:maxHeight="260dp"
+        android:visibility="gone"
+        tools:ignore="ContentDescription" />
+
+    <TextView
+        android:id="@+id/bubble_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="2dp"
+        android:textColor="@color/lan_text_dim"
+        android:textSize="10sp" />
+</LinearLayout>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 状态圆点：8dp 的圆点，activated = 已启动（青绿），默认 = 未启动（灰）。
+     LanMsgDialog.setState() 里用 vDot.setActivated(online) 切换。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_activated="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/lan_online" />
+            <size
+                android:width="8dp"
+                android:height="8dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/lan_idle" />
+            <size
+                android:width="8dp"
+                android:height="8dp" />
+        </shape>
+    </item>
+</selector>

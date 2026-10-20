@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 不可点时边框收掉，避免比按钮文字更醒目 -->
+    <item android:state_enabled="false" android:color="@android:color/transparent" />
+    <item android:color="@color/lan_accent" />
+</selector>
