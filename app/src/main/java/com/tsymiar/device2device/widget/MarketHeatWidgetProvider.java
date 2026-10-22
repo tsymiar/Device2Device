@@ -78,28 +78,44 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /** 一次取多少条，也是能画的上限：新浪 {@code num} 最多 100，再往上要翻页 */
     public static final int TOP_N = 100;
 
-    /**
-     * 摆几格的目标：比一屏摆得下的多，多出来的排在画布下沿之外，滚过去才看得见
-     * （见 {@link #canvasPx} 与 {@code MarketHeatWidgetService}）。
-     */
+    /** 摆几格：一屏铺满 50 家（点哪格开哪只就靠这个数，见 {@link #tilesFor}） */
     private static final int TILES_WANT = 50;
+
+    /** 格数下限：部件小到 50 家摆不下时才往下减，减到这里为止 */
+    private static final int TILES_MIN = 24;
 
     /**
      * 格子的最小面积（dp²）：再小就摆不下字了（四个字的名字折成两行也要二十来 dp 宽）。
-     * 画布高度由它兜底：部件越小，50 只越是摊在比一屏高的画布上，多出来的靠滚动看；
-     * 部件够大时画布就等于可见高度，一屏摆得下全部，不必滚动。
+     * 一屏画几格就按「画布面积 ÷ 它」算。
      */
     private static final float TILE_MIN_DP2 = 800f;
 
     /** 画布比量出来的可见高度再高这么一点：宁可最后一行被切一丁点，也不在底部留一道白 */
     private static final float CANVAS_COVER = 1.03f;
 
+    /** 一格里还认得出字的最小面积（dp²）：50 家摊一屏时按它判要不要减格数 */
+    private static final float TILE_FLOOR_DP2 = 420f;
+
     /**
-     * 透明点击槽的个数，也是能画的上限：一格一个，摆在格子的位置上（见 {@link #paintSlots}）。
+     * 50 家摊一屏时每格该占的面积（dp²）：画布高度按它兜底。
      *
-     * 为什么要有这一层：集合小部件里，格子里（嵌套 RemoteViews）挂 PendingIntent 不生效、
-     * 填 fillIn 又只认条目里第一个 —— 点同一行任何一格都只会打开这一行第一只。
-     * 只有放进根布局的那一层点击才真的生效，所以把 N 个空 View 铺在马赛克上，各挂各的标的。
+     * 宿主报来的 OPTION_APPWIDGET_SIZES 常常比真实可见区域小一大截（实测报 384x132dp，
+     * 屏上那块地是 404x212dp），只按它算画布就只铺满一半高。格数固定 50，按「每格 950dp²」
+     * 反推出的画布高度与真实高度基本吻合，于是照样铺满。
+     */
+    private static final float TILE_FILL_DP2 = 950f;
+
+    /**
+     * 横向回缩：宿主渲染 remote views 时会按自己的密度再放大一档，逐像素写死的格子宽度
+     * 跟着放大（实测 ×1.147），右边那一列就戳出边框。按这个比例回缩之后落在可见宽度里。
+     */
+    private static final float WIDTH_COMPENSATE = 0.88f;
+
+    /**
+     * 透明点击槽的个数，也是能画的上限：一格一个，摆到格子的位置上（见 {@link #paintSlots}）。
+     *
+     * 集合小部件里只有根布局那一层的点击真的生效（格子里的 PendingIntent 不认、fillIn 只认
+     * 条目里第一个），所以把 N 个空 View 铺在马赛克上，各挂各的标的。
      */
     private static final int SLOT_COUNT = 60;
 
@@ -120,12 +136,6 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             R.id.heat_slot_48, R.id.heat_slot_49, R.id.heat_slot_50, R.id.heat_slot_51,
             R.id.heat_slot_52, R.id.heat_slot_53, R.id.heat_slot_54, R.id.heat_slot_55,
             R.id.heat_slot_56, R.id.heat_slot_57, R.id.heat_slot_58, R.id.heat_slot_59};
-    /**
-     * 每一格的目标面积（dp²）：格数 = 可视面积 / 它，格子就不跟着部件大小忽大忽小。
-     * 1400 是按 4x4（可视约 230x180dp）摆 30 格反推的：约 37dp 见方，名字与涨跌幅都摆得下。
-     */
-    private static final float TILE_AREA_DP2 = 1700f;
-
     /** 多实例共享最近一次结果：同一份榜单没必要每个部件各拉一次 */
     private static volatile List<CapRow> sRows;
     private static volatile String sError;
@@ -441,7 +451,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             sLayouts.remove(widgetId);
             return null;
         }
-        HeatLayout layout = new HeatLayout(root, area[0], area[2], new int[]{size[0], size[1], tiles},
+        HeatLayout layout = new HeatLayout(root, Math.round(area[0] * WIDTH_COMPENSATE), area[2],
+                new int[]{size[0], size[1], tiles},
                 area[1]);
         sLayouts.put(widgetId, layout);
         return layout;
@@ -482,10 +493,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         }
 
         /**
-         * 真的需要滚吗：画布比可见区域高出「一截」才算。
-         *
-         * 画布本来就故意比可见区域高 {@link #CANVAS_COVER} 那么一点（宁可最后一行贴着下沿
-         * 被切一丁点，也不在底部留一道白），那几％不算滚动。
+         * 真的需要滚吗：画布高出「一截」才算（{@link #CANVAS_COVER} 那点垫高不算）
          */
         boolean scrollable() {
             return MarketHeatWidgetProvider.scrollable(new int[]{widthPx, visible, canvas});
@@ -494,8 +502,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         /**
          * 每一格摆在哪（相对马赛克这块地的 px 矩形），自上而下、自左而右。
          *
-         * 只按市值份额往下分（相邻两块之间留 {@link #SEAM_PX} 那条缝），不套摆放时那套面积预算 ——
-         * 两者相差不到一两个百分点，当点击区域用绰绰有余，换来的是不必重算一遍那套像素配平。
+         * 只按市值份额往下分（兄弟间留 {@link #SEAM_PX}），不套摆放那套面积预算 ——
+         * 差不到一两个百分点，当点击区域够用。
          */
         List<HeatSlot> slots() {
             List<HeatSlot> out = new ArrayList<>();
@@ -606,7 +614,11 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
                     + " map=" + w + "x" + h + " header=" + (header == null ? -1 : header.getMeasuredHeight())
                     + " legend=" + (legend == null ? -1 : legend.getMeasuredHeight())
                     + " empty=" + (empty == null ? -1 : empty.getMeasuredHeight()));
-            if (w > 0 && h > 0) return new int[]{w, h, canvasPx(context, w, h)};
+            Log.i(TAG, "measure size=" + size[0] + "x" + size[1] + "dp root=" + root.getMeasuredWidth()
+                    + "x" + root.getMeasuredHeight() + " map=" + w + "x" + h);
+            if (w > 0 && h > 0) {
+                return new int[]{w, h, canvasPx(context, w, h)};
+            }
         } catch (Throwable t) {
             Log.w(TAG, "heat layout measure failed", t);
         }
@@ -615,20 +627,21 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 排版用的画布多高（px）：默认就等于可见高度 —— {@link #TILES_WANT} 只在一屏里摊开，
-     * 上下正好铺满，不必滚动。只有当一屏按 {@link #TILE_MIN_DP2} 摆不下这么多只时
-     * （部件又矮又窄）才把画布撑高，多出来的那些行滚过去看（见 {@code MarketHeatWidgetService}）。
+     * 排版用的画布多高（px）：等于可见高度（略加 {@link #CANVAS_COVER} 防底部留白）。
+     * 画几格由 {@link #tilesFor} 按面积定，所以画布不会溢出、也就不必滚动 —— 一屏铺满，
+     * 每格都在可见范围内，点击槽才对得准。
+     * 只有部件小到连 {@link #TILES_MIN} 格都摆不下时才撑高画布，那时才滚。
      */
     private static int canvasPx(Context context, int mapWidthPx, int mapHeightPx) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        float wDp = mapWidthPx / metrics.density;
-        float minDp = TILES_WANT * TILE_MIN_DP2 / Math.max(1f, wDp);
-        // 略高一点点（CANVAS_COVER）：这块高度是我们在自己进程里 measure 出来的，桌面上
-        // 那圈宿主内边距、字体行高跟这里未必分毫不差，差几像素就会在底部剩一道白。
-        // 宁可多出百分之几让最后一行贴着下沿被切一点（反正本来就能滚），也不留缝
+        float wDp = Math.max(1f, mapWidthPx / metrics.density);
+        // 两条里取大的：宿主报的可见高度（再垫 3% 防底部留白）、按「50 家 × 950dp²」反推的高度
+        float fillDp = TILES_WANT * TILE_FILL_DP2 / wDp;
         float coverDp = mapHeightPx / metrics.density * CANVAS_COVER;
-        float canvasDp = Math.max(coverDp, minDp);
-        return Math.max(mapHeightPx, Math.round(canvasDp * metrics.density));
+        // 同一条宿主缩放（见 WIDTH_COMPENSATE）：画布也要按它回缩，否则最后一行会被切成
+        // 贴着下沿的一条几像素 —— 那几格既看不清也点不准，不如按整行算
+        float canvasDp = Math.max(coverDp, fillDp) * WIDTH_COMPENSATE;
+        return Math.max(1, Math.round(canvasDp * metrics.density));
     }
 
     /** 量尺寸前把标题那几行的字号设成真正要用的那一份：它们多高取决于字号，量偏了就合不严 */
@@ -751,9 +764,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         if (row == null || context == null || widthPx <= 0 || heightPx <= 0) return null;
         RemoteViews views = new MapBrush(context, widgetId * TILE_CODE_STRIDE)
                 .draw(row, widthPx, heightPx);
-        // 行高写死：格子上那几个 setHeight / setMaxHeight 在桌面那个 TextView 上量出来不生效
-        // （格子的高跟着文字走，一行里几个格子高矮不一），整片马赛克就比排版算出来的高，
-        // 按排版摆的点击槽跟着对不上。行是列表条目，改它的 LayoutParams 一定管用
+        // 行高写死：格子上那几个 setHeight / setMaxHeight 在桌面那个 TextView 上不生效
+        // （高度跟着文字走），行就比排版高、点击槽跟着错位；改条目的 LayoutParams 一定管用
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             float density = context.getResources().getDisplayMetrics().density;
             int rootId = row.isLeaf() ? R.id.widget_market_heat_tile
@@ -898,22 +910,26 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             TileLabel label = tileLabel(row, Math.max(1f, widthPx - 2f * pad),
                     Math.max(1f, heightPx - 2f * pad), density, fontScale);
             views.setViewPadding(id, pad, pad, pad, pad);
-            views.setInt(id, "setWidth", Math.max(1, widthPx));
-            // 高度用 setMinHeight + setMaxHeight 两头钉死，不用 setHeight：后者在桌面那个
-            // TextView 上量出来并不生效（格子的高会跟着文字走，一行里几个格子高矮不一，
-            // 整片马赛克的行高于是比排版算出来的大），点击槽就跟着对不上了
-            views.setInt(id, "setMinHeight", Math.max(1, heightPx));
-            views.setInt(id, "setMaxHeight", Math.max(1, heightPx));
+            // 宽高写进 LayoutParams（31+）：setWidth / setHeight / setMaxHeight 那几个
+            // 在桌面那个 TextView 上量出来不生效——格子会跟着文字高矮不一，整片马赛克
+            // 只铺到可见区域的一半，按格子位置摆的点击槽也就对不上
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                float d = context.getResources().getDisplayMetrics().density;
+                views.setViewLayoutWidth(id, Math.max(1, widthPx) / d, TypedValue.COMPLEX_UNIT_DIP);
+                views.setViewLayoutHeight(id, Math.max(1, heightPx) / d, TypedValue.COMPLEX_UNIT_DIP);
+            } else {
+                views.setInt(id, "setWidth", Math.max(1, widthPx));
+                views.setInt(id, "setMinHeight", Math.max(1, heightPx));
+                views.setInt(id, "setMaxHeight", Math.max(1, heightPx));
+            }
             views.setInt(id, "setBackgroundColor", fill);
             views.setTextViewText(id, label.text);
             views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, label.sp);
             // 行数按内容收住：中文没有词间空格，TextView 会逐字折行，留着宽的 maxLines 就会给你拆成两行
             views.setInt(id, "setMaxLines", label.lines);
             views.setTextColor(id, tileTextColor(palette, Color.alpha(fill)));
-            // 点这一格：填一个 FillInIntent 上去，列表上那个模板 PendingIntent 带着它发出去。
-            // 平台只认「条目根」上那一层 fillIn（嵌套的 RemoteViews 挂 PendingIntent 是不生效的，
-            // 实测点击连 clickable 都不会变），所以点击精度就止步于「一行」—— 同一行里点哪一格
-            // 都会打开这一行的第一只（按市值倒序，也就是这一行最大的那只）。
+            // 点这一格：填 FillInIntent，由列表上的模板 PendingIntent 带出去。
+            // 平台只认条目根那一层（嵌套 RemoteViews 里的点击不生效），所以只精确到行
             views.setOnClickFillInIntent(id, stockFillIn(row));
             codes++;
             return views;
@@ -1388,7 +1404,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         // 调试包里把「量到的尺寸 → 算出的格数」写在第二行最前面：
         // 拖大拖小之后这串数动不动，一眼就能分清是启动器没送新尺寸、还是我们这边没跟着算
         views.setTextViewText(R.id.widget_meta, metaText(context, rows));
-        views.setTextViewText(R.id.widget_legend, legendText(rows, tiles, scrollable(area)));
+        views.setTextViewText(R.id.widget_legend, legendText(rows, tiles, false));
         views.setTextViewText(R.id.widget_market_heat_time, stampText());
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
         views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
@@ -1413,26 +1429,24 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 这块地方真的需要滚吗：画布比可见区域高出「一截」才算（判据与点击槽同一套，
-     * 见 {@code HeatLayout#scrollable}）—— 图例上那句「上下滑动」与点击槽的取舍必须一致，
-     * 否则会一边说能滑、一边滑不动。
+     * 与 {@code HeatLayout#scrollable} 同一套判据：图例那句「上下滑动」和点击槽的取舍要一致
      */
     private static boolean scrollable(int[] area) {
         return area[2] > area[1] * (CANVAS_COVER + 0.03f);
     }
 
     /**
-     * 把摆好的马赛克挂到主体那片列表上：行由 {@code MarketHeatWidgetService} 一行行喂，
-     * 这里只负责「挂哪个 adapter」与「没数据时切空态」。
+     * 把摆好的马赛克整片铺进主体那块地里：一个竖容器 + 每行一个 RemoteViews。
      *
-     * 点击分两层：列表上挂一个模板 PendingIntent（点哪一格都先走它），每一格再用
-     * {@code setOnClickFillInIntent} 把该标的的 extras 填进去 —— collection 条目里
-     * 直接给子 View 挂 PendingIntent 是不生效的，只有 FillIn 这一条路。
+     * 早先是用 ListView 一行一个条目喂的（为了能滚），但那层有两处对不上：
+     * 列表会给条目加一圈内边距（实测左右各 30px），格子的坐标原点因此和容器不是同一个；
+     * 条目里的子 View 也挂不住点击（只有 fillIn 一条路，且只认条目里第一个）。
+     * 现在画布固定等于可见高度、不需要滚动，就改成直接铺树 —— 摆的坐标与画出来的坐标
+     * 完全同源，叠在上面的点击槽才能一格对一格。
      */
     private static void paintMap(Context context, AppWidgetManager manager, int widgetId, int[] size,
                                  RemoteViews views, int tiles, int[] area) {
         HeatLayout layout = mapFor(context, widgetId, size, tiles, area);
-        views.setEmptyView(R.id.widget_market_heat_map, R.id.widget_market_heat_empty);
         if (layout == null) {
             views.setViewVisibility(R.id.widget_market_heat_map, View.GONE);
             views.setViewVisibility(R.id.widget_market_heat_empty, View.VISIBLE);
@@ -1441,35 +1455,28 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         }
         views.setViewVisibility(R.id.widget_market_heat_map, View.VISIBLE);
         views.setViewVisibility(R.id.widget_market_heat_empty, View.GONE);
-        views.setPendingIntentTemplate(R.id.widget_market_heat_map, heatIntent(context, widgetId));
-        // intent 必须带上 widgetId 并把自己标成独一无二：多个实例各有一份排版，
-        // data 不区分时系统会认为它们是同一个 adapter，喂错数据
-        Intent intent = new Intent(context, MarketHeatWidgetService.class)
-                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
-        intent.setData(Uri.parse(intent.toUri(Intent.URI_INTENT_SCHEME)));
-        views.setRemoteAdapter(R.id.widget_market_heat_map, intent);
+        RemoteViews mosaic = new RemoteViews(context.getPackageName(), R.layout.widget_market_heat_col);
+        mosaic.removeAllViews(R.id.widget_market_heat_col);
+        for (int i = 0; i < layout.rows.size(); i++) {
+            int h = i < layout.heights.length ? layout.heights[i] : 0;
+            RemoteViews row = rowViews(context, widgetId, layout.rows.get(i), layout.widthPx, h);
+            if (row != null) mosaic.addView(R.id.widget_market_heat_col, row);
+        }
+        views.removeAllViews(R.id.widget_market_heat_map);
+        views.addView(R.id.widget_market_heat_map, mosaic);
         // 透明点击槽：一格一个，按这一格的像素位置摆上去（点得准靠的是这一层，见 SLOT_COUNT）
         paintSlots(context, views, widgetId, layout);
-        // 行是现取的：排版换了（数据到了 / 尺寸变了）得让列表重新问一遍
-        manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_market_heat_map);
     }
 
     /**
-     * 把透明点击槽摆到每一格上：宽高、位置、点击三样都写。
+     * 把透明点击槽摆到每一格上：宽高、位置、点击三样都写（位置按 dp 给，误差不到一像素）。
      *
-     * 位置只能按 dp 给（{@code setViewLayoutMargin} 收的是浮点 dp），一格差不到一像素；
-     * 这些 API 是 31 才有的，老系统上摆不了 —— 那就全部收起来，点击退回列表那一层
-     * （虽然只精确到行，但不至于点不动）。
+     * 这些 API 是 31 才有的：老系统摆不了，就全收起来，点击退回列表那一层（只精确到行）。
      */
     private static void paintSlots(Context context, RemoteViews views, int widgetId,
                                    HeatLayout layout) {
-        // 需要滚动时不摆点击槽：那些槽是一层「能点」的透明板，会把拖动事件一并吃掉，
-        // 底下的列表就再也拖不动了 —— 只能二选一。此时退回列表那一层：点击只精确到行
-        // （见 tile 里的 fillIn），但滚得动；一屏摆得下的时候才用槽，那时本来也不用滚。
-        if (layout.scrollable()) {
-            hideSlots(views);
-            return;
-        }
+        // 画布等于可见高度（见 canvasPx），整片马赛克都在可见范围内 —— 槽可以一直摆，
+        // 不必再和「滚动」二选一
         List<HeatSlot> slots = layout.slots();
         boolean place = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
         float density = context.getResources().getDisplayMetrics().density;
@@ -1502,8 +1509,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /**
      * 点某一格：打开行情页并带上这只票。
      *
-     * requestCode 必须每格一个：Intent 的 extras 不参与 PendingIntent 的相等比较，
-     * 两只票只差 extras、requestCode 再撞上就会被系统复用成同一个 —— 点哪格都是同一只票。
+     * requestCode 必须每格一个 —— extras 不参与 PendingIntent 的相等比较，撞上就被复用成同一个。
      */
     private static PendingIntent stockIntent(Context context, CapRow row, int requestCode) {
         Intent intent = new Intent(context, MarketActivity.class);
@@ -1669,21 +1675,20 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 画几格：一屏摆得下的那么多，但不少于 {@link #TILES_WANT}（多出来的滚过去看）。
+     * 画几格：一屏摆 50 家（画布就等于可见高度，见 {@link #canvasPx}）。
      *
-     * 一屏摆得下几格 = 可见面积 ÷ {@link #TILE_AREA_DP2}（格子大小照旧）；格数再兜一个
-     * {@link #TILES_WANT} 的下限 —— 于是小部件上实际只有一屏那么多，剩下的排在画布下沿之外。
-     * 格子可能小到摆不下字，这是可以接受的：字号跟着方块大小走（见 {@code tileSp}），
-     * 小到一定程度就整格只留颜色（见 {@code labelFor} 最后一档）—— 面积与颜色照旧是信息，
-     * 格子也照旧能点。
+     * 50 家摊在一屏里，每格还能有 {@link #TILE_FLOOR_DP2} 以上就照 50 家摆；部件被缩得很小时
+     * 才按面积往下减（减到 {@link #TILES_MIN}）。上限是 {@link #SLOT_COUNT}：每格都得有一个
+     * 点击槽，多画的格子点了没反应。
      */
     private static int tilesFor(Context context, int[] area) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         float wDp = Math.max(0f, area[0] / metrics.density);
-        float hDp = Math.max(0f, area[2] / metrics.density);   // 画布（比可见区域高）
-        int fit = Math.round(wDp * hDp / TILE_AREA_DP2);
-        // 上限是点击槽的个数：每格都得有一个槽，多出来的格子点了没反应，不如不画
-        return Math.max(TILES_WANT, Math.min(Math.min(TOP_N, SLOT_COUNT), fit));
+        float hDp = Math.max(0f, area[2] / metrics.density);   // 画布
+        int want = Math.min(TILES_WANT, SLOT_COUNT);
+        if (wDp * hDp / want >= TILE_FLOOR_DP2) return want;
+        int fit = Math.round(wDp * hDp / TILE_FLOOR_DP2);
+        return Math.max(TILES_MIN, Math.min(want, fit));
     }
 
     /** 点空白进行情页：这里是一整屏的盘面，不带具体标的，进去看行情页本身 */
@@ -1713,10 +1718,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /**
      * 集合条目模板专用的 flag：要 MUTABLE。
      *
-     * AppWidget 的点击模型是「列表挂一个模板 PendingIntent，格子挂一个 FillInIntent」，
-     * 两者的 extras 在**发送那一刻**才合并 —— IMMUTABLE 的 PendingIntent 不允许被填，
-     * 合并会被系统丢掉，表现就是点格子只打开一个不带标的的行情页。
-     * 只有这个模板用 MUTABLE，其余（标题、刷新）仍旧 IMMUTABLE。
+     * FillInIntent 的 extras 在发送那一刻才合进模板，IMMUTABLE 的不允许被填、会被丢掉 ——
+     * 表现就是点格子只打开一个不带标的的行情页。其余（标题、刷新）仍旧 IMMUTABLE。
      */
     private static int fillInFlags() {
         int value = PendingIntent.FLAG_UPDATE_CURRENT;

@@ -83,11 +83,8 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 热力图主体：一摞「行」—— treemap 的顶层就是一行行横排的（见 MarketTreemap.layout 的
-         topRows），每行由 MarketHeatWidgetService 逐行喂进来。
-         外面套一层 FrameLayout 是为了在上面再叠一版「透明点击槽」：集合小部件里，点击只认
-         直接挂在 AppWidgetHostView 下的那一层，格子里（嵌套 RemoteViews）挂 PendingIntent 无效、
-         填 fillIn 又只认条目里第一个 —— 只有把点击槽放进根布局才点得准。 -->
+    <!-- 热力图主体：一摞「行」，由 MarketHeatWidgetService 逐行喂。外面套 FrameLayout 是
+         为了叠「透明点击槽」—— 集合小部件里只有根布局那一层的点击真的生效。 -->
     <FrameLayout
         android:id="@+id/widget_market_heat_frame"
         android:layout_width="match_parent"
@@ -97,20 +94,14 @@
         android:layout_weight="1"
         android:clipChildren="true">
 
-        <ListView
+        <FrameLayout
             android:id="@+id/widget_market_heat_map"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:clipChildren="true"
-            android:divider="@android:color/transparent"
-            android:dividerHeight="0dp"
-            android:listSelector="@android:color/transparent"
-            android:scrollbars="none" />
+            android:clipChildren="true" />
 
-        <!-- 一格一个，按格子的像素位置摆好（见 MarketHeatWidgetProvider#paintSlots）；
-             平时全是 0dp 且 gone，只有用到的那些会被设上宽高、位置与点击。
-             直接挂在这一层（与列表同级）：多套一层容器 MIUI 的部件工厂会认不出来
-             （整块部件显示「载入窗口小部件时出现问题」） -->
+        <!-- 透明点击槽：一格一个，按格子的像素位置摆（见 paintSlots）。平时 0dp + gone。
+             与列表同级直接挂在这一层——多套一层容器 MIUI 的部件工厂会认不出来 -->
         <TextView
             android:id="@+id/heat_slot_0"
             android:layout_width="0dp"
