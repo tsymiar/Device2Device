@@ -8,9 +8,8 @@ import androidx.annotation.NonNull;
 /**
  * 发布 / 订阅窗口上填的那几项（broker 地址、端口、topic、正文、一对一目标）。
  *
- * 除了当次的取值，还会落到 SharedPreferences：两个窗口都是悬浮窗，填一次是一次，
- * 之前只存在内存里 —— 进程一退（或者发布窗口在没订阅过的情况下打开）就全空了，
- * 发布端于是压根不知道该连哪个 broker，表现就是「连不上」。
+ * 同时落到 SharedPreferences：两个窗口都是悬浮窗，只存内存的话进程一退就全空，
+ * 发布端于是不知道该连哪个 broker。
  */
 public class PubSubSetting {
     static private final PubSubSetting setting = new PubSubSetting();

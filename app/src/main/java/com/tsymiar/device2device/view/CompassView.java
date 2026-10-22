@@ -68,7 +68,7 @@ public class CompassView extends View {
         mTickMajor = stroke(0xFF90A4AE, dp(2f));
         mCardinal = textPaint(dp(11f), 0xFF546E7A, true);
         mDegreePaint = textPaint(dp(11f), 0xFF90A4AE, false);
-        mCoordPaint = textPaint(dp(22f), 0xFF546E7A, false);   // 跟放大后的方位文字差不多大
+        mCoordPaint = textPaint(dp(22f), 0xFF546E7A, false);   // 与放大后的方位文字尺寸相近
         mMarkerPaint = fill(0xFF1E88E5);
         mNorthPaint = fill(0xFFE53935);
         mSouthPaint = fill(0xFFB0BEC5);
@@ -125,7 +125,7 @@ public class CompassView extends View {
         float r = Math.min(w, h - top - bottom) / 2f - dp(6);
 
         if (mZoomed) {
-            // 经纬度放在 view 顶端到倒三角之间（差不多正中），倒三角再指着盘顶＝手机正前方
+            // 经纬度置于 view 顶端与倒三角之间（近似居中），倒三角指向盘顶，即手机正前方
             float dialTop = cy - r;
             float markerTop = dialTop - dp(9);          // 倒三角的顶边
             Paint.FontMetrics fm = mCoordPaint.getFontMetrics();
@@ -138,7 +138,7 @@ public class CompassView extends View {
         canvas.drawCircle(cx, cy, r, mDialFill);
         canvas.drawCircle(cx, cy, r, mDialRing);
 
-        // 放大后盘面里的字和指针跟着放大，不然整屏看过去中间一大片留白
+        // 放大后盘面文字与指针同步放大，否则整屏中部会出现大片留白
         mCardinal.setTextSize(dp(mZoomed ? 18f : 11f));
         mDegreePaint.setTextSize(dp(mZoomed ? 15f : 11f));
 
@@ -266,7 +266,7 @@ public class CompassView extends View {
             paint.setTextSize(fitted);
         }
         canvas.drawText(text, x, y, paint);
-        paint.setTextSize(size);   // 用完还原，别把下一次的字号也压小
+        paint.setTextSize(size);   // 用完后还原，避免影响后续字号
     }
 
     private float dp(float value) {

@@ -221,8 +221,6 @@ public class DefaultFragment extends Fragment implements SensorEventListener {
 				int ph = (int)(gravity[0] * 100);
 
 				mPoints[i] = new PointF(xlist.get(i), ph);
-
-				// mView.invalidate();
 			}
 			return mPoints;
 		}
@@ -242,7 +240,6 @@ public class DefaultFragment extends Fragment implements SensorEventListener {
 				p4.x = wt;
 				Path path = new Path();
 				path.moveTo(startp.x, startp.y);
-				// 贝塞尔三次曲线
 				path.cubicTo(p3.x, p3.y, p4.x, p4.y, endp.x, endp.y);
 				// 贝塞尔二次 path.quadTo();
 				canvas.drawPath(path, paint);

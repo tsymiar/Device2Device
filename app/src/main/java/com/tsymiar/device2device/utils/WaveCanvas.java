@@ -54,13 +54,13 @@ public class WaveCanvas {
     private static final double DB_SPL_AT_FULL_SCALE = 94.0;
     /** dBFS 下限：PCM 16bit 的动态范围到 -90 dBFS */
     private static final double DBFS_FLOOR = -90.0;
-    /** 显示下限：手机底噪换算出来不到 30 dB，按「安静的室内」兜底，免得数字低得不真实 */
+    /** 显示下限：手机底噪换算出来不到 30 dB，以「安静的室内」作为兜底，以免数值过低而失真 */
     private static final double DB_SPL_FLOOR = 30.0;
-    private int mBaseLine = 0;// Y轴基线
+    private int mBaseLine = 0;
     private PaintingTask mAudioTask = null;
-    private final int mMarginRight = 30;//波形图绘制距离右边的距离
-    private float mDivider = 0.2f;//为了节约绘画时间，每0.2个像素画一个数据
-    private long mCurrentTime;//当前时间戳
+    private final int mMarginRight = 30;
+    private float mDivider = 0.2f;
+    private long mCurrentTime;
     private DecibelListener mDecibelListener;
     /**
      * 实时分贝，单位 dB SPL（日常看到的分贝数：安静 ≈ 30 dB，正常说话 60 dB 上下）。
@@ -70,10 +70,10 @@ public class WaveCanvas {
     private volatile double mCurrentDb = DB_SPL_FLOOR;
     private float mZoomY = 1.0f;// Y轴缩放倍率（幅度）
     private float mZoomX = 1.0f;// X轴缩放倍率（时基，越大时间窗口越短）
-    private Paint mPaintDbBg;// 分贝文字背景
-    private Paint mPaintDbText;// 分贝文字
-    private String mSavePcmPath;//保存pcm文件路径
-    private String mSaveWavPath;//保存wav文件路径
+    private Paint mPaintDbBg;
+    private Paint mPaintDbText;
+    private String mSavePcmPath;
+    private String mSaveWavPath;
     private Paint mCirclePaint;
     private Paint mCenter;
     private Paint mPaintLine;
@@ -95,18 +95,18 @@ public class WaveCanvas {
                                String path, Callback callback) {
         mSavePcmPath = path + audioName + ".pcm";
         mSaveWavPath = path + audioName + ".wav";
-        new Thread(new WriteRunnable()).start();//开线程写文件
+        new Thread(new WriteRunnable()).start();
         mAudioTask = new PaintingTask(audioRecord, recBufSize, sfv, mPaint, callback);
         mAudioTask.execute();
     }
 
     private void init() {
-        mCirclePaint = new Paint();//画圆
-        mCirclePaint.setColor(Color.rgb(246, 131, 126));//设置上圆的颜色
+        mCirclePaint = new Paint();
+        mCirclePaint.setColor(Color.rgb(246, 131, 126));
 
-        mCenter = new Paint();//中心线
-        mCenter.setColor(Color.rgb(39, 199, 175));// 画笔为color
-        mCenter.setStrokeWidth(1);// 设置画笔粗细
+        mCenter = new Paint();
+        mCenter.setColor(Color.rgb(39, 199, 175));
+        mCenter.setStrokeWidth(1);
         mCenter.setAntiAlias(true);
         mCenter.setFilterBitmap(true);
         mCenter.setStyle(Style.FILL);
@@ -122,8 +122,8 @@ public class WaveCanvas {
         paintRect.setColor(Color.rgb(39, 199, 175));
 
         mPaint = new Paint();
-        mPaint.setColor(Color.rgb(39, 199, 175));// 画笔为color
-        mPaint.setStrokeWidth(1);// 设置画笔粗细
+        mPaint.setColor(Color.rgb(39, 199, 175));
+        mPaint.setStrokeWidth(1);
         mPaint.setAntiAlias(true);
         mPaint.setFilterBitmap(true);
         mPaint.setStyle(Paint.Style.FILL);
@@ -147,7 +147,7 @@ public class WaveCanvas {
         if (mAudioTask != null) {
             mAudioTask.stopRecord();
         }
-        clear(); // 清除
+        clear();
     }
 
     /**
@@ -166,8 +166,8 @@ public class WaveCanvas {
     class PaintingTask extends AsyncTask<Object, Object, Object> {
         private final int recBufSize;
         private final AudioRecord audioRecord;
-        private final SurfaceView sfv;// 画板
-        private final Paint mPaint;// 画笔
+        private final SurfaceView sfv;
+        private final Paint mPaint;
         private final Callback callback;
 
         PaintingTask(AudioRecord audioRecord, int recBufSize,
@@ -178,7 +178,7 @@ public class WaveCanvas {
             mLineOff = ((WaveSurface) sfv).getLineOff();
             this.mPaint = mPaint;
             this.callback = callback;
-            inBuf.clear();// 清除 换缓冲区的数据
+            inBuf.clear();
             mIsRecording = true;
         }
 
@@ -186,9 +186,8 @@ public class WaveCanvas {
         protected Object doInBackground(Object... params) {
             try {
                 short[] buffer = new short[recBufSize];
-                audioRecord.startRecording();// 开始录制
+                audioRecord.startRecording();
                 while (mIsRecording) {
-                    // 从MIC保存数据到缓冲区
                     int readSize = audioRecord.read(buffer, 0,
                             recBufSize);
                     synchronized (inBuf) {
@@ -282,7 +281,6 @@ public class WaveCanvas {
          * @param mBaseLine Y轴基线
          */
         void simpleDraw(ArrayList<Short> buf, int mBaseLine) {
-            //波形图绘制距离左边的距离
             int marginLeft = 20;
             // 每个采样点占多少像素：X 轴放大后一屏只画更短的一段音频，波形细节更多
             double samplesPerSecond = SAMPLE_RATE / (double) RATE_X;
@@ -291,7 +289,7 @@ public class WaveCanvas {
                     / (samplesPerSecond * windowSeconds));
             if (!mIsRecording)
                 return;
-            //  Y轴缩小的比例 默认为1；放大到很高倍率时别让它变成 0（除 0 会崩）
+            // Y 轴缩小比例，默认 1；放大至很高倍率时需避免其变为 0（除零将导致崩溃）
             int rateY = Math.max(1, (int) ((65535 / 2 / (sfv.getHeight() - mLineOff)) / mZoomY));
 
             for (int i = 0; i < buf.size(); i++) {

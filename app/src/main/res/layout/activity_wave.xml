@@ -232,7 +232,7 @@
             tools:text="@string/speech_to_text" />
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 录音时的实时分贝图：占住页面下方原来空着的那块；只在录音中显示（默认 gone） -->
+    <!-- 录音时的实时分贝图：占住页面下方空着的那块；只在录音中显示（默认 gone） -->
     <com.tsymiar.device2device.view.DecibelView
         android:id="@+id/db_meter"
         android:layout_width="0dp"

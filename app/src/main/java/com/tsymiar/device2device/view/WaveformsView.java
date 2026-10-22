@@ -273,13 +273,8 @@ public class WaveformsView extends View {
         paintLine = new Paint();
         paintLine.setColor(Color.rgb(169, 169, 169));
         canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
-        // canvas.drawLine(0, height*0.25f+20, measuredWidth, height*0.25f+20,
-        // paintLine);//第二根线
-        // canvas.drawLine(0, height*0.75f+20, measuredWidth, height*0.75f+20,
-        // paintLine);//第3根线
         canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth, measuredHeight - mLineOffset / 2 - 1,
                 paintLine);// 最下面的那根线
-        // }
         if (state == 1) {
             mSoundRecord = null;
             state = 0;
@@ -295,10 +290,6 @@ public class WaveformsView extends View {
             paintLine = new Paint();
             paintLine.setColor(Color.rgb(169, 169, 169));
             canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
-            // canvas.drawLine(0, height*0.25f+20, measuredWidth,
-            // height*0.25f+20, paintLine);//第二根线
-            // canvas.drawLine(0, height*0.75f+20, measuredWidth,
-            // height*0.75f+20, paintLine);//第3根线
             canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth,
                     measuredHeight - mLineOffset / 2 - 1, paintLine);// 最下面的那根线
             return;

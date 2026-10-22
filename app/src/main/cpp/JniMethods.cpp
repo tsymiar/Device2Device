@@ -193,9 +193,8 @@ static bool parseTopicHex(const std::string& hex, uint32_t& topic)
     const size_t last = hex.find_last_not_of(" \t\r\n");
     std::string text = hex.substr(begin, last - begin + 1);
 
-    // 认 0x / 0X 前缀：界面上的默认值就是「0x1234」，而 strtol(…, 16) 只吃掉前导的那个 0、
-    // 从 'x' 处停下 —— 整串于是被解析成 0，订阅与发布双双落在 topic 0 上，
-    // 换成手打的「1234」又变成 0x1234，两边对不上，看着就是「连上了但收不到」。
+    // 认 0x / 0X 前缀：界面默认值是「0x1234」，而 strtol(…, 16) 只吃掉前导 0、从 'x' 处停下，
+    // 整串就成了 0 —— 与手打的「1234」对不上，看着像「连上了但收不到」
     if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
         text = text.substr(2);
     }

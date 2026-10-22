@@ -181,7 +181,6 @@ public class WaveActivity extends AppCompatActivity {
             }
         });
 
-        // 读取/播放按钮
         findViewById(R.id.wave_read).setOnClickListener(view -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -189,7 +188,6 @@ public class WaveActivity extends AppCompatActivity {
             startActivityForResult(intent, REQUEST_CODE_PICK_AUDIO);
         });
 
-        // 录制按钮
         mRecordBtn = findViewById(R.id.wave_record);
         mRecordBtn.setOnClickListener(view -> {
             mWaveView.setVisibility(View.VISIBLE);
@@ -298,7 +296,6 @@ public class WaveActivity extends AppCompatActivity {
                     mWaveform.recomputeHeights(mDensity);
                     mWaveView.setVisibility(View.INVISIBLE);
                     mWaveform.setVisibility(View.VISIBLE);
-                    // 加载完成后自动播放
                     playWaveAudio(0);
                 });
             }
@@ -520,10 +517,8 @@ public class WaveActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // 停止波形更新
         handler.removeCallbacksAndMessages(null);
 
-        // 停止录音
         if (mWaveCanvas != null) {
             mWaveCanvas.setDecibelListener(null);
             if (mWaveCanvas.mIsRecording()) {
@@ -538,7 +533,6 @@ public class WaveActivity extends AppCompatActivity {
             mLoadSoundFileThread.interrupt();
         }
 
-        // 释放播放器
         if (mPlayer != null) {
             mPlayer.stop();
             mPlayer = null;

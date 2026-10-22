@@ -140,11 +140,9 @@ public final class DeductionData {
     public static class PsychProfile {
         public float greed = 0.5f;        // 贪婪 0.0-1.0
         public float fear = 0.5f;         // 恐惧 0.0-1.0
-        // 偏好的时间锚点统计
         public int pastCount = 0;
         public int presentCount = 0;
         public int futureCount = 0;
-        // 偏好的情绪变量
         public int fearEmotionCount = 0;
         public int nostalgiaCount = 0;
         // 放过/定罪统计

@@ -65,7 +65,6 @@ public class DeductionAudio {
                 sample += v * l.amplitude * env;
             }
             if (activeCount > 1) sample /= activeCount; // 叠加归一化
-            // 限幅
             if (sample > 1.0f) sample = 1.0f;
             if (sample < -1.0f) sample = -1.0f;
             short val = (short) (sample * 32000.0f);

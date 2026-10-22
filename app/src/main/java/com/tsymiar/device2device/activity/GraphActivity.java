@@ -45,7 +45,7 @@ import java.util.Locale;
 
 /**
  * 传感器页：上半屏是五个仪表/数值卡片——指南针（方向）、水平仪、海拔（GPS）、
- * 磁场强度、步数；下面那块是原来的加速度曲线（点 Start Chart 载入 SensorFragment）。
+ * 磁场强度、步数；下面那块是加速度曲线（点 Start Chart 载入 SensorFragment）。
  *
  * 步数那张卡片显示的是今日步数（每天 0 点清零）：系统计步器给的是累计值，
  * 换算在 {@link #applyStepCounter} 里做。
@@ -156,7 +156,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         Button open = findViewById(R.id.bt);
         open.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-                // 图表区还是收着的话先展开：Draw 在前、Start Chart 在后，
+                // 图表区还是收着时先展开：Draw 在前、Start Chart 在后，
                 // 直接点 Start Chart 不该什么都没发生
                 showChartArea(true);
                 if (savedInstanceState == null) {
@@ -259,7 +259,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         mZoomHost.bringToFront();
     }
 
-    /** 把仪表按原来的位置塞回卡片，整屏容器收起来 */
+    /** 把仪表按原位塞回卡片，整屏容器收起来 */
     private void restoreZoom() {
         if (mZoomed == null) return;
         View view = mZoomed;
@@ -491,7 +491,6 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     }
 
     public boolean onCreateOptionsMenu(Menu menu) {
-        // getMenuInflater().inflate(R.menu.menu_main,menu);
         getMenuInflater().inflate(R.menu.options, menu);
         return true;
     }
@@ -503,7 +502,6 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
     @SuppressLint("NonConstantResourceId")
     public boolean itemSelected(MenuItem item, Activity activity) {
         Intent intent;
-        // Handle item selection
         int itemId = item.getItemId();
         if (itemId == R.id.sensor) {
             intent = new Intent(activity, SensorActivity.class);

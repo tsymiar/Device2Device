@@ -102,9 +102,7 @@ public final class MarketSparkline {
         }
 
         float stroke = 1.4f * density;
-        // 末点那个圆点：只比线宽粗一倍多点 —— 它只是曲线的一个句号，再大就从图上跳出来，
-        // 把「末点在哪」变成这幅图最显眼的东西。外缘看着那么大头的其实是那圈底色描边，
-        // 描边也只比圆点宽一丝（见下面 halo）。
+        // 末点圆点：只比线宽粗一倍多点，再大就从图上跳出来（描边也只宽一丝，见 halo）
         float dot = 1.5f * density;
         float padX = Math.max(1f, stroke);
         float padTop = dot + stroke + 1f;

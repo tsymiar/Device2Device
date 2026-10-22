@@ -492,10 +492,8 @@ public class SensorFragment extends Fragment implements SensorEventListener {
             long currentUpdateTime = System.currentTimeMillis();
             // 两次检测的时间间隔
             long timeInterval = currentUpdateTime - lastUpdateTime;
-            // 判断是否达到了检测时间间隔
             if (timeInterval < UPDATE_INTERVAL_TIME)
                 return;
-            // 当前时间变成last时间
             lastUpdateTime = currentUpdateTime;
 
             final float alpha = 0.8f;
@@ -508,8 +506,6 @@ public class SensorFragment extends Fragment implements SensorEventListener {
             linearAcceleration[0] = arg.values[0] - gravity[0];
             linearAcceleration[1] = arg.values[1] - gravity[1];
             linearAcceleration[2] = arg.values[2] - gravity[2];
-
-            //Toast.makeText(SensorChart.this,""+arg.values[0],Toast.LENGTH_SHORT).show();
         }
     }
 }

@@ -30,7 +30,7 @@ public final class ChartControls {
 
     /** 最小化后的缩放比例 */
     private static final float MIN_SCALE = 0.5f;
-    /** 拖动时至少要留在容器里的比例，免得整块被拖出去找不回来 */
+    /** 拖动时至少保留在容器内的比例，以免整体被拖出后无法找回 */
     private static final float KEEP_VISIBLE = 0.5f;
 
     private final View mCard;
@@ -44,7 +44,7 @@ public final class ChartControls {
     private boolean mPaused;
     private boolean mMinimized;
     private boolean mHidden;
-    /** 隐藏前的采样状态：重新「显示」时按它恢复，别把用户自己点的暂停给抹了 */
+    /** 隐藏前的采样状态：重新「显示」时据此恢复，避免覆盖用户手动设置的暂停 */
     private boolean mPausedBeforeHide;
     private float mDx;
     private float mDy;
@@ -71,7 +71,7 @@ public final class ChartControls {
         }
         // 拖动把手；缩小之后整块都能拖
         setupDrag(mDragHandle);
-        // 祖先默认会裁子 View，拖出去的部分会被切掉，看起来像没动
+        // 祖先默认裁剪子 View，拖出的部分会被切除，表现为未发生移动
         disableClipUpChain(root);
         if (mCard != null) {
             mCard.setOnClickListener(v -> {
@@ -106,13 +106,13 @@ public final class ChartControls {
             mHideBtn.setText(hidden ? R.string.show : R.string.hide);
         }
         if (hidden) {
-            // 曲线本体都收起来了，采样没必要继续烧电：顺手暂停，并把暂停按钮一起藏掉
+            // 曲线本体已隐藏，采样无需继续耗电：同时暂停采样并隐藏暂停按钮
             mPausedBeforeHide = mPaused;
             if (!mPaused) setPaused(true);
             if (mPauseBtn != null) mPauseBtn.setVisibility(View.GONE);
         } else {
             if (mPauseBtn != null) mPauseBtn.setVisibility(View.VISIBLE);
-            // 只是被隐藏才停的，显示回来就恢复原来的采样状态
+            // 只是被隐藏才停的，显示回来就恢复隐藏前的采样状态
             if (!mPausedBeforeHide && mPaused) setPaused(false);
         }
     }

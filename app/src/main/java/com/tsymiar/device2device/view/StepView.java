@@ -93,7 +93,7 @@ public class StepView extends View {
             paint.setTextSize(size);
         }
         canvas.drawText(text, x, y, paint);
-        // 必须还原：paint 是复用的，不还原的话字号会被一次狭窄布局永久压小，
+        // 必须还原：paint 是复用的，不还原时字号会被一次狭窄布局永久压小，
         // 后续几行也会被带着一起变小
         paint.setTextSize(origin);
     }

@@ -389,7 +389,7 @@ public class SoundRecord {
         codec.release();
         codec = null;
 
-        //临时黑客使其与旧版本一起工作。
+        // 按帧大小把采样数换算成帧数。
         mNumFrames = mNumSamples / getSamplesPerFrame();
 
         mNumFramesFloat = (float) mNumSamples / getSamplesPerFrame();
@@ -437,7 +437,6 @@ public class SoundRecord {
         mSampleRate = 44100;
         mChannels = 1;  // record mono audio.
         short[] buffer = new short[1024];  // buffer contains 1 mono frame of 1024 16 bits samples
-        // 获得满足条件的最小缓冲区大小
         int minBufferSize = AudioRecord.getMinBufferSize(
                 mSampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         // make sure minBufferSize can contain at least 1 second of audio (16 bits sample).

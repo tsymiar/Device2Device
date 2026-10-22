@@ -232,7 +232,6 @@ public class DeductionEngine {
             desc.add(s.name + "[" + action + "] 于" + anchor);
         }
 
-        // 关系描述
         List<String> relDesc = new ArrayList<>();
         for (DeductionData.Relation rel : relations) {
             relDesc.add(rel.label());

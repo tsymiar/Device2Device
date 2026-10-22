@@ -579,16 +579,10 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 价格行两个字号（{@code [0]} 大字价、{@code [1]} 涨跌幅）：跟着宽度自适应之后，
-     * 再按量出来的实际宽度收到「这一行真的摆得下」的那一份。
+     * 价格行两个字号（{@code [0]} 大字价、{@code [1]} 涨跌幅），按量出来的宽度收到摆得下的那一份。
      *
-     * 大字价吃了这一行的弹性空间（见布局里的 layout_weight），摆不下时末尾会被截成
-     * 「1,234.5…」—— 那就看不出现在到底多少了，所以尺寸不够时按这个次序让：
-     * ①先缩涨跌幅 —— 它短、字小，缩一两号看不出来，而大字价是这一行的主角；
-     * ②再缩大字价 —— 缩到 {@link #PRICE_SP_MIN} 为止，再小这行就撑不起来了；
-     * ③两样都缩到下限还挤，才轮到截断大字价（涨跌幅连 % 都不许丢）。
-     *
-     * 宽度与字号严格成正比，所以不用迭代试：给多少宽度就按同一个比例缩多少。
+     * 宽度不够时先缩涨跌幅、再缩大字价（各到下限），都缩到下限才截断大字价 ——
+     * 涨跌幅连 % 都不许丢。宽度与字号成正比，按比例一次算完，不用迭代。
      */
     private static int[] priceLine(Context context, int wdp, String price, String change) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();

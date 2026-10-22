@@ -16,8 +16,6 @@ public class BuggerActivity extends Activity {
         data.putExtra(Intent.EXTRA_SUBJECT, R.string.feed);
         data.putExtra(Intent.EXTRA_TEXT, R.string.ill_reply);
         startActivity(data);
-        // 附件
-        // File file = new File(Environment.getExternalStorageDirectory().getPath()+ File.separator + "simplenote"+ File.separator+"note.xml");
     }
 
     @Override
