@@ -26,12 +26,19 @@ import androidx.annotation.Nullable;
 public class DecibelView extends View {
 
     private static final int MAX_BARS = 72;
-    /** 显示下限：30 dB ≈ 安静的室内，低于它就贴着底边画，不然安静时整片是空的 */
+    /** 显示下限：30 dB 约等于安静的室内，低于该值时贴底边绘制，否则安静环境下整片为空 */
     private static final float MIN_DB = 30f;
     /** 显示上限：0 dBFS（满刻度）按 1 Pa = 94 dB SPL 换算 */
     private static final float MAX_DB = 94f;
     private static final float WARN_DB = 70f;
     private static final float HOT_DB = 85f;
+
+    /**
+     * 折线的平滑强度：Catmull-Rom 的张力，1 = 标准。
+     * 取 0.85 留一点余地：电平陡变处（突然一声响）标准值会过冲，
+     * 曲线会高出真实峰值，读数偏大。
+     */
+    private static final float SMOOTH = 0.85f;
 
     /** 实时曲线的绘制形态：点一下卡片循环切换 */
     public enum Style {
@@ -86,6 +93,8 @@ public class DecibelView extends View {
         mBarPaint = fill(0xFF43A047);
         mLinePaint = stroke(0xFF43A047, dp(1.6f));
         mLinePaint.setStrokeCap(Paint.Cap.ROUND);
+        // 折线改曲线之后拐角变多，尖角接合（MITER）在急弯处会支出来一小截
+        mLinePaint.setStrokeJoin(Paint.Join.ROUND);
         mAreaPaint = fill(0x5543A047);
         mPeakPaint = stroke(0xFFE53935, dp(1));
         mPeakPaint.setPathEffect(new DashPathEffect(new float[]{dp(4), dp(3)}, 0));
@@ -145,7 +154,7 @@ public class DecibelView extends View {
         super.onDraw(canvas);
         int w = getWidth();
         int h = getHeight();
-        // 卡片铺满自己这块区域，直角：和页面里 MaterialCardView 那张结果卡片一个路子
+        // 卡片铺满自身区域，直角：和页面里 MaterialCardView 那张结果卡片一个路子
         mRect.set(0, 0, w, h);
         canvas.drawRect(mRect, mPanelPaint);
         float inset = dp(1) / 2f;                 // 描边压在边界上会被裁掉一半，往里收半个线宽
@@ -219,20 +228,58 @@ public class DecibelView extends View {
         drawHistoryLine(canvas, left, bottom, slot, areaH);
     }
 
+    /**
+     * 折线 / 面积共用的路径。
+     *
+     * 用 Catmull-Rom 转三次贝塞尔 —— 曲线仍然穿过每一个采样点（峰值不会被抹平），
+     * 只在点与点之间补一段平滑过渡。逐点 lineTo 时，采样点之间只有几像素，
+     * 相邻两点电平一跳就是一个尖角，整条线看着是锯齿。
+     */
     private void buildHistoryPath(float left, float bottom, float slot, float areaH, boolean closed) {
         mPath.reset();
-        float firstX = left + slot * 0.5f;
-        if (closed) mPath.moveTo(firstX, bottom);
-        for (int i = 0; i < mCount; i++) {
-            float x = left + slot * (i + 0.5f);
-            float y = bottom - areaH * ratioOf(mHistory[i]);
-            if (i == 0 && !closed) mPath.moveTo(x, y);
-            else mPath.lineTo(x, y);
-        }
+        if (mCount <= 0) return;
+
+        float firstX = xAt(left, slot, 0);
+        float firstY = yAt(bottom, areaH, 0);
         if (closed) {
-            mPath.lineTo(left + slot * (mCount - 0.5f), bottom);
+            mPath.moveTo(firstX, bottom);
+            mPath.lineTo(firstX, firstY);
+        } else {
+            mPath.moveTo(firstX, firstY);
+        }
+
+        for (int i = 0; i < mCount - 1; i++) {
+            float x0 = xAt(left, slot, i);
+            float y0 = yAt(bottom, areaH, i);
+            float x1 = xAt(left, slot, i + 1);
+            float y1 = yAt(bottom, areaH, i + 1);
+            // 切线用前后各一个点算；首末两段缺少对应一侧的点，复用自己，曲线就不会翘出去
+            float prevY = yAt(bottom, areaH, Math.max(i - 1, 0));
+            float nextY = yAt(bottom, areaH, Math.min(i + 2, mCount - 1));
+            float c1x = x0 + (x1 - x0) / 3f;
+            float c1y = clampY(y0 + (y1 - prevY) / 6f * SMOOTH, bottom, areaH);
+            float c2x = x1 - (x1 - x0) / 3f;
+            float c2y = clampY(y1 - (nextY - y0) / 6f * SMOOTH, bottom, areaH);
+            mPath.cubicTo(c1x, c1y, c2x, c2y, x1, y1);
+        }
+
+        if (closed) {
+            mPath.lineTo(xAt(left, slot, mCount - 1), bottom);
             mPath.close();
         }
+    }
+
+    private float xAt(float left, float slot, int i) {
+        return left + slot * (i + 0.5f);
+    }
+
+    private float yAt(float bottom, float areaH, int i) {
+        return bottom - areaH * ratioOf(mHistory[i]);
+    }
+
+    /** 控制点不得超出绘图区：否则陡变处的过冲会使曲线画出卡片并压到标题 */
+    private static float clampY(float y, float bottom, float areaH) {
+        return Math.max(bottom - areaH, Math.min(bottom, y));
     }
 
     /** 电平 -> 高度比例：MIN_DB 贴底，MAX_DB 到顶 */
