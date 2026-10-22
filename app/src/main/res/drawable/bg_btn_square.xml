@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 直角按钮底板：文件传输对话框里那几颗用它。
+     原来用的是系统 Button 默认底（Material 带 2dp 圆角），一眼就和对话框里其它方块对不齐；
+     这里给一个纯直角的底，颜色仍取主题的 colorButtonNormal（深浅模式各有一套），
+     内边距写进 shape 里，换底之后按钮不会突然变矮。 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33000000">
+
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorButtonNormal" />
+
+            <padding
+                android:bottom="10dp"
+                android:left="12dp"
+                android:right="12dp"
+                android:top="10dp" />
+        </shape>
+    </item>
+</ripple>

@@ -27,7 +27,7 @@
             android:background="@drawable/bg_spinner"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:textColor="#212121"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="14sp"
             android:dropDownVerticalOffset="4dp"
             android:dropDownWidth="match_parent"
@@ -71,8 +71,8 @@
         android:paddingEnd="8dp"
         android:paddingTop="7dp"
         android:paddingBottom="7dp"
-        android:textColor="#212121"
-        android:textColorHint="#B0B0B0"
+        android:textColor="@color/dialog_text_primary"
+        android:textColorHint="@color/hint_text"
         android:textSize="12sp" />
 
     <!-- Ollama 接入方式：自建服务（地址可填）或官方云。选到 Ollama 时才出现 -->
@@ -103,7 +103,7 @@
                 android:buttonTint="@color/colorAccent"
                 android:checked="true"
                 android:text="@string/chat_ollama_local"
-                android:textColor="#212121"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="13sp" />
 
             <RadioButton
@@ -113,7 +113,7 @@
                 android:layout_marginStart="10dp"
                 android:buttonTint="@color/colorAccent"
                 android:text="@string/chat_ollama_cloud"
-                android:textColor="#212121"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="13sp" />
         </RadioGroup>
 
@@ -133,8 +133,8 @@
             android:paddingEnd="8dp"
             android:paddingTop="6dp"
             android:paddingBottom="6dp"
-            android:textColor="#212121"
-            android:textColorHint="#B0B0B0"
+            android:textColor="@color/dialog_text_primary"
+            android:textColorHint="@color/hint_text"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -157,7 +157,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/chat_model"
-            android:textColor="#212121"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="13sp" />
 
         <Button
@@ -226,7 +226,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="6dp"
-            android:textColor="#212121"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="12sp"
             android:singleLine="true"
             android:ellipsize="middle" />
@@ -248,9 +248,9 @@
         app:cardElevation="2dp"
         app:cardCornerRadius="12dp"
         app:contentPadding="10dp"
-        app:cardBackgroundColor="#FFFFFF"
+        app:cardBackgroundColor="@color/chat_card"
         app:strokeWidth="1dp"
-        app:strokeColor="#E8E8E8">
+        app:strokeColor="@color/chat_card_stroke">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -264,8 +264,8 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_edit"
                 android:hint="@string/msg"
-                android:textColor="#212121"
-                android:textColorHint="#B0B0B0"
+                android:textColor="@color/dialog_text_primary"
+                android:textColorHint="@color/hint_text"
                 android:textSize="14sp"
                 android:maxLines="3"
                 android:inputType="textMultiLine"

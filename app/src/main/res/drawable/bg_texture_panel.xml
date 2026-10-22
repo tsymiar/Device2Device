@@ -5,8 +5,7 @@
 
     <solid android:color="#99000000" />
 
-    <corners android:radius="12dp" />
-
+    <!-- 直角：这块是压在渲染画面上的控制条，圆角会露出底下亮画面的一角，看着像缺了一块 -->
     <stroke
         android:width="1dp"
         android:color="#55FFFFFF" />

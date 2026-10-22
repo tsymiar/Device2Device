@@ -186,7 +186,6 @@ public class BtDialogActivity extends Activity {
             if (mBluetoothAdapter.getScanMode() == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
                 java.lang.reflect.Method method = BluetoothAdapter.class.getMethod("setScanMode", int.class);
                 method.invoke(mBluetoothAdapter, BluetoothAdapter.SCAN_MODE_CONNECTABLE);
-                Log.d(TAG, "Scan mode reset to CONNECTABLE");
             }
         } catch (Exception e) {
             Log.w(TAG, "Cannot reset scan mode: " + e.getMessage());
