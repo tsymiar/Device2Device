@@ -162,24 +162,60 @@ public class BtRemoteActivity extends Activity {
             return;
         }
 
-        mBtAdapter.cancelDiscovery();
-        try {
-            mBtSocket.connect();
-            mToast = Toast.makeText(this, "蓝牙地址:\n" + address, Toast.LENGTH_LONG);
-            mToast.setGravity(Gravity.RIGHT, 0, 30);
-            mToast.show();
-            Log.d(TAG, "Connected OK");
-        } catch (IOException e) {
+        final BluetoothSocket socket = mBtSocket;
+        Toast.makeText(this, "连接中:\n" + address, Toast.LENGTH_SHORT).show();
+        /**
+         * BluetoothSocket.connect() 是阻塞的：它要跟对端握手，对端不应答时能卡几十秒。
+         * 放在 onResume() 里跑就是主线程卡死 —— 输入派发超过 5 秒系统就按 ANR 把进程杀掉，
+         * 用户看到的就是"一点连接 app 直接没了"。实测三次 ANR 全死在这一行。
+         * 所以连接整个挪到后台线程，结果回到主线程再 Toast / finish / 起接收线程。
+         */
+        new Thread(() -> {
+            boolean ok = false;
+            String err = null;
             try {
-                mBtSocket.close();
-            } catch (IOException ignored) {}
-            Toast.makeText(getBaseContext(), "连接失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                // cancelDiscovery 在 Android 12+ 需要 BLUETOOTH_SCAN，没权限就别调，免得抛 SecurityException
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    mBtAdapter.cancelDiscovery();
+                }
+                socket.connect();
+                ok = true;
+            } catch (Exception e) {
+                err = e.getMessage();
+                Log.e(TAG, "Connect failed", e);
+                try {
+                    socket.close();
+                } catch (IOException ignored) {}
+            }
+            final boolean connected = ok;
+            final String error = err;
+            runOnUiThread(() -> onConnectResult(connected, error, address, socket));
+        }, "bt-connect").start();
+    }
+
+    /**
+     * 连接结果回到主线程处理。
+     *
+     * 用局部变量 socket 而不是 mBtSocket：连接期间 onDestroy() 可能已经跑过 closeSocket()
+     * 把字段置空了，那时再去读字段就是 NPE。
+     */
+    private void onConnectResult(boolean connected, String error, String address, BluetoothSocket socket) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (!connected) {
+            Toast.makeText(getBaseContext(), "连接失败: " + error, Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
+        mBtSocket = socket;
+        mToast = Toast.makeText(this, "蓝牙地址:\n" + address, Toast.LENGTH_LONG);
+        mToast.setGravity(Gravity.RIGHT, 0, 30);
+        mToast.show();
 
         try {
-            mOutStream = mBtSocket.getOutputStream();
+            mOutStream = socket.getOutputStream();
         } catch (IOException e) {
             Toast.makeText(getBaseContext(), "无法获取输出流: " + e.getMessage(), Toast.LENGTH_LONG).show();
             finish();
@@ -187,7 +223,7 @@ public class BtRemoteActivity extends Activity {
         }
 
         if (!"00:00:00:00:00:00".equals(address)) {
-            new ReceiveThread(mBtSocket).start();
+            new ReceiveThread(socket).start();
         }
 
         setupTouchListeners();
@@ -358,7 +394,6 @@ public class BtRemoteActivity extends Activity {
     private void sendData(String message) {
         if (mOutStream == null || message == null) return;
         byte[] msgBuffer = message.getBytes();
-        Log.d(TAG, "Send: " + message);
         try {
             mOutStream.write(msgBuffer);
             if (mBtAdapter.getState() != BluetoothAdapter.STATE_OFF) {

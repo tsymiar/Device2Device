@@ -27,6 +27,7 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 
 import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.service.ReceiverService;
 import com.tsymiar.device2device.utils.ExitAll;
 
 import java.util.Set;
@@ -43,10 +44,9 @@ public class BtDevicesActivity extends Activity {
         ExitAll.getInstance().addActivity(this);
 
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
-        setContentView(R.layout.activity_devlist);
+        setContentView(R.layout.activity_device_list);
         setResult(Activity.RESULT_CANCELED);
 
-        // Scan button
         ImageView scanView = findViewById(R.id.img_search);
         assert scanView != null;
         scanView.setOnClickListener(v -> {
@@ -112,6 +112,9 @@ public class BtDevicesActivity extends Activity {
             exitBtn.setOnClickListener(v -> {
                 // 清除可检测性残留的系统UI浮层
                 resetScanMode();
+                // 关掉悬浮窗：它是 BtRemoteActivity 拉起的 START_STICKY 前台服务，
+                // 不显式 stop 时，Activity 都 finish 了那块浮层还挂在屏幕上
+                ReceiverService.stop(BtDevicesActivity.this);
                 // 退出由 btn_bluetooth 启动的所有窗口
                 sendBroadcast(new Intent(BtDialogActivity.ACTION_EXIT_BLUETOOTH));
                 setResult(Activity.RESULT_FIRST_USER);
@@ -141,7 +144,6 @@ public class BtDevicesActivity extends Activity {
     }
 
     private void doDiscovery() {
-        Log.d(TAG, "doDiscovery()");
         setProgressBarIndeterminateVisibility(true);
         setTitle(R.string.scanning);
         findViewById(R.id.devlist_title_new_devices).setVisibility(View.VISIBLE);
@@ -171,7 +173,6 @@ public class BtDevicesActivity extends Activity {
             if (mBtAdapter.getScanMode() == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
                 java.lang.reflect.Method method = BluetoothAdapter.class.getMethod("setScanMode", int.class);
                 method.invoke(mBtAdapter, BluetoothAdapter.SCAN_MODE_CONNECTABLE);
-                Log.d(TAG, "Scan mode reset to CONNECTABLE");
             }
         } catch (Exception e) {
             Log.w(TAG, "Cannot reset scan mode: " + e.getMessage());
