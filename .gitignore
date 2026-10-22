@@ -17,6 +17,7 @@ captures/
 .cxx/
 .navigation/
 .tmp/
+logs/
 
 # ---------- 构建产物 ----------
 *.apk
