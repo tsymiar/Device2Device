@@ -7,10 +7,13 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.graphics.Paint;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
@@ -75,6 +78,15 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     /** 黄金那行人民币标注占掉的高度（dp）：只有显示时才从曲线高度里扣 */
     private static final int NOTE_DP = 12;
 
+    /** 价格行里大字价与涨跌幅之间的间距（dp）：与布局里 widget_change 的 marginStart 一致 */
+    private static final int PRICE_GAP_DP = 6;
+    /**
+     * 大字价与涨跌幅的字号下限：为了把这一行挤进卡片，两个字号可以一起往下缩，但不能缩到认不出来 ——
+     * 缩到下限还摆不下时，被截的是大字价（见 {@link #priceLine}），不再动涨跌幅。
+     */
+    private static final int PRICE_SP_MIN = 12;
+    private static final int CHANGE_SP_MIN = 8;
+
     /** goAsync 的兜底超时：网络异常时不至于一直挂着广播 */
     private static final long TIMEOUT_MS = 30000L;
 
@@ -135,20 +147,48 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);      // 系统广播（APPWIDGET_UPDATE 等）按默认分发
-        if (intent == null || !ACTION_REFRESH.equals(intent.getAction())) return;
+        if (intent == null) return;
+        if (ACTION_REFRESH.equals(intent.getAction())) {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID);
+            int[] ids;
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                ids = new int[]{id};
+            } else {
+                ids = manager.getAppWidgetIds(
+                        new ComponentName(context, MarketChartWidgetProvider.class));
+            }
+            for (int widgetId : ids) {
+                WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_chart);
+            }
+            onUpdate(context, manager, ids);
+            return;
+        }
+        // 深浅模式切换：曲线位图与文字颜色都是更新那一刻按当时配置画好的，桌面只会用新配置
+        // 重新 inflate 布局，写死的那些色值不会变。这个广播只投递给运行时注册的接收器
+        // （见 MarketWidgetApp），manifest 里收不到；收到就重画一遍（数据走缓存，不联网）
+        if (Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+            repaintAll(context);
+        }
+    }
+
+    /** 把所有实例按当前配置重画（曲线位图与文字色都重取，数据走缓存，不联网） */
+    public static void repaintAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
-                AppWidgetManager.INVALID_APPWIDGET_ID);
-        int[] ids;
-        if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            ids = new int[]{id};
-        } else {
-            ids = manager.getAppWidgetIds(new ComponentName(context, MarketChartWidgetProvider.class));
-        }
+        int[] ids = manager.getAppWidgetIds(
+                new ComponentName(context, MarketChartWidgetProvider.class));
+        if (ids == null || ids.length == 0) return;
         for (int widgetId : ids) {
-            WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_chart);
+            Row row = sRow.get(widgetId);
+            if (row == null) continue;
+            try {
+                manager.updateAppWidget(widgetId,
+                        views(context, manager, widgetId, row, MarketWidgetProvider.now()));
+            } catch (Throwable t) {
+                Log.w(TAG, "chart widget repaint failed", t);
+            }
         }
-        onUpdate(context, manager, ids);
     }
 
     @Override
@@ -408,10 +448,19 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
             if (quote.high > high) high = quote.high;
             if (quote.low < low) low = quote.low;
         }
-        return new Row(item, true, MarketWidgetProvider.fmtPrice(last.close),
+        return new Row(item, true, priceText(last.close),
                 String.format(java.util.Locale.US, "%+.2f%%", percent),
                 color, null, interval, series, base, high, low, last.close,
                 goldNote(item, last.close, 0f));
+    }
+
+    /**
+     * 大字价一律两位小数：三位四位时（金价 1900.5000）它长得没边，窄部件上再被截一下就是
+     * 「1,234.5…」—— 连现在到底多少都看不出来。第二位以后那点精度，对「看一眼现在多少」没有意义；
+     * 真要看精细报价，下面的区间高低与行情页里都有。
+     */
+    private static String priceText(float price) {
+        return String.format(java.util.Locale.US, "%.2f", price);
     }
 
     /**
@@ -460,9 +509,12 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market_chart);
         views.setTextViewText(R.id.widget_title, row.item.title());
         views.setTextViewText(R.id.widget_symbol, MarketWidgetProvider.marketCode(row.item));
-        views.setTextViewText(R.id.widget_price, row.price);
-        views.setTextViewText(R.id.widget_change,
-                row.error != null && !row.ok ? row.error : row.change);
+        // 涨跌幅那一格也是错误文案的落点（价格行只有两格，没别处可放）；两串都留着 ——
+        // 后面要按它们的实际宽度算这一行的字号（见 priceLine）
+        String price = row.price;
+        String change = row.error != null && !row.ok ? row.error : row.change;
+        views.setTextViewText(R.id.widget_price, price);
+        views.setTextViewText(R.id.widget_change, change);
         views.setTextViewText(R.id.widget_range, rangeText(row));
         // 黄金才多这一行标注（人民币价 / 单位），非黄金收起来，别白占一格高度
         boolean note = !TextUtils.isEmpty(row.note);
@@ -481,12 +533,14 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         views.setTextColor(R.id.widget_change, color(context, row.color));
 
         // 部件尺寸差很大（从 2x2 小格到拉满的 4x3），字号跟着宽度自适应，窄格子里不溢出
-        int[] size = sizeDp(manager, widgetId);
+        int[] size = sizeDp(context, manager, widgetId);
         int wdp = size[0];
-        views.setTextViewTextSize(R.id.widget_price, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 9, 14, 23));
-        views.setTextViewTextSize(R.id.widget_change, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 20, 9, 13));
+        // 大字价 / 涨跌幅：字号跟着宽度自适应之后，还要按量出来的实际宽度再收一次 ——
+        // 大字价吃掉了弹性空间（layout_weight），摆不下时它会被截断成「1,234.5…」，
+        // 所以先把字号收到真正摆得下的那一份（见 priceLine）
+        int[] sp = priceLine(context, wdp, price, change);
+        views.setTextViewTextSize(R.id.widget_price, TypedValue.COMPLEX_UNIT_SP, sp[0]);
+        views.setTextViewTextSize(R.id.widget_change, TypedValue.COMPLEX_UNIT_SP, sp[1]);
         views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP,
                 clampSp(wdp / 18, 9, 12));
         views.setTextViewTextSize(R.id.widget_symbol, TypedValue.COMPLEX_UNIT_SP,
@@ -524,6 +578,68 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         return views;
     }
 
+    /**
+     * 价格行两个字号（{@code [0]} 大字价、{@code [1]} 涨跌幅）：跟着宽度自适应之后，
+     * 再按量出来的实际宽度收到「这一行真的摆得下」的那一份。
+     *
+     * 大字价吃了这一行的弹性空间（见布局里的 layout_weight），摆不下时末尾会被截成
+     * 「1,234.5…」—— 那就看不出现在到底多少了，所以尺寸不够时按这个次序让：
+     * ①先缩涨跌幅 —— 它短、字小，缩一两号看不出来，而大字价是这一行的主角；
+     * ②再缩大字价 —— 缩到 {@link #PRICE_SP_MIN} 为止，再小这行就撑不起来了；
+     * ③两样都缩到下限还挤，才轮到截断大字价（涨跌幅连 % 都不许丢）。
+     *
+     * 宽度与字号严格成正比，所以不用迭代试：给多少宽度就按同一个比例缩多少。
+     */
+    private static int[] priceLine(Context context, int wdp, String price, String change) {
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        float fontScale = metrics.scaledDensity;
+        // 行宽：根布局两侧各 9dp padding，两个 View 之间还隔着 6dp
+        int avail = Math.max(1, Math.round((wdp - CHART_SIDE_DP - PRICE_GAP_DP) * metrics.density));
+        int priceSp = clampSp(wdp / 9, 14, 23);
+        int changeSp = clampSp(wdp / 20, 9, 13);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float pricePx = textWidthPx(paint, price, priceSp * fontScale);
+        float changePx = textWidthPx(paint, change, changeSp * fontScale);
+        // 让出位置来：先涨跌幅（拿剩下的那点地方），再大字价（拿再剩下的）
+        changeSp = fitSp(changeSp, changePx, avail - pricePx, CHANGE_SP_MIN);
+        changePx = textWidthPx(paint, change, changeSp * fontScale);
+        priceSp = fitSp(priceSp, pricePx, avail - changePx, PRICE_SP_MIN);
+        return new int[]{priceSp, changeSp};
+    }
+
+    /** 这串字最多能占 {@code allow}（px）：按这个额度把字号缩到摆得下，但不低于 {@code min} */
+    private static int fitSp(int sp, float widthPx, float allow, int min) {
+        if (widthPx <= allow || widthPx <= 0f) return sp;
+        return Math.max(min, (int) (sp * Math.max(0f, allow) / widthPx));
+    }
+
+    /**
+     * 这行字在这个字号下排出来有多宽（px）。
+     *
+     * 不能只信 {@code measureText}：它不做字体回退，默认的拉丁字体里没有汉字，量出来是缺字
+     * 宽度（≈0.56em），而错误文案就是汉字（「未找到标的」）—— 按缺字宽度算出来的行宽会短一半。
+     * 所以两个都算取大的：实测值 + 「全角 1em、其余 0.6em」的估算。估大了不过是字小一点。
+     */
+    private static float textWidthPx(Paint paint, CharSequence text, float sizePx) {
+        paint.setTextSize(Math.max(1f, sizePx));
+        float measured = paint.measureText(text, 0, text.length());
+        float estimate = 0f;
+        for (int i = 0; i < text.length(); ) {
+            int cp = Character.codePointAt(text, i);
+            estimate += (isWide(cp) ? 1f : 0.6f) * sizePx;
+            i += Character.charCount(cp);
+        }
+        return Math.max(measured, estimate);
+    }
+
+    /** 这个码位是不是全角字（汉字 / 假名 / 谚文 / 全角标点）：它们占满一个 em */
+    private static boolean isWide(int cp) {
+        return (cp >= 0x1100 && cp <= 0x115F)          // 谚文字母
+                || (cp >= 0x2E80 && cp <= 0xA4CF)      // CJK 部首 / 假名 / 汉字 / 注音
+                || (cp >= 0xAC00 && cp <= 0xD7A3)      // 谚文音节
+                || (cp >= 0xFF00 && cp <= 0xFF60);     // 全角 ASCII
+    }
+
     /** 底部一行左侧：周期 + 区间高低（曲线未绘制时不显示高低，以免误导） */
     private static String rangeText(Row row) {
         StringBuilder sb = new StringBuilder(QuoteSource.intervalLabel(row.interval));
@@ -535,17 +651,31 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 部件当前的尺寸（dp）。min / max 取大的那个：竖屏撑宽的时候才不会按最小尺寸画。
+     * 部件当前的尺寸（dp）：min / max 是「当前朝向下的上下界」，两个朝向各存一套 ——
+     * 竖屏要窄的那份（另一份是横着的尺寸），横屏反之。
+     *
+     * 照 max 一把取会出事：竖屏里部件实际只有那么宽，字号 / 曲线却按横屏的宽度算，
+     * 大字价那一行就直接排到卡片外面去了。
      */
-    private static int[] sizeDp(AppWidgetManager manager, int widgetId) {
+    private static int[] sizeDp(Context context, AppWidgetManager manager, int widgetId) {
         Bundle opts = manager == null ? null : manager.getAppWidgetOptions(widgetId);
         int minW = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
         int minH = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
         int maxW = opts == null ? minW : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minW);
         int maxH = opts == null ? minH : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minH);
-        int w = Math.max(minW, maxW);
-        int h = Math.max(minH, maxH);
+        boolean portrait = context == null
+                || context.getResources().getConfiguration().orientation
+                != Configuration.ORIENTATION_LANDSCAPE;
+        int w = pickSize(minW, maxW, portrait);
+        int h = pickSize(minH, maxH, portrait);
         return new int[]{w > 0 ? w : 250, h > 0 ? h : 130};
+    }
+
+    /** 两个朝向各报了一套数：竖屏取窄的、横屏取宽的；只报了一套时就用那一套 */
+    private static int pickSize(int min, int max, boolean portrait) {
+        int a = min > 0 ? min : max;
+        int b = max > 0 ? max : min;
+        return portrait ? Math.min(a, b) : Math.max(a, b);
     }
 
     /** 点整块进行情页并带上这个标的；requestCode 用 widgetId，多部件互相不该覆盖 extras */

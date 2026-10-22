@@ -49,9 +49,9 @@ import java.util.Map;
  *  - --interval：周期下拉，列表随所选数据源变化（各源支持的周期不同）
  *  - --symbol：标的输入框，可直接填代码，也可填股票名称/拼音（先搜索再取数，主图显示名称）
  *  - --limit：每屏最多 320 根（可左右拖动查看更早历史）
- *  - 自动刷新 ≈ --live + --refresh（默认 15 秒）
+ *  - 自动更新 ≈ --live + --refresh（默认 15 秒）
  *  - 蜡烛图绘制、MA/成交量/MACD/RSI/KDJ 均在 KLineView 中完成；单击主图弹出详情小窗口
- *  - 数据源/周期/标的/自动刷新开关均写入 SharedPreferences，退出再进自动恢复上次选择
+ *  - 数据源/周期/标的/自动更新开关均写入 SharedPreferences，退出再进自动恢复上次选择
  */
 public class MarketActivity extends AppCompatActivity {
 
@@ -87,7 +87,7 @@ public class MarketActivity extends AppCompatActivity {
     private int C_PRIMARY;               // 主按钮 查询
     private int C_PRIMARY_PRESSED;
     private int C_ON_PRIMARY;            // 主按钮上的文字
-    private int C_ON;                    // 自动刷新 开
+    private int C_ON;                    // 自动更新 开
     private int C_ON_PRESSED;
     private int C_ON_TEXT;               // 橙底上的文字
     private int C_TEXT;                  // 输入文本
@@ -101,6 +101,9 @@ public class MarketActivity extends AppCompatActivity {
     private KLineView mChart;
     private TextView mStatus;
     private TextView mHint;
+    private TextView mNineBtn;
+    /** 九转 + 反弹信号是否显示（一个开关管两类信号） */
+    private boolean mShowNine = true;
 
     private String mSource = QuoteSource.AUTO;
     private String mInterval = "1d";
@@ -123,7 +126,7 @@ public class MarketActivity extends AppCompatActivity {
      * 慢回来的那次结果会把图表换成上一个标的 / 上一个周期的数据，回调里据此把它作废。
      */
     private int mLoadSeq = 0;
-    /** 状态行基准文案：市值到了再按它重拼，避免自动刷新把同一段文字反复追加越来越长 */
+    /** 状态行基准文案：市值到了再按它重拼，避免自动更新把同一段文字反复追加越来越长 */
     private String mStatusBase = "";
     private AlertDialog mPickDialog;    // 选标的对话框，Activity 销毁时要一起收掉
     private String mName = "";          // 当前标的中文名（主图首行）
@@ -164,7 +167,7 @@ public class MarketActivity extends AppCompatActivity {
         buildChart(root);
         root.addView(buildBottom());
 
-        // 屏幕常亮：自动刷新时不希望熄屏中断行情查看
+        // 屏幕常亮：自动更新时不希望熄屏中断行情查看
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // 数据源下拉选中上次选中的那一档（false 表示不要触发 onItemSelected 里的重复加载）
         int sourceIndex = Arrays.asList(QuoteSource.SOURCES).indexOf(mSource);
@@ -365,7 +368,7 @@ public class MarketActivity extends AppCompatActivity {
         return row;
     }
 
-    /** 第二行：代码输入 + 查询 + 自动刷新 */
+    /** 第二行：代码输入 + 查询 + 自动更新 */
     private LinearLayout buildSymbolRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -395,6 +398,23 @@ public class MarketActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
         btnLp.setMargins(dp(6), 0, 0, 0);
         row.addView(primaryButton("查询", v -> load()), btnLp);
+
+        // 九转与反弹共用一个开关：两者都是「在K线上标信号」，一起开一起关比各占一个按钮清爽
+        mNineBtn = new TextView(this);
+        mNineBtn.setGravity(Gravity.CENTER);
+        mNineBtn.setTextSize(13);
+        mNineBtn.setPadding(dp(10), 0, dp(10), 0);
+        mNineBtn.setClickable(true);
+        mNineBtn.setFocusable(true);
+        mNineBtn.setOnClickListener(v -> {
+            mShowNine = !mShowNine;
+            mChart.setShowSignals(mShowNine);
+            updateNineBtn();
+        });
+        row.addView(mNineBtn, btnLp);
+        updateNineBtn();
+
+        // 自动刷新放最右：它是这一行里最「全局」的一个开关，跟查询、九转这些当次操作分开
         row.addView(refreshButton(), btnLp);
         return row;
     }
@@ -454,7 +474,7 @@ public class MarketActivity extends AppCompatActivity {
     /** 次要按钮：关=描边灰，开=橙色实心 */
     private TextView refreshButton() {
         TextView button = new TextView(this);
-        button.setText("自动刷新 关");
+        button.setText("自动更新 关");
         button.setGravity(Gravity.CENTER);
         button.setTextSize(12);
         button.setPadding(dp(10), 0, dp(10), 0);
@@ -470,7 +490,7 @@ public class MarketActivity extends AppCompatActivity {
     }
 
     private void applyRefreshStyle(TextView button) {
-        button.setText(mAutoRefresh ? "自动刷新 开" : "自动刷新 关");
+        button.setText(mAutoRefresh ? "自动更新 开" : "自动更新 关");
         button.setTextColor(mAutoRefresh ? C_ON_TEXT : C_TEXT);
         button.setBackground(mAutoRefresh
                 ? buttonBg(C_ON, 0, C_ON_PRESSED, 0)
@@ -478,6 +498,15 @@ public class MarketActivity extends AppCompatActivity {
     }
 
     /** 数据源变化后重建周期列表；若当前周期不被支持则回落到该源默认周期 */
+    private void updateNineBtn() {
+        if (mNineBtn == null) return;
+        mNineBtn.setText(mShowNine ? "九转反弹 开" : "九转反弹 关");
+        mNineBtn.setTextColor(mShowNine ? C_ON_TEXT : C_TEXT);
+        mNineBtn.setBackground(mShowNine
+                ? buttonBg(C_ON, 0, C_ON_PRESSED, 0)
+                : buttonBg(C_BTN, C_BTN_STROKE, C_BTN_PRESSED, C_BTN_PRESSED_STROKE));
+    }
+
     private void refreshIntervals(boolean reload) {
         String[] intervals = QuoteSource.intervals(mSource);
         mIntervals = intervals;
@@ -512,8 +541,8 @@ public class MarketActivity extends AppCompatActivity {
     /** 周期显示文本：1d 之类原始值看不出是什么线，日K/周K 更直观，两者都给出来便于核对 */
     private String intervalText() {
         String label = QuoteSource.intervalLabel(mInterval);
-        if (label == null || label.isEmpty() || label.equals(mInterval)) return mInterval;
-        return mInterval + "/" + label;
+        if (label == null || label.isEmpty()) return mInterval;
+        return label;
     }
 
     /** 输入框内容（为空时按数据源默认标的） */
@@ -714,7 +743,7 @@ public class MarketActivity extends AppCompatActivity {
             if (!alive()) return;
             mChart.setSnapshot(snapshot);
             if (snapshot.totalCap > 0 && mStatus != null) {
-                // 按基准文案重拼，不再往状态行上追加：自动刷新每 15 秒来一次，追加会越加越长
+                // 按基准文案重拼，不再往状态行上追加：自动更新每 15 秒来一次，追加会越加越长
                 mStatus.setText(mStatusBase + "  市值 " + Snapshot.cap(snapshot.totalCap));
             }
         });

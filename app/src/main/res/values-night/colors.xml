@@ -82,4 +82,11 @@
     <!-- 输入框底板：比卡片亮一档，好和卡片分开 -->
     <color name="lan_field_bg">#FF2A3238</color>
     <color name="lan_field_stroke">#FF546E7A</color>
+    <!-- 通用输入框（KCP 等）：深色模式配深底浅字 -->
+    <color name="edit_bg">#2A3238</color>
+    <color name="edit_text">#E0E0E0</color>
+    <color name="market_rebound">#FFEC407A</color>
+    <!-- 聊天输入卡片：夜间深卡，与对话框底色同一档 -->
+    <color name="chat_card">#FF1E1E1E</color>
+    <color name="chat_card_stroke">#FF3A4048</color>
 </resources>

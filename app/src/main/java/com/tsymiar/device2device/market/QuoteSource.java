@@ -880,9 +880,9 @@ public final class QuoteSource {
     public static String intervalLabel(String interval) {
         if (interval == null) return "";
         switch (interval) {
-            // 1m 现在是当日分时图（见 fetchIntraday），叫「分时」才不至于让人以为是一分钟一根的蜡烛
+            // 1m 现在是当日分时图（见 fetchIntraday），叫「分时线」才不至于让人以为是一分钟一根的蜡烛
             case "1m":
-                return "分时";
+                return "分时线";
             case "1Q":
                 return "季K";
             case "60m":

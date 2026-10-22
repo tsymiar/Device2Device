@@ -18,14 +18,17 @@ import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.net.Uri;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SizeF;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.RemoteViews;
+import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 
@@ -38,6 +41,7 @@ import com.tsymiar.device2device.market.Snapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -55,6 +59,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 落到 View 上：每个内部节点是一个嵌套 LinearLayout（沿宽度切就横排 widget_market_heat_row、
  * 沿高度切就竖排 widget_market_heat_col），叶子是一片 TextView，宽高用
  * {@code setInt(id, "setWidth"/"setHeight", px)} 逐个写死。
+ *
+ * 「合缝」是这套摆法的硬约束：写死的像素没有伸缩余地，各段之和必须恰好等于该层边长，
+ * 边上多几像素就被裁、少几像素就留白 —— 所以①马赛克那块地方是 measure 出来的
+ * （见 {@link #mapAreaPx}，不是按 dp 折算的）；②相邻格子之间那条 1px 发丝缝
+ * （见 {@code MapBrush#seam}）先从边长里扣掉，剩下的才由 {@code MapBrush#shares} 配到各段。
  */
 public class MarketHeatWidgetProvider extends AppWidgetProvider {
 
@@ -69,13 +78,53 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /** 一次取多少条，也是能画的上限：新浪 {@code num} 最多 100，再往上要翻页 */
     public static final int TOP_N = 100;
 
-    /** 画几格的下限：再小的部件也照摆这么多 —— 宁可挤成一片色块，也要把盘面摆全 */
-    private static final int TILES_MIN = 30;
+    /**
+     * 摆几格的目标：比一屏摆得下的多，多出来的排在画布下沿之外，滚过去才看得见
+     * （见 {@link #canvasPx} 与 {@code MarketHeatWidgetService}）。
+     */
+    private static final int TILES_WANT = 50;
+
+    /**
+     * 格子的最小面积（dp²）：再小就摆不下字了（四个字的名字折成两行也要二十来 dp 宽）。
+     * 画布高度由它兜底：部件越小，50 只越是摊在比一屏高的画布上，多出来的靠滚动看；
+     * 部件够大时画布就等于可见高度，一屏摆得下全部，不必滚动。
+     */
+    private static final float TILE_MIN_DP2 = 800f;
+
+    /** 画布比量出来的可见高度再高这么一点：宁可最后一行被切一丁点，也不在底部留一道白 */
+    private static final float CANVAS_COVER = 1.03f;
+
+    /**
+     * 透明点击槽的个数，也是能画的上限：一格一个，摆在格子的位置上（见 {@link #paintSlots}）。
+     *
+     * 为什么要有这一层：集合小部件里，格子里（嵌套 RemoteViews）挂 PendingIntent 不生效、
+     * 填 fillIn 又只认条目里第一个 —— 点同一行任何一格都只会打开这一行第一只。
+     * 只有放进根布局的那一层点击才真的生效，所以把 N 个空 View 铺在马赛克上，各挂各的标的。
+     */
+    private static final int SLOT_COUNT = 60;
+
+    /** 与 {@code widget_market_heat.xml} 里 heat_slot_0..59 一一对应 */
+    private static final int[] SLOT_IDS = {
+            R.id.heat_slot_0, R.id.heat_slot_1, R.id.heat_slot_2, R.id.heat_slot_3,
+            R.id.heat_slot_4, R.id.heat_slot_5, R.id.heat_slot_6, R.id.heat_slot_7,
+            R.id.heat_slot_8, R.id.heat_slot_9, R.id.heat_slot_10, R.id.heat_slot_11,
+            R.id.heat_slot_12, R.id.heat_slot_13, R.id.heat_slot_14, R.id.heat_slot_15,
+            R.id.heat_slot_16, R.id.heat_slot_17, R.id.heat_slot_18, R.id.heat_slot_19,
+            R.id.heat_slot_20, R.id.heat_slot_21, R.id.heat_slot_22, R.id.heat_slot_23,
+            R.id.heat_slot_24, R.id.heat_slot_25, R.id.heat_slot_26, R.id.heat_slot_27,
+            R.id.heat_slot_28, R.id.heat_slot_29, R.id.heat_slot_30, R.id.heat_slot_31,
+            R.id.heat_slot_32, R.id.heat_slot_33, R.id.heat_slot_34, R.id.heat_slot_35,
+            R.id.heat_slot_36, R.id.heat_slot_37, R.id.heat_slot_38, R.id.heat_slot_39,
+            R.id.heat_slot_40, R.id.heat_slot_41, R.id.heat_slot_42, R.id.heat_slot_43,
+            R.id.heat_slot_44, R.id.heat_slot_45, R.id.heat_slot_46, R.id.heat_slot_47,
+            R.id.heat_slot_48, R.id.heat_slot_49, R.id.heat_slot_50, R.id.heat_slot_51,
+            R.id.heat_slot_52, R.id.heat_slot_53, R.id.heat_slot_54, R.id.heat_slot_55,
+            R.id.heat_slot_56, R.id.heat_slot_57, R.id.heat_slot_58, R.id.heat_slot_59};
     /**
      * 每一格的目标面积（dp²）：格数 = 可视面积 / 它，格子就不跟着部件大小忽大忽小。
      * 1400 是按 4x4（可视约 230x180dp）摆 30 格反推的：约 37dp 见方，名字与涨跌幅都摆得下。
      */
-    private static final float TILE_AREA_DP2 = 1400f;
+    private static final float TILE_AREA_DP2 = 1700f;
 
     /** 多实例共享最近一次结果：同一份榜单没必要每个部件各拉一次 */
     private static volatile List<CapRow> sRows;
@@ -88,38 +137,34 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /** 同一批取数只发一次请求 */
     private static final AtomicBoolean sPending = new AtomicBoolean(false);
 
-    /** 每个实例当前摆好的排版树 + 摆它时用的 {宽dp, 高dp, 格数}：三者任一变了都得重摆（见 mapFor） */
-    private static final Map<Integer, MarketTreemap.Node> sMaps = new ConcurrentHashMap<>();
-    private static final Map<Integer, int[]> sMapSizes = new ConcurrentHashMap<>();
+    /** 每个实例当前摆好的排版 + 摆它时用的尺寸：尺寸变了都得重摆（见 mapFor） */
+    private static final Map<Integer, HeatLayout> sLayouts = new ConcurrentHashMap<>();
 
     /** 每个实例最近一次从尺寸回调里拿到的 options：取数回来 / 定时刷新都拿不到新的，算尺寸就看这份 */
     private static final Map<Integer, Bundle> sOpts = new ConcurrentHashMap<>();
 
-    /** 列表可视高度之外被占掉的高度（dp）：根布局 padding 上下 9 + 马赛克上下 margin 3/2；
-     *  标题 / 状态 / 图例那三行不在这里固定，它们跟着系统字体缩放长高，见 {@link #chromePx} */
+    /** 马赛克之外那圈固定开销（dp）：根布局 padding 上下 9 + 马赛克上下 margin 3/2。
+     *  只给 {@link #estimateAreaPx} 兜底用 —— 正常情况下这一圈的高度是量出来的（见 {@link #mapAreaPx}） */
     private static final int HEAT_CHROME_FRAME_DP = 23;
-    /** 标题 12sp（加粗）、状态行 9sp、底部图例 9sp：都只有一行，见 {@link #chromePx} */
+    /** 标题 12sp（加粗）、状态行 9sp、底部图例 9sp：都只有一行，同上，兜底用 */
     private static final float CHROME_TITLE_SP = 12f;
     private static final float CHROME_LINE_SP = 9f;
-    /** 列表左右被占掉的宽度（dp）：根布局 padding 两侧 */
+    /** 马赛克左右之外被占掉的宽度（dp）：根布局 padding 两侧。同上，兜底用 */
     private static final int HEAT_SIDE_DP = 18;
     /** 拿不到尺寸的兜底：部件固定 5 格宽 × 2 格高，按 70*N-30 换算即 320 × 110 */
     private static final int SIZE_FALLBACK_W_DP = 320;
     private static final int SIZE_FALLBACK_H_DP = 110;
 
     /**
-     * 摆马赛克时比「列表那块空间」再往里收几 dp：每个格子的宽高都是写死的像素值，没有可伸缩的余地，
-     * 少摆几像素只是边上留一道几乎看不见的空当，多摆几像素看上去就是画歪了。
-     */
-    private static final float MAP_SAFETY_DP = 1f;
-    /**
-     * 相邻两格之间那条缝（px）：一个像素的发丝缝，格子之间分得开、又不显空隙。
-     * 固定像素而不是跟着 density 走 —— 缝从每一层按比例扣，排在树深处的格子被扣得越多，
-     * 画出来的面积就越不是那份市值；宽度按 {@link #shares} 精确配平，
-     * 各段加上缝恰好等于该层边长，马赛克仍然是紧的。
+     * 相邻两格之间的发丝缝（px）：就 1 个物理像素 —— 再细看不见，再粗就不是缝了。
+     *
+     * 缝是一片没底色也没字的空 View（见 {@code MapBrush#seam}），它的宽度从这个方向的长度里
+     * 先扣掉，剩下的再由 {@link #shares} 精确配平到各段：各段之和 + 所有缝 = 该层边长，
+     * 于是格子既不重叠，也不缺口 —— 缝是算出来的，不是「摆完看着歪」剩下的那点差错。
      */
     private static final int SEAM_PX = 1;
-    /** 每个实例各占一段 requestCode（见 {@code stockIntent}），免得两个实例的格子互相串 */
+
+    /** 每个实例各占一段 requestCode（见 {@code openMarket}），免得两个实例的格子互相串 */
     private static final int TILE_CODE_STRIDE = 2048;
     /**
      * 量一行字有多宽时用的探针字号：宽高都按这个字号量一次，再按比例反解放得下的字号
@@ -137,6 +182,14 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
      */
     private static final float TEXT_FIT_SAFETY = 0.94f;
 
+    /**
+     * 桌面端行高比本进程量出来的松多少（见 tileLabel 里 lineRatio 那一乘）。
+     *
+     * 桌面排中文会回退到中文字体，行高比本进程 Paint 的 ascent+descent 高一成多；
+     * 不补这一下，字会比排版留给它的高度还高 —— 行高钉死之后就被切掉一截。
+     */
+    private static final float DESKTOP_LINE_SLACK = 1.15f;
+
     /** 字号上下限：低于 SP_MIN 已难以辨认，不如不写；上限只用来挡住超大格子 */
     private static final float SP_MIN = 6f;
     private static final float SP_MAX = 28f;
@@ -153,7 +206,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /** 竖排的两种尝试：先带涨跌幅，放不下再只叠名字 */
     private static final boolean[] STACK_TRIES = {true, false};
     /** 宽不到高的一半算「竖长」：这种格子先试竖排，别急着摆横的两行 */
-    private static final float STACK_ASPECT = 0.5f;
+    private static final float STACK_ASPECT = 0.45f;
     /** 面积 → 字号的系数：40dp 见方的格子约 14sp，见 {@link #areaSp} */
     private static final float AREA_SP_GAIN = 2.2f;
     /**
@@ -162,8 +215,16 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
      */
     private static final float AREA_FADE_REF_DP2 = 2500f;
     private static final float AREA_FADE = 0.15f;
-    /** 格子四周留白（dp）：文字不贴着色块边缘，也不受 setStateListAnimator 之类的挤压 */
-    private static final float TILE_PAD_DP = 6f;
+    /**
+     * 格子四周留白（dp）：文字不贴着色块边缘，也不压到格子之间的缝上。
+     * 有发丝缝替我们把色块分开了，这一圈不必留太大 —— 省下来的都归文字。
+     */
+    private static final float TILE_PAD_DP = 5f;
+    /**
+     * 留白相对格子短边的占比上限：比 {@link #TILE_PAD_DP} 优先。
+     * 三十来 dp 的小格子被 5dp 一圈吃掉三分之一，本来摆得下的名字就挤没了 —— 那里按短边收。
+     */
+    private static final float TILE_PAD_RATIO = 0.11f;
 
 
     /** goAsync 的兜底超时：网络异常时不至于一直挂着广播 */
@@ -175,8 +236,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
                                           int appWidgetId, Bundle newOptions) {
         super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions);
         // 尺寸变了整套马赛克要重摆：格子的宽高是写死的像素，不重摆就仍是旧尺寸下的马赛克
-        sMaps.remove(appWidgetId);
-        sMapSizes.remove(appWidgetId);
+        sLayouts.remove(appWidgetId);
         // 立刻按回调给的这份新尺寸画一遍：该时刻这份尺寸一定是最新的
         paint(context, manager, appWidgetId, newOptions);
         // 数据还新鲜就到此为止，onUpdate 只会把同一版再画一遍
@@ -190,8 +250,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         super.onDeleted(context, appWidgetIds);
         if (appWidgetIds == null) return;
         for (int id : appWidgetIds) {
-            sMaps.remove(id);
-            sMapSizes.remove(id);
+            sLayouts.remove(id);
             sOpts.remove(id);
         }
     }
@@ -199,21 +258,47 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);      // 系统广播（APPWIDGET_UPDATE 等）按默认分发
-        if (intent == null || !ACTION_REFRESH.equals(intent.getAction())) return;
-        if (intent.getBooleanExtra(EXTRA_FORCE, false)) sStamp = 0L;
+        if (intent == null) return;
+        if (ACTION_REFRESH.equals(intent.getAction())) {
+            if (intent.getBooleanExtra(EXTRA_FORCE, false)) sStamp = 0L;
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID);
+            int[] ids;
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                ids = new int[]{id};
+            } else {
+                ids = manager.getAppWidgetIds(
+                        new ComponentName(context, MarketHeatWidgetProvider.class));
+            }
+            for (int widgetId : ids) {
+                WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_heat);
+            }
+            onUpdate(context, manager, ids);
+            return;
+        }
+        // 深浅模式切换：RemoteViews 里的颜色是「更新那一刻」写死的（setTextColor /
+        // setBackgroundColor 都不跟着配置变），桌面只会用新配置重新 inflate 布局，
+        // 那些写死的色值还是旧的 —— 于是日间切夜间后整片马赛克停在旧配色上。
+        // 这个广播只投递给运行时注册的接收器（见 MarketWidgetApp），manifest 里收不到；
+        // 万一有的 ROM 转发了，顺手重画一遍也不亏。
+        if (Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+            repaintAll(context);
+        }
+    }
+
+    /**
+     * 把所有实例按当前配置重画一遍（数据走缓存，不联网）：深浅模式切换、或任何
+     * 「颜色可能变了但数据没变」的场合用。几何排版与配色无关，缓存还能接着用。
+     */
+    public static void repaintAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
-                AppWidgetManager.INVALID_APPWIDGET_ID);
-        int[] ids;
-        if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            ids = new int[]{id};
-        } else {
-            ids = manager.getAppWidgetIds(new ComponentName(context, MarketHeatWidgetProvider.class));
-        }
+        int[] ids = manager.getAppWidgetIds(
+                new ComponentName(context, MarketHeatWidgetProvider.class));
+        if (ids == null) return;
         for (int widgetId : ids) {
-            WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_heat);
+            paint(context, manager, widgetId);
         }
-        onUpdate(context, manager, ids);
     }
 
     @Override
@@ -314,8 +399,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             try {
                 // 数据换了，这个实例摆好的马赛克作废
-                sMaps.remove(id);
-                sMapSizes.remove(id);
+                sLayouts.remove(id);
                 manager.updateAppWidget(id, views(context, manager, id));
             } catch (Throwable t) {
                 Log.w(TAG, "heat widget render failed", t);
@@ -338,60 +422,234 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     // ===== 排版：按每个实例的尺寸摆一棵树 =====
-    /** 这个实例要摆的排版树；没数据给 null，由空态占位顶上。
+    /** 这个实例摆好的那一摞行；没数据给 null，由空态占位顶上。
      *  缓存要连同尺寸一起存：旧树每一刀朝哪边切是按另一个形状的矩形定的，摆到现在的框里会歪出去 */
-    static MarketTreemap.Node mapFor(Context context, int widgetId, int[] size, int tiles) {
+    static HeatLayout mapFor(Context context, int widgetId, int[] size, int tiles, int[] area) {
         List<CapRow> rows = sRows;
         if (rows == null || rows.isEmpty() || context == null) return null;
-        MarketTreemap.Node cached = sMaps.get(widgetId);
-        int[] cachedSize = sMapSizes.get(widgetId);
-        if (cached != null && cachedSize != null
-                && cachedSize[0] == size[0] && cachedSize[1] == size[1]
-                && cachedSize[2] == tiles) {
+        HeatLayout cached = sLayouts.get(widgetId);
+        if (cached != null && cached.size[0] == size[0] && cached.size[1] == size[1]
+                && cached.size[2] == tiles && cached.canvas == area[2]) {
             return cached;
         }
         // 榜单按市值倒序存着，取前 N 只就是「最大的 N 只」（见 fetchTopCaps 收尾那次排序）
         List<CapRow> shown = rows.size() > tiles ? new ArrayList<>(rows.subList(0, tiles)) : rows;
-        MarketTreemap.Node node = MarketTreemap.layout(shown,
-                mapWidthPx(context, size), mapHeightPx(context, size));
-        if (node == null) {
-            sMaps.remove(widgetId);
-            sMapSizes.remove(widgetId);
+        // 画布比可见区域高（area[2]）：高出来的那部分行滚过去才看得见；
+        // 顶层一律横着分行（topRows）—— 这些行要当列表条目用
+        MarketTreemap.Node root = MarketTreemap.layout(shown, area[0], area[2], true);
+        if (root == null) {
+            sLayouts.remove(widgetId);
             return null;
         }
-        sMaps.put(widgetId, node);
-        sMapSizes.put(widgetId, new int[]{size[0], size[1], tiles});
-        return node;
-    }
-
-    /** 摆放用的矩形宽度（px）：整数就够，铺的时候也是按整数像素切的 */
-    private static int mapWidthPx(Context context, int[] size) {
-        float density = context.getResources().getDisplayMetrics().density;
-        return Math.max(1, Math.round((size[0] - HEAT_SIDE_DP - MAP_SAFETY_DP) * density));
+        HeatLayout layout = new HeatLayout(root, area[0], area[2], new int[]{size[0], size[1], tiles},
+                area[1]);
+        sLayouts.put(widgetId, layout);
+        return layout;
     }
 
     /**
-     * 摆放用的矩形有多高（px）：列表那块空间再往里收 {@link #MAP_SAFETY_DP}。
-     * 每个格子的高都是写死的像素值，多摆几像素就压到下面的图例上去了。
+     * 摆好的排版，拆成列表要的那几样：摊平之后的一行行、每行多高、行有多宽。
+     * 由 {@code MarketHeatWidgetService} 逐行取（RemoteViews 的 collection 只能这么喂）。
      */
-    private static int mapHeightPx(Context context, int[] size) {
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        return Math.max(1, Math.round(
-                listHeightPx(context, size) - MAP_SAFETY_DP * metrics.density));
+    static final class HeatLayout {
+        final MarketTreemap.Node root;
+        /** 摊平后的那几行（一行行横着排、各占满整行宽）；只有一只可摆时就是它自己 */
+        final List<MarketTreemap.Node> rows;
+        /** 每行多高（px），与 {@link #rows} 一一对应 */
+        final int[] heights;
+        /** 行有多宽（px）= 列表的宽度 */
+        final int widthPx;
+        /** 摆这份排版时的 {宽dp, 高dp, 格数} */
+        final int[] size;
+        /** 画布多高（px）：比可见区域高，高出来的部分靠滚动 */
+        final int canvas;
+        /** 可见区域多高（px）：画布比它高出「一截」时才真的需要滚动 */
+        final int visible;
+
+        HeatLayout(MarketTreemap.Node root, int widthPx, int canvasPx, int[] size, int visiblePx) {
+            this.root = root;
+            this.widthPx = Math.max(1, widthPx);
+            this.canvas = Math.max(1, canvasPx);
+            this.visible = Math.max(1, visiblePx);
+            this.size = size;
+            List<MarketTreemap.Node> flat = new ArrayList<>();
+            List<Integer> hs = new ArrayList<>();
+            flatten(root, this.canvas, flat, hs);
+            this.rows = flat;
+            int[] out = new int[hs.size()];
+            for (int i = 0; i < out.length; i++) out[i] = hs.get(i);
+            this.heights = out;
+        }
+
+        /**
+         * 真的需要滚吗：画布比可见区域高出「一截」才算。
+         *
+         * 画布本来就故意比可见区域高 {@link #CANVAS_COVER} 那么一点（宁可最后一行贴着下沿
+         * 被切一丁点，也不在底部留一道白），那几％不算滚动。
+         */
+        boolean scrollable() {
+            return MarketHeatWidgetProvider.scrollable(new int[]{widthPx, visible, canvas});
+        }
+
+        /**
+         * 每一格摆在哪（相对马赛克这块地的 px 矩形），自上而下、自左而右。
+         *
+         * 只按市值份额往下分（相邻两块之间留 {@link #SEAM_PX} 那条缝），不套摆放时那套面积预算 ——
+         * 两者相差不到一两个百分点，当点击区域用绰绰有余，换来的是不必重算一遍那套像素配平。
+         */
+        List<HeatSlot> slots() {
+            List<HeatSlot> out = new ArrayList<>();
+            int top = 0;
+            for (int i = 0; i < rows.size(); i++) {
+                collect(rows.get(i), 0, top, widthPx, Math.max(1, heights[i]), out);
+                top += Math.max(1, heights[i]);
+            }
+            return out;
+        }
+
+        /** 递归摊平一块：横排分宽、竖排分高，兄弟之间各让 SEAM_PX 一条缝 */
+        private void collect(MarketTreemap.Node node, int left, int top, int width, int height,
+                             List<HeatSlot> out) {
+            if (node == null) return;
+            if (node.isLeaf()) {
+                out.add(new HeatSlot(node.row, left, top, Math.max(1, width), Math.max(1, height)));
+                return;
+            }
+            boolean along = node.alongWidth;
+            int length = Math.max(1, along ? width : height);
+            int[] pieces = sharesOut(node.children, length, null);
+            int at = 0;
+            for (int i = 0; i < node.children.size(); i++) {
+                int piece = Math.max(1, pieces[i]);
+                if (along) {
+                    collect(node.children.get(i), left + at, top, piece, height, out);
+                } else {
+                    collect(node.children.get(i), left, top + at, width, piece, out);
+                }
+                at += piece + SEAM_PX;
+            }
+        }
+    }
+
+    /** 一格的位置（px，相对马赛克左上角）与它代表的那只票 */
+    static final class HeatSlot {
+        final CapRow row;
+        final int left;
+        final int top;
+        final int width;
+        final int height;
+
+        HeatSlot(CapRow row, int left, int top, int width, int height) {
+            this.row = row;
+            this.left = left;
+            this.top = top;
+            this.width = width;
+            this.height = height;
+        }
     }
 
     /**
-     * 列表可视高度（px）：部件高度减去 {@link #chromePx} 那圈东西。treemap 按这个矩形的形状切，
-     * 摆几格（{@link #tilesFor}）也用同一个数，格子数与摆放面积才对得上。
+     * 把排版树摊成一摞行：竖着码放的容器一路往下找到真正的行（换向时会多套一层竖容器，
+     * 见 {@code MarketTreemap} 的 head / tail），横着排的容器本身就是一行，不再往下拆 ——
+     * 它占满整行宽，正好当列表的一个条目。
      */
-    private static float listHeightPx(Context context, int[] size) {
+    private static void flatten(MarketTreemap.Node node, int lengthPx,
+                                List<MarketTreemap.Node> out, List<Integer> heights) {
+        if (node == null) return;
+        if (node.isLeaf() || node.alongWidth) {
+            out.add(node);
+            heights.add(Math.max(1, lengthPx));
+            return;
+        }
+        List<MarketTreemap.Node> kids = node.children;
+        int[] pieces = sharesOut(kids, lengthPx, null);
+        for (int i = 0; i < kids.size(); i++) {
+            flatten(kids.get(i), pieces[i], out, heights);
+        }
+    }
+
+    /** 这个实例摆好的排版（供 RemoteViewsService 取）；没有就给 null */
+    static HeatLayout layoutFor(Context context, int widgetId) {
+        return sLayouts.get(widgetId);
+    }
+
+    /**
+     * 马赛克能占多大地方（px）：{@code [0]} 宽、{@code [1]} 高 —— 格子就在这块矩形里摆，
+     * 左右上下都从它的边线起算，所以这两个数必须是那块地本身的尺寸，不是估的。
+     *
+     * 为什么不估：每片格子的宽高都是写死的整数像素，各段之和必须恰好等于这块矩形
+     * （见 {@code MapBrush#shares}）；而标题那三行的字号跟着部件宽度变（见 {@code views}）、
+     * 行高跟着系统字体缩放变 —— 按固定 dp 折算出剩下的空间，多几像素底下就压出一道白，
+     * 少几像素最下面一排就被裁掉。这里是量出来的：把整份布局按部件尺寸 measure 一遍，
+     * 中间那块 {@code widget_market_heat_map}（0dp + weight 1，吃的就是剩余空间）
+     * 称出来有多大，就按多大摆。
+     */
+    private static int[] mapAreaPx(Context context, int[] size, int titleSp, int smallSp) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        return Math.max(1f, size[1] * metrics.density - chromePx(context, size[1]));
+        int widthPx = Math.max(1, Math.round(size[0] * metrics.density));
+        int heightPx = Math.max(1, Math.round(size[1] * metrics.density));
+        try {
+            View root = LayoutInflater.from(context).inflate(R.layout.widget_market_heat, null);
+            setChromeSp(root, R.id.widget_title, titleSp);
+            setChromeSp(root, R.id.widget_meta, smallSp);
+            setChromeSp(root, R.id.widget_legend, smallSp);
+            setChromeSp(root, R.id.widget_market_heat_time, smallSp);
+            root.measure(View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY));
+            View map = root.findViewById(R.id.widget_market_heat_map);
+            int w = map == null ? 0 : map.getMeasuredWidth();
+            int h = map == null ? 0 : map.getMeasuredHeight();
+            View header = root.findViewById(R.id.widget_header);
+            View legend = root.findViewById(R.id.widget_legend);
+            View empty = root.findViewById(R.id.widget_market_heat_empty);
+            Log.i(TAG, "measure size=" + size[0] + "x" + size[1] + "dp rootH=" + root.getMeasuredHeight()
+                    + " map=" + w + "x" + h + " header=" + (header == null ? -1 : header.getMeasuredHeight())
+                    + " legend=" + (legend == null ? -1 : legend.getMeasuredHeight())
+                    + " empty=" + (empty == null ? -1 : empty.getMeasuredHeight()));
+            if (w > 0 && h > 0) return new int[]{w, h, canvasPx(context, w, h)};
+        } catch (Throwable t) {
+            Log.w(TAG, "heat layout measure failed", t);
+        }
+        int[] fallback = estimateAreaPx(context, size);
+        return new int[]{fallback[0], fallback[1], canvasPx(context, fallback[0], fallback[1])};
+    }
+
+    /**
+     * 排版用的画布多高（px）：默认就等于可见高度 —— {@link #TILES_WANT} 只在一屏里摊开，
+     * 上下正好铺满，不必滚动。只有当一屏按 {@link #TILE_MIN_DP2} 摆不下这么多只时
+     * （部件又矮又窄）才把画布撑高，多出来的那些行滚过去看（见 {@code MarketHeatWidgetService}）。
+     */
+    private static int canvasPx(Context context, int mapWidthPx, int mapHeightPx) {
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        float wDp = mapWidthPx / metrics.density;
+        float minDp = TILES_WANT * TILE_MIN_DP2 / Math.max(1f, wDp);
+        // 略高一点点（CANVAS_COVER）：这块高度是我们在自己进程里 measure 出来的，桌面上
+        // 那圈宿主内边距、字体行高跟这里未必分毫不差，差几像素就会在底部剩一道白。
+        // 宁可多出百分之几让最后一行贴着下沿被切一点（反正本来就能滚），也不留缝
+        float coverDp = mapHeightPx / metrics.density * CANVAS_COVER;
+        float canvasDp = Math.max(coverDp, minDp);
+        return Math.max(mapHeightPx, Math.round(canvasDp * metrics.density));
+    }
+
+    /** 量尺寸前把标题那几行的字号设成真正要用的那一份：它们多高取决于字号，量偏了就合不严 */
+    private static void setChromeSp(View root, int id, int sp) {
+        View view = root.findViewById(id);
+        if (view instanceof TextView) {
+            ((TextView) view).setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        }
+    }
+
+    /** 量不出来时的兜底：按 dp 折算掉边框与标题那三行 */
+    private static int[] estimateAreaPx(Context context, int[] size) {
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        return new int[]{
+                Math.max(1, Math.round((size[0] - HEAT_SIDE_DP) * metrics.density)),
+                Math.max(1, Math.round(size[1] * metrics.density - chromePx(context, size[1])))};
     }
 
     /**
      * 马赛克之外还要多高（px）：固定部分（{@link #HEAT_CHROME_FRAME_DP}）加上标题那三行。
-     * 这三行是拿 Paint 真量出来的（折算出 45dp、实测 41dp，差的几 dp 就是马赛克底下那道白）；
+     * 只在 {@link #estimateAreaPx} 兜底时用 —— 正常情况下用的是 {@link #mapAreaPx} 量出来的那份。
      * 部件被拉矮时按比例少算一点，别把热力图压成一条缝。
      */
     private static float chromePx(Context context, int hdp) {
@@ -414,23 +672,100 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
 
     // ===== 渲染 =====
     /**
-     * 整片马赛克：按排版树递归地把 group 与格子一个个 addView 进去，摆在 widthPx × heightPx 里。
+     * 按 weight 把 lengthPx 切成整数像素：先往下取整，再一像素一像素地把差额配回去。
+     *
+     * 各段相加必须恰好等于 lengthPx —— 每段各自四舍五入会多出半像素，几十段加起来就把
+     * 最右边那格推出边框；反过来只往下取整又会越积越多，右边留一道白缝。
+     *
+     * 配平是双向的：每段先保底 1px（画不出来的格子不如留一根线），而一堆份额极小的孩子
+     * 挤在同一条边上时，这个保底能把总量撑过 lengthPx —— 那时得从最宽的几段里扣回来，
+     * 只补不扣时，该段会一路超出右边框。
+     *
+     * 顶层那几行各占多高也走这里（见 {@link HeatLayout}）—— 行高同样要一像素不差地加起来。
+     *
+     * @param targets 各段该占的理想长度；为 null 时按市值 {@code weight} 分
+     */
+    static int[] sharesOut(List<MarketTreemap.Node> kids, int lengthPx, double[] targets) {
+        int n = kids.size();
+        int[] out = new int[n];
+        if (n == 0 || lengthPx <= 0) return out;
+        double total = 0d;
+        for (int i = 0; i < n; i++) {
+            total += targets != null ? Math.max(0d, targets[i]) : Math.max(0f, kids.get(i).weight);
+        }
+        float[] frac = new float[n];
+        int used = 0;
+        for (int i = 0; i < n; i++) {
+            double want0 = targets != null ? Math.max(0d, targets[i])
+                    : Math.max(0f, kids.get(i).weight);
+            double share = total > 0d ? want0 / total : 1d / n;
+            float want = (float) (lengthPx * share);
+            out[i] = Math.max(1, (int) want);
+            frac[i] = want - (int) want;
+            used += out[i];
+        }
+        int left = lengthPx - used;
+        for (; left != 0; ) {
+            int best = -1;
+            for (int i = 0; i < n; i++) {
+                if (frac[i] < 0f) continue;              // 该段已经配过，不再参与下一轮
+                if (left < 0 && out[i] <= 1) continue;   // 要往回扣，只剩 1px 的段不能动
+                // 补：给余数最大的那段；扣：拿最宽的那段 —— 两边都挑改动最不显眼的一段
+                if (best < 0 || (left > 0 ? frac[i] > frac[best] : out[i] > out[best])) best = i;
+            }
+            if (best < 0) break;      // 配不动了：每段都只剩 1px / 都配过一轮
+            if (left > 0) {
+                out[best]++;
+                left--;
+            } else {
+                out[best]--;
+                left++;
+            }
+            frac[best] = -1f;
+        }
+        if (left != 0) {
+            // 上面那个循环可能提前收手（每段都配过一轮，差额还没补完）。这时差额不能就这么
+            // 留着：各段相加必须恰好等于 lengthPx，短一像素该排就露一条黑缝、长一像素就
+            // 戳出边框（嵌套好几层，一条条黑缝叠起来就是「马赛克不紧凑」）。摊给最宽的那段 ——
+            // 它相对误差最小，多一两像素看不出来
+            int widest = 0;
+            for (int i = 1; i < n; i++) {
+                if (out[i] > out[widest]) widest = i;
+            }
+            out[widest] = Math.max(1, out[widest] + left);
+        }
+        return out;
+    }
+
+    /**
+     * 摆好的一行（供 {@code MarketHeatWidgetService} 逐行取）：按排版树递归地把 group 与格子
+     * 一个个 addView 进去，摆在 widthPx × heightPx 里。
      * 小块能穿插在大块之间而不是被拉成一根根条带，靠的是 RemoteViews 之间也能 addView：
      * 叶子是一片 widget_market_heat_tile，内部节点按切分方向选用 widget_market_heat_row / widget_market_heat_col
      * 里二选一，嵌套起来就是一棵子树。
      *
-     * @return 可以直接塞进 widget_market_heat_map 的那片 View；没有东西可摆时给 null
+     * @return 可以直接塞进列表条目里的那一片 View；没有东西可摆时给 null
      */
-    static RemoteViews mapViews(Context context, int widgetId, MarketTreemap.Node root,
+    static RemoteViews rowViews(Context context, int widgetId, MarketTreemap.Node row,
                                 int widthPx, int heightPx) {
-        if (root == null || context == null || widthPx <= 0 || heightPx <= 0) return null;
-        return new MapBrush(context, widgetId * TILE_CODE_STRIDE).draw(root, widthPx, heightPx);
+        if (row == null || context == null || widthPx <= 0 || heightPx <= 0) return null;
+        RemoteViews views = new MapBrush(context, widgetId * TILE_CODE_STRIDE)
+                .draw(row, widthPx, heightPx);
+        // 行高写死：格子上那几个 setHeight / setMaxHeight 在桌面那个 TextView 上量出来不生效
+        // （格子的高跟着文字走，一行里几个格子高矮不一），整片马赛克就比排版算出来的高，
+        // 按排版摆的点击槽跟着对不上。行是列表条目，改它的 LayoutParams 一定管用
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            float density = context.getResources().getDisplayMetrics().density;
+            int rootId = row.isLeaf() ? R.id.widget_market_heat_tile
+                    : (row.alongWidth ? R.id.widget_market_heat_row : R.id.widget_market_heat_col);
+            views.setViewLayoutHeight(rootId, heightPx / density, TypedValue.COMPLEX_UNIT_DIP);
+        }
+        return views;
     }
 
     /**
      * 铺一棵子树时要带着的那些东西：一半是为了递归不必传同一串参数（dp→px、字体缩放、调色板、缝宽），
-     * {@code codes} 则因为每格的 PendingIntent 都得各不相同（见 {@code stockIntent}），
-     * 起点带 widgetId，两个实例的编号不会串。
+     * {@code codes} 是每格的编号起点（带 widgetId，两个实例的编号不会串）。
      */
     private static final class MapBrush {
         private final Context context;
@@ -483,6 +818,11 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(),
                     along ? R.layout.widget_market_heat_row : R.layout.widget_market_heat_col);
             int rootId = along ? R.id.widget_market_heat_row : R.id.widget_market_heat_col;
+            // 先把这一层清空再往里加。桌面那边是「同一个布局 id 就 reapply」而不是重新 inflate，
+            // 而 RemoteViews 的 addView 是往现有孩子后面追加 —— 不清的话，同一个位置换过内容
+            // （尺寸变了、行里多了少了格子）就会把上一次的残留留在里面，看上去就是几只
+            // 重复的股票挤在行尾，色块大小也就跟市值对不上了。
+            views.removeAllViews(rootId);
             int length = along ? widthPx : heightPx;
             // cross 用当前实际的维度：量缝那次走的是另一套尺寸（按市值分的），
             // 拿它当该维度会有几个像素的出入 —— 最右列就差这几个像素合不上缝
@@ -559,14 +899,23 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
                     Math.max(1f, heightPx - 2f * pad), density, fontScale);
             views.setViewPadding(id, pad, pad, pad, pad);
             views.setInt(id, "setWidth", Math.max(1, widthPx));
-            views.setInt(id, "setHeight", Math.max(1, heightPx));
+            // 高度用 setMinHeight + setMaxHeight 两头钉死，不用 setHeight：后者在桌面那个
+            // TextView 上量出来并不生效（格子的高会跟着文字走，一行里几个格子高矮不一，
+            // 整片马赛克的行高于是比排版算出来的大），点击槽就跟着对不上了
+            views.setInt(id, "setMinHeight", Math.max(1, heightPx));
+            views.setInt(id, "setMaxHeight", Math.max(1, heightPx));
             views.setInt(id, "setBackgroundColor", fill);
             views.setTextViewText(id, label.text);
             views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, label.sp);
             // 行数按内容收住：中文没有词间空格，TextView 会逐字折行，留着宽的 maxLines 就会给你拆成两行
             views.setInt(id, "setMaxLines", label.lines);
             views.setTextColor(id, tileTextColor(palette, Color.alpha(fill)));
-            views.setOnClickPendingIntent(id, stockIntent(context, row, codes++));
+            // 点这一格：填一个 FillInIntent 上去，列表上那个模板 PendingIntent 带着它发出去。
+            // 平台只认「条目根」上那一层 fillIn（嵌套的 RemoteViews 挂 PendingIntent 是不生效的，
+            // 实测点击连 clickable 都不会变），所以点击精度就止步于「一行」—— 同一行里点哪一格
+            // 都会打开这一行的第一只（按市值倒序，也就是这一行最大的那只）。
+            views.setOnClickFillInIntent(id, stockFillIn(row));
+            codes++;
             return views;
         }
 
@@ -575,11 +924,11 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
          *
          * 小格子按比例收，而且收得更狠 —— 固定 {@link #TILE_PAD_DP} 时，扁条那样的格子
          * （二十来像素高）会被上下留白吃掉一半，本来还摆得下一行名字的，就这么空了。
-         * 上下（左右）加起来不超过短边的三分之一。
+         * 上下（左右）加起来不超过短边的 {@link #TILE_PAD_RATIO} 倍。
          */
         private int tilePadPx(int widthPx, int heightPx) {
             int want = Math.round(TILE_PAD_DP * density);
-            int limit = Math.min(widthPx, heightPx) / 6;
+            int limit = Math.round(Math.min(widthPx, heightPx) * TILE_PAD_RATIO);
             return Math.max(0, Math.min(want, limit));
         }
 
@@ -606,55 +955,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
          *                摆放时传的是由面积预算折算出来的长度（见那个私有的 draw）
          */
         private static int[] shares(List<MarketTreemap.Node> kids, int lengthPx, double[] targets) {
-            int n = kids.size();
-            int[] out = new int[n];
-            if (n == 0 || lengthPx <= 0) return out;
-            double total = 0d;
-            for (int i = 0; i < n; i++) {
-                total += targets != null ? Math.max(0d, targets[i]) : Math.max(0f, kids.get(i).weight);
-            }
-            float[] frac = new float[n];
-            int used = 0;
-            for (int i = 0; i < n; i++) {
-                double want0 = targets != null ? Math.max(0d, targets[i])
-                        : Math.max(0f, kids.get(i).weight);
-                double share = total > 0d ? want0 / total : 1d / n;
-                float want = (float) (lengthPx * share);
-                out[i] = Math.max(1, (int) want);
-                frac[i] = want - (int) want;
-                used += out[i];
-            }
-            int left = lengthPx - used;
-            for (; left != 0; ) {
-                int best = -1;
-                for (int i = 0; i < n; i++) {
-                    if (frac[i] < 0f) continue;              // 该段已经配过，不再参与下一轮
-                    if (left < 0 && out[i] <= 1) continue;   // 要往回扣，只剩 1px 的段不能动
-                    // 补：给余数最大的那段；扣：拿最宽的那段 —— 两边都挑改动最不显眼的一段
-                    if (best < 0 || (left > 0 ? frac[i] > frac[best] : out[i] > out[best])) best = i;
-                }
-                if (best < 0) break;      // 配不动了：每段都只剩 1px / 都配过一轮
-                if (left > 0) {
-                    out[best]++;
-                    left--;
-                } else {
-                    out[best]--;
-                    left++;
-                }
-                frac[best] = -1f;
-            }
-            if (left != 0) {
-                // 上面那个循环可能提前收手（每段都配过一轮，差额还没补完）。这时差额不能就这么
-                // 留着：各段相加必须恰好等于 lengthPx，短一像素该排就露一条黑缝、长一像素就
-                // 戳出边框（嵌套好几层，一条条黑缝叠起来就是「马赛克不紧凑」）。摊给最宽的那段 ——
-                // 它相对误差最小，多一两像素看不出来
-                int widest = 0;
-                for (int i = 1; i < n; i++) {
-                    if (out[i] > out[widest]) widest = i;
-                }
-                out[widest] = Math.max(1, out[widest] + left);
-            }
-            return out;
+            return sharesOut(kids, lengthPx, targets);
         }
     }
 
@@ -676,9 +977,13 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
                                        float density, float fontScale) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setTextSize(TEXT_PROBE_PX);
-        // includeFontPadding=false 时一行就是 ascent+descent，用它当行高
+        // includeFontPadding=false 时一行就是 ascent+descent，用它当行高。
+        // 再乘 1.15：桌面那边排中文用的是回退字体（本进程的 Paint 量不到它），实测行高
+        // 比这里算出来的高一成多 —— 不补这一下，格子里的字会比排版给的高度还高，
+        // 行高被钉死之后就被切掉一截（热力图右上角那几格正是这么缺的）
         Paint.FontMetrics fm = paint.getFontMetrics();
-        float lineRatio = Math.max(0.5f, (fm.descent - fm.ascent) / TEXT_PROBE_PX);
+        float lineRatio = Math.max(0.5f, (fm.descent - fm.ascent) / TEXT_PROBE_PX)
+                * DESKTOP_LINE_SLACK;
         float availW = Math.max(1f, widthPx);
         float availH = Math.max(1f, thicknessPx);
         TileLabel label = labelFor(row, availW, availH, paint, lineRatio, density, fontScale);
@@ -779,7 +1084,12 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         if (flat != null && (stacked == null || flat.sp >= stacked.sp)) return flat;
         if (stacked != null) return stacked;
 
-        // 6) 连竖排都放不下：按最小可读字号摆得下几个字就摆几个（至少两个），半截名字也比只剩涨跌幅有用。
+        // 5.5) 名字一行放不下、一字一行也放不下时，试着从中间断成两行：名字还是完整的，
+        //      只是摊到两行上 —— 排在「截掉半个名字」前面，就是为了少截字
+        TileLabel broken = brokenLabel(name, availW, availH, paint, lineRatio, density, fontScale);
+        if (broken != null) return broken;
+
+        // 6) 连断成两行都放不下：按最小可读字号摆得下几个字就摆几个（至少两个），半截名字也比只剩涨跌幅有用。
         //    这一档的字号被 SP_NAME_MIN 钉死，退无可退 —— 所以宽高都按 TEXT_FIT_SAFETY 留够余量再判
         if (availH * TEXT_FIT_SAFETY >= SP_NAME_MIN * lineRatio * fontScale) {
             // 按名字里最宽的那个字算而不是拿「名」当样本：夹个全角符号或大写字母时，
@@ -888,6 +1198,41 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             i += Character.charCount(cp);
         }
         return widest;
+    }
+
+    /**
+     * 名字从中间断成两行的候选（名称还是完整的，只是摊在两行上）。
+     *
+     * 比「一字一行」宽得多（每行只放半个名字，宽度松一半），也比「截掉半个名字」好：这一档是
+     * 名字实在挤不进一行时的最后退路之一，宁可让它占两行，也不把它截短。
+     *
+     * @return 断得开且还读得出就给方案；名字只有一个字（也就谈不上断）或两行仍挤不下给 null
+     */
+    private static TileLabel brokenLabel(String name, float availW, float availH, Paint paint,
+                                         float lineRatio, float density, float fontScale) {
+        String[] halves = splitInTwo(name);
+        if (halves == null) return null;
+        float sp = tileSp(availW, availH, halves, paint, lineRatio, density, fontScale);
+        if (sp < SP_NAME_FLOOR) return null;
+        return new TileLabel(TextUtils.join("\n", halves), clampSp(sp, SP_NAME_FLOOR), 2);
+    }
+
+    /** 把一个名字从中间劈成前后两段（按 codePoint 切，名字里夹个符号也不会被劈成乱码） */
+    private static String[] splitInTwo(String name) {
+        List<String> cps = new ArrayList<>();
+        for (int i = 0; i < name.length(); ) {
+            int cp = name.codePointAt(i);
+            cps.add(new String(Character.toChars(cp)));
+            i += Character.charCount(cp);
+        }
+        if (cps.size() < 2) return null;
+        int head = cps.size() / 2;
+        StringBuilder first = new StringBuilder();
+        StringBuilder second = new StringBuilder();
+        for (int i = 0; i < cps.size(); i++) {
+            (i < head ? first : second).append(cps.get(i));
+        }
+        return new String[]{first.toString(), second.toString()};
     }
 
     /**
@@ -1002,18 +1347,18 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 点某一格：把该标的交给行情页。
+     * 点某一格：把该标的的 extras 交给列表上那个模板 PendingIntent（见 {@link #heatIntent}）。
      *
-     * requestCode 必须每格一个：Intent 的 extras 不参与 PendingIntent 的相等比较，
-     * 两只票只差 extras、requestCode 再撞上就会被复用成同一个 —— 三十格会全都开同一只票。
+     * 格子是列表条目里的子 View，平台只认条目根那一层：extras 由 FillInIntent 在发送时
+     * 合进模板（模板必须是 MUTABLE，见 {@link #fillInFlags}）。同一行里点哪一格都是
+     * 这一行第一只 —— 列表的点击单位是「条目」，不是条目里的某个子 View。
      */
-    private static PendingIntent stockIntent(Context context, CapRow row, int requestCode) {
-        Intent intent = new Intent(context, MarketActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    private static Intent stockFillIn(CapRow row) {
+        Intent intent = new Intent();
         intent.putExtra(MarketWidgetProvider.EXTRA_SOURCE, QuoteSource.AUTO);
         intent.putExtra(MarketWidgetProvider.EXTRA_SYMBOL, row.code.isEmpty() ? row.secid : row.code);
         intent.putExtra(MarketWidgetProvider.EXTRA_NAME, row.name);
-        return PendingIntent.getActivity(context, requestCode, intent, flags());
+        return intent;
     }
 
     /** 整块 RemoteViews：标题 → 一整片马赛克 → 图例 */
@@ -1029,15 +1374,21 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
                                      Bundle opts) {
         List<CapRow> rows = sRows;
         int[] size = sizeFor(context, manager, widgetId, opts);
+        int wdp = size[0];
+        // 标题与那些小字的字号：跟着部件宽度走；先算出来 —— 马赛克区域要按它们实际撑出来的
+        // 高度量（见 mapAreaPx），两边必须同一份，不然一头也合不严
+        int titleSp = clampSp(wdp / 20, 9, 13);
+        int smallSp = clampSp(wdp / 30, 7, 9);
+        int[] area = mapAreaPx(context, size, titleSp, smallSp);
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_market_heat);
         views.setTextViewText(R.id.widget_title, context.getString(R.string.market_heat_widget_title));
-        // 摆几格由这块部件的大小定（见 tilesFor）；取整份榜单时也不超过实际到手的条数
-        int tiles = tilesFor(context, size);
+        // 摆几格由这块地方的大小定（见 tilesFor）；取整份榜单时也不超过实际到手的条数
+        int tiles = tilesFor(context, area);
         if (rows != null && rows.size() < tiles) tiles = rows.size();
         // 调试包里把「量到的尺寸 → 算出的格数」写在第二行最前面：
         // 拖大拖小之后这串数动不动，一眼就能分清是启动器没送新尺寸、还是我们这边没跟着算
         views.setTextViewText(R.id.widget_meta, metaText(context, rows));
-        views.setTextViewText(R.id.widget_legend, legendText(rows, tiles));
+        views.setTextViewText(R.id.widget_legend, legendText(rows, tiles, scrollable(area)));
         views.setTextViewText(R.id.widget_market_heat_time, stampText());
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
         views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
@@ -1045,20 +1396,15 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         views.setTextColor(R.id.widget_market_heat_time, color(context, R.color.market_widget_text_hint));
         views.setTextColor(R.id.widget_market_heat_empty, color(context, R.color.market_widget_text_hint));
 
-        int wdp = size[0];
-        views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 20, 9, 13));
-        // widget_refresh 是图标，不跟着标题缩放：24dp 在常见部件尺寸下都合适
-        views.setTextViewTextSize(R.id.widget_meta, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 30, 7, 9));
-        views.setTextViewTextSize(R.id.widget_legend, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 30, 7, 9));
-        views.setTextViewTextSize(R.id.widget_market_heat_time, TypedValue.COMPLEX_UNIT_SP,
-                clampSp(wdp / 30, 7, 9));
+        views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP, titleSp);
+        // widget_refresh 是图标，不跟着标题缩放：18dp 在常见部件尺寸下都合适
+        views.setTextViewTextSize(R.id.widget_meta, TypedValue.COMPLEX_UNIT_SP, smallSp);
+        views.setTextViewTextSize(R.id.widget_legend, TypedValue.COMPLEX_UNIT_SP, smallSp);
+        views.setTextViewTextSize(R.id.widget_market_heat_time, TypedValue.COMPLEX_UNIT_SP, smallSp);
         views.setTextViewText(R.id.widget_market_heat_empty, emptyText(context, rows));
 
-        // 主体：摆一棵树，一次 addView 进去（每一格各自的点击在里面挂好）
-        paintMap(context, widgetId, size, views, tiles);
+        // 主体：把摆好的那一摞行挂到列表上（每一行由 MarketHeatWidgetService 铺，点击见 tile）
+        paintMap(context, manager, widgetId, size, views, tiles, area);
 
         views.setOnClickPendingIntent(R.id.widget_root, openMarket(context, widgetId));
         views.setOnClickPendingIntent(R.id.widget_header, openMarket(context, widgetId));
@@ -1067,26 +1413,123 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 把一整片马赛克铺进主体区域：没有数据时没有 setEmptyView 替我们切（那是 AdapterView 才有的），
-     * 这里自己切换空态占位。
+     * 这块地方真的需要滚吗：画布比可见区域高出「一截」才算（判据与点击槽同一套，
+     * 见 {@code HeatLayout#scrollable}）—— 图例上那句「上下滑动」与点击槽的取舍必须一致，
+     * 否则会一边说能滑、一边滑不动。
      */
-    private static void paintMap(Context context, int widgetId, int[] size, RemoteViews views, int tiles) {
-        MarketTreemap.Node root = mapFor(context, widgetId, size, tiles);
-        RemoteViews map = mapViews(context, widgetId, root,
-                mapWidthPx(context, size), mapHeightPx(context, size));
-        // 先把上一次摆的那片清掉再铺新的 —— RemoteViews 每次刷新是「贴」到已有视图上的
-        // （同一个布局 id 走 reapply），addView 只管往里加，不管里面已经有什么：
-        // 不清时一次刷新就多叠一层马赛克（取数 + 家数 + 行情页推送，一趟能叠三层），
-        // 叠出来的那几层也就一并戳出边框。RemoteViews 里能清容器的只有 removeAllViews。
-        views.removeAllViews(R.id.widget_market_heat_map);
-        if (map == null) {
+    private static boolean scrollable(int[] area) {
+        return area[2] > area[1] * (CANVAS_COVER + 0.03f);
+    }
+
+    /**
+     * 把摆好的马赛克挂到主体那片列表上：行由 {@code MarketHeatWidgetService} 一行行喂，
+     * 这里只负责「挂哪个 adapter」与「没数据时切空态」。
+     *
+     * 点击分两层：列表上挂一个模板 PendingIntent（点哪一格都先走它），每一格再用
+     * {@code setOnClickFillInIntent} 把该标的的 extras 填进去 —— collection 条目里
+     * 直接给子 View 挂 PendingIntent 是不生效的，只有 FillIn 这一条路。
+     */
+    private static void paintMap(Context context, AppWidgetManager manager, int widgetId, int[] size,
+                                 RemoteViews views, int tiles, int[] area) {
+        HeatLayout layout = mapFor(context, widgetId, size, tiles, area);
+        views.setEmptyView(R.id.widget_market_heat_map, R.id.widget_market_heat_empty);
+        if (layout == null) {
             views.setViewVisibility(R.id.widget_market_heat_map, View.GONE);
             views.setViewVisibility(R.id.widget_market_heat_empty, View.VISIBLE);
+            hideSlots(views);
             return;
         }
         views.setViewVisibility(R.id.widget_market_heat_map, View.VISIBLE);
         views.setViewVisibility(R.id.widget_market_heat_empty, View.GONE);
-        views.addView(R.id.widget_market_heat_map, map);
+        views.setPendingIntentTemplate(R.id.widget_market_heat_map, heatIntent(context, widgetId));
+        // intent 必须带上 widgetId 并把自己标成独一无二：多个实例各有一份排版，
+        // data 不区分时系统会认为它们是同一个 adapter，喂错数据
+        Intent intent = new Intent(context, MarketHeatWidgetService.class)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+        intent.setData(Uri.parse(intent.toUri(Intent.URI_INTENT_SCHEME)));
+        views.setRemoteAdapter(R.id.widget_market_heat_map, intent);
+        // 透明点击槽：一格一个，按这一格的像素位置摆上去（点得准靠的是这一层，见 SLOT_COUNT）
+        paintSlots(context, views, widgetId, layout);
+        // 行是现取的：排版换了（数据到了 / 尺寸变了）得让列表重新问一遍
+        manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_market_heat_map);
+    }
+
+    /**
+     * 把透明点击槽摆到每一格上：宽高、位置、点击三样都写。
+     *
+     * 位置只能按 dp 给（{@code setViewLayoutMargin} 收的是浮点 dp），一格差不到一像素；
+     * 这些 API 是 31 才有的，老系统上摆不了 —— 那就全部收起来，点击退回列表那一层
+     * （虽然只精确到行，但不至于点不动）。
+     */
+    private static void paintSlots(Context context, RemoteViews views, int widgetId,
+                                   HeatLayout layout) {
+        // 需要滚动时不摆点击槽：那些槽是一层「能点」的透明板，会把拖动事件一并吃掉，
+        // 底下的列表就再也拖不动了 —— 只能二选一。此时退回列表那一层：点击只精确到行
+        // （见 tile 里的 fillIn），但滚得动；一屏摆得下的时候才用槽，那时本来也不用滚。
+        if (layout.scrollable()) {
+            hideSlots(views);
+            return;
+        }
+        List<HeatSlot> slots = layout.slots();
+        boolean place = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        float density = context.getResources().getDisplayMetrics().density;
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            int id = SLOT_IDS[i];
+            if (!place || i >= slots.size()) {
+                views.setViewVisibility(id, View.GONE);
+                continue;
+            }
+            HeatSlot slot = slots.get(i);
+            views.setViewVisibility(id, View.VISIBLE);
+            views.setViewLayoutMargin(id, RemoteViews.MARGIN_LEFT, slot.left / density,
+                    TypedValue.COMPLEX_UNIT_DIP);
+            views.setViewLayoutMargin(id, RemoteViews.MARGIN_TOP, slot.top / density,
+                    TypedValue.COMPLEX_UNIT_DIP);
+            views.setViewLayoutWidth(id, slot.width / density, TypedValue.COMPLEX_UNIT_DIP);
+            views.setViewLayoutHeight(id, slot.height / density, TypedValue.COMPLEX_UNIT_DIP);
+            views.setOnClickPendingIntent(id, stockIntent(context, slot.row,
+                    widgetId * TILE_CODE_STRIDE + i));
+        }
+    }
+
+    /** 没有马赛克可点时把槽全收起来（不收起就是一层看不见的挡板，点了还乱跳） */
+    private static void hideSlots(RemoteViews views) {
+        for (int id : SLOT_IDS) {
+            views.setViewVisibility(id, View.GONE);
+        }
+    }
+
+    /**
+     * 点某一格：打开行情页并带上这只票。
+     *
+     * requestCode 必须每格一个：Intent 的 extras 不参与 PendingIntent 的相等比较，
+     * 两只票只差 extras、requestCode 再撞上就会被系统复用成同一个 —— 点哪格都是同一只票。
+     */
+    private static PendingIntent stockIntent(Context context, CapRow row, int requestCode) {
+        Intent intent = new Intent(context, MarketActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra(MarketWidgetProvider.EXTRA_SOURCE, QuoteSource.AUTO);
+        intent.putExtra(MarketWidgetProvider.EXTRA_SYMBOL,
+                row.code.isEmpty() ? row.secid : row.code);
+        intent.putExtra(MarketWidgetProvider.EXTRA_NAME, row.name);
+        return PendingIntent.getActivity(context, requestCode, intent, flags());
+    }
+
+    /**
+     * 列表上那个模板 Intent：点任意一格都先走它，标的由格子里的 FillInIntent 补上。
+     *
+     * requestCode 与 {@link #openMarket} 错开：Intent 的 extras 不参与 PendingIntent 的相等比较，
+     * 两者只差 extras 又撞上 requestCode，就会被系统当成同一个复用 —— 谁后创建谁把另一个的
+     * extras 盖掉。错开一格编号，模板就是模板、标题就是标题。
+     *
+     * 必须 MUTABLE：FillInIntent 的 extras 是在发送那一刻合进模板的，IMMUTABLE 的
+     * PendingIntent 不允许被填 —— 那样点格子只会打开行情页的默认视图，带不上这只票。
+     */
+    private static PendingIntent heatIntent(Context context, int widgetId) {
+        Intent intent = new Intent(context, MarketActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(context, TILE_CODE_STRIDE + widgetId, intent,
+                fillInFlags());
     }
 
     /**
@@ -1133,9 +1576,12 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /** 底部说明：面积 / 颜色的含义 + 这个部件实际画了几只（跟着尺寸走，见 {@link #tilesFor}） */
-    private static String legendText(List<CapRow> rows, int tiles) {
+    private static String legendText(List<CapRow> rows, int tiles, boolean scrollable) {
         if (rows == null || rows.isEmpty()) return "";
-        return "面积=市值 · 颜色=涨跌 · 沪深京" + Math.min(tiles, rows.size()) + "强";
+        // 摆得比一屏多时留一句提示：不说的话没人知道这图还能往下翻
+        return scrollable
+                ? "面积=市值 · 颜色=涨跌 · 沪深京" + Math.min(tiles, rows.size()) + " · 上下滑动"
+                : "面积=市值 · 颜色=涨跌 · 沪深京" + Math.min(tiles, rows.size());
     }
 
     private static String emptyText(Context context, List<CapRow> rows) {
@@ -1155,14 +1601,23 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         if (sizes == null) return new int[]{SIZE_FALLBACK_W_DP, SIZE_FALLBACK_H_DP};
         boolean portrait = context.getResources().getConfiguration().orientation
                 != Configuration.ORIENTATION_LANDSCAPE;
-        float w = portrait ? Float.MAX_VALUE : 0f;
-        float h = portrait ? 0f : Float.MAX_VALUE;
+        // 取「当前朝向」那一条的宽高，别把两种朝向的数混着挑：竖屏要最窄的那份宽（占满屏的那条），
+        // 横屏要最宽的那份。高度必须用同一条目的高 —— 早先竖屏宽取最窄、高却取全局最高，
+        // 混进了横屏那条更高的高，竖屏按它摆马赛克就戳出部件（本 bug）。同宽多条（被拉伸过）
+        // 取最矮的那条，保守不超出；常见只放一次（每条朝向各一条）时就是当前尺寸，正好铺满。
+        float bw = portrait ? Float.MAX_VALUE : 0f;
+        float bh = 0f;
         for (float[] size : sizes) {
-            w = portrait ? Math.min(w, size[0]) : Math.max(w, size[0]);
-            h = portrait ? Math.max(h, size[1]) : Math.min(h, size[1]);
+            float w = size[0], h = size[1];
+            if (w <= 0f || h <= 0f) continue;
+            boolean better = portrait ? (w < bw) : (w > bw);
+            if (better || (w == bw && (bh == 0f || h < bh))) {
+                bw = w;
+                bh = h;
+            }
         }
-        return new int[]{w > 0 ? Math.round(w) : SIZE_FALLBACK_W_DP,
-                h > 0 ? Math.round(h) : SIZE_FALLBACK_H_DP};
+        return new int[]{bw > 0f ? Math.round(bw) : SIZE_FALLBACK_W_DP,
+                bh > 0f ? Math.round(bh) : SIZE_FALLBACK_H_DP};
     }
 
     /**
@@ -1172,6 +1627,13 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
      */
     private static float[][] sizeList(Bundle opts) {
         if (opts == null) return null;
+        if (opts != null) {
+            Log.i(TAG, "opts min=" + opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, -1)
+                    + "x" + opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, -1)
+                    + " max=" + opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, -1)
+                    + "x" + opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1)
+                    + " sizes=" + opts.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES));
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             float[][] listed = kept(opts.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES));
             if (listed != null) return listed;
@@ -1207,27 +1669,21 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * 这个尺寸的部件摆几格：可视面积 / {@link #TILE_AREA_DP2}，再夹到 [TILES_MIN, TOP_N]。
-     * 高度用 {@link #listHeightPx} 折回 dp（它已扣掉标题那几行）再扣 {@link #MAP_SAFETY_DP} ——
-     * 摆的时候用的也是这两个数，格子数与摆放面积才对得上。
-     */
-    /**
-     * 画几格：股票数量优先。
+     * 画几格：一屏摆得下的那么多，但不少于 {@link #TILES_WANT}（多出来的滚过去看）。
      *
-     * 格数只由部件大小定（可视面积 ÷ {@link #TILE_AREA_DP2}），再兜一个 {@link #TILES_MIN}
-     * 的下限，不超过 {@link #TOP_N}。不按榜单收尾、也不设「每格至少要多大」的上限 ——
-     * 那是在用股票数量换文字可读，而这个小部件首要的是把盘面摆全。
-     *
-     * 格子因此可能小到摆不下字，这是可以接受的：字号跟着方块大小走（见 {@code tileSp}），
+     * 一屏摆得下几格 = 可见面积 ÷ {@link #TILE_AREA_DP2}（格子大小照旧）；格数再兜一个
+     * {@link #TILES_WANT} 的下限 —— 于是小部件上实际只有一屏那么多，剩下的排在画布下沿之外。
+     * 格子可能小到摆不下字，这是可以接受的：字号跟着方块大小走（见 {@code tileSp}），
      * 小到一定程度就整格只留颜色（见 {@code labelFor} 最后一档）—— 面积与颜色照旧是信息，
      * 格子也照旧能点。
      */
-    private static int tilesFor(Context context, int[] size) {
+    private static int tilesFor(Context context, int[] area) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        float wDp = Math.max(0f, size[0] - HEAT_SIDE_DP - MAP_SAFETY_DP);
-        float hDp = Math.max(0f, listHeightPx(context, size) / metrics.density - MAP_SAFETY_DP);
-        int count = Math.round(wDp * hDp / TILE_AREA_DP2);
-        return Math.max(TILES_MIN, Math.min(TOP_N, count));
+        float wDp = Math.max(0f, area[0] / metrics.density);
+        float hDp = Math.max(0f, area[2] / metrics.density);   // 画布（比可见区域高）
+        int fit = Math.round(wDp * hDp / TILE_AREA_DP2);
+        // 上限是点击槽的个数：每格都得有一个槽，多出来的格子点了没反应，不如不画
+        return Math.max(TILES_WANT, Math.min(Math.min(TOP_N, SLOT_COUNT), fit));
     }
 
     /** 点空白进行情页：这里是一整屏的盘面，不带具体标的，进去看行情页本身 */
@@ -1250,6 +1706,22 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         int value = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             value |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return value;
+    }
+
+    /**
+     * 集合条目模板专用的 flag：要 MUTABLE。
+     *
+     * AppWidget 的点击模型是「列表挂一个模板 PendingIntent，格子挂一个 FillInIntent」，
+     * 两者的 extras 在**发送那一刻**才合并 —— IMMUTABLE 的 PendingIntent 不允许被填，
+     * 合并会被系统丢掉，表现就是点格子只打开一个不带标的的行情页。
+     * 只有这个模板用 MUTABLE，其余（标题、刷新）仍旧 IMMUTABLE。
+     */
+    private static int fillInFlags() {
+        int value = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            value |= PendingIntent.FLAG_MUTABLE;
         }
         return value;
     }

@@ -8,10 +8,16 @@
 
      clipChildren 明写着 true：格子的宽高是写死的像素值，TextView 自己不会把格子撑大，
      但文字画到格子外面去是画得出去的（ViewGroup 只是默认裁，宿主改了就不裁）。
-     写上它，「字绝不跑到旁边的色块上」就是结构性的保证，不依赖字号算得准不准。 -->
+     写上它，「字绝不跑到旁边的色块上」就是结构性的保证，不依赖字号算得准不准。
+
+     baselineAligned 必须关掉：同一行里每片格子的字号各自按面积算（见 Provider 的 tileSp），
+     字号不同则基线位置不同，LinearLayout 默认要把它们的基线对齐 —— 于是被量出来的是
+     「最高 ascent + 最高 descent」而不是最高那片格子，这一行就比算给它的高度厚出几像素，
+     层层累积正是「马赛克合不严」的来源。关掉之后一行多高就是最高那片格子多高。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_market_heat_row"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:baselineAligned="false"
     android:clipChildren="true"
     android:orientation="horizontal" />

@@ -102,7 +102,10 @@ public final class MarketSparkline {
         }
 
         float stroke = 1.4f * density;
-        float dot = 2.6f * density;
+        // 末点那个圆点：只比线宽粗一倍多点 —— 它只是曲线的一个句号，再大就从图上跳出来，
+        // 把「末点在哪」变成这幅图最显眼的东西。外缘看着那么大头的其实是那圈底色描边，
+        // 描边也只比圆点宽一丝（见下面 halo）。
+        float dot = 1.5f * density;
         float padX = Math.max(1f, stroke);
         float padTop = dot + stroke + 1f;
         float padBottom = dot + stroke + 1f;
@@ -165,10 +168,12 @@ public final class MarketSparkline {
 
         // 最新价：实心圆点 + 一圈底色描边，把末点从渐变里拎出来
         float lastY = padTop + (max - last) / span * usableH;
+        // 描边只比圆点宽一丝：够隔开下面的渐变填充就行，再宽就成了「一个大圈套个小点」
+        float halo = dot + 0.6f * density;
         Paint haloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         haloPaint.setStyle(Paint.Style.FILL);
         haloPaint.setColor(haloColor);
-        canvas.drawCircle(lastX, lastY, dot + 1.5f * density, haloPaint);
+        canvas.drawCircle(lastX, lastY, halo, haloPaint);
         Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         dotPaint.setStyle(Paint.Style.FILL);
         dotPaint.setColor(lineColor);

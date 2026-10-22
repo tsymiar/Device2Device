@@ -29,7 +29,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
-    <application android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="@string/app_name" android:roundIcon="@drawable/ic_launcher" android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true" tools:ignore="AllowBackup,GoogleAppIndexingWarning">
+    <application android:name=".MarketWidgetApp" android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="@string/app_name" android:roundIcon="@drawable/ic_launcher" android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true" android:theme="@style/AppTheme" android:requestLegacyExternalStorage="true" tools:ignore="AllowBackup,GoogleAppIndexingWarning">
 
         <activity android:name=".activity.MainActivity" android:exported="true"
             tools:ignore="MissingClass">
@@ -81,6 +81,13 @@
              BIND_REMOTEVIEWS 权限保证只有桌面能绑定它 -->
         <service
             android:name=".widget.MarketWidgetService"
+            android:exported="true"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 行情热力图的数据源：马赛克的顶层是「一行行横排」的几行，一行一个条目，
+             摆不下的那些行滚过去才看得见（见 MarketHeatWidgetService） -->
+        <service
+            android:name=".widget.MarketHeatWidgetService"
             android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 

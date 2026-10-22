@@ -35,25 +35,27 @@
         <!-- 只放图标：见 widget_market_heat.xml 里的同款说明 -->
         <ImageView
             android:id="@+id/widget_refresh"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="2dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:paddingStart="5dp"
+            android:paddingEnd="1dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
             android:contentDescription="@string/market_widget_refresh"
             android:src="@drawable/ic_refresh"
             android:tint="@color/market_widget_text_dim" />
 
         <!-- 取数时在图标原位换成转圈，与 ChatBox「思考中…」那个 ProgressBar 同一套路：
-             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响 -->
+             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响。
+             尺寸跟着静态图标走（16dp），换位时大小别跳 -->
         <ProgressBar
             android:id="@+id/widget_refresh_spin"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
             android:layout_marginStart="2dp"
             android:layout_marginEnd="2dp"
-            android:indeterminateTint="@color/market_widget_text_dim"
+            android:indeterminate="true"
+            android:indeterminateDrawable="@drawable/progress_spin"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -84,11 +86,13 @@
         android:textSize="10sp"
         android:visibility="gone" />
 
+    <!-- 取数时间：沉到部件右下角，与热力图 / 曲线两个部件同一处（都只有时分，不带「更新」二字） -->
     <TextView
         android:id="@+id/widget_meta"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
+        android:gravity="end"
         android:maxLines="1"
         android:text="@string/market_widget_loading"
         android:textColor="@color/market_widget_text_hint"

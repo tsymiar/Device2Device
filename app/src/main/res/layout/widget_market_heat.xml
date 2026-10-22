@@ -3,12 +3,13 @@
      （一棵排版树铺成的 treemap，每个格子一只股票，面积=市值、颜色=涨跌幅）→ 底部一行图例。
 
      与列表版 widget_market_list.xml 同一个套路，区别只在主体的马赛克区域：
-     - 排版在 MarketTreemap 里算好一棵树，这里按树用 addView 铺成嵌套的
-       LinearLayout + TextView（见 widget_market_heat_row / widget_market_heat_col / widget_market_heat_tile）；
+     - 排版在 MarketTreemap 里算好一棵树，顶层是「一行行横排」的几行，每行由
+       MarketHeatWidgetService 铺成嵌套的 LinearLayout + TextView
+       （见 widget_market_heat_row / widget_market_heat_col / widget_market_heat_tile）；
      - 格子宽高用 setInt(id, "setWidth" / "setHeight", px) 逐个设，于是「面积 = 市值」
-       落在真实的 View 上，每一格可各自绑定点击进入行情页（位图无法实现逐格点击）；
-     - 不需要滚动容器：各格面积之和等于马赛克区域，treemap 天然摆得下整份榜单，
-       省掉了 AdapterView 的回调，也不用 RemoteViewsService；
+       落在真实的 View 上，每一格可各自点击进入行情页（位图无法实现逐格点击；
+       列表条目里的点击走 setPendingIntentTemplate + setOnClickFillInIntent）；
+     - 摆 50 格、比一屏摆得下的多：画布比可见区域高，高出来的那些行滚过去才看得见；
      - 主体 0dp + weight 1 吃掉剩余空间；没数据时空态占位顶上。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -58,44 +59,359 @@
              文字挪到 contentDescription，无障碍朗读照旧 -->
         <ImageView
             android:id="@+id/widget_refresh"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="2dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:paddingStart="5dp"
+            android:paddingEnd="1dp"
+            android:paddingTop="1dp"
+            android:paddingBottom="1dp"
             android:contentDescription="@string/market_widget_refresh"
             android:src="@drawable/ic_refresh"
             android:tint="@color/market_widget_text_dim" />
 
         <!-- 取数时在图标原位换成转圈，与 ChatBox「思考中…」那个 ProgressBar 同一套路：
-             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响 -->
+             由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响。
+             尺寸跟着静态图标走（16dp），换位时大小别跳 -->
         <ProgressBar
             android:id="@+id/widget_refresh_spin"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
             android:layout_marginStart="2dp"
             android:layout_marginEnd="2dp"
-            android:indeterminateTint="@color/market_widget_text_dim"
+            android:indeterminate="true"
+            android:indeterminateDrawable="@drawable/progress_spin"
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 热力图主体：一整片马赛克，由 Provider 按排版树用 addView 一层层铺进来
-         （排版见 MarketTreemap，格子的宽高用 setInt(id, "setWidth"/"setHeight", px) 逐个设）。
-         每一刀都按市值分账，所以铺出来的格子面积之和就等于马赛克区域 —— 既不超出边框，
-         也不需要滚动：面积比例这一份信息整个摆得进来，用不着把一部分藏到屏幕外边。
-         主体按 0dp + weight 吃掉剩余空间，Provider 那边拿 {@code MAP_SAFETY_DP} 往里收一点再摆，
-         以免格子（宽高为固定像素值）遮挡下图例 -->
-    <LinearLayout
-        android:id="@+id/widget_market_heat_map"
+    <!-- 热力图主体：一摞「行」—— treemap 的顶层就是一行行横排的（见 MarketTreemap.layout 的
+         topRows），每行由 MarketHeatWidgetService 逐行喂进来。
+         外面套一层 FrameLayout 是为了在上面再叠一版「透明点击槽」：集合小部件里，点击只认
+         直接挂在 AppWidgetHostView 下的那一层，格子里（嵌套 RemoteViews）挂 PendingIntent 无效、
+         填 fillIn 又只认条目里第一个 —— 只有把点击槽放进根布局才点得准。 -->
+    <FrameLayout
+        android:id="@+id/widget_market_heat_frame"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="3dp"
         android:layout_marginBottom="2dp"
         android:layout_weight="1"
-        android:clipChildren="true"
-        android:gravity="center"
-        android:orientation="vertical" />
+        android:clipChildren="true">
+
+        <ListView
+            android:id="@+id/widget_market_heat_map"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="true"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="0dp"
+            android:listSelector="@android:color/transparent"
+            android:scrollbars="none" />
+
+        <!-- 一格一个，按格子的像素位置摆好（见 MarketHeatWidgetProvider#paintSlots）；
+             平时全是 0dp 且 gone，只有用到的那些会被设上宽高、位置与点击。
+             直接挂在这一层（与列表同级）：多套一层容器 MIUI 的部件工厂会认不出来
+             （整块部件显示「载入窗口小部件时出现问题」） -->
+        <TextView
+            android:id="@+id/heat_slot_0"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_1"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_2"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_3"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_4"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_5"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_6"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_7"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_8"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_9"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_10"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_11"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_12"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_13"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_14"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_15"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_16"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_17"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_18"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_19"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_20"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_21"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_22"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_23"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_24"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_25"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_26"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_27"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_28"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_29"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_30"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_31"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_32"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_33"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_34"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_35"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_36"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_37"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_38"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_39"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_40"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_41"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_42"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_43"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_44"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_45"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_46"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_47"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_48"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_49"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_50"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_51"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_52"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_53"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_54"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_55"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_56"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_57"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_58"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/heat_slot_59"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <!-- 列表为空（还没取到数据 / 榜单取空）时的占位：setEmptyView 挂在列表上 -->
     <TextView

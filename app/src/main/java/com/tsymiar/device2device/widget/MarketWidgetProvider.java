@@ -251,20 +251,48 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);      // 系统广播（APPWIDGET_UPDATE 等）按默认分发
-        if (intent == null || !ACTION_REFRESH.equals(intent.getAction())) return;
+        if (intent == null) return;
+        if (ACTION_REFRESH.equals(intent.getAction())) {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID);
+            int[] ids;
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                ids = new int[]{id};
+            } else {
+                ids = manager.getAppWidgetIds(
+                        new ComponentName(context, MarketWidgetProvider.class));
+            }
+            for (int widgetId : ids) {
+                WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_list);
+            }
+            onUpdate(context, manager, ids);
+            return;
+        }
+        // 深浅模式切换：行里的文字颜色是更新那一刻写死的，不重画就停在旧配色上。
+        // 这个广播只投递给运行时注册的接收器（见 MarketWidgetApp），manifest 里收不到
+        if (Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())) {
+            repaintAll(context);
+        }
+    }
+
+    /** 把所有实例按当前配置重画（数据走缓存，不联网） */
+    public static void repaintAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
-                AppWidgetManager.INVALID_APPWIDGET_ID);
-        int[] ids;
-        if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            ids = new int[]{id};
-        } else {
-            ids = manager.getAppWidgetIds(new ComponentName(context, MarketWidgetProvider.class));
-        }
+        int[] ids = manager.getAppWidgetIds(
+                new ComponentName(context, MarketWidgetProvider.class));
+        if (ids == null || ids.length == 0) return;
         for (int widgetId : ids) {
-            WidgetSpin.spin(context, manager, widgetId, R.layout.widget_market_list);
+            try {
+                manager.updateAppWidget(widgetId,
+                        baseViews(context, widgetId, readItems(context, widgetId),
+                                context.getString(R.string.market_widget_loading)));
+                // 行也是 RemoteViews 里写死的颜色，让数据源按新配置重铺一遍
+                manager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_list);
+            } catch (Throwable t) {
+                Log.w(TAG, "list widget repaint failed", t);
+            }
         }
-        onUpdate(context, manager, ids);
     }
 
     @Override
@@ -661,8 +689,9 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         return String.format(Locale.US, "%." + decimals + "f", price);
     }
 
+    /** 取数时间：只给时分，不再加「更新」二字（三个行情小部件放的都是右下角那一格） */
     static String now() {
-        return new SimpleDateFormat("更新 HH:mm", Locale.getDefault()).format(new Date());
+        return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
     }
 
     /** 多个小部件一起刷新时，等最后一个回来再结束广播；超时兜底 force() */

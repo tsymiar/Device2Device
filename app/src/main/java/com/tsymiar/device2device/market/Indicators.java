@@ -166,6 +166,38 @@ public final class Indicators {
         return new Kdj(kOut, dOut, jOut);
     }
 
+    /**
+     * 神奇九转（TD 序列简化版）：以「收盘价相对 4 根前的高低」为递推条件。
+     *  - buy[i]：close[i] < close[i-4] 的连续计数（1..9），第 9 根即「买入九转」信号（底）；
+     *  - sell[i]：close[i] > close[i-4] 的连续计数（1..9），第 9 根即「卖出九转」信号（顶）。
+     * 条件中断（含相等）计数归零；计数封顶 9 便于绘制，真正的信号只看第 9 根。
+     */
+    public static final class NineTurns {
+        public final int[] buy;   // 买入九转计数，0 表示无
+        public final int[] sell;  // 卖出九转计数，0 表示无
+        NineTurns(int[] buy, int[] sell) {
+            this.buy = buy;
+            this.sell = sell;
+        }
+    }
+
+    public static NineTurns nineTurns(float[] closes) {
+        int n = closes.length;
+        int[] buy = new int[n];
+        int[] sell = new int[n];
+        int bc = 0, sc = 0;
+        for (int i = 0; i < n; i++) {
+            if (i >= 4) {
+                if (closes[i] < closes[i - 4]) { bc = Math.min(bc + 1, 9); sc = 0; }
+                else if (closes[i] > closes[i - 4]) { sc = Math.min(sc + 1, 9); bc = 0; }
+                else { bc = 0; sc = 0; }
+            }
+            buy[i] = bc;
+            sell[i] = sc;
+        }
+        return new NineTurns(buy, sell);
+    }
+
     private static void fillNaN(float[] values) {
         for (int i = 0; i < values.length; i++) values[i] = Float.NaN;
     }

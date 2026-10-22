@@ -64,6 +64,7 @@
     <!-- 详情小窗文字：日间的小窗底仍是深色，文字必须取浅色，不能复用页面正文色（深灰压深底看不清） -->
     <color name="market_tooltip_text">#FFF9FAFB</color>
     <color name="market_tooltip_text_dim">#FFCBD5E1</color>
+    <color name="market_rebound">#FFC2185B</color>
 
     <!-- ===== 局域网消息对话框（浅色卡片） =====
          主色沿用 colorPrimary 的青绿；自己发的用蓝、对方来的用青绿，
@@ -103,4 +104,10 @@
     <color name="market_widget_text">#FF111827</color>
     <color name="market_widget_text_dim">#FF5B6675</color>
     <color name="market_widget_text_hint">#FF8A94A6</color>
+    <!-- 通用输入框（KCP 等）：随深浅模式切换底色与文字，保证对比度 -->
+    <color name="edit_bg">#F2F3F5</color>
+    <color name="edit_text">#212121</color>
+    <!-- 聊天输入卡片：日间白卡细边，夜间深卡深边（文字色见 dialog_text_primary） -->
+    <color name="chat_card">#FFFFFFFF</color>
+    <color name="chat_card_stroke">#FFE8E8E8</color>
 </resources>

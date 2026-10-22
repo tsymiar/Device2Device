@@ -29,7 +29,7 @@ public final class MarketPalette {
     public final int accent;          // 主按钮（青绿）
     public final int accentPressed;
     public final int onAccent;        // 主按钮上的文字
-    public final int on;              // 自动刷新「开」
+    public final int on;              // 自动更新「开」
     public final int onPressed;
     public final int onText;          // 橙底上的文字
 
@@ -50,6 +50,7 @@ public final class MarketPalette {
     public final int tooltipStroke;
     public final int tooltipText;     // 浮窗里的正文（浮窗底始终是深色，跟页面正文色分开取）
     public final int tooltipTextDim;  // 浮窗里的次级文字（时间那行）
+    public final int rebound;         // 反弹信号
 
     private MarketPalette(Context c, boolean night) {
         this.night = night;
@@ -84,6 +85,7 @@ public final class MarketPalette {
         tooltipStroke = color(c, R.color.market_tooltip_stroke);
         tooltipText = color(c, R.color.market_tooltip_text);
         tooltipTextDim = color(c, R.color.market_tooltip_text_dim);
+        rebound = color(c, R.color.market_rebound);
     }
 
     /** 按当前系统深浅模式取配色 */
