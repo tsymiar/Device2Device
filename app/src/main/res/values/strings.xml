@@ -57,7 +57,7 @@
     <string name="file_msg_clear">清空</string>
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
-    <string name="section_files">💬 Services</string>
+    <string name="section_files">🛰 Services</string>
     <string name="section_game">🎮 Games</string>
     <string name="market_quote">📈 行情 K线 · Market</string>
     <string name="market_widget_label">📈 行情列表</string>
@@ -173,7 +173,7 @@
     <string name="kcp_listen">KCP 监听 0.0.0.0:%1$d（本机 %2$s）</string>
     <string name="kcp_target_empty">先填对端 IP</string>
     <string name="group_kcp">KCP</string>
-    <string name="group_discover">discovery</string>
+    <string name="group_discover">detect</string>
     <string name="discover_btn">discover</string>
     <string name="discover_end">end</string>
     <string name="discover_empty">未发现设备</string>
@@ -234,11 +234,15 @@
     <string name="http_copy_done">访问地址已复制：\n%1$s</string>
 
     <!-- ===== LAN Text Messenger ===== -->
-    <string name="lan_msg">💬 局域网消息</string>
-    <string name="lan_msg_title">💬 局域网消息 · LAN Messenger</string>
+    <string name="lan_msg">📡 局域网消息</string>
+    <string name="lan_msg_title">📡 局域网消息 · LAN Messenger</string>
     <string name="lan_msg_name_hint">本机名</string>
     <string name="lan_msg_default_name">Android</string>
     <string name="lan_msg_port">39001</string>
+    <string name="lan_discovery_addr_hint" translatable="false">发现地址(可空/224.224.224.224)</string>
+    <string name="lan_discovery_port_hint" translatable="false">发现端口</string>
+    <string name="lan_discovery_addr_default" translatable="false">224.224.224.224</string>
+    <string name="lan_discovery_port_default" translatable="false">39000</string>
     <string name="lan_msg_start">▶ 启动收发</string>
     <string name="lan_msg_stop">⏹ 停止</string>
     <string name="lan_msg_discover">🔍 发现设备</string>
