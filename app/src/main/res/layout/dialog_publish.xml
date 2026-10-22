@@ -31,7 +31,6 @@
         android:maxLines="1"
         android:minHeight="48dp"
         android:selectAllOnFocus="true"
-        android:text="@string/pub_payload"
         android:textColor="@color/dialog_text_primary"
         android:textColorHint="@color/dialog_text_secondary"
         app:layout_constraintEnd_toEndOf="parent"

@@ -27,7 +27,7 @@ JNIEXPORT jstring CPP_FUNC_CALL(stringGetJNI)(JNIEnv *env, jobject clazz);
 JNIEXPORT jobject CPP_FUNC_CALL(getMessage)(JNIEnv *env, jobject , jobject clazz);
 JNIEXPORT jlong CPP_FUNC_CALL(timeSetJNI)(JNIEnv *env, jobject clazz, jbyteArray time, jint len);
 JNIEXPORT jint CPP_FUNC_CALL(StartSubscribe)(JNIEnv *env, jclass clazz, jstring addr, jint port, jstring topic, jstring viewId, jint id);
-JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass clazz, jstring topic, jstring message, jstring addr = (jstring) "", jint port = 0);
+JNIEXPORT void CPP_FUNC_CALL(Publish)(JNIEnv *env, jclass clazz, jstring topic, jstring message, jstring addr, jint port, jstring target);
 JNIEXPORT void CPP_FUNC_CALL(QuitSubscribe)(JNIEnv *, jclass clazz);
 
 JNIEXPORT void
@@ -87,6 +87,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanMessage)(JNIEnv*, jclass, jstring
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanImage)(JNIEnv*, jclass, jstring ip, jint port, jstring base64);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(refreshLanPeers)(JNIEnv*, jclass);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryPort)(JNIEnv*, jclass, jint port);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryAddress)(JNIEnv*, jclass, jstring address);
 #ifdef __cplusplus
 }
 #endif

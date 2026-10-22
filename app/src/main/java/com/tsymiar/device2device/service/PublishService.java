@@ -38,6 +38,9 @@ public class PublishService extends Service {
         super.onCreate();
         windowManager = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
         layoutInflater = LayoutInflater.from(this);
+        // 发布窗口没有地址 / 端口两格，broker 用的是订阅窗口存下的那份；
+        // 进程重启后也得能把它们读回来，否则「先发布」这条路根本不知道连哪儿
+        PubSubSetting.load(this);
     }
 
     @SuppressLint({"InflateParams", "RtlHardcoded"})
@@ -76,6 +79,13 @@ public class PublishService extends Service {
         editTopic = floatView.findViewById(R.id.edit_pub_topic);
         editPayload = floatView.findViewById(R.id.edit_payload);
         editTarget = floatView.findViewById(R.id.edit_pub_target);
+        // 按上次的值填回去（正文不预填：发出去的该是这次要发的东西，不是上次那句）
+        if (!PubSubSetting.getTopic().isEmpty() && editTopic != null) {
+            editTopic.setText(PubSubSetting.getTopic());
+        }
+        if (!PubSubSetting.getTarget().isEmpty() && editTarget != null) {
+            editTarget.setText(PubSubSetting.getTarget());
+        }
 
         floatView.findViewById(R.id.btn_pub_finish).setOnClickListener(v -> closeWindow());
         floatView.findViewById(R.id.btn_pub_confirm).setOnClickListener(
@@ -87,6 +97,7 @@ public class PublishService extends Service {
                     // 一对一目标：对端设备 IP 或其订阅端 id，留空则按 topic 广播
                     if (editTarget != null)
                         PubSubSetting.setTarget(editTarget.getText().toString());
+                    PubSubSetting.save(PublishService.this);
                     Intent data = new Intent();
                     data.putExtra("Publish", "SUCCESS");
                     data.setAction(BROADCAST_ACTION);

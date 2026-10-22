@@ -92,21 +92,9 @@ public class SubscribeService extends Service {
         super.onCreate();
         windowManager = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
         layoutInflater = LayoutInflater.from(this);
-        connecting = true;
-        new Thread(() -> {
-            int index = 0;
-            while (connecting) {
-                index++;
-                if (callback != null) {
-                    callback.onDataChange(index + " " + TAG);
-                }
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
+        // 上次填的 broker 地址 / 端口 / topic 先读回来：两个窗口都是悬浮窗，
+        // 值只存在内存里的话，进程一退就得从头再敲一遍
+        PubSubSetting.load(this);
     }
 
     public static class FloatingOnTouchListener implements View.OnTouchListener {
@@ -189,8 +177,16 @@ public class SubscribeService extends Service {
         EditText editAddr = floatView.findViewById(R.id.edit_addr);
         EditText editPort = floatView.findViewById(R.id.edit_port);
         EditText editTopic = floatView.findViewById(R.id.edit_topic);
+        // 三格都按上次的值填回去（空着才留布局里的示例）：只填地址时，
+        // 端口那格留着示例串、topic 那格留着「Topic」，确认后解析不出来 —— 连接就停在这儿
         if (!PubSubSetting.getAddr().isEmpty() && editAddr != null) {
             editAddr.setText(PubSubSetting.getAddr());
+        }
+        if (editPort != null) {
+            editPort.setText(String.valueOf(PubSubSetting.getPort()));
+        }
+        if (!PubSubSetting.getTopic().isEmpty() && editTopic != null) {
+            editTopic.setText(PubSubSetting.getTopic());
         }
         floatView.findViewById(R.id.btn_confirm).setOnClickListener(
                 v -> {
@@ -205,6 +201,7 @@ public class SubscribeService extends Service {
                     }
                     if (editTopic != null)
                         PubSubSetting.setTopic(editTopic.getText().toString());
+                    PubSubSetting.save(SubscribeService.this);
                     Intent data = new Intent();
                     data.setAction(BROADCAST_ACTION);
                     data.putExtra("Subscribe", "SUCCESS");
@@ -222,6 +219,7 @@ public class SubscribeService extends Service {
                             PubSubSetting.setPort(9999);
                         }
                     }
+                    PubSubSetting.save(SubscribeService.this);
                     removeFloatView();
                 }
         );

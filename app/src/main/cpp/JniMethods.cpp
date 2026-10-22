@@ -185,12 +185,28 @@ static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RE
  */
 static bool parseTopicHex(const std::string& hex, uint32_t& topic)
 {
-    if (hex.empty()) {
+    // 先去首尾空白：悬浮窗里粘贴过来的值常带空格
+    const size_t begin = hex.find_first_not_of(" \t\r\n");
+    if (begin == std::string::npos) {
         return false;
     }
+    const size_t last = hex.find_last_not_of(" \t\r\n");
+    std::string text = hex.substr(begin, last - begin + 1);
+
+    // 认 0x / 0X 前缀：界面上的默认值就是「0x1234」，而 strtol(…, 16) 只吃掉前导的那个 0、
+    // 从 'x' 处停下 —— 整串于是被解析成 0，订阅与发布双双落在 topic 0 上，
+    // 换成手打的「1234」又变成 0x1234，两边对不上，看着就是「连上了但收不到」。
+    if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
+        text = text.substr(2);
+    }
+    if (text.empty()) {
+        return false;
+    }
+
     char* end = nullptr;
-    const long value = strtol(hex.c_str(), &end, 16);
-    if (end == hex.c_str() || value < 0 || value > 0xFFFFFFFFL) {
+    const long value = strtol(text.c_str(), &end, 16);
+    // 整串都必须是十六进制数字：以前「12zz」会被当成 0x12 悄悄订上去
+    if (end == text.c_str() || *end != '\0' || value < 0 || value > 0xFFFFFFFFL) {
         return false;
     }
     topic = static_cast<uint32_t>(value);
@@ -1039,6 +1055,13 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryPort)(JNIEnv*, jclass, ji
     // 发现与收发各占一个端口：收发是 39001 的 KCP 会话，发现是 39000 的广播，
     // 两者互不相干，改发现端口不会动到收发
     LanMessenger::instance().setDiscoveryPort(port);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setLanDiscoveryAddress)(JNIEnv* env, jclass, jstring address)
+{
+    std::lock_guard<std::mutex> lock(g_lanMutex);
+    std::string addr = Jstring2Cstring(env, address);
+    LanMessenger::instance().setDiscoveryAddress(addr);
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanMessage)(JNIEnv* env, jclass,
