@@ -67,6 +67,7 @@ public class FileMsgDialog extends DialogFragment {
     private final SimpleDateFormat logTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     private Button btnSelect, btnStartServer, btnConnect, btnSendFile, btnDisconnect;
     private View clientPanel;
+    private View btnClose;
 
     private boolean isServerStarted = false;
     private boolean isConnected = false;
@@ -208,10 +209,12 @@ public class FileMsgDialog extends DialogFragment {
         btnSendFile = dialog.findViewById(R.id.btn_file_trans_send);
         btnDisconnect = dialog.findViewById(R.id.btn_file_trans_disconnect);
         clientPanel = dialog.findViewById(R.id.client_panel);
+        btnClose = dialog.findViewById(R.id.btn_file_trans_close);
     }
 
     @SuppressLint({"SetTextI18n", "DefaultLocale"})
     private void initListeners(Dialog dialog) {
+        if (btnClose != null) btnClose.setOnClickListener(v -> dismiss());
         btnSelect.setOnClickListener(v -> checkPermissionAndOpenPicker());
 
         btnStartServer.setOnClickListener(v -> {
@@ -301,7 +304,7 @@ public class FileMsgDialog extends DialogFragment {
         return (ip == null || ip.isEmpty()) ? "127.0.0.1" : ip;
     }
 
-    /** 端口输入框可能为空 / 非法：别让 NumberFormatException 把对话框崩掉，记一行日志 */
+    /** 端口输入框可能为空或非法：需避免 NumberFormatException 导致对话框崩溃，并记录一行日志 */
     private int readPort() {
         if (etPort == null) return -1;
         String text = etPort.getText() == null ? "" : etPort.getText().toString().trim();
@@ -318,10 +321,7 @@ public class FileMsgDialog extends DialogFragment {
         }
     }
 
-    // ------------------------------------------------------------------
-    // 日志：带时间戳、可滚动回溯
-    // ------------------------------------------------------------------
-
+    // ===== 日志：带时间戳、可滚动回溯 =====
     /** 追加一行日志；可在任意线程调用，内部切回主线程 */
     private void appendLog(String message) {
         if (tvLog == null || message == null) return;
@@ -334,7 +334,7 @@ public class FileMsgDialog extends DialogFragment {
 
         Runnable append = () -> {
             if (tvLog == null) return;
-            // 用户翻上去看历史时别把他拽回底部：只有本来就在底部才自动跟随
+            // 用户上翻查看历史时不应将其拉回底部：仅当本就位于底部时才自动跟随
             boolean follow = isLogAtBottom();
             logLines.addLast(line);
             while (logLines.size() > MAX_LOG_LINES) {
@@ -428,7 +428,6 @@ public class FileMsgDialog extends DialogFragment {
             ContentResolver resolver = getContext().getContentResolver();
             String fileName = null;
 
-            // 尝试获取文件名
             String[] projection = {"_display_name"};
             try (android.database.Cursor cursor = resolver.query(uri, projection, null, null, null)) {
                 if (cursor != null && cursor.moveToFirst()) {
@@ -443,7 +442,6 @@ public class FileMsgDialog extends DialogFragment {
                 fileName = "temp_file_" + System.currentTimeMillis();
             }
 
-            // 复制到 app 私有目录
             File cacheDir = getContext().getCacheDir();
             File tempFile = new File(cacheDir, fileName);
 

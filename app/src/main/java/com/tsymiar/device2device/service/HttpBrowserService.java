@@ -1328,7 +1328,7 @@ public class HttpBrowserService {
 
     /** 构建 HTML 尾部（totalCount 为目录全量子项数；pagerHtml 为分页条，单页时传空串保持原观感） */
     private String buildHtmlFoot(int totalCount, String pagerHtml) {
-        // 列头排序已改为服务端全局排序（见 sortHeaderLink / parseSortKey），此处不再放置页内排序脚本
+        // 列头排序走服务端全局排序（见 sortHeaderLink / parseSortKey），此处不需要页内排序脚本
         // 勾选打包：行内复选框联动全选、计数与 zip 按钮；打包请求带 zip=name 可重复参数
         String selectionScript =
                 "<script>"
@@ -2006,7 +2006,7 @@ public class HttpBrowserService {
 
     /**
      * 大文件（&gt;10MB）流式发送：256KB 缓冲循环拷贝。
-     * 相比原先 64KB，可显著减少 read/write 系统调用与 ContentProvider IPC 往返次数。
+     * 缓冲取大一点，可显著减少 read/write 系统调用与 ContentProvider IPC 往返次数。
      * 响应始终携带 Content-Length，keepAlive 时连接可继续复用。
      */
     private static void streamLargeFile(OutputStream os, InputStream is,

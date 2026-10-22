@@ -116,6 +116,10 @@ public class LanMsgDialog extends Dialog {
     /** 这次停是"退到后台超时"自动停的；回到前台据此恢复，用户自己点的「停止」不该被拉起来 */
     private boolean mAutoStopped = false;
     private int mPort = 39001;
+    /** 发现广播地址/端口（与收发 KCP 端口 39001 分开；默认广播 255.255.255.255 + 端口 39000） */
+    private EditText etDiscoveryAddr;
+    private EditText etDiscoveryPort;
+    private int mDiscoveryPort = 39000;
     /** 消息区最多保留的条数，长聊也不会把内存撑大 */
     private static final int MAX_CHAT_LINES = 300;
 
@@ -178,6 +182,8 @@ public class LanMsgDialog extends Dialog {
     private void bindViews() {
         etName = findViewById(R.id.et_lan_name);
         etPort = findViewById(R.id.et_lan_port);
+        etDiscoveryAddr = findViewById(R.id.et_lan_discovery_addr);
+        etDiscoveryPort = findViewById(R.id.et_lan_discovery_port);
         btnStart = findViewById(R.id.btn_lan_start);
         btnRefresh = findViewById(R.id.btn_lan_refresh);
         vDot = findViewById(R.id.v_lan_dot);
@@ -421,6 +427,18 @@ public class LanMsgDialog extends Dialog {
         if (name.isEmpty()) {
             name = getContext().getString(R.string.lan_msg_default_name);
         }
+        // 发现在 start 之前设到单例上（start 里才会真正 open 发现 socket）：
+        // 地址空 = 走广播；填 224.224.224.224 等组播/单播地址则额外发一份并加入组播组
+        String discAddr = etDiscoveryAddr != null && etDiscoveryAddr.getText() != null
+                ? etDiscoveryAddr.getText().toString().trim() : "";
+        int discPort = readDiscoveryPort();
+        if (discPort > 0) {
+            mDiscoveryPort = discPort;
+            NetworkWrapper.setLanDiscoveryPort(discPort);
+        }
+        if (!discAddr.isEmpty()) {
+            NetworkWrapper.setLanDiscoveryAddress(discAddr);
+        }
         acquireMulticastLock();
         int ret = NetworkWrapper.startLanMessenger(name, Utils.getLocalWifiIp(getContext()), port);
         if (ret < 0) {
@@ -440,6 +458,8 @@ public class LanMsgDialog extends Dialog {
         if (etPort != null) {
             etPort.setEnabled(false);
         }
+        if (etDiscoveryAddr != null) etDiscoveryAddr.setEnabled(false);
+        if (etDiscoveryPort != null) etDiscoveryPort.setEnabled(false);
         if (etName != null) {
             // 名称于启动时传递给对端，中途修改不会同步，因此启动后即锁定，以免误认为已生效
             etName.setEnabled(false);
@@ -486,6 +506,8 @@ public class LanMsgDialog extends Dialog {
         if (etPort != null) {
             etPort.setEnabled(true);
         }
+        if (etDiscoveryAddr != null) etDiscoveryAddr.setEnabled(true);
+        if (etDiscoveryPort != null) etDiscoveryPort.setEnabled(true);
         if (etName != null) {
             etName.setEnabled(true);
         }
@@ -504,6 +526,16 @@ public class LanMsgDialog extends Dialog {
                 }
             });
         }, "lan-msg-stop").start();
+    }
+
+    private int readDiscoveryPort() {
+        if (etDiscoveryPort == null || etDiscoveryPort.getText() == null) return -1;
+        try {
+            int port = Integer.parseInt(etDiscoveryPort.getText().toString().trim());
+            return (port > 0 && port <= 65535) ? port : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private int readPort() {

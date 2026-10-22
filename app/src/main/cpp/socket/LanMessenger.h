@@ -147,6 +147,9 @@ public:
      * 那个因端口被占而失败。只影响本机：发现靠双方用同一个端口喊话，对端仍须用默认值。
      */
     void setDiscoveryPort(int port);
+    /** 发现广播目标地址：默认 255.255.255.255（广播）。填 224.224.224.224 等组播地址，
+     *  或任意单播地址，announce 会额外发一份过去；组播地址还会让发现 socket 加入该组以接收 */
+    void setDiscoveryAddress(const std::string& addr);
     /** Announce once more right away and re-push the whole peer table (the Java side clears
         first, then adds entries one by one) */
     void refresh();
@@ -237,6 +240,8 @@ private:
     std::string m_selfId;
     int m_port{ LAN_CHAT_PORT };
     int m_discoveryPort{ LAN_DISCOVERY_PORT };
+    /** 发现广播目标地址；空或 255.255.255.255 走广播，其它地址 announce 会额外发一份 */
+    std::string m_discoveryAddress{ "255.255.255.255" };
 
     /** UDP socket used for discovery: announcing and receiving, reusing UdpSocket */
     UdpSocket m_discovery;

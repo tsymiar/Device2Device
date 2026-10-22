@@ -135,6 +135,11 @@ void LanMessenger::setDiscoveryPort(int port)
     m_discoveryPort = (port > 0) ? port : LAN_DISCOVERY_PORT;
 }
 
+void LanMessenger::setDiscoveryAddress(const std::string& addr)
+{
+    m_discoveryAddress = addr.empty() ? "255.255.255.255" : addr;
+}
+
 LanMessenger::~LanMessenger()
 {
     stop();
@@ -145,6 +150,8 @@ LanMessenger& LanMessenger::instance()
     static LanMessenger self;
     return self;
 }
+
+static bool isMulticast(const std::string& addr);
 
 int LanMessenger::start(const std::string& name, const std::string& selfIp, int port)
 {
@@ -164,6 +171,9 @@ int LanMessenger::start(const std::string& name, const std::string& selfIp, int 
     // blocking in recvfrom for a full timeout
     m_discovery.setPort(m_discoveryPort);
     m_discovery.enableBroadcast(true);
+    if (isMulticast(m_discoveryAddress)) {
+        m_discovery.setMulticastGroup(m_discoveryAddress);
+    }
     m_discovery.setRecvTimeoutMs(500);
     if (m_discovery.open() < 0) {
         LOGE("discovery bind %d fail\n", m_discoveryPort);
@@ -306,6 +316,11 @@ void LanMessenger::announceOnce()
             m_discovery.sendTo(ip.c_str(), m_discoveryPort, payload.data(), payload.size());
         }
     }
+    // 可选的组播/单播发现地址（如 224.224.224.224）：广播被部分网络过滤时，
+    // 走组播或手动指定地址能绕过；空或就是广播地址时不重复发
+    if (!m_discoveryAddress.empty() && m_discoveryAddress != "255.255.255.255") {
+        m_discovery.sendTo(m_discoveryAddress.c_str(), m_discoveryPort, payload.data(), payload.size());
+    }
 }
 
 void LanMessenger::replyOnce(const std::string& ip)
@@ -336,6 +351,13 @@ void LanMessenger::announceLoop()
             announceOnce();
         }
     }
+}
+
+static bool isMulticast(const std::string& addr) {
+    struct in_addr a {};
+    if (addr.empty() || inet_pton(AF_INET, addr.c_str(), &a) != 1) return false;
+    uint32_t h = ntohl(a.s_addr);
+    return (h >> 28) == 0x0Eu;   // 224.0.0.0/4
 }
 
 bool LanMessenger::onDiscoveryPacket(const std::string& payload, const std::string& fromIp)

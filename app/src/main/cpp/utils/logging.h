@@ -39,7 +39,7 @@
 /**
  * 取路径里的文件名。
  *
- * 不能写成 basename(strdup(__FILE__))：strdup 出来的那份没人 free，
+ * 不能写成 basename(strdup(__FILE__))：strdup 出来的字符串没人 free，
  * 每打一条日志就泄漏一块 —— 日志越密漏得越快。
  */
 static inline const char* logFileName(const char* path)

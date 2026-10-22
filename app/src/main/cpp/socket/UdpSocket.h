@@ -58,6 +58,9 @@ public:
      */
     void enableBroadcast(bool on);
 
+    /** 加入组播组（仅接收需要；发往组播地址无需此步）。open() 之前设，join 在 open() 里做 */
+    void setMulticastGroup(const std::string& group);
+
     /** 收包超时（毫秒）。0 = 一直堵在 recvfrom —— 保持老行为 */
     void setRecvTimeoutMs(int ms);
 
@@ -90,6 +93,8 @@ private:
     /** stop 标志：置上之后 Receiver 的循环退出、receive() 不再读 */
     bool m_flag = false;
     bool m_broadcast = false;
+    std::string m_multicastGroup;
+    bool m_multicast = false;
     int m_recvTimeoutMs = 0;
     bool m_bound = false;
     NetProtocol protocol{};

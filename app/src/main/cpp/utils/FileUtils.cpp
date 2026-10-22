@@ -107,7 +107,7 @@ long FileUtils::ReadBinaryFile(const std::string& filename, size_t sliceSize, Fi
      * 返回渲染出去的片数；<0 表示失败。
      *
      * 缓冲在堆上分配（栈上放几 MB 的帧会爆栈），循环由 gcount() 驱动：
-     * 只看 fin.read() 的返回值的话，读到 0 字节时循环条件恒真会卡死。
+     * 只看 fin.read() 的返回值时，读到 0 字节时循环条件恒真会卡死。
      */
     if (sliceSize == 0) {
         LOGE("sliceSize is 0 for [%s]", filename.c_str());

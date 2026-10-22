@@ -17,7 +17,7 @@ import java.io.IOException;
 /**
  * Apache MINA SSHD 的薄封装：只开 exec / shell，不挂 SFTP / SCP 子系统。
  *
- * Android 相关的坑在这里处理掉（官方 docs/android.md 的建议）：
+ * Android 上的兼容问题在这里处理（官方 docs/android.md 的建议）：
  * - user.home / user.dir：Android 没有这两个系统属性，缺了会在初始化时抛
  *   IllegalArgumentException("No user home")；
  * - BouncyCastle / EdDSA 都是 sshd 的可选依赖，没引就登记成「提前禁用」，

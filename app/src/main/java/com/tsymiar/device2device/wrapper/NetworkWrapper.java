@@ -60,4 +60,7 @@ public class NetworkWrapper {
 
     /** 设置发现用的广播端口（与收发的 KCP 端口分开，默认 39000） */
     public static native void setLanDiscoveryPort(int port);
+
+    /** 设置发现广播目标地址：默认 255.255.255.255（广播），可填 224.224.224.224 等组播或单播地址 */
+    public static native void setLanDiscoveryAddress(String address);
 }

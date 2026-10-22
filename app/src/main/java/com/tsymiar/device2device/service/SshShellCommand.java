@@ -153,7 +153,7 @@ class SshShellCommand implements Command, Runnable {
         String path = cwd.getAbsolutePath();
         String root = rootDir.getAbsolutePath();
         if (path.startsWith(root)) {
-            // 提示符里只显示相对根目录的部分，别把一长串 /storage/emulated/... 铺满屏幕
+            // 提示符里只显示相对根目录的部分，避免过长路径铺满屏幕
             path = "~" + path.substring(root.length());
         }
         return path.isEmpty() ? "$ " : path + " $ ";

@@ -7,6 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <new>
+#include <netinet/in.h>
 #include <cerrno>
 
 #ifndef LOG_TAG
@@ -49,6 +50,12 @@ int UdpSocket::port() const
 void UdpSocket::enableBroadcast(bool on)
 {
     m_broadcast = on;
+}
+
+void UdpSocket::setMulticastGroup(const std::string& group)
+{
+    m_multicastGroup = group;
+    m_multicast = true;
 }
 
 void UdpSocket::setRecvTimeoutMs(int ms)
@@ -112,6 +119,17 @@ int UdpSocket::open()
         LOGE("bind %d: %s", m_port, strerror(errno));
         ::close(fd);
         return -2;
+    }
+
+    if (m_multicast && !m_multicastGroup.empty()) {
+        struct ip_mreq mreq {};
+        mreq.imr_multiaddr.s_addr = inet_addr(m_multicastGroup.c_str());
+        mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+        if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+            LOGE("join multicast %s fail: %s", m_multicastGroup.c_str(), strerror(errno));
+        } else {
+            LOGI("joined multicast group %s", m_multicastGroup.c_str());
+        }
     }
 
     m_socket = fd;

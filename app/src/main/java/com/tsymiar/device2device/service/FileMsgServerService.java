@@ -24,12 +24,11 @@ import com.tsymiar.device2device.wrapper.NetworkWrapper;
 /**
  * 文件传输「接收端」前台服务。
  *
- * 之前服务端跑在 FileMsgDialog 里：对话框一销毁（返回键 / 旋转 / 切走）
- * 就跟着 onDestroy 停掉，对端自然连不上 —— 这是"本机自测一切正常、
- * 跨设备死活连不上"的另一个根因（自测时对话框一直开着，看不出来）。
+ * 服务端跑在 Service 而不是对话框里：对话框一销毁（返回键 / 旋转 / 切走）就会停掉服务，
+ * 对端自然连不上（自测时对话框一直开着，看不出来）。
  *
- * 现在照 HttpServerService / SshServerService 的套路搬进前台服务：
- * 常驻通知 + START_STICKY，对话框关了照样收；只能显式点「Stop Server」停止。
+ * 照 HttpServerService / SshServerService 的套路走前台服务：常驻通知 + START_STICKY，
+ * 对话框关了照样收；只能显式点「Stop Server」停止。
  */
 public class FileMsgServerService extends Service {
     private static final String TAG = "FileMsgServerService";

@@ -96,7 +96,7 @@ public class SshServerService extends Service {
                 context.startService(intent);
             }
         } catch (Exception e) {
-            // 后台启动限制（Android 12+）等场景下系统会直接抛异常，兜住，别让点一下就闪退
+            // 后台启动限制（Android 12+）等场景下系统会直接抛异常，需捕获该异常，避免点击后立即崩溃
             Log.e(TAG, "startForegroundService failed", e);
             try {
                 context.startService(intent);
