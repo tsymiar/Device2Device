@@ -185,7 +185,14 @@ public final class HumanMesh {
         b.yWrist = b.yElbow - 0.143f * H * armLen;
         b.yNeckTop = b.yChin + 0.05f * b.headH;
         b.yNeckBot = b.yShoulder + 0.015f * H;
-        b.topW = Math.max(0.035f * H, b.shoulderW - 0.030f * H * b.girth);
+        // 臂根（肩关节）的位置：贴着肩峰往里一点，约 0.95 个肩半宽。
+        //
+        // 原来按「肩半宽 − 0.030H」往里收，收得太狠：女 165 的臂根只到 14.5cm，而上臂半径
+        // 3.6cm —— 上臂内缘（10.9cm）直接钻进胸廓（半宽 15.2）与腰（12.0）里去了。
+        // SDF 的平滑并集（3cm）再把两者焊成一块，于是环绕躯干量出来的那一圈把手臂也算进去：
+        // 胸围 100、腰围 104、臀围 95 —— 腰比胸还粗，看着就像「臀围和胸围反了」。
+        // 挪到 0.95 之后上臂内缘落在 14.9cm，与腰之间留出 2.9cm，那一圈才是躯干自己的轮廓。
+        b.topW = Math.max(0.035f * H, b.shoulderW * 0.95f);
         return b;
     }
 
@@ -206,7 +213,10 @@ public final class HumanMesh {
 
         // ---------------- 身体：隐式曲面 → 等值面网格 ----------------
         SdfModel sdf = new SdfModel();
-        sdf.setBlend(0.018f * H);
+        // 平滑并集的半径：3cm 太肥，上臂与腰之间那两三厘米的空隙会被它焊死，
+        // 躯干量出来的那一圈就把手臂一起兜进去（腰围因此虚高，胸/腰/臀的先后全乱）。
+        // 收到 0.015H ≈ 2.5cm：肩、肘、髋这些该连的地方仍连着，手臂与腰之间留得出缝
+        sdf.setBlend(0.015f * H);
         buildBodyField(sdf, p, b);
 
         float h = H / Math.max(40, gridOverHeight);
