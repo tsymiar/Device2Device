@@ -64,6 +64,9 @@ public class DeductionBoardView extends View {
     // 内容坐标（未滚动）中可交互区域的位置，供触摸判定
     private float mGreedY = 0f, mFearY = 0f, mSlotsY0 = 0f;
 
+    /** 盘面标题：顶部固定区要按它的宽度给「第 N 章」留位，抽为常量以免两处不一致 */
+    private static final String TITLE = "声纹推演盘";
+
     // 竖屏布局常量（逻辑画布 640 宽；卡片全宽，最大化移动端可读性与触摸区）
     private static final float P_L = 24f, P_R = 616f;
     private static final float P_REL_Y = 68f, P_REL_X0 = 336f;
@@ -74,6 +77,9 @@ public class DeductionBoardView extends View {
     private static final float P_CARD_Y0 = P_LIB_Y + 28f; // 卡片条顶 y
     private static final float P_CARD_H = 134f;           // 卡片条高
     private static final float P_CARD_GAP = 10f;          // 相邻卡片水平间距
+    /** 各小节标题的字号；卡片下沿的留白要按它的上升部算，写死一个数是顶不住的 */
+    private static final float P_SECTION_TITLE_S = 0.72f;
+    private static final float P_CARD_GAP_V = 24f;        // 卡片下沿到下一节标题的额外间距
 
     // 横屏样本库：画布底部的一行横向卡片条（结果区铺底时临时隐藏）
     private static final float L_SHELF_X0 = -0.95f, L_SHELF_X1 = 0.45f;
@@ -204,7 +210,8 @@ public class DeductionBoardView extends View {
                 if (s != null) {
                     drawText(c, gx2x(bx + 0.02f), gy2y(y - 0.08f), "-> " + s.name, s.color(), 0.45f);
                     String act = String.format("动作：%s   锚点：%s", slot.action.label(), slot.anchor.label());
-                    drawText(c, gx2x(bx + 0.02f), gy2y(y - 0.12f), act, Color.argb(160, 180, 200, 220), 0.32f);
+                    drawText(c, gx2x(bx + 0.02f), gy2y(y - 0.12f), act, Color.argb(160, 180, 200, 220),
+                            fitScale(act, 0.32f, w2x(bw - 0.04f)));
                 }
             } else {
                 drawText(c, gx2x(bx + 0.02f), gy2y(y - 0.08f), "（拖拽样本到此处）", Color.argb(120, 80, 100, 130), 0.32f);
@@ -278,15 +285,20 @@ public class DeductionBoardView extends View {
         float visH = (getHeight() - mBottomBarH) / s;
 
         // 固定顶部：标题 + 相对关系行（基线取 54，避免放大后大字号标题顶部被画布裁切）
-        drawText(c, P_L, 54, "声纹推演盘", Color.rgb(0, 220, 200), 1.2f);
-        drawText(c, 336, 54, "第 " + (mChapter + 1) + " 章", Color.argb(170, 150, 180, 210), 0.72f);
+        // 标题右边要留给「第 N 章」，所以各自只在自己那半边里量宽度，超了就缩字号
+        drawText(c, P_L, 54, TITLE, Color.rgb(0, 220, 200),
+                fitScale(TITLE, 1.2f, P_REL_X0 - P_L - 8f));
+        String chapter = "第 " + (mChapter + 1) + " 章";
+        drawText(c, P_REL_X0, 54, chapter, Color.argb(170, 150, 180, 210),
+                fitScale(chapter, 0.72f, P_R - P_REL_X0));
         String[] rels = { "掩盖", "激发", "反转", "同步" };
         for (int i = 0; i < 4; ++i) {
             float cx = P_REL_X0 + i * (P_CHIP_W + P_CHIP_GAP);
             int rc = (mSelectedRelation == i) ? Color.rgb(0, 220, 200) : Color.argb(140, 100, 140, 180);
             drawRectP(c, cx, P_REL_Y, P_CHIP_W, P_CHIP_H, GameUi.withAlpha(rc, mSelectedRelation == i ? 60 : 20), true);
             drawRectP(c, cx, P_REL_Y, P_CHIP_W, P_CHIP_H, rc, false);
-            drawText(c, cx + 6, P_REL_Y + P_CHIP_H / 2, rels[i], rc, 0.46f);
+            // 在 chip 边框内居中：贴着左边画会顶出圆角框，chip 窄的时候尤其明显
+            drawTextCentered(c, cx, P_CHIP_W, baselineInBox(P_REL_Y, P_CHIP_H, 0.46f), rels[i], rc, 0.46f);
         }
 
         // 滚动区
@@ -319,13 +331,21 @@ public class DeductionBoardView extends View {
             float x = P_L + i * (cw + P_CARD_GAP);
             drawSampleTile(c, x, yTop, cw, P_CARD_H, samples.get(i), i);
         }
-        return yTop + P_CARD_H + 24;
+        /**
+         * 卡片下沿 → 下一节标题（"待验证命题"）。
+         *
+         * 固定留 24 是不够的：P_SECTION_TITLE_S 号标题的上升部有 29 逻辑像素左右 ——
+         * fontLogicalPx() 里除以 canvasScale，而 canvasScale = 宽度/640 又正比于 density，
+         * 两者约掉，这个上升部跟屏幕密度基本无关，固定 24 在任何机器上都不够，
+         * 于是"待验证命题"的上半截会顶进样本卡片里。所以间距按标题行高给。
+         */
+        return yTop + P_CARD_H + P_CARD_GAP_V + lineHeight(P_SECTION_TITLE_S) * 0.85f;
     }
 
     private float renderPortraitProposition(Canvas c, float py) {
         DeductionData.Proposition p = mEngine.currentProposition();
         if (p == null) return py;
-        drawText(c, P_L, py, "待验证命题", Color.rgb(255, 210, 100), 0.72f);
+        drawText(c, P_L, py, "待验证命题", Color.rgb(255, 210, 100), P_SECTION_TITLE_S);
         py += 40;
         int w = (int) (P_R - P_L - 20);
         int n = wrappedLineCount(p.text, 0.5f, w);
@@ -358,31 +378,36 @@ public class DeductionBoardView extends View {
         drawText(c, P_L, py, "三槽：拖拽样本至此", Color.rgb(0, 220, 200), 0.72f);
         py += 40;
         mSlotsY0 = py;
+        // 槽的可用文字区：左右各留 16，所有行都以这个区间的中线对齐，不会顶到边框上
+        float boxX = P_L + 16;
+        float boxW = P_R - P_L - 32;
         String[] names = { "样本", "干预动作", "时间锚点" };
         for (int i = 0; i < 3; ++i) {
             float sy = py + i * (P_SLOT_H + P_SLOT_GAP);
             drawRectP(c, P_L, sy, P_R - P_L, P_SLOT_H, Color.argb(160, 15, 20, 35), true);
             int bc = (mDragging && mSelectedSample >= 0) ? Color.rgb(0, 220, 200) : Color.argb(80, 60, 90, 130);
             drawRectP(c, P_L, sy, P_R - P_L, P_SLOT_H, bc, false);
-            drawText(c, P_L + 16, sy + 30, String.format("槽%d：%s", i + 1, names[i]),
+            drawTextCentered(c, boxX, boxW, sy + 30, String.format("槽%d：%s", i + 1, names[i]),
                     Color.argb(170, 150, 180, 210), 0.58f);
             DeductionData.DeductionSlot slot = mSlots[i];
             if (slot.sampleId >= 0) {
                 DeductionData.DeductionSample s = mEngine.findSample(slot.sampleId);
                 if (s != null) {
-                    drawText(c, P_L + 16, sy + 66, "-> " + s.name, s.color(), 0.7f);
+                    drawTextCentered(c, boxX, boxW, sy + 66, "-> " + s.name, s.color(), 0.7f);
                     String act = String.format("动作：%s   锚点：%s", slot.action.label(), slot.anchor.label());
-                    drawText(c, P_L + 16, sy + 98, act, Color.argb(160, 180, 200, 220), 0.52f);
+                    drawTextCentered(c, boxX, boxW, sy + 98, act, Color.argb(160, 180, 200, 220), 0.52f);
                 }
             } else {
-                drawText(c, P_L + 16, sy + 66, "（拖拽样本到此处）", Color.argb(120, 80, 100, 130), 0.5f);
+                drawTextCentered(c, boxX, boxW, sy + 66, "（拖拽样本到此处）",
+                        Color.argb(120, 80, 100, 130), 0.5f);
             }
         }
         return py + 3 * (P_SLOT_H + P_SLOT_GAP) - P_SLOT_GAP + 26;
     }
 
     private float renderPortraitTip(Canvas c, float py) {
-        drawText(c, P_L, py, "长按样本锁存 | 点击槽切动作 | 长按槽清空", Color.argb(140, 100, 130, 160), 0.5f);
+        String tip = "长按样本锁存 | 点击槽切动作 | 长按槽清空";
+        drawText(c, P_L, py, tip, Color.argb(140, 100, 130, 160), fitScale(tip, 0.5f, P_R - P_L));
         return py + 44;
     }
 
@@ -821,6 +846,62 @@ public class DeductionBoardView extends View {
         return mPaint.measureText(t);
     }
 
+    /**
+     * 在 maxW 宽度里挑一个放得下的字号档位：从 s 起步逐步缩小直到测量宽度不再超出。
+     *
+     * 卡片宽度是随样本条数量变化的，写死字号必然有几档会顶出边框 —— 与其截断成半个字，
+     * 不如先把字号降下来。降到下限仍放不下时由 wrapText 折行兜底。
+     */
+    private float fitScale(String t, float s, float maxW) {
+        if (t == null || t.isEmpty() || maxW <= 0) return s;
+        float sc = s;
+        while (sc > 0.18f && measureTextWidth(t, sc) > maxW) {
+            sc -= 0.02f;
+        }
+        return sc;
+    }
+
+    /** 一行文字在 [top, top+h] 这段高度里垂直居中时的基线位置 */
+    private float baselineInBox(float top, float h, float s) {
+        mPaint.reset();
+        mPaint.setAntiAlias(true);
+        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTextSize(fontLogicalPx(s));
+        Paint.FontMetrics fm = mPaint.getFontMetrics();
+        return top + h / 2f - (fm.ascent + fm.descent) / 2f;
+    }
+
+    /** 在 [bx, bx+bw] 内水平居中画一行；放不下就先缩字号，绝不越出左右边框 */
+    private void drawTextCentered(Canvas c, float bx, float bw, float baseline, String t,
+                                  int color, float s) {
+        if (t == null || t.isEmpty() || bw <= 0) return;
+        float scale = fitScale(t, s, bw);
+        float x = bx + (bw - measureTextWidth(t, scale)) / 2f;
+        drawText(c, Math.max(bx, x), baseline, t, color, scale);
+    }
+
+    /** 在 [bx, bx+bw] 内画一段文字：每行各自居中（整段居中会把长短不一的边搞成锯齿，逐行居中不会） */
+    private void drawTextWrappedCentered(Canvas c, float bx, float bw, float baseline, String t,
+                                         int color, float s) {
+        if (t == null || t.isEmpty() || bw <= 0) return;
+        List<String> lines = wrappedLines(t, (int) bw, s);
+        float lh = lineHeight(s);
+        for (int i = 0; i < lines.size(); ++i) {
+            String line = lines.get(i);
+            float x = bx + (bw - measureTextWidth(line, s)) / 2f;
+            drawText(c, Math.max(bx, x), baseline + i * lh, line, color, s);
+        }
+    }
+
+    /** 按给定字号折行：wrapText 依赖 mPaint 当前的字号，所以字号在这里统一设好 */
+    private List<String> wrappedLines(String t, int maxPx, float s) {
+        mPaint.reset();
+        mPaint.setAntiAlias(true);
+        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTextSize(fontLogicalPx(s));
+        return wrapText(t, maxPx);
+    }
+
     /** 绘制单个样本卡片瓦片（横向样本条共用），bounds 均为逻辑像素 */
     private void drawSampleTile(Canvas c, float x, float y, float w, float h,
                                 DeductionData.DeductionSample s, int index) {
@@ -833,14 +914,22 @@ public class DeductionBoardView extends View {
 
         float pad = Math.max(6f, w * 0.05f);
         float availW = Math.max(1f, w - pad * 2f);
+        // 锁标记置于右上角，名称整体下移一行为其让位，避免两处文字重叠
+        float nameTop = y + 30;
+        if (s.locked) {
+            float lockW = Math.min(34f, availW * 0.3f);
+            drawTextCentered(c, x + w - pad - lockW, lockW, y + 22, "锁",
+                    Color.rgb(255, 200, 100), 0.42f);
+            nameTop = y + 52;
+        }
         float fontScale;
         if (mPortrait) {
             // 竖屏：字号自动收缩，保证名称可在卡片内折行且不与 meta 行重叠
-            float availName = Math.max(lineHeight(0.26f), h - 44f);
+            float availName = Math.max(lineHeight(0.26f), h - (nameTop - y) - 26f);
             fontScale = 0.26f;
             float[] cands = {0.6f, 0.54f, 0.48f, 0.42f, 0.36f, 0.3f, 0.26f};
             for (float sc : cands) {
-                if (wrappedLineCount(s.name, sc, (int) availW) * lineHeight(sc) <= availName) {
+                if (wrappedLines(s.name, (int) availW, sc).size() * lineHeight(sc) <= availName) {
                     fontScale = sc;
                     break;
                 }
@@ -848,11 +937,7 @@ public class DeductionBoardView extends View {
         } else {
             fontScale = w >= 170f ? 0.6f : (w >= 110f ? 0.5f : 0.42f);
         }
-        if (s.locked) {
-            drawText(c, x + w - 18, y + 22, "锁", Color.rgb(255, 200, 100), 0.55f);
-        }
-        drawTextWrapped(c, x + pad, y + 30, s.name, s.color(), fontScale,
-                (int) Math.max(1, availW));
+        drawTextWrappedCentered(c, x + pad, availW, nameTop, s.name, s.color(), fontScale);
         StringBuilder meta = new StringBuilder();
         if (w >= 170f) {
             meta.append("[").append(s.kindLabel()).append("] ").append(s.source);
@@ -866,16 +951,13 @@ public class DeductionBoardView extends View {
             String metaText = meta.toString();
             float metaScale = 0.3f;
             if (mPortrait) {
-                metaScale = 0.34f;
-                while (metaScale > 0.2f && measureTextWidth(metaText, metaScale) > availW) {
-                    metaScale -= 0.02f;
-                }
-                // 仍放不下时截断尾部，避免横向溢出到相邻卡片
+                metaScale = fitScale(metaText, 0.34f, availW);
+                // 缩到下限仍放不下才截断尾部，避免横向溢出到相邻卡片
                 while (measureTextWidth(metaText, metaScale) > availW && metaText.length() > 1) {
                     metaText = metaText.substring(0, metaText.length() - 1);
                 }
             }
-            drawText(c, x + pad, y + h - 12, metaText,
+            drawTextCentered(c, x + pad, availW, y + h - 12, metaText,
                     s.basePitch > 1.01f ? Color.rgb(255, 120, 120)
                             : GameUi.lighten(s.color(), 1.3f), metaScale);
         }
