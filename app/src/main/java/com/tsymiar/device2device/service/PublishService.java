@@ -79,12 +79,17 @@ public class PublishService extends Service {
         editTopic = floatView.findViewById(R.id.edit_pub_topic);
         editPayload = floatView.findViewById(R.id.edit_payload);
         editTarget = floatView.findViewById(R.id.edit_pub_target);
-        // 按上次的值填回去（正文不预填：发出去的该是这次要发的东西，不是上次那句）
+        // 回填上次的值；正文（payload）无记录时用默认串 pub_payload，方便直接发送
         if (!PubSubSetting.getTopic().isEmpty() && editTopic != null) {
             editTopic.setText(PubSubSetting.getTopic());
         }
         if (!PubSubSetting.getTarget().isEmpty() && editTarget != null) {
             editTarget.setText(PubSubSetting.getTarget());
+        }
+        if (editPayload != null) {
+            String payload = PubSubSetting.getPayload();
+            if (payload.isEmpty()) payload = getString(R.string.pub_payload);
+            editPayload.setText(payload);
         }
 
         floatView.findViewById(R.id.btn_pub_finish).setOnClickListener(v -> closeWindow());

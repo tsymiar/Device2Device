@@ -170,6 +170,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             if (msg.obj == null) return;
             switch (msg.what) {
                 case Receiver.MSG_STAT:
+                case Receiver.SUBSCRIBER:
                     setTextSafely(R.id.txt_status, msg.obj.toString());
                     break;
                 case Receiver.FILE_PROGRESS: {
@@ -205,8 +206,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     break;
                 }
                 case Receiver.TOAST:
-                case Receiver.KAI_SUBSCRIBE:
-                case Receiver.KAI_PUBLISHER:
                     Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
                     break;
                 case Receiver.TEXTURE:
@@ -225,6 +224,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     appendKcpStatus(msg.obj.toString());
                     break;
                 case Receiver.MSG_HINT:
+                case Receiver.PUBLISHER:
                     setTextSafely(R.id.txt_hint, msg.obj.toString());
                     break;
                 case Receiver.LAN_PEER: {
@@ -259,6 +259,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     break;
                 }
                 default:
+                    setTextSafely(R.id.txt_hint, msg.obj.toString());
                     break;
             }
         }

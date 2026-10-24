@@ -322,8 +322,13 @@ public class MarketActivity extends AppCompatActivity {
                 mSource = source;
                 // 换数据源=换一套指标口径（有无成交量都可能变），副图选择回到该源默认
                 mChart.resetPanelChoice();
-                // 切换分类=换标的：先清空输入框，让提示语展示该源的代码写法，再加载该源默认标的
-                mSymbolEdit.setText("");
+                // 商品源：默认标的直接进编辑框（可看可改）；其它源清空，只留该源代码写法的提示
+                String defaultSym = QuoteSource.isCommodity(mSource)
+                        ? QuoteSource.defaultSymbol(mSource) : "";
+                mSymbolEdit.setText(defaultSym);
+                if (!defaultSym.isEmpty()) {
+                    mSymbolEdit.setSelection(defaultSym.length());
+                }
                 mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
                 mName = "";
                 mChart.setName("");

@@ -183,8 +183,8 @@
     <string name="address">192.168.0.1</string>
     <string name="topic">0x1234</string>
     <string name="sub_port">9999</string>
-    <string name="pub_payload">some message</string>
-    <string name="pub_target">empty = broadcast</string>
+    <string name="pub_payload">message</string>
+    <string name="pub_target">hex dest if not empty</string>
     <string name="hint_address">address</string>
     <string name="hint_port">port</string>
     <string name="minimum">-</string>

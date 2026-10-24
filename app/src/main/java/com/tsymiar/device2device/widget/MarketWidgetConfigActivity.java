@@ -236,6 +236,12 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 mSource = QuoteSource.SOURCES[position];
                 mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
+                // 商品源：默认标的直接进编辑框（同行情页）；其它源只换提示语，不覆盖已填内容
+                if (QuoteSource.isCommodity(mSource)) {
+                    String def = QuoteSource.defaultSymbol(mSource);
+                    mSymbolEdit.setText(def);
+                    mSymbolEdit.setSelection(def.length());
+                }
             }
 
             @Override

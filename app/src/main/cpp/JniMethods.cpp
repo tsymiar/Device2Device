@@ -136,9 +136,11 @@ void RecvHook(const Scadup::Message& msg)
     const Scadup::Message::Payload& pl = msg.payload;
     const std::string body = (pl.content != nullptr && pl.length > 0)
             ? std::string(pl.content, pl.length) : std::string();
+    char time[16];
+    getCurrentTime(time, sizeof(time));
     std::stringstream ss;
     ss << std::hex << msg.head.topic;
-    std::string message = "Recv topic:\t[0x" + ss.str() + "]\tsize=" + std::to_string(body.size())
+    std::string message = "[" + std::string(time) + "] Recv topic: [0x" + ss.str() + "] size=" + std::to_string(body.size())
         + "\nPayload:\t[" + pl.status + "]\t[ " + body + " ].";
     Message::instance().setMessage(message, MSG_STAT);
 }
@@ -168,7 +170,7 @@ static void SubscribeTask(std::string addr, int port, uint32_t topic, Scadup::RE
         char content[160];
         snprintf(content, sizeof(content), "Subscribed %s:%d topic 0x%04x (one-to-one id 0x%llx)",
             addr.c_str(), port, topic, static_cast<unsigned long long>(sub.dstId()));
-        Message::instance().setMessage(content, TOAST);
+        Message::instance().setMessage(content, SUBSCRIBER);
     }
 
     ret = static_cast<int>(sub.subscribe(topic, hook));

@@ -306,6 +306,8 @@ public final class QuoteSource {
         prefix("^(?:oil|brent|布伦特)", BRENT);
         prefix("^(?:ng0?|天然气)", NG);
         prefix("^(?:udi|dxy|usdx|美元)", USD);
+        // 东财 secid（1.601899）：该源默认标的就是这个格式，不认它会被判成需搜索而切不过去
+        prefix("^\\d+\\.\\d+$", EAST);
     }
 
     private static void prefix(String regex, String... sources) {
@@ -847,6 +849,11 @@ public final class QuoteSource {
             default:
                 return "sh600519";
         }
+    }
+
+    /** 是否为商品 / 指数源（gold/xau/gc/crude/brent/ng/usd） */
+    public static boolean isCommodity(String source) {
+        return COMMODITY_SOURCES.contains(source);
     }
 
     /** 输入框里已填的标的形态是否属于该数据源（切换数据源时用于判断是否替换为默认代码） */

@@ -191,6 +191,12 @@ public class MarketChartConfigActivity extends AppCompatActivity {
                 if (source.equals(mSource)) return;
                 mSource = source;
                 mSymbolEdit.setHint(QuoteSource.symbolHint(mSource));
+                // 商品源：默认标的直接进编辑框（同行情页）；其它源只换提示语
+                if (QuoteSource.isCommodity(mSource)) {
+                    String def = QuoteSource.defaultSymbol(mSource);
+                    mSymbolEdit.setText(def);
+                    mSymbolEdit.setSelection(def.length());
+                }
                 refreshIntervals();
                 setStatus("");
             }

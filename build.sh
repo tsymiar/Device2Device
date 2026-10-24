@@ -59,9 +59,10 @@ find_sdk() {
 }
 
 clean_output() {
-    echo "清理：停 gradle daemon + 删 app/build、app/.cxx、dist"
+    echo "清理：停 gradle daemon + 删 app/build、app/.cxx、app/jniLibs、dist"
     "${GRADLE}" --stop >/dev/null 2>&1 || true
-    rm -rf "${main_pwd}/app/build" "${main_pwd}/app/.cxx" "${OUT_DIR}"
+    rm -rf "${main_pwd}/app/build" "${main_pwd}/app/.cxx" "${main_pwd}/app/jniLibs" "${OUT_DIR}"
+    rm -rf "${main_pwd}/logs" "${main_pwd}/*.log"
 }
 
 case "${CMD}" in
@@ -150,6 +151,17 @@ export ANDROID_SDK_ROOT="${SDK_DIR}"
 set_prop sdk.dir "${SDK_DIR}"
 
 cd "${main_pwd}" || exit
+
+# 单一真源：每次打包前按 C++ Message.h 的 enum MASSAGER 重生成 Receiver.java，杜绝 C/JNI 数值偏离
+if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "${main_pwd}/tools/gen_receiver_java.py"; then
+        echo "生成 Receiver.java 失败" >&2
+        exit 1
+    fi
+else
+    echo "警告：未找到 python3，跳过 Receiver.java 重新生成（依赖已提交的版本）" >&2
+fi
+
 GRADLE_EXTRA=()
 [ "${BUILD_OFFLINE:-}" = "1" ] && GRADLE_EXTRA=(--offline)
 

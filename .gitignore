@@ -50,4 +50,5 @@ venv/
 
 # ---------- AI / Copilot 辅助目录 ----------
 .github/**/*.md
-.codebuddy/
+.co*
+.work*
