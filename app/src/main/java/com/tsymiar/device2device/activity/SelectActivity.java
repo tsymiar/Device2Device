@@ -504,6 +504,13 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 networkArrow.setText("▲");
             }
         });
+        // 游戏区域折叠/展开：默认收起，点标题栏摊开（与网络服务区同一套写法）
+        final LinearLayout gameContent = findViewById(R.id.game_content);
+        final TextView gameArrow = findViewById(R.id.game_arrow);
+        findViewById(R.id.game_header).setOnClickListener(v ->
+                setSectionExpanded(gameContent.getVisibility() != View.VISIBLE,
+                        gameContent, gameArrow));
+
         // 页面恢复时同步 HTTP / SSH 前台服务运行状态（若已在后台运行）
         showHttpState();
         showSshState();
@@ -1207,7 +1214,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
-    private void setSshExpanded(boolean expanded, LinearLayout content, TextView arrow) {
+    /** 折叠区展开/收起：内容显隐 + 箭头方向。SSH 与游戏两块共用 */
+    private void setSectionExpanded(boolean expanded, LinearLayout content, TextView arrow) {
         if (content != null) {
             content.setVisibility(expanded ? View.VISIBLE : View.GONE);
         }
@@ -1221,7 +1229,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         boolean running = SshServerService.isRunning();
         // 服务还在跑就把折叠区摊开：否则状态卡片有 SSH 信息，按钮却收着，状态不一致
         if (running) {
-            setSshExpanded(true, mSshContent, mSshArrow);
+            setSectionExpanded(true, mSshContent, mSshArrow);
         }
         // 复制/停止这两个操作默认折叠，服务跑起来后才展开
         View actions = findViewById(R.id.ssh_actions);
