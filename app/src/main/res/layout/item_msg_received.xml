@@ -24,16 +24,16 @@
                 android:id="@+id/tv_content"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@android:color/black"
+                android:textColor="@color/ui_text"
                 android:textSize="16sp"/>
 
-            <!-- 气泡底色是 #E0E0E0 浅灰，转圈用白色等于看不见，这里给个中灰 -->
+            <!-- 转圈取次级文字色：气泡底色随深浅模式变，白底不能用白、深底不能用黑 -->
             <ProgressBar
                 android:id="@+id/progress_bar"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_marginStart="8dp"
-                android:indeterminateTint="#757575"
+                android:indeterminateTint="@color/ui_text_dim"
                 android:visibility="gone"/>
         </LinearLayout>
 
@@ -43,6 +43,6 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:layout_gravity="end"
-            android:textColor="#80000000"/>
+            android:textColor="@color/ui_text_dim"/>
     </LinearLayout>
 </LinearLayout>

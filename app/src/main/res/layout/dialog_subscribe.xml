@@ -18,7 +18,7 @@
         android:layout_height="32dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:text="@string/exit"
-        android:textColor="#FF5252"
+        android:textColor="@color/ui_danger"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />

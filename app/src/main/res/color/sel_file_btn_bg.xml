@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 文件传输按钮底色：可用时主题实心底，禁用时压成灰底 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ui_card_pressed" android:state_enabled="false" />
+    <item android:color="@color/ui_accent" />
+</selector>

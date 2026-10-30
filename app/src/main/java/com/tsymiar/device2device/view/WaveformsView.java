@@ -99,7 +99,7 @@ public class WaveformsView extends View {
         borderLinePaint.setAntiAlias(true);
         borderLinePaint.setStrokeWidth(1.5f);
         borderLinePaint.setPathEffect(new DashPathEffect(new float[] { 3.0f, 2.0f }, 0.0f));
-        borderLinePaint.setColor(getResources().getColor(R.color.selection_border));
+        borderLinePaint.setColor(getResources().getColor(R.color.white));
         Paint playbackLinePaint = new Paint();
         playbackLinePaint.setAntiAlias(false);
         playbackLinePaint.setColor(getResources().getColor(R.color.playback_indicator));

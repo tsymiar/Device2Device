@@ -254,7 +254,7 @@ public class BtRemoteActivity extends Activity {
             mSwitch0.setOnClickListener(v -> {
                 mSwitchToggled = !mSwitchToggled;
                 if (mSwitchToggled) {
-                    mSwitch0.setColorFilter(getResources().getColor(R.color.switch_selected), PorterDuff.Mode.SRC_IN);
+                    mSwitch0.setColorFilter(getResources().getColor(R.color.green_ok), PorterDuff.Mode.SRC_IN);
                 } else {
                     mSwitch0.clearColorFilter();
                 }

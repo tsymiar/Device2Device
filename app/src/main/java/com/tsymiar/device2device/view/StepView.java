@@ -9,6 +9,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 /**
  * 步数：窄卡片排版——大数字居中 + 小字说明。无计步传感器时给占位文案。
  *
@@ -40,12 +42,14 @@ public class StepView extends View {
     public StepView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mPanelPaint = fill(0xFFFFFFFF);
-        mPanelStroke = stroke(0xFFE0E0E0, dp(1f));
-        mValuePaint = centerTextPaint(dp(17f), 0xFF039BE5, true);
-        mSubPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mHintPaint = centerTextPaint(dp(8f), 0xFFB0BEC5, false);
-        mSubCenterPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
+        // 配色走 ui_* token，深浅两套值由资源限定符切换
+        UiPalette ui = UiPalette.of(context);
+        mPanelPaint = fill(ui.card);
+        mPanelStroke = stroke(ui.stroke, dp(1f));
+        mValuePaint = centerTextPaint(dp(17f), ui.info, true);
+        mSubPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mHintPaint = centerTextPaint(dp(8f), ui.textHint, false);
+        mSubCenterPaint = centerTextPaint(dp(10f), ui.textDim, false);
     }
 
     /** 今日步数（调用方已按当天基线换算过） */

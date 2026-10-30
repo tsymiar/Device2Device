@@ -9,6 +9,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 /**
  * 磁场强度：窄卡片排版——大数字居中 + 小字说明 + 底部 0~100µT 刻度条。
  * 无磁力计时给占位文案。
@@ -41,13 +43,14 @@ public class MagneticView extends View {
     public MagneticView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mPanelPaint = fill(0xFFFFFFFF);
-        mPanelStroke = stroke(0xFFE0E0E0, dp(1f));
-        mValuePaint = centerTextPaint(dp(17f), 0xFF5E35B1, true);
-        mSubPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mSubCenterPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mTrackPaint = fill(0xFFE0E0E0);
-        mFillPaint = fill(0xFF5E35B1);
+        UiPalette ui = UiPalette.of(context);
+        mPanelPaint = fill(ui.card);
+        mPanelStroke = stroke(ui.stroke, dp(1f));
+        mValuePaint = centerTextPaint(dp(17f), ui.purple, true);
+        mSubPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mSubCenterPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mTrackPaint = fill(ui.divider);
+        mFillPaint = fill(ui.purple);
     }
 
     /** 总磁场强度（µT） */

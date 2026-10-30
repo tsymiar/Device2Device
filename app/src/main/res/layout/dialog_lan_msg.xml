@@ -242,7 +242,7 @@
             android:paddingTop="4dp"
             android:paddingEnd="8dp"
             android:paddingBottom="4dp"
-            android:text="@string/lan_msg_clear"
+            android:text="@string/action_clear"
             android:textColor="@color/sel_lan_link_text"
             android:textSize="12sp" />
     </LinearLayout>
@@ -335,7 +335,7 @@
             android:textSize="12sp"
             app:backgroundTint="@color/sel_lan_send_bg"
             app:cornerRadius="20dp"
-            app:rippleColor="#33FFFFFF" />
+            app:rippleColor="@color/ui_ripple" />
     </LinearLayout>
 
 </LinearLayout>

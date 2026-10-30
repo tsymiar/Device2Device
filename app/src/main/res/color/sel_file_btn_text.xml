@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 文件传输按钮文字：实心底上必须配 ui_on_fill（日间白字 / 夜间近黑字），禁用时换弱一档 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ui_text_hint" android:state_enabled="false" />
+    <item android:color="@color/ui_on_fill" />
+</selector>

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:background="@color/grey"
+    android:background="@color/ui_card_alt"
     android:orientation="vertical"
     app:cardCornerRadius="16dp"
     android:padding="16dp">
@@ -18,14 +18,14 @@
         android:gravity="center"
         android:paddingVertical="8dp"
         android:text="@string/sdcard_device2device"
-        android:textColor="@color/menu_menu"
+        android:textColor="@color/ui_accent"
         android:textSize="13sp" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginVertical="8dp"
-        android:background="#44ffffff" />
+        android:background="@color/ui_divider" />
 
     <!-- Directional pad -->
     <RelativeLayout
@@ -92,7 +92,7 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginVertical="8dp"
-        android:background="#44ffffff" />
+        android:background="@color/ui_divider" />
 
     <!-- Send status text -->
     <TextView
@@ -101,7 +101,7 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="4dp"
         android:textAppearance="?android:attr/textAppearanceMedium"
-        android:textColor="@color/black" />
+        android:textColor="@color/ui_text" />
 
     <!-- Bottom input bar -->
     <LinearLayout
@@ -121,8 +121,8 @@
             android:inputType="textCapCharacters"
             android:maxLength="8"
             android:minHeight="48dp"
-            android:textColor="@android:color/background_dark"
-            android:textColorHint="#779988"
+            android:textColor="@color/ui_text"
+            android:textColorHint="@color/ui_text_hint"
             android:textIsSelectable="false"
             android:typeface="monospace"
             tools:ignore="RelativeOverlap" />

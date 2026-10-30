@@ -9,6 +9,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 /**
  * 距离（ proximity 传感器）：窄卡片排版——数值居中 + 小字说明。
  * 多数设备的 proximity 只报 0/最大值两档，所以同时给出「贴近/远离」提示。
@@ -37,11 +39,12 @@ public class ProximityView extends View {
     public ProximityView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mPanelPaint = fill(0xFFFFFFFF);
-        mPanelStroke = stroke(0xFFE0E0E0, dp(1f));
-        mValuePaint = centerTextPaint(dp(17f), 0xFFF4511E, true);
-        mSubPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mSubCenterPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
+        UiPalette ui = UiPalette.of(context);
+        mPanelPaint = fill(ui.card);
+        mPanelStroke = stroke(ui.stroke, dp(1f));
+        mValuePaint = centerTextPaint(dp(17f), ui.warn, true);
+        mSubPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mSubCenterPaint = centerTextPaint(dp(10f), ui.textDim, false);
     }
 
     /** 距离（cm），proximity 传感器原始值 */

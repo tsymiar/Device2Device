@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -52,7 +53,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="textUri"
                 android:text="@string/file_msg_default_ip"
-                android:textColor="@color/dark_grey" />
+                android:textColor="@color/ui_text_dim" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -69,7 +70,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:text="@string/file_msg_default_port"
-                android:textColor="@color/dark_grey" />
+                android:textColor="@color/ui_text_dim" />
         </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
 
@@ -79,26 +80,28 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="6dp"
         android:text="@string/file_msg_receiver"
-        android:textColor="@color/colorPrimary"
+        android:textColor="@color/ui_accent"
         android:textSize="13sp"
         android:textStyle="bold" />
 
-    <Button
+    <!-- 必须用 MaterialButton：普通 Button 在 MaterialComponents 主题下会被自动换成 MaterialButton，
+         它自己管背景，写 android:background 会被忽略，底色只能走 app:backgroundTint -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_file_trans_server"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="4dp"
-        android:text="@string/file_msg_start_server" 
-        android:background="@drawable/bg_btn_square"
-        android:textColor="@color/dialog_text_primary"/>
+        android:text="@string/file_msg_start_server"
+        android:textColor="@color/sel_file_btn_text"
+        app:backgroundTint="@color/sel_file_btn_bg" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="12dp"
-        android:background="#E0E0E0" />
+        android:background="@color/ui_divider" />
 
     <!-- ============ 发送端 / Client ============ -->
     <TextView
@@ -110,14 +113,14 @@
         android:textSize="13sp"
         android:textStyle="bold" />
 
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_file_trans_connect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:text="@string/file_msg_connect" 
-        android:background="@drawable/bg_btn_square"
-        android:textColor="@color/dialog_text_primary"/>
+        android:text="@string/file_msg_connect"
+        android:textColor="@color/sel_file_btn_text"
+        app:backgroundTint="@color/sel_file_btn_bg" />
 
     <!-- 连接成功后才展开：文件选择 + 发送/断开，全部归到发送端一组 -->
     <LinearLayout
@@ -140,21 +143,21 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="#f5f5f5"
+                android:background="@color/ui_card_alt"
                 android:ellipsize="middle"
                 android:hint="@string/file_msg_no_file"
                 android:maxLines="1"
                 android:padding="12dp"
-                android:textColor="@color/dark_grey" />
+                android:textColor="@color/ui_text_dim" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_file_trans_select"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="@string/file_msg_select" 
-        android:background="@drawable/bg_btn_square"
-        android:textColor="@color/dialog_text_primary"/>
+                android:text="@string/file_msg_select"
+                android:textColor="@color/sel_file_btn_text"
+                app:backgroundTint="@color/sel_file_btn_bg" />
         </LinearLayout>
 
         <LinearLayout
@@ -162,27 +165,27 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_file_trans_disconnect"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:enabled="false"
-                android:text="@string/file_msg_disconnect" 
-        android:background="@drawable/bg_btn_square"
-        android:textColor="@color/dialog_text_primary"/>
+                android:text="@string/file_msg_disconnect"
+                android:textColor="@color/sel_file_btn_text"
+                app:backgroundTint="@color/sel_file_btn_bg" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_file_trans_send"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:enabled="false"
-                android:text="@string/file_msg_send" 
-        android:background="@drawable/bg_btn_square"
-        android:textColor="@color/dialog_text_primary"/>
+                android:text="@string/file_msg_send"
+                android:textColor="@color/sel_file_btn_text"
+                app:backgroundTint="@color/sel_file_btn_bg" />
         </LinearLayout>
     </LinearLayout>
 
@@ -191,7 +194,7 @@
         android:layout_height="1dp"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="12dp"
-        android:background="#E0E0E0" />
+        android:background="@color/ui_divider" />
 
     <!-- ============ 日志 ============ -->
     <LinearLayout
@@ -206,7 +209,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/file_msg_log"
-            android:textColor="@color/dark_grey"
+            android:textColor="@color/ui_text_dim"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -221,7 +224,7 @@
             android:paddingEnd="4dp"
             android:paddingTop="2dp"
             android:paddingBottom="2dp"
-            android:text="@string/file_msg_clear"
+            android:text="@string/action_clear"
             android:textColor="@color/status_text"
             android:textSize="12sp" />
     </LinearLayout>
@@ -231,7 +234,7 @@
         android:layout_width="match_parent"
         android:layout_height="120dp"
         android:layout_marginBottom="8dp"
-        android:background="#f5f5f5"
+        android:background="@color/ui_card_alt"
         android:fillViewport="false"
         android:padding="8dp">
 
@@ -239,7 +242,7 @@
             android:id="@+id/tv_file_trans_log"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/dark_grey"
+            android:textColor="@color/ui_text_dim"
             android:textSize="11sp"
             android:typeface="monospace" />
     </ScrollView>

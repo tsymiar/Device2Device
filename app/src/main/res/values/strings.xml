@@ -54,7 +54,8 @@
     <string name="file_msg_disconnect">Disconnect</string>
     <string name="file_msg_send">Send File</string>
     <string name="file_msg_log">LOG</string>
-    <string name="file_msg_clear">清空</string>
+    <!-- 清空：文件传输 / 局域网消息 / 状态卡片共用 -->
+    <string name="action_clear">清空</string>
     <string name="section_network">🌐 Network</string>
     <string name="section_advanced">⚡ MessageQueue</string>
     <string name="section_files">🛰 Services</string>
@@ -64,7 +65,7 @@
     <string name="market_widget_desc">一个部件可放多个自选标的的最新价与涨跌幅，小字标出市场代码，超出高度可上下滚动。</string>
     <string name="market_widget_config">行情列表设置</string>
     <string name="market_widget_loading">加载中…</string>
-    <string name="market_widget_refresh">刷新</string>
+    <string name="action_refresh">刷新</string>
     <string name="market_widget_title">行情</string>
     <!-- 行情曲线小部件：桌面上与「行情」并列的另一个部件，只盯一个标的画走势 -->
     <string name="market_chart_widget_label">📈 行情曲线</string>
@@ -97,7 +98,6 @@
     <string name="time_base">时基</string>
     <string name="read">local</string>
     <string name="record">record</string>
-    <string name="status">status</string>
     <string name="close">Close</string>
 
     <!-- ===== About / Feedback ===== -->
@@ -136,14 +136,14 @@
     <string name="commit">发送</string>
     <string name="chat_api_key_hint">API Key（按服务缓存）</string>
     <string name="chat_api_key_show">key</string>
-    <string name="chat_api_key_hide">隐藏</string>
+
     <string name="chat_ollama_local">本地</string>
     <string name="chat_ollama_cloud">在线</string>
     <string name="chat_ollama_host_hint">服务地址，如 127.0.0.1 / 192.168.1.20:11434</string>
     <string name="chat_model">模型</string>
     <string name="chat_model_pick">点选模型</string>
     <string name="chat_model_pick_title">选择模型</string>
-    <string name="chat_model_refresh">刷新</string>
+
     <string name="chat_model_reset">默认</string>
     <string name="chat_model_fetching">正在获取模型…</string>
     <string name="chat_model_none">没有取到模型</string>
@@ -161,7 +161,6 @@
     <string name="time">time</string>
     <string name="subscribe">Subscribe</string>
     <string name="publish">Publish</string>
-    <string name="tcp">TCP</string>
     <!-- 按钮一律英文：不写 server / client，由分组框 + 边框颜色区分 -->
     <string name="kcp_server">KCP 8090</string>
     <string name="kcp_client">KCP send</string>
@@ -254,7 +253,7 @@
     <string name="lan_msg_bad_port">端口需在 1025–65535 之间</string>
     <string name="lan_msg_peer_none">（暂未发现其它设备，点「发现设备」再试）</string>
     <string name="lan_msg_chat">消息</string>
-    <string name="lan_msg_clear">清空</string>
+
     <string name="lan_msg_cleared">已清空历史消息</string>
     <string name="lan_msg_chat_hint">收发历史会记录在这里</string>
     <string name="lan_msg_stopped">已停止收发</string>
@@ -272,14 +271,13 @@
     <string name="chat_attach_name_only">附件：%1$s（仅文件名）</string>
 
     <!-- ===== 主页面底部状态卡片 ===== -->
-    <string name="status_clear">清空</string>
+
 
     <!-- ===== SSH ===== -->
     <string name="ssh_server">🔐 SSH</string>
     <string name="ssh_server_running">🔐 SSH 服务运行中</string>
     <string name="ssh_server_stop">⏹ 停止 SSH</string>
     <string name="ssh_server_copy">📋 复制连接信息</string>
-    <string name="ssh_copy_done">连接信息已复制：\n%1$s</string>
     <string name="ssh_not_running">SSH 服务未运行，无法复制</string>
 
     <!-- ===== Exit ===== -->

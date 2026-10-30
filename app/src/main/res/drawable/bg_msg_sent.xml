@@ -1,5 +1,5 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FF4081"/>
+    <solid android:color="@color/ui_bubble_self"/>
     <corners
         android:topLeftRadius="16dp"
         android:topRightRadius="4dp"

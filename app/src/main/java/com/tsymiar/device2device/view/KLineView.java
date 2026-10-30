@@ -123,13 +123,28 @@ public class KLineView extends View {
     private boolean mScaling;
     private final ScaleGestureDetector mScaleDetector;
 
-    /** 神奇九转计数（买入/卖出，1..9），setData 时按收盘价递推算好 */
-    private Indicators.NineTurns mNine;
-    /** 反弹信号标记：mRebound[i]==1 表示第 i 根是「超卖回升」反弹信号 */
-    private int[] mRebound;
-    /** 反弹信号颜色（深浅模式自适应） */
+    // ===== 多空标记 =====
+    // 同一根 K 线可能同时命中好几个（比如 MACD 金叉和 KDJ 低位金叉经常撞在一起），
+    // 所以按位存进 mMarks，绘制时同侧按顺序往下 / 往上错开，别叠成一坨
+    private static final int MK_NINE_BUY = 0;    // 神奇九转 买入九转（底）
+    private static final int MK_NINE_SELL = 1;   // 神奇九转 卖出九转（顶）
+    private static final int MK_REBOUND = 2;     // RSI 超卖回升
+    private static final int MK_FALLBACK = 3;    // RSI 超买走弱
+    private static final int MK_MACD_GOLD = 4;   // MACD 金叉
+    private static final int MK_MACD_DEAD = 5;   // MACD 死叉
+    private static final int MK_KDJ_GOLD = 6;    // KDJ 低位金叉
+    private static final int MK_KDJ_DEAD = 7;    // KDJ 高位死叉
+    private static final int MK_COUNT = 8;
+    /** 标记文字，下标即 MK_* */
+    private static final String[] MK_TEXT = {"9", "9", "弹", "落", "金", "死", "低", "高"};
+    /** true=多头（画在 K 线下方），false=空头（画在上方） */
+    private static final boolean[] MK_BULL = {true, false, true, false, true, false, true, false};
+
+    /** 每根 K 线的多空标记，按位存（见 MK_*），setData 时算好 */
+    private int[] mMarks;
+    /** 反弹 / 超买回落的颜色（深浅模式自适应），跟九转、金叉死叉用的涨跌色分开 */
     private int mReboundColor = 0xFFC2185B;
-    /** 神奇九转 / 反弹信号是否显示（行情页一个开关同时管这两类信号） */
+    /** 多空标记是否显示（行情页一个开关管全部标记） */
     private boolean mShowSignals = true;
 
     public KLineView(Context context) {
@@ -267,8 +282,7 @@ public class KLineView extends View {
 
         mData = sanitize(quotes);
         float[] closes = Indicators.closes(mData);
-        mNine = Indicators.nineTurns(closes);
-        mRebound = computeRebound(closes);
+        mMarks = computeMarks(closes);
         mPendingTail = atTail;
         // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）；
         // 用户手动切过副图后就一直用他选的那个，刷新不再覆盖（锁了成交量但该源没量才回落 MACD）
@@ -287,19 +301,46 @@ public class KLineView extends View {
         invalidate();
     }
 
-    /** 反弹信号：RSI(14) 从超卖区(<=30)上穿 30，且该根为阳线，视为「超卖回升」反弹 */
-    private int[] computeRebound(float[] closes) {
+    /**
+     * 多空标记：按位写进 marks[i]。
+     *
+     * 四条来源互相独立，命中条件都取「上/下穿的那一根」而不是整段区间，
+     * 这样同一根上叠多个标记时只会多占一行，不会整片糊住。
+     */
+    private int[] computeMarks(float[] closes) {
         int n = closes.length;
-        int[] rb = new int[n];
+        int[] marks = new int[n];
+
+        // 神奇九转：只取第 9 根（从 <9 变到 9 的那根），1~8 和重复的 9 不算
+        Indicators.NineTurns nine = Indicators.nineTurns(closes);
+        for (int i = 0; i < n; i++) {
+            if (nine.buy[i] == 9 && (i == 0 || nine.buy[i - 1] < 9)) marks[i] |= 1 << MK_NINE_BUY;
+            else if (nine.sell[i] == 9 && (i == 0 || nine.sell[i - 1] < 9)) marks[i] |= 1 << MK_NINE_SELL;
+        }
+
+        // RSI：超卖区上穿 30 且收阳 → 反弹；超买区下穿 70 且收阴 → 回落
         float[] rsi = Indicators.rsi(closes, 14);
         for (int i = 1; i < n; i++) {
             if (Float.isNaN(rsi[i]) || Float.isNaN(rsi[i - 1])) continue;
-            if (rsi[i - 1] <= 30f && rsi[i] > 30f) {
-                Quote q = mData.get(i);
-                if (q.close >= q.open) rb[i] = 1;
-            }
+            Quote q = mData.get(i);
+            if (rsi[i - 1] <= 30f && rsi[i] > 30f && q.close >= q.open) marks[i] |= 1 << MK_REBOUND;
+            else if (rsi[i - 1] >= 70f && rsi[i] < 70f && q.close <= q.open) marks[i] |= 1 << MK_FALLBACK;
         }
-        return rb;
+
+        // MACD：DIF 上穿 DEA 金叉、下穿死叉
+        Indicators.Macd macd = Indicators.macd(closes, 12, 26, 9);
+        for (int i = 1; i < n; i++) {
+            if (macd.dif[i - 1] <= macd.dea[i - 1] && macd.dif[i] > macd.dea[i]) marks[i] |= 1 << MK_MACD_GOLD;
+            else if (macd.dif[i - 1] >= macd.dea[i - 1] && macd.dif[i] < macd.dea[i]) marks[i] |= 1 << MK_MACD_DEAD;
+        }
+
+        // KDJ：只在超买超卖区取交叉，否则日线上几乎天天有金叉死叉，标记就没意义了
+        Indicators.Kdj kdj = Indicators.kdj(Indicators.highs(mData), Indicators.lows(mData), closes, 9, 3, 3);
+        for (int i = 1; i < n; i++) {
+            if (kdj.k[i - 1] <= kdj.d[i - 1] && kdj.k[i] > kdj.d[i] && kdj.k[i] < 20f) marks[i] |= 1 << MK_KDJ_GOLD;
+            else if (kdj.k[i - 1] >= kdj.d[i - 1] && kdj.k[i] < kdj.d[i] && kdj.k[i] > 80f) marks[i] |= 1 << MK_KDJ_DEAD;
+        }
+        return marks;
     }
 
     /**
@@ -423,8 +464,7 @@ public class KLineView extends View {
         drawCandles(canvas, range);
         drawMovingAverages(canvas, range);
         drawLastPrice(canvas, range);
-        drawNineTurns(canvas, range);
-        drawRebound(canvas, range);
+        drawMarks(canvas, range);
         drawPanel(canvas);
         drawTimeAxis(canvas);
         drawSelection(canvas, range);
@@ -557,7 +597,9 @@ public class KLineView extends View {
     }
 
     private void drawCandles(Canvas canvas, float[] range) {
-        if (mLineMode) {
+        // 四价同值的序列（美元指数日线由汇率反算，没有真实 OHLC）画蜡烛只会得到一串断开的横杠，
+        // 看起来就是「不连续」，改画折线才读得出走势
+        if (mLineMode || !hasIntradayRange()) {
             drawTrendLine(canvas, range);
             return;
         }
@@ -582,6 +624,15 @@ public class KLineView extends View {
         }
     }
 
+    /** 视窗内有没有任何一根带真实振幅：全都没有就说明这份数据没有 OHLC */
+    private boolean hasIntradayRange() {
+        for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
+            Quote q = mData.get(i);
+            if (q.high > q.low) return true;
+        }
+        return false;
+    }
+
     /**
      * 折线（分时）模式：视窗内收盘价连成平滑曲线，下方填一层半透明面积，末端标出最新价。
      *
@@ -592,8 +643,23 @@ public class KLineView extends View {
     private void drawTrendLine(Canvas canvas, float[] range) {
         int first = Math.max(0, mStart);
         int last = Math.min(mData.size() - 1, mStart + mVisible - 1);
-        if (last <= first) return;
         int n = last - first + 1;
+        if (n < 1) return;
+        // 只有一笔最新价（美元指数分时源挂掉、只剩实时快照时就是这样）：画一条水平线，
+        // 别让绘图区空着——空的折线区会被当成「加载失败」
+        if (n == 1) {
+            float y = yOf(mData.get(first).close, range);
+            mLinePaint.setStyle(Paint.Style.STROKE);
+            mLinePaint.setStrokeWidth(dp(1.4f));
+            mLinePaint.setPathEffect(null);
+            mLinePaint.setColor(mTrend);
+            canvas.drawLine(mMainRect.left, y, mMainRect.right, y, mLinePaint);
+            mPaint.setStyle(Paint.Style.FILL);
+            mPaint.setColor(mTrend);
+            canvas.drawCircle(mMainRect.right, y, dp(2.2f), mPaint);
+            drawPrevCloseAxis(canvas, range);
+            return;
+        }
         float[] xs = new float[n];
         float[] ys = new float[n];
         for (int i = 0; i < n; i++) {
@@ -784,49 +850,76 @@ public class KLineView extends View {
         canvas.drawText(text, bx, by + sp(3), mTextPaint);
     }
 
-    /** 神奇九转：只画第 9 根信号（从 <9 变到 9 的那一根），1~8 与之后重复的 9 都不画 */
-    private void drawNineTurns(Canvas canvas, float[] range) {
-        if (mNine == null || !mShowSignals) return;
-        mTextPaint.setTextSize(sp(10));
+    /**
+     * 多空标记：多头画在 K 线下方（箭头朝上）、空头画在上方（箭头朝下），
+     * 同一根命中多个时按 MK_* 顺序往远离 K 线的方向错开一行。
+     */
+    private void drawMarks(Canvas canvas, float[] range) {
+        if (mMarks == null || !mShowSignals) return;
+        mTextPaint.setTextSize(sp(9));
         mTextPaint.setTextAlign(Paint.Align.CENTER);
         mTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        float step = sp(17);
         for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
-            int b = mNine.buy[i];
-            int s = mNine.sell[i];
-            if (b == 9 && (i == 0 || mNine.buy[i - 1] < 9)) {
-                float cx = xOf(i);
-                float y = Math.min(yOf(mData.get(i).low, range) + sp(11), mMainRect.bottom - sp(2));
-                mTextPaint.setColor(mDown);
-                canvas.drawText("9", cx, y, mTextPaint);
-            } else if (s == 9 && (i == 0 || mNine.sell[i - 1] < 9)) {
-                float cx = xOf(i);
-                float y = Math.max(yOf(mData.get(i).high, range) - sp(11), mMainRect.top + sp(2));
-                mTextPaint.setColor(mUp);
-                canvas.drawText("9", cx, y, mTextPaint);
+            int bits = mMarks[i];
+            if (bits == 0) continue;
+            Quote q = mData.get(i);
+            float cx = xOf(i);
+            int bullSlot = 0, bearSlot = 0;
+            for (int k = 0; k < MK_COUNT; k++) {
+                if ((bits & (1 << k)) == 0) continue;
+                if (MK_BULL[k]) {
+                    float y = Math.min(yOf(q.low, range) + sp(14) + bullSlot * step, mMainRect.bottom - sp(2));
+                    drawMarkGlyph(canvas, cx, y, true, MK_TEXT[k], markColor(k));
+                    bullSlot++;
+                } else {
+                    float y = Math.max(yOf(q.high, range) - sp(14) - bearSlot * step, mMainRect.top + sp(2));
+                    drawMarkGlyph(canvas, cx, y, false, MK_TEXT[k], markColor(k));
+                    bearSlot++;
+                }
             }
         }
         mTextPaint.setTypeface(Typeface.DEFAULT);
     }
 
-    /** 反弹信号：在实体下方画一个小三角 + “弹”字（超卖回升） */
-    private void drawRebound(Canvas canvas, float[] range) {
-        if (mRebound == null || !mShowSignals) return;
-        mPaint.setColor(mReboundColor);
+    private int markColor(int kind) {
+        switch (kind) {
+            case MK_NINE_BUY:
+                return mDown;
+            case MK_NINE_SELL:
+                return mUp;
+            case MK_REBOUND:
+            case MK_FALLBACK:
+                return mReboundColor;
+            case MK_MACD_GOLD:
+            case MK_KDJ_GOLD:
+                return mUp;
+            default:
+                return mDown;
+        }
+    }
+
+    /** 一个标记：三角 + 一字标签。bull 时 y 是三角底边（尖朝上），bear 时尖朝下 */
+    private void drawMarkGlyph(Canvas canvas, float cx, float y, boolean bull, String text, int color) {
         mPaint.setStyle(Paint.Style.FILL);
-        mTextPaint.setColor(mReboundColor);
-        mTextPaint.setTextSize(sp(9));
-        mTextPaint.setTextAlign(Paint.Align.CENTER);
-        for (int i = mStart; i < mStart + mVisible && i < mData.size(); i++) {
-            if (mRebound[i] != 1) continue;
-            float cx = xOf(i);
-            float y = Math.min(yOf(mData.get(i).low, range) + sp(14), mMainRect.bottom - sp(2));
-            Path tri = new Path();
-            tri.moveTo(cx, y - sp(6));
+        mPaint.setColor(color);
+        mTextPaint.setColor(color);
+        Path tri = new Path();
+        float h = sp(6);
+        if (bull) {
+            tri.moveTo(cx, y - h);
             tri.lineTo(cx - sp(4), y);
             tri.lineTo(cx + sp(4), y);
             tri.close();
             canvas.drawPath(tri, mPaint);
-            canvas.drawText("弹", cx, y + sp(10), mTextPaint);
+            canvas.drawText(text, cx, y + sp(10), mTextPaint);
+        } else {
+            tri.moveTo(cx, y + h);
+            tri.lineTo(cx - sp(4), y);
+            tri.lineTo(cx + sp(4), y);
+            tri.close();
+            canvas.drawPath(tri, mPaint);
+            canvas.drawText(text, cx, y - sp(3), mTextPaint);
         }
     }
 

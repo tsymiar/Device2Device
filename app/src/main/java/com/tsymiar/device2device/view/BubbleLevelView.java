@@ -8,6 +8,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 /**
  * 水平仪：圆形气泡水准器。
  *
@@ -48,14 +50,16 @@ public class BubbleLevelView extends View {
     public BubbleLevelView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mPlatePaint = fill(0xFFFAFAFA);
-        mRingPaint = stroke(0xFF90A4AE, dp(2f));
-        mGuidePaint = stroke(0xFFCFD8DC, dp(1f));
-        mTargetPaint = stroke(0xFF00897B, dp(1.5f));
-        mBubblePaint = fill(0xCC1E88E5);
-        mBubbleEdge = stroke(0xFF0D47A1, dp(1.5f));
-        mValuePaint = centerText(dp(11f), 0xFF37474F, true);
-        mHintPaint = centerText(dp(10f), 0xFF90A4AE, false);
+        UiPalette ui = UiPalette.of(context);
+        mPlatePaint = fill(ui.card);
+        mRingPaint = stroke(ui.textDim, dp(2f));
+        mGuidePaint = stroke(ui.divider, dp(1f));
+        mTargetPaint = stroke(ui.accent, dp(1.5f));
+        mBubblePaint = fill(ui.info);
+        mBubblePaint.setAlpha(0xCC);   // 气泡半透明，露出下面的十字准线
+        mBubbleEdge = stroke(ui.info, dp(1.5f));
+        mValuePaint = centerText(dp(11f), ui.text, true);
+        mHintPaint = centerText(dp(10f), ui.textHint, false);
     }
 
     /** 两个方向的倾角（度）：x=左右（右抬为正），y=前后（上抬为正） */

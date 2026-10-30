@@ -9,6 +9,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 import java.util.Locale;
 
 /**
@@ -61,20 +63,21 @@ public class CompassView extends View {
     public CompassView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mDialFill = fill(0xFFFAFAFA);
-        mDialRing = stroke(0xFFB0BEC5, dp(1.5f));
-        mTick = stroke(0xFFCFD8DC, dp(1f));
-        mTickMinor = stroke(0xFFE3E8EA, dp(1f));
-        mTickMajor = stroke(0xFF90A4AE, dp(2f));
-        mCardinal = textPaint(dp(11f), 0xFF546E7A, true);
-        mDegreePaint = textPaint(dp(11f), 0xFF90A4AE, false);
-        mCoordPaint = textPaint(dp(22f), 0xFF546E7A, false);   // 与放大后的方位文字尺寸相近
-        mMarkerPaint = fill(0xFF1E88E5);
-        mNorthPaint = fill(0xFFE53935);
-        mSouthPaint = fill(0xFFB0BEC5);
-        mHubPaint = fill(0xFF37474F);
-        mValuePaint = textPaint(dp(17f), 0xFF37474F, true);
-        mHintPaint = textPaint(dp(10f), 0xFF90A4AE, false);
+        UiPalette ui = UiPalette.of(context);
+        mDialFill = fill(ui.card);
+        mDialRing = stroke(ui.stroke, dp(1.5f));
+        mTick = stroke(ui.divider, dp(1f));
+        mTickMinor = stroke(ui.cardPressed, dp(1f));
+        mTickMajor = stroke(ui.textDim, dp(2f));
+        mCardinal = textPaint(dp(11f), ui.textDim, true);
+        mDegreePaint = textPaint(dp(11f), ui.textHint, false);
+        mCoordPaint = textPaint(dp(22f), ui.textDim, false);   // 与放大后的方位文字尺寸相近
+        mMarkerPaint = fill(ui.info);
+        mNorthPaint = fill(ui.danger);
+        mSouthPaint = fill(ui.textDim);
+        mHubPaint = fill(ui.text);
+        mValuePaint = textPaint(dp(17f), ui.text, true);
+        mHintPaint = textPaint(dp(10f), ui.textHint, false);
     }
 
     /** 方位角（度）：0=正北，顺时针为正 */

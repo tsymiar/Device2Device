@@ -9,6 +9,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import com.tsymiar.device2device.utils.UiPalette;
+
 /**
  * 海拔（卫星定位）：窄卡片排版——大数字居中 + 小字单位说明 + 底部 0~4000m 刻度条。
  * 无定位权限或 GPS 未就绪时给占位文案。
@@ -41,13 +43,14 @@ public class AltitudeView extends View {
     public AltitudeView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mDensity = context.getResources().getDisplayMetrics().density;
-        mPanelPaint = fill(0xFFFFFFFF);
-        mPanelStroke = stroke(0xFFE0E0E0, dp(1f));
-        mValuePaint = centerTextPaint(dp(17f), 0xFF00897B, true);
-        mSubPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mSubCenterPaint = centerTextPaint(dp(10f), 0xFF90A4AE, false);
-        mTrackPaint = fill(0xFFE0E0E0);
-        mFillPaint = fill(0xFF00897B);
+        UiPalette ui = UiPalette.of(context);
+        mPanelPaint = fill(ui.card);
+        mPanelStroke = stroke(ui.stroke, dp(1f));
+        mValuePaint = centerTextPaint(dp(17f), ui.accent, true);
+        mSubPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mSubCenterPaint = centerTextPaint(dp(10f), ui.textDim, false);
+        mTrackPaint = fill(ui.divider);
+        mFillPaint = fill(ui.accent);
     }
 
     /** 海拔（米），来自卫星定位 */
