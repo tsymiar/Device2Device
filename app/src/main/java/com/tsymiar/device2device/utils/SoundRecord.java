@@ -346,7 +346,6 @@ public class SoundRecord {
                         // instance with the data decoded so far.
                         break;
                     }
-                    //ByteBuffer newDecodedBytes = ByteBuffer.allocate(newSize);
                     mDecodedBytes.rewind();
                     if (newDecodedBytes != null) {
                         newDecodedBytes.put(mDecodedBytes);
@@ -444,13 +443,7 @@ public class SoundRecord {
             minBufferSize = mSampleRate * 2;
         }
         if (context != null && ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
+            // 没有录音权限时直接放弃本次采集，不在这里发起动态申请（调用方负责）
             return;
         }
         AudioRecord audioRecord = new AudioRecord(

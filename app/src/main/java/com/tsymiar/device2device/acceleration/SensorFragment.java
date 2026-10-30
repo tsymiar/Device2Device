@@ -482,12 +482,10 @@ public class SensorFragment extends Fragment implements SensorEventListener {
 
         @Override
         public void onAccuracyChanged(Sensor arg0, int arg1) {
-            // TODO Auto-generated method stub
         }
 
         @Override
         public void onSensorChanged(SensorEvent arg) {
-            // TODO Auto-generated method stub
             // 检测时间
             long currentUpdateTime = System.currentTimeMillis();
             // 两次检测的时间间隔

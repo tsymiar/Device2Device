@@ -67,12 +67,10 @@ public class SamplePlayer {
                 new AudioTrack.OnPlaybackPositionUpdateListener() {
                     @Override
                     public void onPeriodicNotification(AudioTrack track) {
-                        //LogU.i("1", "1");
                     }
 
                     @Override
                     public void onMarkerReached(AudioTrack track) {
-                        //LogU.i("2", "2");
                         stop();
                         if (mListener != null) {
                             mListener.onCompletion();
