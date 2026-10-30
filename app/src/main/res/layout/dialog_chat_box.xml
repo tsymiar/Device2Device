@@ -31,12 +31,13 @@
             android:textSize="14sp"
             android:dropDownVerticalOffset="4dp"
             android:dropDownWidth="match_parent"
-            android:popupBackground="@android:color/white"
+            android:popupBackground="@color/ui_card"
             android:popupElevation="4dp" />
 
-        <!-- 描边和文字取同一个色：OutlinedButton 的描边默认跟着 colorAccent（粉 #D81B60），
-             文字却默认跟 colorPrimary（青绿 #008577），一小块按钮上两个色相撞在一起。
-             统一用 colorPrimary，跟页面里的小节标题、气泡描边一个色系。 -->
+        <!-- 描边和文字都显式取主色：OutlinedButton 的描边默认跟 colorAccent、文字跟 colorPrimary，
+             这个是粉的、那个是青的，一小块按钮上两个色相会撞。
+             描边类（描边按钮、勾选框）统一走 ui_accent_outline —— 比 ui_accent 暗一档，
+             深底上不至于发亮；实心的发送键才用满亮度的 ui_accent -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_key_mask"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -45,11 +46,11 @@
             android:layout_marginStart="6dp"
             android:minWidth="0dp"
             android:text="@string/chat_api_key_show"
-            android:textColor="@color/colorPrimary"
+            android:textColor="@color/ui_accent_outline"
             android:textSize="11sp"
             app:cornerRadius="18dp"
-            app:rippleColor="#26008577"
-            app:strokeColor="@color/colorPrimary"
+            app:rippleColor="@color/ui_ripple"
+            app:strokeColor="@color/ui_accent_outline"
             app:strokeWidth="1dp" />
     </LinearLayout>
 
@@ -100,7 +101,7 @@
                 android:id="@+id/rb_ollama_local"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:buttonTint="@color/colorAccent"
+                android:buttonTint="@color/ui_accent_outline"
                 android:checked="true"
                 android:text="@string/chat_ollama_local"
                 android:textColor="@color/dialog_text_primary"
@@ -111,7 +112,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
-                android:buttonTint="@color/colorAccent"
+                android:buttonTint="@color/ui_accent_outline"
                 android:text="@string/chat_ollama_cloud"
                 android:textColor="@color/dialog_text_primary"
                 android:textSize="13sp" />
@@ -183,7 +184,7 @@
             android:layout_height="36dp"
             android:layout_marginStart="6dp"
             android:background="?android:attr/selectableItemBackground"
-            android:contentDescription="@string/chat_model_refresh"
+            android:contentDescription="@string/action_refresh"
             android:padding="8dp"
             android:src="@drawable/ic_refresh"
             android:tint="?attr/colorControlNormal" />
@@ -286,7 +287,7 @@
                     android:id="@+id/check_dpsk"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:buttonTint="@color/colorAccent"
+                    android:buttonTint="@color/ui_accent_outline"
                     android:visibility="gone" />
 
                 <TextView
@@ -294,7 +295,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/r1"
-                    android:textColor="#666666"
+                    android:textColor="@color/ui_text_dim"
                     android:textSize="13sp"
                     android:visibility="gone" />
 
@@ -310,8 +311,9 @@
                     android:layout_height="44dp"
                     android:minWidth="0dp"
                     android:text="@string/pkg"
+                    android:textColor="@color/ui_accent_outline"
                     app:cornerRadius="22dp"
-                    app:strokeColor="@color/colorAccent"
+                    app:strokeColor="@color/ui_accent_outline"
                     app:strokeWidth="1.5dp" />
 
                 <Space
@@ -326,8 +328,8 @@
                     android:minWidth="0dp"
                     android:text="@string/commit"
                     android:textSize="14sp"
-                    app:backgroundTint="@color/colorPrimary"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/ui_on_fill"
+                    app:backgroundTint="@color/ui_accent"
                     app:cornerRadius="22dp" />
             </LinearLayout>
         </LinearLayout>

@@ -1,5 +1,4 @@
 package com.tsymiar.device2device.dialog;
-// Android 基础组件
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -213,7 +212,6 @@ public class ChatBoxDialog extends Dialog {
                     (int)(metrics.heightPixels * 0.8) // 占据屏幕80%高度
             );
             if (metrics.heightPixels < metrics.widthPixels) {
-                // 横屏模式
                 window.setLayout(
                         (int)(metrics.widthPixels * 0.6),
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -282,7 +280,6 @@ public class ChatBoxDialog extends Dialog {
 
                 @Override
                 public void onNothingSelected(AdapterView<?> parent) {
-                    // 无选择时保持当前模式
                 }
             });
         }
@@ -401,7 +398,6 @@ public class ChatBoxDialog extends Dialog {
         if (etOllamaHost != null) {
             etOllamaHost.setText(loadOllamaHost());
             etOllamaHost.setSelection(etOllamaHost.getText().length());
-            // 光标移开就落盘，不用专门点"保存"
             etOllamaHost.setOnFocusChangeListener((v, hasFocus) -> {
                 if (!hasFocus) {
                     saveOllamaPrefs();
@@ -921,7 +917,7 @@ public class ChatBoxDialog extends Dialog {
         if (etApiKey == null) return;
         etApiKey.setVisibility(mKeyVisible ? View.VISIBLE : View.GONE);
         if (btnKeyMask != null) {
-            btnKeyMask.setText(mKeyVisible ? R.string.chat_api_key_hide : R.string.chat_api_key_show);
+            btnKeyMask.setText(mKeyVisible ? R.string.hide : R.string.chat_api_key_show);
         }
     }
 
