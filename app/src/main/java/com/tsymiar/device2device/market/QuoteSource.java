@@ -2103,10 +2103,13 @@ public final class QuoteSource {
         // 行情页和桌面小部件可能同时调到这里，这张静态表的所有读写都要串行
         synchronized (AGGREGATORS) {
             long now = System.currentTimeMillis();
-            MinuteAggregator aggregator = AGGREGATORS.get(source);
+            // key 必须带上 step：只按 source 存时，1m / 5m / 15m 会共用同一个聚合器，
+            // 切周期后新旧两个步长的时间戳混在一起，图上就出现串周期的点
+            String key = source + "|" + step;
+            MinuteAggregator aggregator = AGGREGATORS.get(key);
             if (aggregator == null || aggregator.expired(now)) {
                 aggregator = new MinuteAggregator(1000, now);
-                AGGREGATORS.put(source, aggregator);
+                AGGREGATORS.put(key, aggregator);
             }
             for (Tick tick : ticks) {
                 aggregator.push(floorMinute(tick.time, step), tick.price);

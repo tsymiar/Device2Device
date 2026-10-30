@@ -315,6 +315,15 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         return mStatus;
     }
 
+    /**
+     * 回调到达时本页是否还活着：搜索是异步的，等结果回来时可能已经退出，也可能因为旋转屏幕 /
+     * 深浅色切换被重建 —— 这两种 isFinishing() 都是 false，只有 isDestroyed() 认得出后者。
+     * 不查的话往废掉的 Activity 上弹 Dialog 会直接抛 BadTokenException。
+     */
+    private boolean alive() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     private void setStatus(CharSequence text) {
         if (mStatus == null) return;
         mStatus.setText(text);
@@ -371,7 +380,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
             @Override
             public void onResult(List<QuoteSource.Symbol> items) {
                 mSearching = false;
-                if (isFinishing()) return;
+                if (!alive()) return;
                 if (items == null || items.isEmpty()) {
                     setStatus("未找到匹配的标的：" + input);
                     return;
@@ -386,7 +395,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
             @Override
             public void onError(String message) {
                 mSearching = false;
-                if (!isFinishing()) setStatus("搜索失败：" + message);
+                if (alive()) setStatus("搜索失败：" + message);
             }
         });
     }
@@ -400,6 +409,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
 
     /** 多个同名/近似的标的时让用户选一个 */
     private void pickSymbol(List<QuoteSource.Symbol> items) {
+        if (!alive()) return;      // 结果回来时页面可能已重建，这时弹框会抛 BadTokenException
         String[] labels = new String[items.size()];
         for (int i = 0; i < items.size(); i++) {
             labels[i] = items.get(i).name + "  " + items.get(i).code;

@@ -505,7 +505,7 @@ public class MarketActivity extends AppCompatActivity {
     /** 数据源变化后重建周期列表；若当前周期不被支持则回落到该源默认周期 */
     private void updateNineBtn() {
         if (mNineBtn == null) return;
-        mNineBtn.setText(mShowNine ? "九转反弹 开" : "九转反弹 关");
+        mNineBtn.setText(mShowNine ? "多空标记 开" : "多空标记 关");
         mNineBtn.setTextColor(mShowNine ? C_ON_TEXT : C_TEXT);
         mNineBtn.setBackground(mShowNine
                 ? buttonBg(C_ON, 0, C_ON_PRESSED, 0)

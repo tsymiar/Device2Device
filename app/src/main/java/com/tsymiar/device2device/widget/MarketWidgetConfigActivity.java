@@ -115,7 +115,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         setResult(RESULT_CANCELED, resultIntent());
         // 已有配置（重新配置时）直接带出来，可继续增删
         mItems.addAll(MarketWidgetProvider.readItems(this, mAppWidgetId));
-        mSource = mItems.get(0).source;
+        if (!mItems.isEmpty()) mSource = mItems.get(0).source;
         setContentView(buildUi());
         if (mAppWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             setStatus("没拿到小部件 ID：请从桌面的小部件列表里添加（不要从应用内部打开本页）");
@@ -543,6 +543,16 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         return mStatus;
     }
 
+    /**
+     * 回调到达时本页是否还活着：搜索是异步的，等结果回来时可能已经退出、也可能因为
+     * 旋转屏幕 / 深浅色切换被重建 —— 这两种 isFinishing() 都是 false，只有 isDestroyed()
+     * 能认出后者。两者都不查的话，往一个废掉的 Activity 上弹 Dialog 会直接抛
+     * BadTokenException（配置页最常见的崩法）。
+     */
+    private boolean alive() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     /** 所有回执都走这里：空内容就不占位，卡片顶部不会白留一行 */
     private void setStatus(CharSequence text) {
         if (mStatus == null) return;
@@ -606,7 +616,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
                 @Override
                 public void onResult(List<QuoteSource.Symbol> items) {
                     mSearching = false;
-                    if (isFinishing()) return;
+                    if (!alive()) return;
                     if (items == null || items.isEmpty()) {
                         setStatus("未找到匹配的标的：" + input);
                         return;
@@ -621,7 +631,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
                 @Override
                 public void onError(String message) {
                     mSearching = false;
-                    if (!isFinishing()) setStatus("搜索失败：" + message);
+                    if (alive()) setStatus("搜索失败：" + message);
                 }
             });
             return;
@@ -638,6 +648,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
 
     /** 多个同名/近似的标的时让用户选一个 */
     private void pickSymbol(List<QuoteSource.Symbol> items) {
+        if (!alive()) return;      // 搜索结果回来时页面可能已经重建，这时弹框会抛 BadTokenException
         String[] labels = new String[items.size()];
         for (int i = 0; i < items.size(); i++) {
             labels[i] = items.get(i).name + "  " + items.get(i).code;
