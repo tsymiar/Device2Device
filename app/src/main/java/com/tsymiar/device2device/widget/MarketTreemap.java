@@ -41,6 +41,17 @@ public final class MarketTreemap {
      */
     private static final float SLIVER_RATIO = 0.6f;
 
+    /**
+     * 一行最多摆这么多个。squarified 的判据只管长宽比，不管绝对宽度，50 家摊一屏时能选出
+     * 「一行塞 7 个、最末那个只剩 18px」——放不下名字，就剩一块颜色。按行长的 1/它 卡一道下限，
+     * 窄于这个值的行方案一律判为最差，算法自然改挑格子更少的方案。用比例而不是写死像素，
+     * 换密度、换尺寸都不用重标。
+     *
+     * 实测（1017x370 的画布、50 格、市值按 4 倍落差分布）：14 时最差长宽比 1.70、最窄 49px，
+     * 18 时最差 1.48、最窄 52px —— 放宽到 18 形状更好，再放宽收益就没了。
+     */
+    private static final float MAX_PER_LINE = 18f;
+
     private MarketTreemap() {
     }
 
@@ -312,6 +323,7 @@ public final class MarketTreemap {
         int best = 1;
         double run = 0d;
         float bestWorst = Float.MAX_VALUE;
+        float minExt = Math.max(2f, side / MAX_PER_LINE);
         for (int n = 1; from + n <= items.size(); n++) {
             run += Math.max(0d, items.get(from + n - 1).totalCap);
             if (run <= 0d || total <= 0d) break;
@@ -320,7 +332,7 @@ public final class MarketTreemap {
             float worst = 0f;
             for (int i = from; i < from + n; i++) {
                 float ext = side * (float) (Math.max(0d, items.get(i).totalCap) / run);
-                if (ext < 1f) {                          // 该标的已经瘦成一条线
+                if (ext < minExt) {                       // 该标的已经瘦成放不下字的细条
                     worst = Float.MAX_VALUE;
                     break;
                 }

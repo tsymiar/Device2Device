@@ -5,7 +5,9 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -21,6 +23,8 @@ import android.text.TextUtils;
 import android.net.Uri;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
+import android.hardware.display.DisplayManager;
+import android.view.Display;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.SizeF;
@@ -93,6 +97,13 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     /** 画布比量出来的可见高度再高这么一点：宁可最后一行被切一丁点，也不在底部留一道白 */
     private static final float CANVAS_COVER = 1.03f;
 
+    /**
+     * 画布高度的回缩系数，写死 0.88：这个值已经被 {@link #TILE_FILL_DP2} 和 {@link #CANVAS_COVER}
+     * 的标定吸收进去了，两者绑定，不能换成 {@link #widthCompensate} 的动态值——
+     * 本机两态 density 相等、该系数是 1.0，画布会比可见区域高出一整行，最后一排整排被裁。
+     */
+    private static final float CANVAS_SCALE = 0.88f;
+
     /** 一格里还认得出字的最小面积（dp²）：50 家摊一屏时按它判要不要减格数 */
     private static final float TILE_FLOOR_DP2 = 420f;
 
@@ -106,10 +117,44 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     private static final float TILE_FILL_DP2 = 950f;
 
     /**
-     * 横向回缩：宿主渲染 remote views 时会按自己的密度再放大一档，逐像素写死的格子宽度
-     * 跟着放大（实测 ×1.147），右边那一列就戳出边框。按这个比例回缩之后落在可见宽度里。
+     * 宿主渲染这块 remote views 用的 density 相对本应用 density 的倍数。
+     *
+     * remote views 是在**宿主进程**里 inflate 的，inflate 用的是宿主的 Resources，
+     * 于是我们写下去的 dp / sp 全按宿主的 density 换算，而 app 这边量尺寸用的是自己的 density
+     * —— 两者不等时整片内容会被放大 hostDpi / appDpi 倍，最右一列就戳出卡片被裁掉。
+     * 本机实测：physical 560dpi、MIUI 的「显示大小」把应用压到 476dpi，差 1.18 倍。
+     *
+     * 用 {@link Display#getRealMetrics} 拿物理密度（它不吃 override），
+     * 拿不到就退回 1.0：宁可右边留一条，也别把格子戳出边框。
      */
-    private static final float WIDTH_COMPENSATE = 0.88f;
+    private static float hostScale(Context context) {
+        Float cached = sHostScale;
+        if (cached != null) return cached;
+        DisplayMetrics app = context.getResources().getDisplayMetrics();
+        if (app.densityDpi <= 0) return 1f;
+        int realDpi = 0;
+        try {
+            DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
+            Display display = dm == null ? null : dm.getDisplay(Display.DEFAULT_DISPLAY);
+            if (display != null) {
+                DisplayMetrics real = new DisplayMetrics();
+                display.getRealMetrics(real);
+                realDpi = real.densityDpi;
+            }
+        } catch (Throwable t) {
+            realDpi = 0;
+        }
+        int refDpi = realDpi > 0 ? realDpi : Math.round(app.xdpi);
+        if (refDpi <= 0) return 1f;
+        float scale = Math.max(1f, Math.min(1.6f, refDpi / (float) app.densityDpi));
+        Log.i(TAG, "host scale app=" + app.densityDpi + "dpi real=" + realDpi
+                + "dpi xdpi=" + Math.round(app.xdpi) + " scale=" + scale);
+        sHostScale = scale;
+        return scale;
+    }
+
+    /** {@link #hostScale} 的缓存：一行一算会重复打日志，一个会话里也不会变 */
+    private static volatile Float sHostScale;
 
     /**
      * 透明点击槽的个数，也是能画的上限：一格一个，摆到格子的位置上（见 {@link #paintSlots}）。
@@ -437,21 +482,32 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     static HeatLayout mapFor(Context context, int widgetId, int[] size, int tiles, int[] area) {
         List<CapRow> rows = sRows;
         if (rows == null || rows.isEmpty() || context == null) return null;
+        // 写出去的尺寸一律用 COMPLEX_UNIT_PX（见 tile/rowViews），宿主不会再换算，
+        // 所以这里得自己把 app 像素换成宿主像素；不换的话整片被宿主再放大一遍，最右一列被裁
+        float scale = hostScale(context);
+        int canvasPx = Math.max(1, Math.round(area[2] * scale));
         HeatLayout cached = sLayouts.get(widgetId);
         if (cached != null && cached.size[0] == size[0] && cached.size[1] == size[1]
-                && cached.size[2] == tiles && cached.canvas == area[2]) {
+                && cached.size[2] == tiles && cached.canvas == canvasPx) {
             return cached;
         }
         // 榜单按市值倒序存着，取前 N 只就是「最大的 N 只」（见 fetchTopCaps 收尾那次排序）
         List<CapRow> shown = rows.size() > tiles ? new ArrayList<>(rows.subList(0, tiles)) : rows;
+        // 真正画出来的宽度先算好：排版必须按同一个宽度走，否则 squarified 是按满宽挑的长宽比，
+        // 渲染时又被压到 widthCompensate，每格都横向变扁，右边还空出一条
+        // 排版必须按宿主像素排：squarified 是按这个矩形的长宽比挑形状的，
+        // 用 app 像素排（比宿主小一圈）再被放大，格子就横向变扁、末尾几格压成细条
+        int drawW = Math.max(1, Math.round(area[0] * scale));
+        Log.i(TAG, "heat layout appPx w=" + area[0] + " h=" + area[1] + " canvas=" + area[2]
+                + " scale=" + scale + " -> hostPx w=" + drawW + " canvas=" + canvasPx);
         // 画布比可见区域高（area[2]）：高出来的那部分行滚过去才看得见；
         // 顶层一律横着分行（topRows）—— 这些行要当列表条目用
-        MarketTreemap.Node root = MarketTreemap.layout(shown, area[0], area[2], true);
+        MarketTreemap.Node root = MarketTreemap.layout(shown, drawW, canvasPx, true);
         if (root == null) {
             sLayouts.remove(widgetId);
             return null;
         }
-        HeatLayout layout = new HeatLayout(root, Math.round(area[0] * WIDTH_COMPENSATE), area[2],
+        HeatLayout layout = new HeatLayout(root, drawW, canvasPx,
                 new int[]{size[0], size[1], tiles},
                 area[1]);
         sLayouts.put(widgetId, layout);
@@ -638,9 +694,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         // 两条里取大的：宿主报的可见高度（再垫 3% 防底部留白）、按「50 家 × 950dp²」反推的高度
         float fillDp = TILES_WANT * TILE_FILL_DP2 / wDp;
         float coverDp = mapHeightPx / metrics.density * CANVAS_COVER;
-        // 同一条宿主缩放（见 WIDTH_COMPENSATE）：画布也要按它回缩，否则最后一行会被切成
-        // 贴着下沿的一条几像素 —— 那几格既看不清也点不准，不如按整行算
-        float canvasDp = Math.max(coverDp, fillDp) * WIDTH_COMPENSATE;
+        // 画布高度走自己的回缩系数，不跟 widthCompensate：它俩标定来源不同（见 CANVAS_SCALE）
+        float canvasDp = Math.max(coverDp, fillDp) * CANVAS_SCALE;
         return Math.max(1, Math.round(canvasDp * metrics.density));
     }
 
@@ -762,15 +817,16 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
     static RemoteViews rowViews(Context context, int widgetId, MarketTreemap.Node row,
                                 int widthPx, int heightPx) {
         if (row == null || context == null || widthPx <= 0 || heightPx <= 0) return null;
-        RemoteViews views = new MapBrush(context, widgetId * TILE_CODE_STRIDE)
+        RemoteViews views = new MapBrush(context, widgetId * TILE_CODE_STRIDE, hostScale(context))
                 .draw(row, widthPx, heightPx);
         // 行高写死：格子上那几个 setHeight / setMaxHeight 在桌面那个 TextView 上不生效
         // （高度跟着文字走），行就比排版高、点击槽跟着错位；改条目的 LayoutParams 一定管用
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            float density = context.getResources().getDisplayMetrics().density;
             int rootId = row.isLeaf() ? R.id.widget_market_heat_tile
                     : (row.alongWidth ? R.id.widget_market_heat_row : R.id.widget_market_heat_col);
-            views.setViewLayoutHeight(rootId, heightPx / density, TypedValue.COMPLEX_UNIT_DIP);
+            // 写原始 px：remote views 由宿主 inflate，写 dp 会按宿主的 density 再换算一遍，
+            // 那一遍是 app 侧看不见的放大，最右一列就是这么戳出卡片的
+            views.setViewLayoutHeight(rootId, Math.max(1, heightPx), TypedValue.COMPLEX_UNIT_PX);
         }
         return views;
     }
@@ -787,14 +843,16 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         private final MarketPalette palette;
         private int codes;
 
-        MapBrush(Context context, int firstCode) {
+        MapBrush(Context context, int firstCode, float uiScale) {
             this.context = context;
             this.codes = firstCode;
             DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-            this.density = metrics.density;
+            // 格子尺寸是按宿主像素排的（见 hostScale），留白 / 字号得用同一个像素尺度算，
+            // 否则格子放大了、留白还是按应用 density 算，字就贴到格子边上了
+            this.density = metrics.density * uiScale;
             // 系统字体缩放：SP 到 px 走的是它，不是 density —— 用户放大字体后别再把文字挤出去
-            this.fontScale = metrics.scaledDensity;
-            this.gapPx = SEAM_PX;
+            this.fontScale = metrics.scaledDensity * uiScale;
+            this.gapPx = Math.max(1, Math.round(SEAM_PX * uiScale));
             this.palette = MarketPalette.of(context);
         }
 
@@ -914,9 +972,8 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             // 在桌面那个 TextView 上量出来不生效——格子会跟着文字高矮不一，整片马赛克
             // 只铺到可见区域的一半，按格子位置摆的点击槽也就对不上
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                float d = context.getResources().getDisplayMetrics().density;
-                views.setViewLayoutWidth(id, Math.max(1, widthPx) / d, TypedValue.COMPLEX_UNIT_DIP);
-                views.setViewLayoutHeight(id, Math.max(1, heightPx) / d, TypedValue.COMPLEX_UNIT_DIP);
+                views.setViewLayoutWidth(id, Math.max(1, widthPx), TypedValue.COMPLEX_UNIT_PX);
+                views.setViewLayoutHeight(id, Math.max(1, heightPx), TypedValue.COMPLEX_UNIT_PX);
             } else {
                 views.setInt(id, "setWidth", Math.max(1, widthPx));
                 views.setInt(id, "setMinHeight", Math.max(1, heightPx));
@@ -924,7 +981,9 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             }
             views.setInt(id, "setBackgroundColor", fill);
             views.setTextViewText(id, label.text);
-            views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, label.sp);
+            // 同样写原始 px：格子尺寸已经是宿主像素了，字号再走 SP 会被宿主多放大一档，
+        // 字比格子大就折行、撑破留白
+        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_PX, label.sp * fontScale);
             // 行数按内容收住：中文没有词间空格，TextView 会逐字折行，留着宽的 maxLines 就会给你拆成两行
             views.setInt(id, "setMaxLines", label.lines);
             views.setTextColor(id, tileTextColor(palette, Color.alpha(fill)));
@@ -1407,10 +1466,10 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_legend, legendText(rows, tiles, false));
         views.setTextViewText(R.id.widget_market_heat_time, stampText());
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
-        views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_legend, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_market_heat_time, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_market_heat_empty, color(context, R.color.market_widget_text_hint));
+        views.setTextColor(R.id.widget_meta, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_legend, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_market_heat_time, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_market_heat_empty, color(context, R.color.market_text_hint));
 
         views.setTextViewTextSize(R.id.widget_title, TypedValue.COMPLEX_UNIT_SP, titleSp);
         // widget_refresh 是图标，不跟着标题缩放：18dp 在常见部件尺寸下都合适
@@ -1488,12 +1547,13 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             }
             HeatSlot slot = slots.get(i);
             views.setViewVisibility(id, View.VISIBLE);
-            views.setViewLayoutMargin(id, RemoteViews.MARGIN_LEFT, slot.left / density,
-                    TypedValue.COMPLEX_UNIT_DIP);
-            views.setViewLayoutMargin(id, RemoteViews.MARGIN_TOP, slot.top / density,
-                    TypedValue.COMPLEX_UNIT_DIP);
-            views.setViewLayoutWidth(id, slot.width / density, TypedValue.COMPLEX_UNIT_DIP);
-            views.setViewLayoutHeight(id, slot.height / density, TypedValue.COMPLEX_UNIT_DIP);
+            // 槽的位置尺寸来自排版树，已经是宿主像素（见 hostScale），直接写原始 px
+            views.setViewLayoutMargin(id, RemoteViews.MARGIN_LEFT, slot.left,
+                    TypedValue.COMPLEX_UNIT_PX);
+            views.setViewLayoutMargin(id, RemoteViews.MARGIN_TOP, slot.top,
+                    TypedValue.COMPLEX_UNIT_PX);
+            views.setViewLayoutWidth(id, slot.width, TypedValue.COMPLEX_UNIT_PX);
+            views.setViewLayoutHeight(id, slot.height, TypedValue.COMPLEX_UNIT_PX);
             views.setOnClickPendingIntent(id, stockIntent(context, slot.row,
                     widgetId * TILE_CODE_STRIDE + i));
         }
@@ -1552,7 +1612,7 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
             return sError == null ? context.getString(R.string.market_widget_loading) : sError;
         }
         MarketPalette palette = MarketPalette.of(context);
-        int dim = color(context, R.color.market_widget_text_hint);
+        int dim = color(context, R.color.market_text_hint);
         SpannableStringBuilder sb = new SpannableStringBuilder();
         // 涨跌平各带自己的颜色：名字和数字一起染色，一眼看得出今天是红的多还是绿的多
         tinted(sb, "涨 " + sBreadth.up, palette.up);
@@ -1668,10 +1728,50 @@ public class MarketHeatWidgetProvider extends AppWidgetProvider {
      * 都没有才回去问 AppWidgetManager —— 刚改完大小时它给的还是上一份。
      */
     private static int[] sizeFor(Context context, AppWidgetManager manager, int widgetId, Bundle opts) {
-        if (opts != null) sOpts.put(widgetId, new Bundle(opts));
-        Bundle use = opts != null ? opts : sOpts.get(widgetId);
-        if (use == null && manager != null) use = manager.getAppWidgetOptions(widgetId);
-        return sizeDp(context, use);
+        // 宿主给的 opts 不一定带尺寸清单。本机实测 MIUI：有时 OPTION_APPWIDGET_SIZES 是空的，
+        // 只剩 MIN/MAX 那组（min=384x132dp），而真实格子是 354x190dp —— 高度差了 30%，
+        // 照它量出来的可见区域就比实际小一大截，马赛克右边和底部都留白（本 bug）。
+        // 所以：① 有清单就用并记下来；② 没有就用上一次记下的；③ 都没有才退到 MIN/MAX。
+        Bundle best = opts;
+        if (sizesOf(best) == null && manager != null) {
+            Bundle queried = manager.getAppWidgetOptions(widgetId);
+            if (sizesOf(queried) != null) best = queried;
+        }
+        if (sizesOf(best) != null) {
+            sOpts.put(widgetId, new Bundle(best));
+            int[] size = sizeDp(context, best);
+            rememberSize(context, widgetId, size);
+            return size;
+        }
+        Bundle cached = sOpts.get(widgetId);
+        if (cached != null && sizesOf(cached) != null) return sizeDp(context, cached);
+        int[] saved = rememberedSize(context, widgetId);
+        if (saved != null) return saved;
+        return sizeDp(context, best != null ? best
+                : (manager != null ? manager.getAppWidgetOptions(widgetId) : null));
+    }
+
+    /** 这套 opts 里有没有「宿主真正给的尺寸清单」；MIN/MAX 那两头不算（见 {@link #sizeFor}） */
+    private static float[][] sizesOf(Bundle opts) {
+        if (opts == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null;
+        return kept(opts.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES));
+    }
+
+    private static final String PREF_HEAT_SIZE = "market_heat_size";
+
+    /** 记住这个实例上一次的真实尺寸（dp）：下次宿主再给空清单时还能照它摆 */
+    private static void rememberSize(Context context, int widgetId, int[] size) {
+        if (context == null || size == null || size[0] <= 0 || size[1] <= 0) return;
+        context.getSharedPreferences(PREF_HEAT_SIZE, Context.MODE_PRIVATE)
+                .edit().putInt("w" + widgetId, size[0]).putInt("h" + widgetId, size[1]).apply();
+    }
+
+    private static int[] rememberedSize(Context context, int widgetId) {
+        if (context == null) return null;
+        SharedPreferences pref = context.getSharedPreferences(PREF_HEAT_SIZE, Context.MODE_PRIVATE);
+        int w = pref.getInt("w" + widgetId, 0);
+        int h = pref.getInt("h" + widgetId, 0);
+        return w > 0 && h > 0 ? new int[]{w, h} : null;
     }
 
     /**
