@@ -3,7 +3,7 @@
      这里不写 android:tint：桌面小部件的布局是在 launcher 进程里充气的，
      "?attr/colorControlNormal" 是 AppCompat 主题的属性，在 launcher 的主题里找不到，
      充气直接抛 Resources.NotFoundException。tint 一律由使用方在自己的布局上给：
-     对话框里给 ?attr/colorControlNormal，小部件里给 @color/market_widget_text_dim。 -->
+     对话框里给 ?attr/colorControlNormal，小部件里给 @color/market_text_dim。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

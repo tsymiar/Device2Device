@@ -523,11 +523,11 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_meta, meta == null ? "" : meta);
         // 布局里的默认色随深浅模式，这里按当前模式显式覆盖一次，避免桌面缓存了旧配色
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
-        views.setTextColor(R.id.widget_symbol, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_range, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_chart_empty, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_note, color(context, R.color.market_widget_text_hint));
+        views.setTextColor(R.id.widget_symbol, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_meta, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_range, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_chart_empty, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_note, color(context, R.color.market_text_hint));
         // 价格与涨跌幅统一用涨跌色，一眼看红绿
         views.setTextColor(R.id.widget_price, color(context, row.color));
         views.setTextColor(R.id.widget_change, color(context, row.color));
@@ -560,7 +560,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         int chartW = Math.max(1, size[0] - CHART_SIDE_DP);
         int chartH = Math.max(1, size[1] - chrome);
         android.graphics.Bitmap bitmap = MarketSparkline.render(context, row.series, row.base,
-                chartW, chartH, color(context, R.color.market_widget_bg));
+                chartW, chartH, color(context, R.color.market_panel));
         if (bitmap != null) {
             views.setImageViewBitmap(R.id.widget_chart, bitmap);
             views.setViewVisibility(R.id.widget_chart_empty, View.GONE);

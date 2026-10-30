@@ -53,7 +53,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text=""
-                android:textColor="@color/market_widget_text_hint"
+                android:textColor="@color/market_text_hint"
                 android:textSize="9sp" />
         </LinearLayout>
 
@@ -66,9 +66,9 @@
             android:paddingEnd="1dp"
             android:paddingTop="1dp"
             android:paddingBottom="1dp"
-            android:contentDescription="@string/market_widget_refresh"
+            android:contentDescription="@string/action_refresh"
             android:src="@drawable/ic_refresh"
-            android:tint="@color/market_widget_text_dim" />
+            android:tint="@color/market_text_dim" />
 
         <!-- 取数时在图标原位换成转圈，与 ChatBox「思考中…」那个 ProgressBar 同一套路：
              由系统画的 indeterminate 动画，比逐帧 setRotation 稳，也不受图标留白偏移影响。
@@ -107,7 +107,7 @@
             android:gravity="center"
             android:maxLines="1"
             android:text="@string/market_widget_chart_wait"
-            android:textColor="@color/market_widget_text_hint"
+            android:textColor="@color/market_text_hint"
             android:textSize="11sp"
             android:visibility="gone" />
     </FrameLayout>
@@ -145,7 +145,7 @@
             android:layout_marginStart="6dp"
             android:maxLines="1"
             android:text=""
-            android:textColor="@color/market_widget_text_dim"
+            android:textColor="@color/market_text_dim"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -158,7 +158,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:text=""
-        android:textColor="@color/market_widget_text_hint"
+        android:textColor="@color/market_text_hint"
         android:textSize="9sp"
         android:visibility="gone" />
 
@@ -181,7 +181,7 @@
             android:gravity="start|center_vertical"
             android:maxLines="1"
             android:text=""
-            android:textColor="@color/market_widget_text_hint"
+            android:textColor="@color/market_text_hint"
             android:textSize="9sp" />
 
         <TextView
@@ -192,7 +192,7 @@
             android:gravity="end|center_vertical"
             android:maxLines="1"
             android:text="@string/market_widget_loading"
-            android:textColor="@color/market_widget_text_hint"
+            android:textColor="@color/market_text_hint"
             android:textSize="9sp" />
     </LinearLayout>
 

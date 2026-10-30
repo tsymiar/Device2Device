@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 暗色模式颜色 -->
     <color name="dialog_text_primary">#E0E0E0</color>
     <color name="dialog_text_secondary">#9E9E9E</color>
     <color name="dialog_error">#FF5252</color>
-    <color name="dialog_button_text">#E0E0E0</color>
-    <!-- 状态卡片（暗色模式）：同上三个角色，取高亮度版本保证暗底对比度 -->
+    <!-- 状态卡片 -->
     <color name="hint_text">#90A4AE</color>
     <color name="status_text">#80CBC4</color>
     <color name="card_divider">#546E7A</color>
 
-    <!-- ===== 行情配色（夜间 / 深色）：与行情页同一套暗色盘 ===== -->
+    <!-- ===== 行情配色（深色） ===== -->
     <color name="market_bg">#FF0E1116</color>
     <color name="market_panel">#FF151A21</color>
     <color name="market_panel_pressed">#FF223040</color>
@@ -37,27 +35,18 @@
     <color name="market_dea">#FF42A5F5</color>
     <color name="market_rsi">#FFAB47BC</color>
     <color name="market_cursor">#FF9AA4B2</color>
-    <!-- 分时折线（1分钟）：亮蓝，暗底上更醒目 -->
+    <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF42A5F5</color>
     <color name="market_tooltip_bg">#EE151A21</color>
     <color name="market_tooltip_stroke">#664A5568</color>
-    <!-- 详情小窗文字：夜间同样是深底，取浅色 -->
     <color name="market_tooltip_text">#FFE8EAED</color>
     <color name="market_tooltip_text_dim">#FF9AA4B2</color>
 
-    <!-- 行情桌面小部件（深色）：与行情页同色系的深色圆角卡片 -->
-    <color name="market_widget_bg">#FF151A21</color>
+    <!-- 行情桌面小部件（深色）：底色与次要文字跟 market_* 那套同值，只有描边和主文字不一样 -->
     <color name="market_widget_stroke">#FF3C4A66</color>
     <color name="market_widget_text">#FFE8EAED</color>
-    <color name="market_widget_text_dim">#FF9AA4B2</color>
-    <color name="market_widget_text_hint">#FF6B7280</color>
 
-    <!-- ===== 局域网消息窗口（深色） =====
-         这套 lan_* 若只在 values/colors.xml 里放一份浅色值、不做夜间覆盖，
-         设备进夜间模式后整屏都暗下来了，局域网消息还是一张白卡片。
-         下面按同一个角色逐个取深色版本：卡片与日间对话框底色同档，
-         面板比卡片再亮一点分层，正文/次级文字跟 dialog_text_* 对齐，
-         气泡改成深色带色相（蓝=我发的、青=对端来的、红=报错），文字统一浅色保证对比度。 -->
+    <!-- ===== 局域网消息（深色卡片） ===== -->
     <color name="lan_card">#FF1E1E1E</color>
     <color name="lan_panel">#FF252A2E</color>
     <color name="lan_stroke">#FF455A64</color>
@@ -76,17 +65,49 @@
     <color name="lan_bubble_peer">#FF143B36</color>
     <color name="lan_bubble_error">#FF4A2422</color>
     <color name="lan_bubble_stroke">#FF455A64</color>
-    <!-- 标题 / 小节标签 / 选中行文字用的强调色：日间是深青绿，
-         夜间必须换成浅的，深青绿压在深色卡片上根本看不清 -->
+    <!-- 强调色：深底上必须取浅色 -->
     <color name="lan_accent">#FF80CBC4</color>
-    <!-- 输入框底板：比卡片亮一档，好和卡片分开 -->
     <color name="lan_field_bg">#FF2A3238</color>
     <color name="lan_field_stroke">#FF546E7A</color>
-    <!-- 通用输入框（KCP 等）：深色模式配深底浅字 -->
+    <!-- 通用输入框 -->
     <color name="edit_bg">#2A3238</color>
-    <color name="edit_text">#E0E0E0</color>
     <color name="market_rebound">#FFEC407A</color>
-    <!-- 聊天输入卡片：夜间深卡，与对话框底色同一档 -->
     <color name="chat_card">#FF1E1E1E</color>
     <color name="chat_card_stroke">#FF3A4048</color>
+
+    <!-- ===== 通用语义色（深色） ===== -->
+    <color name="ui_bg">#FF0E1116</color>
+    <color name="ui_card">#FF1C2128</color>
+    <color name="ui_card_alt">#FF232A33</color>
+    <color name="ui_card_pressed">#FF2C333C</color>
+    <color name="ui_stroke">#FF39424E</color>
+    <color name="ui_divider">#FF2F3742</color>
+    <color name="ui_text">#FFE8EAED</color>
+    <color name="ui_text_dim">#FF9AA4B2</color>
+    <color name="ui_text_hint">#FF8A94A6</color>
+    <color name="ui_ripple">#33FFFFFF</color>
+
+    <!-- 主色：深底提亮，实心底文字改走 ui_on_fill -->
+    <color name="ui_accent">#FF4DB6AC</color>
+    <color name="ui_on_fill">#FF0A0A12</color>
+    <!-- 深底上 #4DB6AC 对比度约 6.6:1，铺在描边按钮的一圈边加一行 11sp 小字上偏亮、发刺眼。
+         压到约 4.5:1（#1C2128 卡片底上仍清晰可读），降的是亮度和饱和度，色相不变 -->
+    <color name="ui_accent_outline">#FF3E948C</color>
+
+    <color name="ui_ok">#FF66BB6A</color>
+    <color name="ui_warn">#FFFFB74D</color>
+    <color name="ui_danger">#FFEF5350</color>
+    <color name="ui_info">#FF64B5F6</color>
+    <color name="ui_purple">#FFBA68C8</color>
+
+    <!-- 聊天气泡 -->
+    <color name="ui_bubble_peer">#FF2A3238</color>
+    <color name="ui_bubble_self">#FF880E4F</color>
+    <color name="ui_on_bubble_self">#FFFFFFFF</color>
+    <color name="ui_on_bubble_self_dim">#FFE0E0E0</color>
+
+    <!-- 旧主题三色：深色下整体提亮；colorPrimaryDark 是状态栏与实心底，必须更深 -->
+    <color name="colorPrimary">#FF4DB6AC</color>
+    <color name="colorPrimaryDark">#FF004D40</color>
+    <color name="colorAccent">#FFF48FB1</color>
 </resources>

@@ -7,7 +7,7 @@
     <path
         android:pathData="M12,12m-9,0a9,9 0,1 1 18,0a9,9 0,1 1 -18,0"
         android:strokeWidth="2.5"
-        android:strokeColor="@color/market_widget_text_dim"
+        android:strokeColor="@color/market_text_dim"
         android:strokeLineCap="round"
         android:trimPathStart="0"
         android:trimPathEnd="0.78" />

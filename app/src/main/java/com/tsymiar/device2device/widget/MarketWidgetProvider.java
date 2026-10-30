@@ -560,8 +560,8 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_title, title);
         // 布局里的默认色已随深浅模式，这里按当前模式再显式覆盖一次，避免桌面端缓存旧配色
         views.setTextColor(R.id.widget_title, color(context, R.color.market_widget_text));
-        views.setTextColor(R.id.widget_meta, color(context, R.color.market_widget_text_hint));
-        views.setTextColor(R.id.widget_empty, color(context, R.color.market_widget_text_hint));
+        views.setTextColor(R.id.widget_meta, color(context, R.color.market_text_hint));
+        views.setTextColor(R.id.widget_empty, color(context, R.color.market_text_hint));
         views.setTextViewText(R.id.widget_meta, meta == null ? "" : meta);
         // 列表：挂上数据源（MarketWidgetService），点击模板负责把某一行的标的带给行情页
         views.setRemoteAdapter(R.id.widget_list, MarketWidgetService.adapterIntent(context, widgetId));
@@ -584,7 +584,7 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         rowView.setTextViewText(R.id.widget_row_change,
                 data.error != null && !data.ok ? data.error : data.change);
         rowView.setTextColor(R.id.widget_row_name, color(context, R.color.market_widget_text));
-        rowView.setTextColor(R.id.widget_row_symbol, color(context, R.color.market_widget_text_hint));
+        rowView.setTextColor(R.id.widget_row_symbol, color(context, R.color.market_text_hint));
         rowView.setTextColor(R.id.widget_row_price, color(context, data.color));
         rowView.setTextColor(R.id.widget_row_change, color(context, data.color));
         // 尺寸跟着内容：只放一个标的就把字号撑大

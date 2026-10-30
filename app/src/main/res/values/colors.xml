@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!--colors-->
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
-    <color name="selection_border">#ffffff</color>
     <color name="playback_indicator">#ffff66</color>
     <color name="grid_line">#66ffffff</color>
     <color name="time_value">#ddffffdd</color>
@@ -12,24 +10,21 @@
     <color name="waveform_selected">#33b5e5</color>
     <color name="waveform_unselected">#195a72</color>
     <color name="waveform_unselected_overlay">#0a242d</color>
-    <color name="switch_selected">#009900</color>
-    <color name="menu_menu">#ccffff</color>
-    <!-- 对话框颜色（浅色模式） -->
+    <!-- 对话框 -->
     <color name="dialog_text_primary">#212121</color>
     <color name="dialog_text_secondary">#757575</color>
     <color name="dialog_error">#B71C1C</color>
-    <color name="dialog_button_text">#212121</color>
     <color name="green_ok">#009900</color>
-    <color name="grey">#cccccc</color>
     <color name="black">#000000</color>
     <color name="white">#ffffff</color>
+    <!-- 仅用于文字投影 -->
     <color name="dark_grey">#888888</color>
-    <!-- 状态卡片（浅色模式）：提示为次级蓝灰、状态为青绿，分割线比文字更淡一档 -->
+    <!-- 状态卡片 -->
     <color name="hint_text">#546E7A</color>
     <color name="status_text">#00796B</color>
     <color name="card_divider">#B0BEC5</color>
 
-    <!-- ===== 行情配色（日间 / 浅色）：底色纯白，涨绿跌红中的绿调深以保证浅底对比度 ===== -->
+    <!-- ===== 行情配色（浅色） ===== -->
     <color name="market_bg">#FFFFFFFF</color>
     <color name="market_panel">#FFFFFFFF</color>
     <color name="market_panel_pressed">#FFE8EEF6</color>
@@ -44,7 +39,7 @@
     <color name="market_on">#FFF57C00</color>
     <color name="market_on_pressed">#FFE06000</color>
     <color name="market_on_text">#FFFFFFFF</color>
-    <!-- 红涨绿跌（与 matkline.py 一致），浅底上绿再压深一档 -->
+    <!-- 红涨绿跌（与 matkline.py 一致） -->
     <color name="market_up">#FFD62728</color>
     <color name="market_down">#FF1E8E3E</color>
     <color name="market_flat">#FF64748B</color>
@@ -57,18 +52,16 @@
     <color name="market_dea">#FF1E88E5</color>
     <color name="market_rsi">#FF8E24AA</color>
     <color name="market_cursor">#FF64748B</color>
-    <!-- 分时折线（1分钟）：蓝色，浅底上压深一档 -->
+    <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF1E5FA8</color>
     <color name="market_tooltip_bg">#EE1F2937</color>
     <color name="market_tooltip_stroke">#66899BB3</color>
-    <!-- 详情小窗文字：日间的小窗底仍是深色，文字必须取浅色，不能复用页面正文色（深灰压深底看不清） -->
+    <!-- 详情小窗底是深色，文字取浅色 -->
     <color name="market_tooltip_text">#FFF9FAFB</color>
     <color name="market_tooltip_text_dim">#FFCBD5E1</color>
     <color name="market_rebound">#FFC2185B</color>
 
-    <!-- ===== 局域网消息对话框（浅色卡片） =====
-         主色沿用 colorPrimary 的青绿；自己发的用蓝、对方来的用青绿，
-         系统提示压到蓝灰，错误取 dialog_error，一屏里靠色相区分说话方 -->
+    <!-- ===== 局域网消息（浅色卡片） ===== -->
     <color name="lan_card">#FFFFFF</color>
     <color name="lan_panel">#FFF4F7F8</color>
     <color name="lan_stroke">#FFB0BEC5</color>
@@ -78,36 +71,61 @@
     <color name="lan_online">#FF00897B</color>
     <color name="lan_idle">#FF607D8B</color>
     <color name="lan_chip">#FFE0F2F1</color>
-    <!-- 发送按钮：启用时是主色系里亮一档的青绿，禁用时是灰蓝底 + 灰字，两态一眼能分开 -->
+    <!-- 发送按钮：启用 / 禁用 -->
     <color name="lan_send_on">#FF009688</color>
     <color name="lan_send_on_pressed">#FF00796B</color>
     <color name="lan_btn_off">#FFCFD8DC</color>
     <color name="lan_btn_off_text">#FF78909C</color>
-    <!-- 设备列表行：按下浅灰蓝、选中淡青，和卡片底色拉开但不刺眼 -->
     <color name="lan_row_pressed">#FFECEFF1</color>
-    <!-- 气泡：自己发的淡蓝、对端来的淡青、报错淡红。
-         底色都取浅的，文字才能统一用深灰保证对比度；说话方靠底色 + 左右对齐区分 -->
-    <!-- 局域网消息窗口的强调色：日间跟 colorPrimaryDark 同色，夜间由 values-night 换成浅青绿。
-         不用 colorPrimaryDark 直接写死在布局里，就是因为它在深底上太暗 -->
+    <!-- 强调色：夜间由 values-night 换成浅青绿 -->
     <color name="lan_accent">#FF00574B</color>
-    <!-- 输入框底板：日间白底灰边，夜间由 values-night 换成深底 -->
     <color name="lan_field_bg">#FFFFFFFF</color>
     <color name="lan_field_stroke">#FFBDBDBD</color>
+    <!-- 气泡：自己发的淡蓝、对端来的淡青、报错淡红 -->
     <color name="lan_bubble_self">#FFE3F2FD</color>
     <color name="lan_bubble_peer">#FFE0F2F1</color>
     <color name="lan_bubble_error">#FFFDECEA</color>
     <color name="lan_bubble_stroke">#FFCFD8DC</color>
 
-    <!-- 行情桌面小部件（浅色）：白卡片 + 深色文字 -->
-    <color name="market_widget_bg">#FFFFFFFF</color>
+    <!-- 行情桌面小部件（浅色）：底色与次要文字跟 market_* 那套同值，只有描边和主文字不一样 -->
     <color name="market_widget_stroke">#FFCBD5E1</color>
     <color name="market_widget_text">#FF111827</color>
-    <color name="market_widget_text_dim">#FF5B6675</color>
-    <color name="market_widget_text_hint">#FF8A94A6</color>
-    <!-- 通用输入框（KCP 等）：随深浅模式切换底色与文字，保证对比度 -->
+    <!-- 通用输入框（KCP 等） -->
     <color name="edit_bg">#F2F3F5</color>
-    <color name="edit_text">#212121</color>
-    <!-- 聊天输入卡片：日间白卡细边，夜间深卡深边（文字色见 dialog_text_primary） -->
+    <!-- 聊天输入卡片 -->
     <color name="chat_card">#FFFFFFFF</color>
     <color name="chat_card_stroke">#FFE8E8E8</color>
+
+    <!-- ===== 通用语义色（浅色）=====
+         布局一律引 ui_* token，不写死 #rrggbb；每个 token 在 values-night 都有对应值 -->
+    <color name="ui_bg">#FFF2F4F6</color>
+    <color name="ui_card">#FFFFFFFF</color>
+    <color name="ui_card_alt">#FFF5F7F9</color>
+    <color name="ui_card_pressed">#FFE4E9ED</color>
+    <color name="ui_stroke">#FFD7DDE3</color>
+    <color name="ui_divider">#FFE0E0E0</color>
+    <color name="ui_text">#FF1F2937</color>
+    <color name="ui_text_dim">#FF5B6675</color>
+    <color name="ui_text_hint">#FF6B7280</color>
+    <!-- 水波纹：浅底 12% 黑 -->
+    <color name="ui_ripple">#1F000000</color>
+
+    <!-- 主色：实心底上的文字必须走 ui_on_fill -->
+    <color name="ui_accent">#FF00796B</color>
+    <color name="ui_on_fill">#FFFFFFFF</color>
+    <!-- 描边按钮（描边 + 文字）专用：深底上主色满不透明会发亮刺眼，夜间换暗一档的同色系 -->
+    <color name="ui_accent_outline">#FF00796B</color>
+
+    <!-- 语义角色：浅底取 700~800 档 -->
+    <color name="ui_ok">#FF2E7D32</color>
+    <color name="ui_warn">#FFEF6C00</color>
+    <color name="ui_danger">#FFC62828</color>
+    <color name="ui_info">#FF1565C0</color>
+    <color name="ui_purple">#FF6A1B9A</color>
+
+    <!-- 聊天气泡 -->
+    <color name="ui_bubble_peer">#FFE0E0E0</color>
+    <color name="ui_bubble_self">#FFD81B60</color>
+    <color name="ui_on_bubble_self">#FFFFFFFF</color>
+    <color name="ui_on_bubble_self_dim">#CCFFFFFF</color>
 </resources>

@@ -52,7 +52,7 @@ public final class MarketSparkline {
      * @param base    基准价（行情曲线部件传的是当天开盘价），画成横向虚线；<=0 表示不画这条线
      * @param widthDp 可用宽度（dp，已减去布局的左右 padding）
      * @param heightDp 可用高度（dp，已减去上下其它行占掉的部分）
-     * @param haloColor 末点外圈的底色：要跟部件卡片底色一致，取值必须是 market_widget_bg，
+     * @param haloColor 末点外圈的底色：要跟部件卡片底色一致，取值必须是 market_panel，
      *                  不能用 MarketPalette.bg —— 夜间两者并不是同一个颜色，直接用会在
      *                  末点周围露出比卡片更深的一圈
      * @return 背景透明的位图；数据不足或绘制失败返回 null，调用方转成「暂无数据」文案
