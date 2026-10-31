@@ -7,7 +7,7 @@
     android:background="@color/ui_card_alt"
     android:orientation="vertical"
     app:cardCornerRadius="16dp"
-    android:padding="16dp">
+    android:padding="20dp">
 
     <!-- Header: file path info, clickable to open saved data -->
     <TextView
@@ -16,28 +16,27 @@
         android:layout_height="wrap_content"
         android:autoLink="all"
         android:gravity="center"
-        android:paddingVertical="8dp"
+        android:paddingVertical="6dp"
         android:text="@string/sdcard_device2device"
-        android:textColor="@color/ui_accent"
-        android:textSize="13sp" />
+        android:textColor="@color/ui_text_hint"
+        android:textSize="12sp" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginVertical="8dp"
+        android:layout_marginVertical="10dp"
         android:background="@color/ui_divider" />
 
     <!-- Directional pad -->
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="240dp">
 
         <!-- Center switch icon -->
         <ImageView
             android:id="@+id/img_switch"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:layout_centerInParent="true"
             android:src="@drawable/ic_switch"
             tools:ignore="ContentDescription" />
@@ -99,9 +98,10 @@
         android:id="@+id/text_send"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="6dp"
         android:textAppearance="?android:attr/textAppearanceMedium"
-        android:textColor="@color/ui_text" />
+        android:textColor="@color/ui_accent"
+        android:textStyle="bold" />
 
     <!-- Bottom input bar -->
     <LinearLayout
@@ -129,22 +129,22 @@
 
         <ImageView
             android:id="@+id/img_submit"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_marginStart="8dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:padding="8dp"
+            android:padding="6dp"
             android:src="@drawable/ic_submit"
             tools:ignore="ContentDescription" />
 
         <Button
             android:id="@+id/btn0"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             android:layout_marginStart="8dp"
             android:minWidth="0dp"
             android:text="@string/is_0"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
     </LinearLayout>
 
 </LinearLayout>

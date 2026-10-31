@@ -156,15 +156,11 @@ public class BodyProfile {
     // 所以这里把两者协调进一个区间，而不是任由两个滑块独立取值。
 
     /**
-     * 腰臀比基准：两个滑块都取 1 时实测出来的比值（男 / 女）。
-     * 高分 0.83 / 0.73、原生 0.84 / 0.70 —— 两套引擎的标准体型不一样，各用各的，
-     * 否则协调会在其中一套上整体偏一格（原生按 0.73 算，细的那头会夹到 0.59）
+     * 滑块空间的腰/臀比区间（男 / 女）。渲染腰宽 ≈ 滑块腰 × 基础腰臀宽比（~0.85），
+     * 所以夹住「腰/臀滑块比」就能保证渲染腰宽不超过臀宽（无苹果/直筒），也不至于太细（无蚂蚁腰）。
      */
-    private static final float[] WHR_STD_ANNY = {0.83f, 0.73f};
-    private static final float[] WHR_STD_NATIVE = {0.84f, 0.70f};
-    /** 允许的腰臀比区间（男 / 女）：再瘦、再胖也就到这两头 */
-    private static final float[] WHR_LO = {0.72f, 0.62f};
-    private static final float[] WHR_HI = {1.00f, 0.95f};
+    private static final float[] RATIO_LO = {0.90f, 0.85f};   // 男 / 女：腰/臀 滑块比下限
+    private static final float[] RATIO_HI = {1.06f, 1.00f};   // 男 / 女：腰/臀 滑块比上限
     /**
      * 臀围倍率 → 臀围实际的变化倍率（高分引擎实测，两性别几乎一样）。
      *
@@ -194,30 +190,33 @@ public class BodyProfile {
 
     private static void solveWaistHip(float[] wh, int gender, int keep, boolean anny) {
         int g = gender == 1 ? 1 : 0;
-        float std = anny ? WHR_STD_ANNY[g] : WHR_STD_NATIVE[g];
-        float lo = WHR_LO[g];
-        float hi = WHR_HI[g];
+        float lo = RATIO_LO[g];
+        float hi = RATIO_HI[g];
         float w = clamp(wh[0], 0.70f, 1.60f);
         float h = clamp(wh[1], 0.70f, 1.60f);
-        // 响应曲线不是线性的，一次「各让一半」未必正好落在区间里，迭代几次收敛
-        for (int it = 0; it < 6; it++) {
-            float hg = anny ? hipResp(h) : h;
-            float whr = std * w / hg;
-            if (whr >= lo && whr <= hi) break;
-            float t = clamp(whr, lo, hi);
-            if (keep > 0) {
-                h = anny ? hipRespInv(std * w / t) : std * w / t;      // 腰照用户给的算
-            } else if (keep < 0) {
-                w = hg * t / std;                                      // 臀照用户给的算
-            } else {
-                // 腰 ×k、臀 ÷k，乘积不变：只动一头时，拉腰围会看到臀自己胖三圈，
-                // 或者腰拉到底却一点不瘦 —— 分成两半，两头都只是微调
-                float k = (float) Math.sqrt(t / whr);
-                w *= k;
-                h /= k;
-            }
-            w = clamp(w, 0.70f, 1.60f);
-            h = clamp(h, 0.70f, 1.60f);
+        float r = w / h;                                   // 腰/臀 滑块比
+        if (r >= lo && r <= hi) {
+            wh[0] = w;
+            wh[1] = h;
+            return;
+        }
+        float t = clamp(r, lo, hi);
+        if (keep > 0) {
+            h = w / t;
+        } else if (keep < 0) {
+            w = h * t;
+        } else {
+            float k = (float) Math.sqrt(t / r);
+            w *= k;
+            h /= k;
+        }
+        w = clamp(w, 0.70f, 1.60f);
+        h = clamp(h, 0.70f, 1.60f);
+        float r2 = w / h;
+        if (r2 > hi && h < 1.60f) {
+            h = Math.min(1.60f, w / hi);
+        } else if (r2 < lo && w < 1.60f) {
+            w = Math.min(1.60f, h * lo);
         }
         wh[0] = w;
         wh[1] = h;

@@ -1505,19 +1505,18 @@ public final class AnnyModel {
      * 臀部那一块的钟形权重：峰在臀峰，往下（臀沟 / 大腿上缘）与往上（腰线）各自半余弦降到
      * 0，降到底时一阶导也是 0 —— 所以跟腿、跟腰都是接着的，不会在边界上留一圈折。
      */
-    private static float hipBell(float y, float yPeak, float h) {
+    private static float hipBell(float y, float yPeak, float h, float hiUp) {
         // 往下要铺得够宽：臀围现在全落在前后上（左右不跟），一份十几厘米的增量若只在臀峰
         // 上下几厘米里爬完，那一圈就是一个尖。铺到大腿上缘之后坡度降到三分之一。
-        // 往上到 0.61H 为止 —— 腰那一圈（0.62H）一点都不吃臀围，腰围读数才跟滑块一致
-        float lo = 0.160f * h;      // 往下铺多宽：到臀沟 / 大腿上缘
-        float hi = 0.090f * h;      // 往上铺多宽：到腰线
+        float lo = 0.190f * h;      // 往下铺多宽：到臀沟 / 大腿上缘（放宽让臀下缘弧线更舒展更圆）
+        float hi = hiUp;            // 往上铺多宽：到腰线（调用方按峰位给定，避免越过腰线鼓驼峰）
         float u = y <= yPeak ? (yPeak - y) / lo : (y - yPeak) / hi;
         if (u >= 1f) return 0f;
         // 峰顶上下各留一段平顶：实测臀越大峰顶越尖（臀 1.0 的峰顶曲率半径 14.6cm，臀 1.3
         // 掉到 5.8cm、臀 1.6 只剩 5.1cm）—— 剖面上是从大腿那一小截几乎直立地爬到臀峰，峰顶
         // 是个折角，看着是「撅着的一块」而不是圆屁股。平顶把下极那段填满，峰顶就成了圆弧。
         // 平顶与下降段在交界处斜率都是 0，不会另生出折角
-        float f = 0.35f;
+        float f = 0.12f;
         float uu = u <= f ? 0f : (u - f) / (1f - f);
         return 0.5f * (1f + (float) Math.cos(Math.PI * uu));
     }
@@ -1549,16 +1548,18 @@ public final class AnnyModel {
     private static void applyGirth(float[] v, BodyProfile p, float h, float[] par, boolean withBust,
                                    float[][] legAxis) {
         int gi = p.gender == 1 ? 1 : 0;
-        float shoulder = BodyProfile.clamp(p.shoulderR, 0.70f, 1.60f) * BASE_SHOULDER[gi] - 1f;
+        // 女性肩宽加上限：肩宽拉满会出方肩/男性化，限制在 1.30 倍以内
+        float shRaw = BodyProfile.clamp(p.shoulderR, 0.70f, 1.60f);
+        if (p.gender == 1) shRaw = Math.min(shRaw, 1.30f);
+        float shoulder = shRaw * BASE_SHOULDER[gi] - 1f;
         float chestRaw = BodyProfile.clamp(p.chestR, 0.70f, 1.60f) - 1f;
         // 腰臀协调（见 BodyProfile#waistHipAnny）：两个滑块各自拉到头会长出「腰比臀粗」
         // 或者「蚂蚁腰」这种真人没有的体型，这里先按实测的腰臀比区间把两者协调好
         float[] wh = {p.waistR, p.hipR};
         BodyProfile.waistHipAnny(wh, p.gender, 0);
         float waist = wh[0] - 1f;
-        // 臀围标定：默认体型（hipR=1）按人体测量表收紧，份额仍完全由 hipR 决定
-        float hip = BodyProfile.clamp(
-                wh[1] * HIP_CALIB[p.gender == 1 ? 1 : 0], 0.70f, 1.60f) - 1f;
+        // 臀深按「原始滑块 wh[1] 线性」走：滑块 1.0 时 = 基准（不缩），>1 才更翘。
+        float hipD = BodyProfile.clamp(wh[1], 0.70f, 1.60f) - 1f;
         float thigh = BodyProfile.clamp(p.thighR, 0.70f, 1.45f) - 1f;
         float calf = BodyProfile.clamp(p.calfR, 0.70f, 1.45f) - 1f;
         // 上限 2.10：G 杯（25cm）反解出来要 1.90 左右，卡在 1.80 上就只能到 22.6
@@ -1589,14 +1590,16 @@ public final class AnnyModel {
         // 份额压到很小：臀围现在只长前后，大腿要是还吃一大份，臀围 1.6 时大腿半宽 17.1cm
         // 会反过来超过髋的 16.0cm —— 正面看就成了「大腿比髋还宽」。保留少许余量是为了臀部后侧
         // 和那条腿不要断开（那份过渡主要由钟形的下缘负责）
-        float hipLeg = hip * 0.03f;
-        float hipRoot = hip * 0.02f;
+        float hipLeg = hipD * 0.03f;
+        float hipRoot = hipD * 0.02f;
         // 试过把臀围的增量改成「横向多、前后少」想让正面更宽：围度由半宽 + 半深一起决定，
         // 增量又被围度反解自己抵消掉，横向几乎没变宽，反而让不同臀围之间的轮廓不再单调。
         // 所以宽深还是对称给，腰身靠「峰值上移 + 裆部钉住 + 大腿少带」这三条来出
         float thighF = (1f + thigh + hipLeg) * BASE_THIGH[gi];
         float rootF = (1f + thigh + hipRoot) * BASE_THIGH[gi];
         float calfF = (1f + calf) * BASE_CALF[gi];
+        // 小腿不得超过大腿（小腿拉满、大腿拉细时会出「小腿比大腿粗」的萝卜腿）
+        if (thighF > 1e-4f) calfF = Math.min(calfF, thighF * 1.05f);
         // 胸围：用户拉胸围想看到的是「乳房变大」，所以大部分增量折算成乳腺体积（长成什么样
         // 由胸型决定），只有一小部分留给胸腔 —— 骨架不会跟着胸围滑块一起宽那么多
         float chestRib = chestRaw * (female ? CHEST_RIB_SHARE : 0.75f);
@@ -1668,19 +1671,19 @@ public final class AnnyModel {
         // 峰值要跟着纵向比例走（mappedY），不能钉死在 0.52H：臀围是在 mappedY(0.515~0.555)
         // 上量的，腿长比例一动，两者就错开 —— 腿长的体型钟形峰落在测量段外头，臀围读数平
         // 白少 4cm（172/60 就是这么比 165/55 还小的）
-        float yHipBulge = mappedY(0.52f, h, par);
+        float yHipBulge = yHipWide;
         // 但腰以下、大腿以上那一截（髋侧 / 大转子）得跟着臀围走：这份增量只在后半深上时，
         // 正面看髋还是原来那么宽，臀一大就只是屁股往后翘，髋侧跟臀部对不上。左右这份按与
         // 后半深同一条钟形铺（两端斜率都是 0，跟腰、跟腿都接着），份额见 HIP_SIDE_SHARE。
-        float sidePeak = hip * HIP_SIDE_SHARE[gi] * bW[iHip];        // 钟形峰上想加的绝对量
+        float sidePeak = hipD * HIP_SIDE_SHARE[gi] * bW[iHip];       // 钟形峰上想加的绝对量
         // 臀围剩下的一份给「后半深」：宽度那边（含左右这一份）长不下的量按绝对尺寸转投过来
         // （围度守恒），转投过来的量再按钟形铺在臀部那一整块上 —— 全堆在一个高度上就是一
         // 道尖，铺在 0.36H~0.61H（大腿上缘到腰线）这段区域上才是圆润的屁股
-        float wstDF = (1f + waist * 0.85f) * BASE_WAIST[gi]
-                + ((1f + waist) - wstWF) * (bF[iWst] > 0f ? bW[iWst] / bF[iWst] : 0f);
-        float wstDB = (1f + waist * 0.85f) * BASE_WAIST[gi];     // 后腰也跟着粗，但不吃转投
-        float hipDF = (1f + waist * 0.45f) * BASE_WAIST[gi];     // 下腹：只跟腰，不吃臀围
-        float hipDB = (1f + waist * 0.45f) * BASE_WAIST[gi];     // 臀峰后侧的基础，bump 另加
+        // 小腹：去掉「腰宽转投深度」那条（腰一粗就灌进前腹），并收小下腹前深。
+        float wstDF = (1f + waist * 0.75f) * BASE_WAIST[gi];
+        float wstDB = (1f + waist * 0.85f) * BASE_WAIST[gi];
+        float hipDF = (0.80f + waist * 0.40f) * BASE_WAIST[gi];
+        float hipDB = (1f + waist * 0.45f) * BASE_WAIST[gi];
         // 三个锚点上的目标绝对尺寸：臀下缘（腿根）、臀峰、腰。宽 / 前 / 后各铺一份
         float botW = bW[0] * rootF;
         float hipPW = bW[iHip] * hipWideF;
@@ -1691,6 +1694,8 @@ public final class AnnyModel {
         float botB = bB[0] * rootF;
         float hipPB = bB[iHip] * hipDB;
         float wstPB = bB[iWst] * wstDB;
+        // 大腿根后深抬到 0.95×臀部后深，填住臀下缘（0.085 过渡带版本）
+        botB = Math.max(botB, hipPB * 0.95f);
         float[] midW = new float[midN];
         float[] midF = new float[midN];
         float[] midB = new float[midN];
@@ -1719,7 +1724,7 @@ public final class AnnyModel {
             // 峰放在髋最宽那一档（0.55H），不是臀峰（0.52H）：髋侧本来就是最宽的地方，峰
             // 跟基础那条 S 的峰对上，叠加出来还是一个峰；错开 3% 身高时两者之间会拱出
             // 一道坎 —— 臀围 1.6 时那一档的二阶差分实测多出 0.23cm
-            bellW[i] = hipBell(midY[i], yHipWide, h);
+            bellW[i] = hipBell(midY[i], yHipWide, h, 0.070f * h);
             // 这一档到手臂内界还剩多少空间，按钟形权重折回「峰上还能加多少」。取最紧的那一
             // 档：逐档各自去挤时，挤得多的档和挤得少的档拼起来钟形就变形了 —— 臀围拉到
             // 1.6 时那一档的二阶差分实测从 0.85cm 涨到 1.19cm，正面看峰值附近多出一道折
@@ -1740,9 +1745,13 @@ public final class AnnyModel {
         // 臀围是在深度钟形峰那一圈上量的，所以按左右两侧钟形在此处的权重折成等价的一份
         float trade = girthTrade(bW[iHip], bF[iHip] + bB[iHip]);
         float hipSide = bW[iHip] > 1e-4f
-                ? sideEff[iHip] * hipBell(yHipBulge, yHipWide, h) / bW[iHip] : 0f;
-        float hipBump = hip + ((1f + hip) - hipWideF - hipSide * trade)
+                ? sideEff[iHip] * hipBell(yHipBulge, yHipWide, h, 0.070f * h) / bW[iHip] : 0f;
+        float hipBump = hipD + Math.max(0f, (1f + hipD) - hipWideF - hipSide * trade)
                 * (bB[iHip] > 0f ? bW[iHip] / bB[iHip] : 0f);
+        // 大臀围防「尖楔/鸟嘴」：臀宽被手臂内界封顶后，长不下的围度原来全部怼进后半深，
+        // hip 1.6 时 hipBump 能到 0.9（+8cm），背部就伸出一个水平尖楔。这里给后半深 bump
+        // 一个平滑上限（softSat 收敛到 ~0.45，≈ base+4cm），小/负值不受影响。
+        if (hipBump > 0f) hipBump = softSat(hipBump, 0.45f);
         for (int i = 0; i < midN; i++) {
             float aW = aW0[i] + sideEff[i];
             float aF = aF0[i];
@@ -1846,7 +1855,9 @@ public final class AnnyModel {
             // 手臂：之前是硬排除，臂根会现出一圈断层；这里按到「手臂边界」的距离羽化
             float limit = AnnyMeasure.isArmLimit(t, h);
             if (limit > 0f) {
-                float d = (Math.abs(x) - limit * 0.94f) / (limit * 0.14f);
+                // 羽化带收紧（0.14→0.06）：肩宽缩放不要渗到手臂内根，否则上臂根在肩部
+                // 高度被撑大、下方手臂没被撑 → 袖子处鼓出「垫肩/袖口」台阶（肩臂衔接畸形）。
+                float d = (Math.abs(x) - limit * 0.94f) / (limit * 0.06f);
                 keep *= 1f - smoothstep(d);
                 if (keep <= 0f) continue;
             }
@@ -1865,7 +1876,7 @@ public final class AnnyModel {
             // 实测前深那一档的二阶差分能到 1.6cm —— 侧面看就是臀沟上缘的一圈硬折
             // 放宽到 5.5% 试过：全拉满那一档的 1.93cm 一分没降，另有三个组合反倒变差，倒是
             // 把臀下缘那道沟抹平了 —— 落差不是这里的瓶颈，别动
-            float legWd = 1f - smoothstep((y - yTorsoBot) / (0.04f * h));
+            float legWd = 1f - smoothstep((y - yTorsoBot) / (0.085f * h));
             // 臀围的隆起在腿这一侧也要有：腿是圆截面（深度 = 宽度倍率），躯干那一侧的深度
             // 才带钟形隆起。只给一侧时，这份增量要在这条过渡带里从 0 爬到满 —— 实测臀围
             // 1.6 时 0.51H→0.52H 那一档跳了 5.5cm
@@ -1874,7 +1885,7 @@ public final class AnnyModel {
             // 高度上的基础后半深（腿上是腿根那一档），不再拿 bB[0] 去近似所有档
             float bAtY = bandScale(y, midY, bB);
             float bumpY = bAtY > 1e-4f
-                    ? bB[iHip] * hipBump * hipBell(y, yHipBulge, h) / bAtY : 0f;
+                    ? bB[iHip] * hipBump * hipBell(y, yHipBulge, h, 0.070f * h) / bAtY : 0f;
             float sdB = mix(bandScale(y, keyY, keyDB), sw, legWd) + bumpY;  // 腿保持圆形截面
             float sdF = mix(bandScale(y, keyY, keyDF), sw, legWd);
             float sd = sdB + (sdF - sdB) * smoothstep((z + zMix) / (2f * zMix));
@@ -1983,6 +1994,16 @@ public final class AnnyModel {
                 nx = mix(nx, fx + (x - fx) * footW, fw);
                 nz = mix(nz, z * footL, fw);
             }
+            // 胸大时乳房外侧会被推到手臂上：胸部高度按手臂内界封顶，别贴/穿手臂
+            if (limit > 0f && y > yChest - 0.05f * h && y < yShoulder) {
+                float capX = limit * 0.90f;
+                nx = (nx >= 0f) ? Math.min(nx, capX) : Math.max(nx, -capX);
+            }
+            // 防连裆：大腿粗时两腿内侧会越过中线融成一片，这里给腿内侧留一条裆缝
+            if (keep > 0.6f && y < yHip && y > yCalf) {
+                float gap = 0.008f * h;
+                nx = (x >= 0f) ? Math.max(nx, gap) : Math.min(nx, -gap);
+            }
             v[i] = nx;
             v[i + 2] = nz;
         }
@@ -1990,7 +2011,6 @@ public final class AnnyModel {
         // 这里用同一套箱式平均把边界的法线变化摊平（见 smoothChestFinal）
         smoothChestFinal(v, h, 0.12f);
     }
-
 
     /**
      * 脸型 / 五官：Anny 的形变基里没有脸这部分，这里按人脸的纵向分带补上。

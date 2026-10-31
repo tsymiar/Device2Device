@@ -75,7 +75,7 @@ public class BtRemoteActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setFinishOnTouchOutside(false);
-        setContentView(R.layout.activity_commit);
+        setContentView(R.layout.activity_serial);
         ExitAll.getInstance().addActivity(this);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
         mVibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
@@ -232,8 +232,8 @@ public class BtRemoteActivity extends Activity {
     private void shrinkView(View view) {
         if (view != null) {
             view.post(() -> {
-                int halfW = view.getWidth() * 4 / 5;
-                int halfH = view.getHeight() * 4 / 5;
+                int halfW = view.getWidth() * 3 / 4;
+                int halfH = view.getHeight() * 3 / 4;
                 if (halfW <= 0 || halfH <= 0) return;
                 ViewGroup.LayoutParams lp = view.getLayoutParams();
                 lp.width = halfW;

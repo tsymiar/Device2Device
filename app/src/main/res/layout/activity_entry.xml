@@ -61,7 +61,8 @@
             app:cornerRadius="0dp"
             app:icon="@android:drawable/ic_menu_share"
             app:iconGravity="textStart"
-            app:iconPadding="8dp" />
+            app:iconPadding="6dp"
+            app:iconSize="18dp" />
 
         <!-- "搜索设备" 按钮 -->
         <com.google.android.material.button.MaterialButton
@@ -71,11 +72,14 @@
             android:layout_height="48dp"
             android:text="@string/entry"
             android:textSize="14sp"
+            android:textColor="@color/ui_text"
             app:cornerRadius="0dp"
             app:icon="@android:drawable/ic_menu_search"
             app:iconGravity="textStart"
-            app:iconPadding="8dp"
-            app:strokeColor="@color/ui_accent" />
+            app:iconPadding="6dp"
+            app:iconSize="18dp"
+            app:iconTint="@color/ui_text"
+            app:strokeColor="@color/ui_stroke" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
