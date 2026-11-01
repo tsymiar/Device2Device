@@ -1,7 +1,8 @@
 [![Build Status](https://tsymiar.visualstudio.com/MyAutomatic/_apis/build/status/tsymiar.Device2Device?repoName=tsymiar%2FDevice2Device&branchName=main)](https://tsymiar.visualstudio.com/MyAutomatic/_build/latest?definitionId=72&repoName=tsymiar%2FDevice2Device&branchName=main)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/6cb8f83fb83d4e50a33bc39e470f2891)](https://app.codacy.com/gh/tsymiar/Device2Device/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-![Anny](https://img.shields.io/badge/arXiv-2511.03589-B31B1B)
-![KCP](app/src/main/cpp/socket/kcp/kcp.svg)
+[![Anny](https://img.shields.io/badge/GitHub-naver%2Fanny-1f883d?logo=github)](https://github.com/naver/anny)
+[![KCP](https://img.shields.io/badge/GitHub-skywind3000%2Fkcp-2B90D9?logo=github)](https://github.com/skywind3000/kcp)
+[![MyAutomatic](https://img.shields.io/badge/tsymiar-MyAutomatic-8250df?logo=github)](https://github.com/tsymiar/MyAutomatic)
 
 # Device2Device
 
@@ -115,20 +116,24 @@ MIT
 
 ## Recent Changes
 
+### 2026-11
+- **File transfer:** aligned protocol with `LinxSrvc` (Mac/Linux) — magic now embeds `PROTOCOL_VERSION`; `FileMsgSocket` kept in sync with `TransferEngine`.
+- **UI:** splash/auth animation shortened (~2000 ms → ~800 ms).
+
 ### 2026-10
-- **LAN:** KCP-over-UDP messenger — text/image exchange, UDP-broadcast peer discovery, configurable discovery address and port; kcp protocol vendored under `socket/`.
-- **Game:** *Voiceprint Deduction* board — voice samples, proposition synthesis, three psychological traps (echo reinforcement / negative overwrite / self-learning), full-screen dialog with adaptive board text.
-- **Market:** 4×4 market-cap heatmap widget (top-30 A-shares by cap; tile area = cap, colour = daily change, tap opens the quote; painted as one tree, 50 tiles per screen); quote-list widget renamed and rows land progressively as data arrives; default K-line symbol switched to Zijin Mining (601899) with a 1-minute intraday chart (previous-close baseline + change scale).
-- **ChatBox:** multi-provider (DeepSeek / Ollama local + Cloud / OpenRouter), editable Ollama host, per-provider model lists (OpenRouter free models only).
-- **Sensors:** Catmull-Rom smoothed decibel card line and area, control points clamped against overshoot.
-- **System:** SSH controls merged into the Network section; MediaCodec video rendered straight into the TextureView surface; Bluetooth connects on a worker thread and stops the floating service on exit.
-- **Avatar:** Air Bangs; Anny Bust (taller, rounder, seamless); Hip Fullness calibration.
+- **LAN:** KCP-over-UDP messenger with UDP-broadcast discovery.
+- **Game:** *Voiceprint Deduction* board (voice samples, proposition synthesis, 3 psychological traps).
+- **Market:** 4×4 market-cap heatmap widget; progressive quote-list widget; Zijin Mining default K-line.
+- **ChatBox:** multi-provider (DeepSeek / Ollama / OpenRouter) with editable Ollama host.
+- **Sensors:** Catmull-Rom smoothed decibel card.
+- **System:** SSH controls merged into Network; MediaCodec→TextureView; BT on worker thread.
+- **Avatar:** Air Bangs; Anny Bust; Hip Fullness calibration.
 
 ### 2026-09
-- **Avatar:** Anny engine (bundled `anny.mhb`, phenotype scaling), face shapes and hairstyles, real mesh head, A-pose legs, bare feet, body measurements, photo fallback, seam smoothing.
-- **Sensors:** scalable dashboard, full-screen compass / level, decibel card.
-- **Market:** K-line view (11 data sources) + 2×2 quote list widget.
-- **System:** SSH server (port 2222), HTTP server + SAF fixes, dark-mode aware spinner.
+- **Avatar:** Anny engine, face shapes/hairstyles, body measurements, photo fallback.
+- **Sensors:** scalable dashboard, full-screen compass/level, decibel card.
+- **Market:** K-line view (11 sources) + 2×2 quote list widget.
+- **System:** SSH server (2222), HTTP + SAF fixes, dark-mode spinner.
 
 ### 2026-06
-- **Messaging:** `MSG_HINT`, async Pub/Sub with topic isolation, subscription buffer fix, port parsing hardening, UI polish.
+- **Messaging:** `MSG_HINT`, async Pub/Sub, subscription buffer fix, port parsing hardening.

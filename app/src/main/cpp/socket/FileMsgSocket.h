@@ -23,12 +23,16 @@
 
 #include <utils/logging.h>
 
+// 版本写进魔数第 3 字节，版本不同的端在魔数校验阶段就被拒。
+static constexpr uint8_t PROTOCOL_VERSION = 1;
+static constexpr uint8_t kProtocolMagic[4] = { 'F', 'T', 0xF0 + PROTOCOL_VERSION, 0x00 };
+
 // 文件传输协议头 (64字节), 大端序(网络字节序)
 // 与 MyAutomatic/LinxSrvc/Mac/Transfer 的 TransferEngine.h 逐字段对齐，两端才能互通
 #pragma pack(push, 1)
 struct FileHeader {
-    uint8_t  magic[4];       // 魔数: "FTF\0"
-    uint8_t  version;        // 协议版本: 1
+    uint8_t  magic[4];       // 魔数: 'F','T',0xF0+version,0x00
+    uint8_t  version;        // 协议版本
     uint16_t cmd;            // 命令: 1=请求, 2=响应, 3=数据, 4=完成, 5=取消
     uint32_t fileNameLen;    // 文件名长度
     uint64_t fileSize;       // 文件总大小

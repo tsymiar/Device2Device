@@ -7,7 +7,7 @@
         android:interpolator="@android:anim/accelerate_decelerate_interpolator"
         android:fromAlpha="0.0"
         android:toAlpha="1.0"
-        android:duration="2000"
+        android:duration="800"
         android:repeatCount="0" >
 
     </alpha>
@@ -18,7 +18,7 @@
         android:toDegrees="+360"
         android:pivotX="50%"
         android:pivotY="50%"
-        android:duration="2000" />
+        android:duration="800" />
 
     <translate
         android:interpolator="@android:anim/accelerate_decelerate_interpolator"
@@ -26,7 +26,7 @@
         android:toXDelta="90"
         android:fromYDelta="0"
         android:toYDelta="-180"
-        android:duration="1980" />
+        android:duration="790" />
 
     <scale
         android:interpolator="@android:anim/accelerate_decelerate_interpolator"
@@ -34,6 +34,6 @@
         android:toXScale="1.5"
         android:fromYScale="0.0"
         android:toYScale="1.5"
-        android:duration="2000" />
+        android:duration="800" />
 
 </set>

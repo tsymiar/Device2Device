@@ -31,8 +31,8 @@
 // --- Helper: fill FileHeader with common defaults ---
 static inline void fillHeader(FileHeader& h, uint16_t cmd) {
     memset(&h, 0, sizeof(h));
-    memcpy(h.magic, "FTF\0", 4);
-    h.version = 1;
+    memcpy(h.magic, kProtocolMagic, sizeof(kProtocolMagic));
+    h.version = PROTOCOL_VERSION;
     h.cmd = cmd;
 }
 
@@ -639,8 +639,9 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
         // 收到的头是网络序，先转回主机序再解析
         headerToHost(header);
 
-        if (memcmp(header.magic, "FTF\0", 4) != 0) {
-            LOGE("%s invalid magic number: 0x%08x, client disconnected", statusPrefix.c_str(), *(uint32_t*)header.magic);
+        // 验证魔数
+        if (memcmp(header.magic, kProtocolMagic, sizeof(kProtocolMagic)) != 0) {
+            LOGE("%s invalid magic number: 0x%08x, expect 0x%08x, client disconnected", statusPrefix.c_str(), *(uint32_t*)header.magic, *(uint32_t*)kProtocolMagic);
             break;
         }
 
