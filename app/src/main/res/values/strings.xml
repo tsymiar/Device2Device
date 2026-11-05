@@ -1,7 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ===== App ===== -->
-    <string name="app_name">Device2Device</string>
+    <string name="app_name">飞梭</string>
     <string name="developing">开发中</string>
 
     <!-- ===== Render Mode Arrays ===== -->

@@ -170,7 +170,7 @@ public class KLineView extends View {
                 // 跟手不跳变。原先是把锚点拽到画面中心，双指缩放时整幅图会明显抖动。
                 float focusX = detector.getFocusX();
                 int anchor = mStart + (int) Math.floor((focusX - mMainRect.left) / mSlot);
-                mSlot = clamp(mSlot * detector.getScaleFactor(), dp(2), dp(40));
+                mSlot = clamp(mSlot * detector.getScaleFactor(), minSlot(), dp(40));
                 computeVisible();
                 // 反解 mStart 使 xOf(anchor) ≈ focusX，锚点始终贴着手指
                 float desired = anchor + 0.5f - (focusX - mMainRect.left) / mSlot;
@@ -443,6 +443,19 @@ public class KLineView extends View {
 
     private void shiftWithoutClamp(int delta) {
         mStart -= delta;
+    }
+
+    /**
+     * 双指收缩的下限（每根 K 线 / 每个点占的宽度）。
+     * 蜡烛图维持 2dp：再小就看不清影线与实体了。
+     * 分时折线放宽到 1dp；若这样还摆不下当天全部点（窄屏 / 240 个分钟点），
+     * 再按「主图宽 ÷ 点数」继续放宽 —— 目标是把一整天完整缩进同屏。
+     * 下限另兜 0.5dp，避免极端数据量下缩到不可辨识。
+     */
+    private float minSlot() {
+        if (!mLineMode) return dp(2);
+        float fitAll = mData.isEmpty() ? dp(1) : mMainRect.width() / mData.size();
+        return Math.min(dp(1), Math.max(fitAll, dp(0.5f)));
     }
 
     // ===== 绘制 =====

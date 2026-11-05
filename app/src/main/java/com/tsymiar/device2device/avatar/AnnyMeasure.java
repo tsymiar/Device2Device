@@ -312,6 +312,52 @@ final class AnnyMeasure {
         return t > 0.36f && t < 0.90f && ax > isArmLimit(t, h);
     }
 
+    /** 配色专用：用平滑后的内界判定手臂（围度 / 肩宽仍用 isArm，读数不受影响） */
+    static boolean isArmSmooth(float t, float ax, float h) {
+        return t > 0.36f && t < 0.90f && ax > armLimitSmooth(t, h);
+    }
+
+    /** 平滑表的采样数（1/256 ≈ 6.7mm 一档，够画顺色界，内存 1KB） */
+    private static final int TORSO_LUT = 256;
+    private static float[] sTorsoHalf;   // 懒初始化；并发时最多重复算一遍，结果一致
+
+    /**
+     * 只给「配色分界」用的平滑手臂内界：与 isArmLimit 同源，但把 t=0.82 处的尖角抹圆。
+     *
+     * 原折线在 t=0.82 斜率从 +0.27 翻到 −0.88 —— 袖口那条「上衣→皮肤」的分界正好走在
+     * |x| = 这条曲线上，于是肩峰处拐出一个折角。男模型肩宽 48.5cm、肩半宽约 24cm，
+     * 折角正压在外轮廓与三角肌前缘上，看起来像肩和胳膊之间被切了一刀（女模型半宽
+     * 21.9cm，折角落在体外，所以不明显 —— 用户反馈"特别是男模型"即此）。
+     *
+     * 把 1/256 采样的折线做三遍 [1,4,6,4,1] 二项式平滑后查表插值：峰值只降约 1mm、
+     * 拐角被摊到 ∓2cm 内，色界于是顺着肩峰弯过去。
+     */
+    static float armLimitSmooth(float t, float h) {
+        float[] lut = sTorsoHalf;
+        if (lut == null) {
+            float[] src = new float[TORSO_LUT];
+            float[] dst = new float[TORSO_LUT];
+            for (int i = 0; i < TORSO_LUT; i++) src[i] = torsoHalf(i / (float) (TORSO_LUT - 1));
+            for (int pass = 0; pass < 3; pass++) {
+                for (int i = 0; i < TORSO_LUT; i++) {
+                    int l2 = Math.max(0, i - 2), l1 = Math.max(0, i - 1);
+                    int r1 = Math.min(TORSO_LUT - 1, i + 1), r2 = Math.min(TORSO_LUT - 1, i + 2);
+                    dst[i] = (src[l2] + 4f * src[l1] + 6f * src[i] + 4f * src[r1] + src[r2]) / 16f;
+                }
+                float[] swap = src;
+                src = dst;
+                dst = swap;
+            }
+            lut = src;
+            sTorsoHalf = lut;
+        }
+        float x = clamp01(t) * (TORSO_LUT - 1);
+        int i = (int) x;
+        float v = i >= TORSO_LUT - 1 ? lut[TORSO_LUT - 1]
+                : lut[i] + (lut[i + 1] - lut[i]) * (x - i);
+        return v * 1.18f * h;
+    }
+
     /** 肩宽：只看躯干（排除手臂），取肩线附近的最大横向跨度 */
     static float shoulderWidth(float[] v, float h) {
         float lo = 0.76f * h;

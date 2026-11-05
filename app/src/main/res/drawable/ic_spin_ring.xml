@@ -3,9 +3,15 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- 仅一段弧，旋转时才能看出在转；颜色跟随小部件文字色，深浅模式自动切换 -->
+    <!-- 仅一段弧，旋转时才能看出在转；颜色跟随小部件文字色，深浅模式自动切换
+
+         尺寸是跟 widget_refresh 里的静态刷新图标对齐量的（16dp 盒子、viewport 24）：
+         - ic_refresh 字形在 viewport 里外径 16 units → 16dp 盒子里可见直径 ≈ 10.7dp；
+         - 本弧外径（半径 + strokeWidth/2）必须同为 16 units：8 - 2.5/2 = 6.75，
+           这样 16dp 的 ProgressBar 画出来可见外径也是 ≈10.7dp，换位时不跳大小。
+         （此前半径 9、外径 20.5 units，转圈比静态图标大出一圈多，即"刷新时大一圈"的根因） -->
     <path
-        android:pathData="M12,12m-9,0a9,9 0,1 1 18,0a9,9 0,1 1 -18,0"
+        android:pathData="M12,12m-6.75,0a6.75,6.75 0,1 1 13.5,0a6.75,6.75 0,1 1 -13.5,0"
         android:strokeWidth="2.5"
         android:strokeColor="@color/market_text_dim"
         android:strokeLineCap="round"

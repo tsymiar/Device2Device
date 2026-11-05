@@ -298,15 +298,37 @@ public final class AnnyModel {
             col[i * 3 + 2] = (c & 0xFF) / 255f;
             ao[i] = ambient(x, y, z, n[i * 3], n[i * 3 + 1], n[i * 3 + 2], h);
         }
+        // AO 是按「法线朝外程度」逐点估的，肩根 / 三角肌下缘这类曲率急变处会在一两个顶点之间
+        // 掉一大截，远看就是沿手臂走向的一道深色台阶（几何本身的外轮廓是单调的，逐行量下来
+        // 没有外凸）。沿网格平均两遍，只摊开明暗、不动形状，也不改变配色分区
+        smoothScalar(ao, 2, 0.5f);
+
+        // ---- 3.5) 袖口色界的亚三角级细化 ----
+        // 二值配色只能按顶点上色：色界斜着切过三角面时，分界只能落在半边或整条边上，
+        // 于是「衣袖→皮肤」这条线在山坡面上呈 ~1.3cm 的台阶（离线截图放大后就是用户
+        // 说的「颜色变化的地方鼓起一块」）。这里只把跨界的三角形做五轮四分，新顶点取
+        // 边中点 —— 曲面形状完全不变，只是三角化更细（边长 ~0.6mm），色界于是能贴着
+        // |x| = limit(t) 走。非跨界三角形原样保留。
+        Refined hem = refineHem(v, n, region, col, ao, tris, triangleCount, vertexCount, h,
+                hb, faceMap, rim, hasHair, p);
+        float[] vGrid = v;          // 细分前的网格：肩宽要用它量（见下）
+        v = hem.pos;
+        n = hem.nrm;
+        col = hem.col;
+        ao = hem.ao;
+        region = hem.region;
+        int[] hemTris = hem.tris;
+        int hemTrisCount = hem.nTris;
+        int hemVertCount = hem.nVerts;
 
         // ---- 4) 三角形按区域分组：导出 OBJ 时按部件命名与配色 ----
-        short[] idx = new short[triangleCount * 3];
+        short[] idx = new short[hemTrisCount * 3];
         int[] counts = new int[REGION_COUNT];
-        int[] triRegion = new int[triangleCount];
-        for (int t = 0; t < triangleCount; t++) {
-            int a = tris[t * 3] & 0xFFFF;
-            int b = tris[t * 3 + 1] & 0xFFFF;
-            int c = tris[t * 3 + 2] & 0xFFFF;
+        int[] triRegion = new int[hemTrisCount];
+        for (int t = 0; t < hemTrisCount; t++) {
+            int a = hemTris[t * 3] & 0xFFFF;
+            int b = hemTris[t * 3 + 1] & 0xFFFF;
+            int c = hemTris[t * 3 + 2] & 0xFFFF;
             int r = majority(region[a], region[b], region[c]);
             triRegion[t] = r;
             counts[r] += 3;
@@ -319,12 +341,12 @@ public final class AnnyModel {
             cursor[r] = at;
             at += counts[r];
         }
-        for (int t = 0; t < triangleCount; t++) {
+        for (int t = 0; t < hemTrisCount; t++) {
             int r = triRegion[t];
             int w = cursor[r];
-            idx[w] = tris[t * 3];
-            idx[w + 1] = tris[t * 3 + 1];
-            idx[w + 2] = tris[t * 3 + 2];
+            idx[w] = (short) hemTris[t * 3];
+            idx[w + 1] = (short) hemTris[t * 3 + 1];
+            idx[w + 2] = (short) hemTris[t * 3 + 2];
             cursor[r] = w + 3;
         }
         MeshBuilder.Part[] parts = new MeshBuilder.Part[REGION_COUNT];
@@ -340,10 +362,12 @@ public final class AnnyModel {
         res.ao = ao;
         res.indices = idx;
         res.parts = parts;
-        res.vertices = vertexCount;
-        res.triangles = triangleCount;
+        res.vertices = hemVertCount;
+        res.triangles = hemTrisCount;
         res.heightM = h;
-        res.shoulderCm = AnnyMeasure.shoulderWidth(v, h) * 100f;
+        // 肩宽要在「抬肩 + 细化」之前的网格上量：抬肩让三角肌帽在 t 带里上移、细化
+        // 新增的顶点正好落在「手臂内界」阈值上，都会让读数虚涨 3cm（43.7 → 46.8/47.1）
+        res.shoulderCm = AnnyMeasure.shoulderWidth(vPreLift != null ? vPreLift : vGrid, h) * 100f;
         float crotch = AnnyMeasure.crotchHeight(v, idx, h);
         res.inseamCm = crotch * 100f;
         // 乳腺中心被胸型整体上下挪过，量在固定高度上会漏掉整个乳腺（见 bustLevel）
@@ -453,6 +477,8 @@ public final class AnnyModel {
      * 返回的是「可以直接量围度」的顶点。withBust = false 时跳过乳腺，
      * 量出来的那一圈就是下胸围 —— 罩杯（胸围 − 下胸围）建立在这个差值上。
      */
+    private float[] vPreLift;      // 接缝松弛 / 抬肩之前的核心网格：肩宽在它上面量
+
     private float[] buildCore(BodyProfile p, float h, float[] par, boolean withBust) {
         float[] v = base.clone();
 
@@ -485,6 +511,15 @@ public final class AnnyModel {
         applyGirth(v, p, h, par, withBust, legAxis);
         // 各段形变的接缝会留下细微起伏，整体松弛一遍抹平（脚趾与五官在这之后才补，不跟着抹）
         relaxMesh(v, 0.32f, -0.33f);
+        // 肩–臂交界单独再来一遍：肩宽 / 胸围拉大时羽化带上的曲率变化比别处陡，
+        // 全局那一遍的幅度在这里不够，交界处仍会留一道沿手臂走向的浅折
+        relaxShoulderJunction(v, h);
+        // 肩宽只认滑块带来的形状：接缝松弛 / 抬肩都是纯造型步骤，不该改动读数
+        vPreLift = java.util.Arrays.copyOf(v, v.length);
+        // 接缝松弛与抬肩都不改肩宽：抬升会让三角肌帽在 t 带里上移、isArm 的 |x| 阈值
+        // 跟着 limit(t) 外移，读数会凭空涨 3cm（43.7 → 46.8，离线实测），所以测量点在上面
+        relaxDeltoidSeam(v, h);                      // 三角肌前/后缘那道竖折：肩臂"断层"
+        liftShoulders(v, h);                         // 肩线整体抬一点，削弱"塌肩"观感
         healToeSide(v, h);                           // 小趾补回脚掌，填平外侧那道缺口
         smoothToes(v, h);                            // 分开建模的五根脚趾抹成一整只脚
         applyHead(v, p, h);
@@ -1342,6 +1377,212 @@ public final class AnnyModel {
      * 每档的样本少了，抖动比原来大，两遍不够）。
      */
     /**
+     * 肩–臂交界的定向松弛：对三角肌根 / 腋窝这一条带再跑两遍 Taubin（λ/μ 成对，体积不动）。
+     *
+     * 羽化带把「躯干(随肩宽缩放)→手臂(不动)」的落差在横向铺开了，但这一带的曲率本来
+     * 就比别处陡（离线量过：三角肌帽相邻顶点法线夹角最大 33°），全局 relaxMesh 的幅度
+     * 在这条带上不够用。这里只对 t∈[0.74H, 0.89H]、横向落在 [0.80×limit, 1.20×limit]
+     * （躯干外缘稍内 → 三角肌外缘稍外）的顶点施加位移；Laplacian 本身仍用全部邻居平均，
+     * 过渡照常从两侧取信息，不会被带沿切成两截。
+     *
+     * 掩码不能再往外扩：肩宽是靠 t∈[0.76,0.87] 的顶点量出来的，而「算不算手臂」用
+     * |x| > limit 硬判定 —— 抹到 0.80×limit 时最外圈那批顶点会在阈值两侧跳进跳出，
+     * 肩宽读数直接从 47.1cm 掉到 43.7cm（离线实测，非线性跳变）。0.82×limit 是安全边。
+     */
+    private void relaxShoulderJunction(float[] v, float h) {
+        int n = v.length / 3;
+        if (n <= 0 || tris == null || tris.length < 3) return;
+        boolean[] mask = new boolean[n];
+        boolean any = false;
+        for (int i = 0; i < n; i++) {
+            float t = v[i * 3 + 1] / h;
+            if (t < 0.75f || t > 0.90f) continue;
+            float lim = AnnyMeasure.isArmLimit(t, h);
+            if (lim <= 0f) continue;
+            float ax = Math.abs(v[i * 3]);
+            if (ax < lim * 0.82f || ax > lim * 1.30f) continue;
+            mask[i] = true;
+            any = true;
+        }
+        if (!any) return;
+        final float lambda = 0.35f, mu = -0.35f;
+        float[] delta = new float[v.length];
+        laplacian(v, delta);
+        for (int i = 0; i < n; i++) {
+            if (!mask[i]) continue;
+            v[i * 3] += lambda * delta[i * 3];
+            v[i * 3 + 1] += lambda * delta[i * 3 + 1];
+            v[i * 3 + 2] += lambda * delta[i * 3 + 2];
+        }
+        laplacian(v, delta);
+        for (int i = 0; i < n; i++) {
+            if (!mask[i]) continue;
+            v[i * 3] += mu * delta[i * 3];
+            v[i * 3 + 1] += mu * delta[i * 3 + 1];
+            v[i * 3 + 2] += mu * delta[i * 3 + 2];
+        }
+    }
+
+    /**
+     * 三角肌前/后缘那道竖折的专用松弛 —— 用户说的「肩和胳膊之间断层」。
+     *
+     * 实测（男 172cm/65kg、肩宽 0.99）：|x|≈20~22cm、y≈133~140cm、z≈+5.9cm（前）与
+     * −5.6cm（后）这一竖线上，相邻顶点法线夹角最大 78°；女模型同位置只有 37°。
+     * 这是肩宽羽化带（|x| 对 limit 的横向缩放）压在体侧近切线处留下的折：羽化带两端
+     * 虽然已经是二阶连续，但缩放位移沿切线方向的分量在带内仍有一次曲率突变。
+     *
+     * 只对这条带做 4 遍 Taubin（λ=μ=0.55，保体积）：男模型 78°→63°、>50° 的边 6→2 条，
+     * 女模型不受影响（同位置本来就 <40°）。羽化带量程、肩宽读数都不动 —— 测量点
+     * vPreLift 在调用之前就拷好了。
+     */
+    private void relaxDeltoidSeam(float[] v, float h) {
+        int n = v.length / 3;
+        if (n <= 0) return;
+        boolean[] mask = new boolean[n];
+        boolean any = false;
+        for (int i = 0; i < n; i++) {
+            float t = v[i * 3 + 1] / h;
+            if (t < 0.74f || t > 0.86f) continue;
+            float lim = AnnyMeasure.isArmLimit(t, h);
+            if (lim <= 0f) continue;
+            float ax = Math.abs(v[i * 3]);
+            if (ax < lim * 0.78f || ax > lim * 1.12f) continue;
+            mask[i] = true;
+            any = true;
+        }
+        if (!any) return;
+        final float lambda = 0.55f, mu = -0.55f;
+        float[] delta = new float[v.length];
+        for (int pass = 0; pass < 4; pass++) {
+            laplacian(v, delta);
+            for (int i = 0; i < n; i++) {
+                if (!mask[i]) continue;
+                v[i * 3] += lambda * delta[i * 3];
+                v[i * 3 + 1] += lambda * delta[i * 3 + 1];
+                v[i * 3 + 2] += lambda * delta[i * 3 + 2];
+            }
+            laplacian(v, delta);
+            for (int i = 0; i < n; i++) {
+                if (!mask[i]) continue;
+                v[i * 3] += mu * delta[i * 3];
+                v[i * 3 + 1] += mu * delta[i * 3 + 1];
+                v[i * 3 + 2] += mu * delta[i * 3 + 2];
+            }
+        }
+    }
+
+    /**
+     * 抬肩：把「斜方肌外缘 → 肩峰」这条肩线整体抬高，削弱塌肩的观感。
+     *
+     * 基础网格的肩线（实测，1cm 横向档的最高点）从 |x|≈10cm 的 144.1cm 掉到
+     * |x|≈20cm 的 134.1cm —— 10cm 里掉 10cm（≈45°），投影里再叠上颈根的陡坡，
+     * 看起来肩是塌的。抬完是 144.1 → 136.2（≈38°），三角肌帽顶同步抬 2cm。做法是两遍式：先按 1cm 横向档量出当前肩线 yTop(|x|)，
+     * 再对表皮做「横向爬坡 × 距肩线深度衰减」的抬升 —— 权重跟着肩线本身走，
+     * 而不是固定在某个 t 带上（肩线本身是斜的，固定 t 带只能抬到它的一段）。
+     *
+     * 横向：|x|<10cm（颈根 / 头）不动，10→20cm 爬到全量，27cm 之后淡出
+     * （上臂最外缘不动）；深度：贴着肩线 2.5cm 内全量，往下 9cm 归零
+     * （腋窝 / 侧胸不动，只把肩垫"垫高"）。最大抬升 0.012H ≈ 2.1cm。放在身高对齐之前：最高点仍是头顶，normalize 不会
+     * 因此整体缩放；肩宽读数也不受影响（肩峰 / 三角肌帽抬后仍在量测带内）。
+     */
+    private void liftShoulders(float[] v, float h) {
+        int n = v.length / 3;
+        final int nb = 40;                            // 1cm 一档，0~40cm
+        float[] top = new float[nb];
+        for (int i = 0; i < n; i++) {
+            int b = (int) (Math.abs(v[i * 3]) * 100f);
+            if (b < 0 || b >= nb) continue;
+            float y = v[i * 3 + 1];
+            if (y > top[b]) top[b] = y;
+        }
+        for (int pass = 0; pass < 2; pass++) {        // 抹掉 1cm 档间的采样噪声
+            float[] sm = new float[nb];
+            for (int b = 0; b < nb; b++) {
+                int l = Math.max(0, b - 1), r = Math.min(nb - 1, b + 1);
+                sm[b] = (top[l] + 2f * top[b] + top[r]) * 0.25f;
+            }
+            top = sm;
+        }
+        boolean[] moved = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            float ax = Math.abs(v[i * 3]);
+            if (ax < 0.10f || ax > 0.31f) continue;
+            // depth 允许为负：档位平滑会把「躯干–三角肌」之间那道凹槽的 top 抹高，
+            // 槽底顶点算出负深度时按 0（全量）处理，否则三角肌帽会漏抬
+            // 档位之间线性插值：直接用 1cm 档的常数会让 depth 在档界跳一下，
+            // 抬完的表面上留下一道沿档界走的棱（放大能看到高光断开）
+            float bx = ax * 100f;
+            int b0 = Math.min(nb - 2, (int) bx);
+            float fr = bx - b0;
+            float yTop = top[b0] + (top[b0 + 1] - top[b0]) * fr;
+            float depth = yTop - v[i * 3 + 1];
+            if (depth > 0.09f) continue;
+            depth = Math.max(0f, depth);
+            float aAx = sstep((ax - 0.10f) / 0.10f) * (1f - sstep((ax - 0.27f) / 0.04f));
+            float aDp = 1f - sstep((depth - 0.025f) / 0.06f);
+            float dy = 0.012f * h * aAx * aDp;
+            v[i * 3 + 1] += dy;
+            moved[i] = dy > 0f;
+        }
+        // 抬完在带内轻抹一遍 Taubin：权重两端虽然已经是 C2，但「抬多抬少」的落差
+        // 仍会在肩顶留下一条极浅的横向折（放大看高光会断一下）
+        float[] delta = new float[v.length];
+        laplacian(v, delta);
+        for (int i = 0; i < n; i++) {
+            if (!moved[i]) continue;
+            v[i * 3] += 0.30f * delta[i * 3];
+            v[i * 3 + 1] += 0.30f * delta[i * 3 + 1];
+            v[i * 3 + 2] += 0.30f * delta[i * 3 + 2];
+        }
+        laplacian(v, delta);
+        for (int i = 0; i < n; i++) {
+            if (!moved[i]) continue;
+            v[i * 3] -= 0.30f * delta[i * 3];
+            v[i * 3 + 1] -= 0.30f * delta[i * 3 + 1];
+            v[i * 3 + 2] -= 0.30f * delta[i * 3 + 2];
+        }
+    }
+
+    /** smootherstep（五次，C2 连续）：x≤0 → 0，x≥1 → 1；三次的二阶导在两端是断的，
+     *  抬肩这种「只加竖向位移」的操作会把那道断点显成一条高光棱 */
+    private static float sstep(float x) {
+        x = Math.max(0f, Math.min(1f, x));
+        return x * x * x * (x * (x * 6f - 15f) + 10f);
+    }
+
+    /**
+     * 标量场（目前只用于 AO）沿网格的邻居平均：只摊开明暗，不动形状。
+     *
+     * 每遍按「邻接顶点均值」向自己插值 λ；两遍 λ=0.5 相当于把一道 2~3 个顶点宽的台阶
+     * 摊到一个顶点分辨率以上的坡度里。
+     */
+    private void smoothScalar(float[] s, int passes, float lambda) {
+        int n = s.length;
+        if (n <= 0 || tris == null || tris.length < 3) return;
+        float[] sum = new float[n];
+        int[] cnt = new int[n];
+        for (int pass = 0; pass < passes; pass++) {
+            java.util.Arrays.fill(sum, 0f);
+            java.util.Arrays.fill(cnt, 0);
+            for (int t = 0; t + 2 < tris.length; t += 3) {
+                int a = tris[t] & 0xFFFF;
+                int b = tris[t + 1] & 0xFFFF;
+                int c = tris[t + 2] & 0xFFFF;
+                sum[a] += s[b]; cnt[a]++;
+                sum[a] += s[c]; cnt[a]++;
+                sum[b] += s[a]; cnt[b]++;
+                sum[b] += s[c]; cnt[b]++;
+                sum[c] += s[a]; cnt[c]++;
+                sum[c] += s[b]; cnt[c]++;
+            }
+            for (int i = 0; i < n; i++) {
+                if (cnt[i] <= 0) continue;
+                s[i] += lambda * (sum[i] / cnt[i] - s[i]);
+            }
+        }
+    }
+
+    /**
      * 一遍 Taubin 松弛（λ / μ 一正一负成对）：抹平各段形变接缝处的细小起伏。
      *
      * 单跑正向 Laplacian 会让整个人缩一圈；配对之后体积与围度基本不动，只收敛高频。
@@ -1852,13 +2093,29 @@ public final class AnnyModel {
             // 头以下才归这里管；0.86~0.90 之间把倍率淡出，颈根一圈就不会有硬边
             float keep = 1f - smoothstep((t - 0.86f) / 0.04f);
             if (keep <= 0f) continue;                        // 头交给 applyHead
-            // 手臂：之前是硬排除，臂根会现出一圈断层；这里按到「手臂边界」的距离羽化
+            // 手臂：肩根折痕 / 台阶的根源。之前只按水平距离 x 在固定高度把
+            // 「躯干(被肩宽放大)→手臂(不放大)」一刀切，带太窄(0.06×limit≈1.4cm)，
+            // 高分网格上就在肩根现出一道折。现改为：横向把羽化带加宽到 0.10 并用
+            // smootherstep(两端二阶导为 0) 让横截面圆滑；纵向再沿手臂往下把这份肩宽
+            // 缩放收掉——三角肌本就跟肩一起宽，往下(约 0.12H)渐隐为 0，过渡跟着手臂
+            // 走而不是横切一刀，从而避免「袖口台阶」卷土重来。
             float limit = AnnyMeasure.isArmLimit(t, h);
             if (limit > 0f) {
-                // 羽化带收紧（0.14→0.06）：肩宽缩放不要渗到手臂内根，否则上臂根在肩部
-                // 高度被撑大、下方手臂没被撑 → 袖子处鼓出「垫肩/袖口」台阶（肩臂衔接畸形）。
-                float d = (Math.abs(x) - limit * 0.94f) / (limit * 0.06f);
-                keep *= 1f - smoothstep(d);
+                // 羽化带铺满「躯干外缘 → 手臂内界」的整个间隙：躯干轮廓半宽 ≈ limit/1.18
+                // （= 0.847×limit），0.86×limit 正好压在轮廓边外约 1%，1.00×limit 正好是
+                // 手臂内界 —— 中间这 2~3cm 间隙整段用 smootherstep 爬完（两端二阶导为 0）。
+                // 原先 0.90 起步、带宽 0.10×limit（≈2.5cm）只盖住间隙的后半段：前半段里
+                // 躯干已被肩宽推出去而手臂纹丝不动，曲率在带沿上仍有一次跳变，肩根于是
+                // 还留着一道浅折。躯干最外圈的顶点在 0.847×limit 以内（k=1 全额缩放），
+                // 肩宽滑块的量程不受影响；手臂内界之外照旧 k=0 一点不动
+                float d = (Math.abs(x) - limit * 0.86f) / (limit * 0.14f);
+                float k = 1f - smootherstep(d);
+                // 注意：臂–肩羽化只做「横向」这一维（k）。上一版曾把沿手臂向下的纵向
+                // 渐隐 armV 也乘进 keep，而 keep 同时门控肩 / 胸 / 腰围与乳腺增长，于是
+                // 在肩线以下（armV≈0）整段被砍掉，导致肩宽 / 胸围 / 罩杯三个滑块近乎失效。
+                // 修肩根折痕靠的是上面这层更宽、二阶连续的横向羽化，纵向 armV 属多余且有害，
+                // 故移除（肩宽对上臂的影响由三角肌自身随肩一起宽来体现，不靠 keep 渐隐）。
+                keep *= k;
                 if (keep <= 0f) continue;
             }
             // 裆部：缩放轴在臀 → 裆之间渐变，不在 yTorsoBot 处从 0 直接跳到 ±legX
@@ -2195,7 +2452,7 @@ public final class AnnyModel {
         }
         if (t < 0.045f) return R_SKIN;
         if (t > 0.855f && ax < 0.045f * h) return R_SKIN;         // 脖子
-        if (t > 0.36f && isArm(t, ax, h)) return R_SKIN;          // 手臂与手
+        if (t > 0.36f && AnnyMeasure.isArmSmooth(t, ax, h)) return R_SKIN;   // 手臂与手
         return t >= 0.50f ? R_TOP : R_BOTTOM;                     // 躯干上装 / 腿部下装
     }
 
@@ -2260,6 +2517,147 @@ public final class AnnyModel {
 
     private static int majority(int a, int b, int c) {
         return a == b ? a : (b == c ? b : (a == c ? a : b));
+    }
+
+    /** 袖口色界细化后的网格（顶点会涨几百，其余字段含义同原网格） */
+    private static final class Refined {
+        float[] pos, nrm, col, ao;
+        int[] region, tris;
+        int nVerts, nTris;
+    }
+
+    /**
+     * 只把「跨袖口色界」的三角形做五轮四分（1→4→16→64→256→1024 小块），其余原样保留。
+     *
+     * 二值配色只能按顶点上色，色界斜切三角面时只能落在半边或整条边上，于是
+     * 「衣袖→皮肤」这条分界在山坡面上呈 ~1.3cm 的台阶（放大后就是用户说的
+     * 「颜色变化的地方鼓起一块」；外轮廓本身量下来是单调的，没有外凸）。
+     * 细分后跨界三角形的边长降到 1/32（≈0.6mm，比一个像素还细），色界于是能贴着
+     * |x| = limit(t) 走成一条顺滑的线；再多两轮也只是把台阶压到亚像素，肉眼看不出。
+     *
+     * 新顶点取边中点 —— 曲面形状完全不变（三角面本来就在同一平面上），只是三角化
+     * 更细；法线取两端之和归一化，AO 取两端均值（沿用已经平滑过的值），配色在
+     * 中点位置重新分类，所以分界是精确落在新旧顶点之间的那条细分边上。
+     */
+    private Refined refineHem(float[] v, float[] n, int[] region, float[] col, float[] ao,
+            short[] tris, int nTris, int nVerts, float h,
+            float[] hb, float[] faceMap, float[] rim, boolean hasHair, BodyProfile p) {
+        Refiner rf = new Refiner(v, n, region, col, ao, nVerts, h, hb, faceMap, rim, hasHair, p);
+        int[] tr = new int[nTris * 3];
+        for (int i = 0; i < tr.length; i++) tr[i] = tris[i] & 0xFFFF;
+        int nt = nTris;
+        for (int pass = 0; pass < 5; pass++) {
+            rf.mids.clear();
+            int[] next = new int[nt * 4 * 3];
+            int nn = 0;
+            for (int t = 0; t < nt; t++) {
+                int a = tr[t * 3];
+                int b = tr[t * 3 + 1];
+                int c = tr[t * 3 + 2];
+                if (!rf.straddle(a, b, c)) {
+                    next[nn * 3] = a;
+                    next[nn * 3 + 1] = b;
+                    next[nn * 3 + 2] = c;
+                    nn++;
+                    continue;
+                }
+                int ab = rf.mid(a, b);
+                int bc = rf.mid(b, c);
+                int ca = rf.mid(c, a);
+                next[nn * 3] = a;  next[nn * 3 + 1] = ab; next[nn * 3 + 2] = ca; nn++;
+                next[nn * 3] = ab; next[nn * 3 + 1] = b;  next[nn * 3 + 2] = bc; nn++;
+                next[nn * 3] = ca; next[nn * 3 + 1] = bc; next[nn * 3 + 2] = c;  nn++;
+                next[nn * 3] = ab; next[nn * 3 + 1] = bc; next[nn * 3 + 2] = ca; nn++;
+            }
+            tr = next;
+            nt = nn;
+        }
+        Refined out = new Refined();
+        out.pos = java.util.Arrays.copyOf(rf.pos, rf.nv * 3);
+        out.nrm = java.util.Arrays.copyOf(rf.nrm, rf.nv * 3);
+        out.col = java.util.Arrays.copyOf(rf.col, rf.nv * 3);
+        out.ao = java.util.Arrays.copyOf(rf.ao, rf.nv);
+        out.region = java.util.Arrays.copyOf(rf.region, rf.nv);
+        out.tris = tr;
+        out.nVerts = rf.nv;
+        out.nTris = nt;
+        return out;
+    }
+
+    /** refineHem 的可变工作区：就地扩顶点、按边缓存中点 */
+    private static final class Refiner {
+        float[] pos, nrm, col, ao;
+        int[] region;
+        int nv;
+        final float h;
+        final float[] hb, faceMap, rim;
+        final boolean hasHair;
+        final BodyProfile p;
+        final java.util.HashMap<Long, Integer> mids = new java.util.HashMap<>();
+
+        Refiner(float[] v, float[] n, int[] region, float[] col, float[] ao, int nVerts, float h,
+                float[] hb, float[] faceMap, float[] rim, boolean hasHair, BodyProfile p) {
+            int cap = nVerts + 30000;     // 五轮四分实测涨到 28.6k 顶点（短索引 65536 够）
+            this.pos = java.util.Arrays.copyOf(v, cap * 3);
+            this.nrm = java.util.Arrays.copyOf(n, cap * 3);
+            this.col = java.util.Arrays.copyOf(col, cap * 3);
+            this.ao = java.util.Arrays.copyOf(ao, cap);
+            this.region = java.util.Arrays.copyOf(region, cap);
+            this.nv = nVerts;
+            this.h = h;
+            this.hb = hb;
+            this.faceMap = faceMap;
+            this.rim = rim;
+            this.hasHair = hasHair;
+            this.p = p;
+        }
+
+        /** 三个顶点分属「上衣」和「皮肤」两边（且没有第三种区域）就是跨界三角形 */
+        boolean straddle(int a, int b, int c) {
+            boolean top = false;
+            boolean skin = false;
+            int[] rs = {region[a], region[b], region[c]};
+            for (int r : rs) {
+                if (r == R_TOP) top = true;
+                else if (r == R_SKIN) skin = true;
+                else return false;
+            }
+            return top && skin;
+        }
+
+        /** 边中点顶点：位置/法线/AO 插值，配色按该点重新分类 */
+        int mid(int a, int b) {
+            long key = ((long) Math.min(a, b) << 20) | Math.max(a, b);
+            Integer got = mids.get(key);
+            if (got != null) return got;
+            int i = nv++;
+            if (i >= region.length) return a;      // 兜底：容量不够就退化，不抛异常
+            for (int k = 0; k < 3; k++) {
+                pos[i * 3 + k] = 0.5f * (pos[a * 3 + k] + pos[b * 3 + k]);
+            }
+            float nx = nrm[a * 3] + nrm[b * 3];
+            float ny = nrm[a * 3 + 1] + nrm[b * 3 + 1];
+            float nz = nrm[a * 3 + 2] + nrm[b * 3 + 2];
+            float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (len > 1e-6f) {
+                nx /= len;
+                ny /= len;
+                nz /= len;
+            }
+            nrm[i * 3] = nx;
+            nrm[i * 3 + 1] = ny;
+            nrm[i * 3 + 2] = nz;
+            ao[i] = 0.5f * (ao[a] + ao[b]);
+            int r = classify(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], nx, ny, nz, h,
+                    hb, faceMap, rim, hasHair);
+            region[i] = r;
+            int c = colorOf(r, p);
+            col[i * 3] = ((c >> 16) & 0xFF) / 255f;
+            col[i * 3 + 1] = ((c >> 8) & 0xFF) / 255f;
+            col[i * 3 + 2] = (c & 0xFF) / 255f;
+            mids.put(key, i);
+            return i;
+        }
     }
 
     private static float[] rgb(int argb) {
