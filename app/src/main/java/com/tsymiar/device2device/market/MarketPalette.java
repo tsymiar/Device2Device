@@ -46,6 +46,7 @@ public final class MarketPalette {
     public final int rsi;
     public final int cursor;          // 十字光标 / 最新价虚线
     public final int trend;           // 分时折线（1分钟等超短周期）
+    public final int avg;             // 分时均价线
     public final int tooltipBg;       // 详情浮窗底（带 alpha）
     public final int tooltipStroke;
     public final int tooltipText;     // 浮窗里的正文（浮窗底始终是深色，跟页面正文色分开取）
@@ -81,6 +82,7 @@ public final class MarketPalette {
         rsi = color(c, R.color.market_rsi);
         cursor = color(c, R.color.market_cursor);
         trend = color(c, R.color.market_trend);
+        avg = color(c, R.color.market_avg);
         tooltipBg = color(c, R.color.market_tooltip_bg);
         tooltipStroke = color(c, R.color.market_tooltip_stroke);
         tooltipText = color(c, R.color.market_tooltip_text);

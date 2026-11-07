@@ -113,8 +113,9 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         mAppWidgetId = pickWidgetId();
         // 默认取消：用户直接返回时不添加小部件
         setResult(RESULT_CANCELED, resultIntent());
-        // 已有配置（重新配置时）直接带出来，可继续增删
+        // 已有配置（重新配置时）直接带出来，可继续增删；老配置里存过的重复条目顺手合并
         mItems.addAll(MarketWidgetProvider.readItems(this, mAppWidgetId));
+        dedupeItems();
         if (!mItems.isEmpty()) mSource = mItems.get(0).source;
         setContentView(buildUi());
         if (mAppWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
@@ -450,8 +451,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
 
             void bind(int position) {
                 Item item = mItems.get(position);
-                name.setText((position + 1) + ". " + item.title() + "  " + item.symbol
-                        + " · " + QuoteSource.label(item.source));
+                name.setText((position + 1) + ". " + item.detailLabel());
                 remove.setOnClickListener(v -> {
                     int p = getAdapterPosition();
                     if (p < 0 || p >= mItems.size()) return;
@@ -639,7 +639,30 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         add(input, QuoteSource.aliasName(input));
     }
 
+    /** 合并已存列表中的重复条目（同源+同代码，忽略大小写），保留最先添加的 */
+    private void dedupeItems() {
+        for (int i = mItems.size() - 1; i >= 0; i--) {
+            Item cur = mItems.get(i);
+            for (int j = 0; j < i; j++) {
+                if (mItems.get(j).source.equals(cur.source)
+                        && mItems.get(j).symbol.equalsIgnoreCase(cur.symbol)) {
+                    mItems.remove(i);
+                    break;
+                }
+            }
+        }
+    }
+
     private void add(String code, String name) {
+        if (code != null) code = code.trim();
+        // 去重按「数据源 + 代码」（忽略大小写），名称/拼音搜索来的代码同样算数
+        for (Item item : mItems) {
+            if (item.source.equals(mSource) && item.symbol.equalsIgnoreCase(code)) {
+                setStatus("已经在列表里了：" + item.displayLabel());
+                mSymbolEdit.setText("");
+                return;
+            }
+        }
         mItems.add(new Item(mSource, code, name));
         mSymbolEdit.setText("");
         refreshList();
@@ -651,7 +674,10 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         if (!alive()) return;      // 搜索结果回来时页面可能已经重建，这时弹框会抛 BadTokenException
         String[] labels = new String[items.size()];
         for (int i = 0; i < items.size(); i++) {
-            labels[i] = items.get(i).name + "  " + items.get(i).code;
+            QuoteSource.Symbol s = items.get(i);
+            // 名称与代码一致就只出一份，别 "BTCUSDT  BTCUSDT" 重复
+            boolean same = s.name == null || s.name.equalsIgnoreCase(s.code);
+            labels[i] = same ? s.code : s.name + "  " + s.code;
         }
         new AlertDialog.Builder(this)
                 .setTitle("选择标的")

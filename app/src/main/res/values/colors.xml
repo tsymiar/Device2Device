@@ -54,6 +54,8 @@
     <color name="market_cursor">#FF64748B</color>
     <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF1E5FA8</color>
+    <!-- 分时均价线（参考 PhoneStock 的黄色均价线：浅底取深金保证对比度） -->
+    <color name="market_avg">#FFB45309</color>
     <color name="market_tooltip_bg">#EE1F2937</color>
     <color name="market_tooltip_stroke">#66899BB3</color>
     <!-- 详情小窗底是深色，文字取浅色 -->

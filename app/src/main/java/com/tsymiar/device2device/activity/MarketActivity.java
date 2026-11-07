@@ -2,6 +2,8 @@ package com.tsymiar.device2device.activity;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.graphics.Paint;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -13,6 +15,7 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -22,6 +25,9 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatSpinner;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.market.Quote;
@@ -57,6 +63,8 @@ public class MarketActivity extends AppCompatActivity {
 
     private static final int LIMIT = 320;
     private static final long REFRESH_MS = 15000L;
+    /** 休市时段的降频间隔 */
+    private static final long REFRESH_IDLE_MS = 120000L;
     /** 一轮取数超过这个时长还没回来，就当这次回调丢了：解锁下一次加载，免得永远停在"加载中…" */
     private static final long LOAD_STALE_MS = 60000L;
 
@@ -104,6 +112,11 @@ public class MarketActivity extends AppCompatActivity {
     private TextView mNineBtn;
     /** 九转 + 反弹信号是否显示（一个开关管两类信号） */
     private boolean mShowNine = true;
+    /** 标的选择区（横屏默认折叠成一行开关，竖屏始终展开） */
+    private LinearLayout mSelectRow;
+    private LinearLayout mSymbolRow;
+    private TextView mFoldBtn;
+    private boolean mRowsExpanded = false;
 
     private String mSource = QuoteSource.AUTO;
     private String mInterval = "1d";
@@ -139,9 +152,14 @@ public class MarketActivity extends AppCompatActivity {
         public void run() {
             if (!mAutoRefresh) return;
             load();
-            mHandler.postDelayed(this, REFRESH_MS);
+            mHandler.postDelayed(this, refreshInterval());
         }
     };
+
+    /** 刷新间隔：交易时段 15 秒，休市（粗判见 QuoteSource.marketOpen）2 分钟 */
+    private long refreshInterval() {
+        return QuoteSource.marketOpen(mSource, symbolText()) ? REFRESH_MS : REFRESH_IDLE_MS;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -162,10 +180,20 @@ public class MarketActivity extends AppCompatActivity {
         root.setBackgroundColor(C_BG);
         root.setPadding(dp(8), dp(8), dp(8), dp(8));
 
-        root.addView(buildSelectRow());
-        root.addView(buildSymbolRow());
+        mSelectRow = buildSelectRow();
+        mSymbolRow = buildSymbolRow();
+        mFoldBtn = buildFoldButton();
+        root.addView(mFoldBtn);
+        root.addView(mSelectRow);
+        root.addView(mSymbolRow);
         buildChart(root);
         root.addView(buildBottom());
+        applyFoldState();       // 横屏默认折叠选择区，给图表腾高度
+        if (getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE) {
+            // 横屏收掉标题栏，图表再多一行高度
+            if (getSupportActionBar() != null) getSupportActionBar().hide();
+        }
 
         // 屏幕常亮：自动更新时不希望熄屏中断行情查看
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -174,6 +202,15 @@ public class MarketActivity extends AppCompatActivity {
         mSourceSpinner.setSelection(Math.max(0, sourceIndex), false);
 
         setContentView(root);
+        applyImmersive();       // 横屏全屏，竖屏常规
+        // 点标题栏收起 K 线详情浮窗
+        View titleBar = findViewById(androidx.appcompat.R.id.action_bar_container);
+        if (titleBar != null) {
+            titleBar.setClickable(true);
+            titleBar.setOnClickListener(v -> {
+                if (mChart != null) mChart.clearSelection();
+            });
+        }
         refreshIntervals(false);
         load();
     }
@@ -195,7 +232,7 @@ public class MarketActivity extends AppCompatActivity {
     /** 起/停都做成幂等的，任何时候重复调用队列里都只留一个定时任务 */
     private void startAutoRefresh() {
         mHandler.removeCallbacks(mRefreshRunnable);
-        if (mAutoRefresh && !isFinishing()) mHandler.postDelayed(mRefreshRunnable, REFRESH_MS);
+        if (mAutoRefresh && !isFinishing()) mHandler.postDelayed(mRefreshRunnable, refreshInterval());
     }
 
     private void stopAutoRefresh() {
@@ -435,17 +472,87 @@ public class MarketActivity extends AppCompatActivity {
     private LinearLayout buildBottom() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
+        box.setClickable(true);
+        box.setOnClickListener(v -> {
+            if (mChart != null) mChart.clearSelection();
+        });
+        // 固定高度占位防图表抖动：竖屏各两行，横屏各一行
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        int lines = landscape ? 1 : 2;
         mStatus = new TextView(this);
         mStatus.setTextColor(C_TEXT_DIM);
         mStatus.setTextSize(11);
         mStatus.setText("加载中…");
+        mStatus.setIncludeFontPadding(false);
+        // 行高按真实字高算（跟随系统字号），否则放大字体后固定 16dp 装不下，两行会挤在一起
+        Paint.FontMetrics fm = mStatus.getPaint().getFontMetrics();
+        int rowHeight = ((int) Math.ceil(fm.descent - fm.ascent) + dp(2)) * lines;
+        mStatus.setHeight(rowHeight);
+        mStatus.setGravity(Gravity.CENTER_VERTICAL);
+        mStatus.setMaxLines(lines);
+        mStatus.setEllipsize(TextUtils.TruncateAt.END);
         mHint = new TextView(this);
         mHint.setTextColor(C_TEXT_HINT);
         mHint.setTextSize(11);
         mHint.setText("可直接输入名称/拼音（紫金矿业、zjky）或代码 · 拖动查看历史 · 双指缩放 · 单击副图切换 成交量/MACD/RSI/KDJ");
+        mHint.setIncludeFontPadding(false);
+        mHint.setHeight(rowHeight);
+        mHint.setGravity(Gravity.CENTER_VERTICAL);
+        mHint.setMaxLines(lines);
+        mHint.setEllipsize(TextUtils.TruncateAt.END);
         box.addView(mStatus);
         box.addView(mHint);
         return box;
+    }
+
+    /** 横屏全屏：隐系统栏，下滑临时呼出；竖屏恢复常规 */
+    private void applyImmersive() {
+        Window window = getWindow();
+        WindowInsetsControllerCompat insets =
+                WindowCompat.getInsetsController(window, window.getDecorView());
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        WindowCompat.setDecorFitsSystemWindows(window, !landscape);
+        if (landscape) {
+            insets.hide(WindowInsetsCompat.Type.systemBars());
+            insets.setSystemBarsBehavior(
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        } else {
+            insets.show(WindowInsetsCompat.Type.systemBars());
+        }
+    }
+
+    /** 折叠开关行：横屏常驻，竖屏不显示（始终展开） */
+    private TextView buildFoldButton() {
+        TextView fold = new TextView(this);
+        fold.setTextSize(12);
+        fold.setTextColor(C_TEXT_DIM);
+        fold.setGravity(Gravity.CENTER_VERTICAL);
+        fold.setPadding(dp(4), dp(2), dp(4), dp(2));
+        fold.setClickable(true);
+        fold.setOnClickListener(v -> {
+            mRowsExpanded = !mRowsExpanded;
+            applyFoldState();
+        });
+        return fold;
+    }
+
+    /** 横屏默认折叠选择区，竖屏强制展开 */
+    private void applyFoldState() {
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        if (!landscape) {
+            mFoldBtn.setVisibility(View.GONE);
+            mSelectRow.setVisibility(View.VISIBLE);
+            mSymbolRow.setVisibility(View.VISIBLE);
+            return;
+        }
+        mFoldBtn.setVisibility(View.VISIBLE);
+        mFoldBtn.setText(mRowsExpanded ? "▾ 收起" : "▸ 展开");
+        int rowVisibility = mRowsExpanded ? View.VISIBLE : View.GONE;
+        mSelectRow.setVisibility(rowVisibility);
+        mSymbolRow.setVisibility(rowVisibility);
     }
 
     private AppCompatSpinner spinner(int items) {
@@ -618,7 +725,11 @@ public class MarketActivity extends AppCompatActivity {
     private void pickSymbol(List<Symbol> items) {
         if (!alive()) return;
         String[] labels = new String[items.size()];
-        for (int i = 0; i < items.size(); i++) labels[i] = items.get(i).name + "  " + items.get(i).code;
+        for (int i = 0; i < items.size(); i++) {
+            Symbol s = items.get(i);
+            boolean same = s.name == null || s.name.equalsIgnoreCase(s.code);
+            labels[i] = same ? s.code : s.name + "  " + s.code;
+        }
         dismissPickDialog();
         mPickDialog = new AlertDialog.Builder(this)
                 .setTitle("选择标的")

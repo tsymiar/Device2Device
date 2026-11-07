@@ -37,6 +37,8 @@
     <color name="market_cursor">#FF9AA4B2</color>
     <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF42A5F5</color>
+    <!-- 分时均价线：深底取亮黄 -->
+    <color name="market_avg">#FFFFD54F</color>
     <color name="market_tooltip_bg">#EE151A21</color>
     <color name="market_tooltip_stroke">#664A5568</color>
     <color name="market_tooltip_text">#FFE8EAED</color>

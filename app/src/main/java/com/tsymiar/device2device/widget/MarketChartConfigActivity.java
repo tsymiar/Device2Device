@@ -302,8 +302,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
 
     private void refreshCurrent() {
         if (mCurrent == null) return;
-        mCurrent.setText(mItem.title() + "  " + mItem.symbol
-                + " · " + QuoteSource.label(mItem.source));
+        mCurrent.setText(mItem.detailLabel());
     }
 
     private View buildStatus() {

@@ -76,6 +76,7 @@
     <string name="market_widget_chart_none">暂无曲线数据</string>
     <!-- 行情热力图小部件：4x4，按市值分面积、按涨跌幅染色的沪深京 A 股 -->
     <string name="market_heat_widget_label">📊 市值热力图</string>
+    <string name="compass_widget_label">🧭 指南针</string>
     <string name="market_heat_widget_desc">一屏摆开当天沪深京 A 股市值最大的一批（部件越大摆的格子越多）：每格面积按市值分，颜色按涨跌幅染（红涨绿跌，越浓涨跌越大）。点整块进行情页，点右上角「刷新」立即取数据。</string>
     <string name="market_heat_widget_title">市值热力图</string>
     <string name="market_heat_widget_legend">面积=市值 · 颜色=涨跌 · 沪深京 A股 @30</string>

@@ -133,6 +133,26 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_market_heat" />
         </receiver>
+
+        <!-- 指南针小部件：静态圆形表盘，点击拉起测向页触发传感器，测完画回部件 -->
+        <receiver
+            android:name=".widget.CompassWidgetProvider"
+            android:exported="true"
+            android:label="@string/compass_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/compass_widget_info" />
+        </receiver>
+        <activity
+            android:name=".widget.CompassActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity android:name=".activity.WaveActivity" android:label="@string/title_wave" android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
         <activity android:name=".activity.GraphActivity"
             android:label="@string/title_sensor_dashboard" />

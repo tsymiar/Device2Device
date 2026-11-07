@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 表盘整体画进位图（刻度/指针/文字都随方位变化，RemoteViews 拼不出来） -->
+    <ImageView
+        android:id="@+id/compass_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/compass_widget_label" />
+</FrameLayout>

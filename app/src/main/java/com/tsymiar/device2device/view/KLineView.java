@@ -9,9 +9,12 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.widget.OverScroller;
 
 import com.tsymiar.device2device.market.Indicators;
 import com.tsymiar.device2device.market.MarketPalette;
@@ -20,20 +23,13 @@ import com.tsymiar.device2device.market.Snapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * K线（蜡烛图）视图 —— MyAutomatic/toolset/matkline.py 绘图部分的 Android 版。
- *
- * 对应脚本 plot_candles：
- *  - 主图：蜡烛 + 影线（中国习惯红涨绿跌）+ MA5/MA10/MA20
- *  - 最新价虚线 + 价格轴自适应小数位
- *  - 底部副图：成交量 / MACD(12,26,9) / RSI(14)，单击切换（对应脚本单击循环）
- *  - 时间轴智能标签（日内显示时分，日线显示月-日）
- * 交互：左右拖动平移、双指缩放每根K线宽度、点按主图查看该根详情（通过回调外抛）
+ * K线视图 —— MyAutomatic/toolset/matkline.py 绘图部分的 Android 版。
+ * 主图蜡烛/分时折线 + MA + 多空标记；副图 成交量/MACD/RSI/KDJ 单击切换；
+ * 交互：拖动平移、惯性滚动、双指缩放、长按十字跟随、点按出详情浮窗。
  */
 public class KLineView extends View {
 
@@ -47,12 +43,9 @@ public class KLineView extends View {
     private int mGrid = 0xFF20262F;
     private int mText = 0xFFB7BDC7;
     private int mTextDim = 0xFF6B7280;
-    // 红涨绿跌（与脚本 UP_COLOR/DOWN_COLOR/mMaColors 一致）
+    // 红涨绿跌（与脚本 UP_COLOR/DOWN_COLOR 一致）
     private int mUp = 0xFFD62728;
     private int mDown = 0xFF2CA02C;
-    private int mMa5 = 0xFFE8890C;
-    private int mMa10 = 0xFF2F6FD0;
-    private int mMa20 = 0xFF8A5CD6;
     private int mCursor = 0xFF9AA4B2;
     private int mDif = 0xFFFFA726;
     private int mDea = 0xFF42A5F5;
@@ -65,6 +58,8 @@ public class KLineView extends View {
     /** 分时折线（1分钟等超短周期用折线代替蜡烛）：线色与下方半透明面积色 */
     private int mTrend = 0xFF2F6FD0;
     private int mTrendFill = 0x332F6FD0;
+    /** 分时均价线（参考 PhoneStock：黄色，随调色板日/夜切换） */
+    private int mAvg = 0xFFB45309;
 
     /** 副图标题带指标参数（脚本 PANEL_LABEL_FMT） */
     private static final String[] PANEL_NAMES = {"成交量", "MACD(12,26,9)", "RSI(14)", "KDJ(9,3,3)"};
@@ -73,7 +68,7 @@ public class KLineView extends View {
     private static final int PANEL_RSI = 2;
     private static final int PANEL_KDJ = 3;
     private static final int[] MA_WINDOWS = {5, 10, 20};
-    private int[] mMaColors = {mMa5, mMa10, mMa20};
+    private int[] mMaColors = {0xFFE8890C, 0xFF2F6FD0, 0xFF8A5CD6};
 
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -118,29 +113,22 @@ public class KLineView extends View {
     /** 纵轴收窄的死区（占当前量程的比例）：小于它就不改量程 */
     private static final float RANGE_DEAD_BAND = 0.03f;
 
-    private float mTouchDownX, mTouchDownY, mLastX;
+    private float mLastX;
     private boolean mMoved;
     private boolean mScaling;
     private final ScaleGestureDetector mScaleDetector;
+    /** 长按进入十字光标跟随模式：按住期间手势只移动光标，不滚动（参考 PhoneStock） */
+    private boolean mCrosshair;
+    private final GestureDetector mGestureDetector;
+    /** fling 惯性滚动：拖动抬起后按速度继续滑行（参考 PhoneStock 的 VelocityTracker+Scroller） */
+    private final OverScroller mScroller;
+    private VelocityTracker mVelocityTracker;
 
     // ===== 多空标记 =====
     // 同一根 K 线可能同时命中好几个（比如 MACD 金叉和 KDJ 低位金叉经常撞在一起），
-    // 所以按位存进 mMarks，绘制时同侧按顺序往下 / 往上错开，别叠成一坨
-    private static final int MK_NINE_BUY = 0;    // 神奇九转 买入九转（底）
-    private static final int MK_NINE_SELL = 1;   // 神奇九转 卖出九转（顶）
-    private static final int MK_REBOUND = 2;     // RSI 超卖回升
-    private static final int MK_FALLBACK = 3;    // RSI 超买走弱
-    private static final int MK_MACD_GOLD = 4;   // MACD 金叉
-    private static final int MK_MACD_DEAD = 5;   // MACD 死叉
-    private static final int MK_KDJ_GOLD = 6;    // KDJ 低位金叉
-    private static final int MK_KDJ_DEAD = 7;    // KDJ 高位死叉
-    private static final int MK_COUNT = 8;
-    /** 标记文字，下标即 MK_* */
-    private static final String[] MK_TEXT = {"9", "9", "弹", "落", "金", "死", "低", "高"};
-    /** true=多头（画在 K 线下方），false=空头（画在上方） */
-    private static final boolean[] MK_BULL = {true, false, true, false, true, false, true, false};
-
-    /** 每根 K 线的多空标记，按位存（见 MK_*），setData 时算好 */
+    // 所以按位存进 mMarks，绘制时同侧按顺序往下 / 往上错开，别叠成一坨。
+    // 位定义与计算在 MarkEngine（从本类拆出的纯函数部分）
+    /** 每根 K 线的多空标记，按位存（见 MarkEngine.MK_*），setData 时算好 */
     private int[] mMarks;
     /** 反弹 / 超买回落的颜色（深浅模式自适应），跟九转、金叉死叉用的涨跌色分开 */
     private int mReboundColor = 0xFFC2185B;
@@ -156,6 +144,31 @@ public class KLineView extends View {
         mDensity = getResources().getDisplayMetrics().density;
         mSlot = dp(8);
         setBackgroundColor(mBg);
+        mScroller = new OverScroller(context);
+        mGestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public void onLongPress(MotionEvent e) {
+                // 长按后进入十字跟随：之后的 ACTION_MOVE 全部用于移动光标，滚动被挂起
+                if (mScaling || e.getPointerCount() > 1) return;
+                mCrosshair = true;
+                if (mVelocityTracker != null) mVelocityTracker.clear();
+                select(indexOfX(e.getX()));
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                // 双击复位：回到默认每根宽度并跳到最新一根（PhoneStock 无此交互，行情 App 常见补充）
+                mScroller.forceFinished(true);
+                mSlot = dp(8);
+                mPendingTail = true;
+                mSelected = -1;
+                computeVisible();
+                clampStart();
+                publishSelection();
+                invalidate();
+                return true;
+            }
+        });
         mScaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
             public boolean onScaleBegin(ScaleGestureDetector detector) {
@@ -187,7 +200,6 @@ public class KLineView extends View {
         });
     }
 
-    /** 主图首行显示的标的名称（股票名/商品中文名）；传空串则只显示标题 */
     /** 整套换色：日间 / 夜间由外层传入（见 MarketPalette），换完立即重绘 */
     public void setPalette(MarketPalette p) {
         if (p == null) return;
@@ -197,10 +209,7 @@ public class KLineView extends View {
         mTextDim = p.textDim;
         mUp = p.up;
         mDown = p.down;
-        mMa5 = p.ma5;
-        mMa10 = p.ma10;
-        mMa20 = p.ma20;
-        mMaColors = new int[]{mMa5, mMa10, mMa20};
+        mMaColors = new int[]{p.ma5, p.ma10, p.ma20};
         mCursor = p.cursor;
         mDif = p.dif;
         mDea = p.dea;
@@ -211,12 +220,12 @@ public class KLineView extends View {
         mTooltipTextDim = p.tooltipTextDim;
         mTrend = p.trend;
         mTrendFill = (p.trend & 0x00FFFFFF) | 0x33000000;    // 同色 20% 透明做面积
+        mAvg = p.avg;
         mReboundColor = p.rebound;
         setBackgroundColor(mBg);
         invalidate();
     }
 
-    /** 行情页「神奇九转」开关 */
     /** 九转与反弹信号的总开关（行情页上两者共用一个按钮） */
     public void setShowSignals(boolean show) {
         mShowSignals = show;
@@ -265,13 +274,8 @@ public class KLineView extends View {
     }
 
     /**
-     * 装载数据并立即重绘。
-     *
-     * 自动刷新（默认 15s 一次）也会走这里，所以刷新要"就地更新"而不是整体重置：
-     *  - 视窗原本贴在最新一根才继续跟随最新；用户拖去看历史时不把他拽回去；
-     *  - 十字光标选中的那根保持不变（刷新前选的是第 N 根，刷新后还是第 N 根）；
-     *  - 纵轴量程带迟滞，最后一根K线的微小跳动不会让整幅图上下位移。
-     * 换标的 / 换周期这类数据规模变化很大的情况，clampStart() 会把视窗收回合法范围。
+     * 装载数据并立即重绘。自动刷新也走这里，故做"就地更新"：
+     * 贴尾时继续跟随最新；用户在看历史/选中某根时保持不动；量程迟滞防抖。
      */
     public void setData(String title, List<Quote> quotes) {
         mTitle = title == null ? "" : title;
@@ -281,8 +285,7 @@ public class KLineView extends View {
         int keepSelected = mSelected;
 
         mData = sanitize(quotes);
-        float[] closes = Indicators.closes(mData);
-        mMarks = computeMarks(closes);
+        mMarks = MarkEngine.compute(mData);
         mPendingTail = atTail;
         // 无成交量（如部分外汇源）时默认展示 MACD，而不是空面板（与脚本口径一致）；
         // 用户手动切过副图后就一直用他选的那个，刷新不再覆盖（锁了成交量但该源没量才回落 MACD）
@@ -301,56 +304,7 @@ public class KLineView extends View {
         invalidate();
     }
 
-    /**
-     * 多空标记：按位写进 marks[i]。
-     *
-     * 四条来源互相独立，命中条件都取「上/下穿的那一根」而不是整段区间，
-     * 这样同一根上叠多个标记时只会多占一行，不会整片糊住。
-     */
-    private int[] computeMarks(float[] closes) {
-        int n = closes.length;
-        int[] marks = new int[n];
-
-        // 神奇九转：只取第 9 根（从 <9 变到 9 的那根），1~8 和重复的 9 不算
-        Indicators.NineTurns nine = Indicators.nineTurns(closes);
-        for (int i = 0; i < n; i++) {
-            if (nine.buy[i] == 9 && (i == 0 || nine.buy[i - 1] < 9)) marks[i] |= 1 << MK_NINE_BUY;
-            else if (nine.sell[i] == 9 && (i == 0 || nine.sell[i - 1] < 9)) marks[i] |= 1 << MK_NINE_SELL;
-        }
-
-        // RSI：超卖区上穿 30 且收阳 → 反弹；超买区下穿 70 且收阴 → 回落
-        float[] rsi = Indicators.rsi(closes, 14);
-        for (int i = 1; i < n; i++) {
-            if (Float.isNaN(rsi[i]) || Float.isNaN(rsi[i - 1])) continue;
-            Quote q = mData.get(i);
-            if (rsi[i - 1] <= 30f && rsi[i] > 30f && q.close >= q.open) marks[i] |= 1 << MK_REBOUND;
-            else if (rsi[i - 1] >= 70f && rsi[i] < 70f && q.close <= q.open) marks[i] |= 1 << MK_FALLBACK;
-        }
-
-        // MACD：DIF 上穿 DEA 金叉、下穿死叉
-        Indicators.Macd macd = Indicators.macd(closes, 12, 26, 9);
-        for (int i = 1; i < n; i++) {
-            if (macd.dif[i - 1] <= macd.dea[i - 1] && macd.dif[i] > macd.dea[i]) marks[i] |= 1 << MK_MACD_GOLD;
-            else if (macd.dif[i - 1] >= macd.dea[i - 1] && macd.dif[i] < macd.dea[i]) marks[i] |= 1 << MK_MACD_DEAD;
-        }
-
-        // KDJ：只在超买超卖区取交叉，否则日线上几乎天天有金叉死叉，标记就没意义了
-        Indicators.Kdj kdj = Indicators.kdj(Indicators.highs(mData), Indicators.lows(mData), closes, 9, 3, 3);
-        for (int i = 1; i < n; i++) {
-            if (kdj.k[i - 1] <= kdj.d[i - 1] && kdj.k[i] > kdj.d[i] && kdj.k[i] < 20f) marks[i] |= 1 << MK_KDJ_GOLD;
-            else if (kdj.k[i - 1] >= kdj.d[i - 1] && kdj.k[i] < kdj.d[i] && kdj.k[i] > 80f) marks[i] |= 1 << MK_KDJ_DEAD;
-        }
-        return marks;
-    }
-
-    /**
-     * 入库前把不该参与绘图的行滤掉。这类数据混进去没有异常、日志干净，图上却是错的：
-     *  - null / 无时间戳：坐标与时间标签无对应值；
-     *  - 四价出现 NaN 或 Infinity：混进极值计算后整幅图的量程被拉坏，所有K线叠在一起；
-     *  - 四价全 0：行情接口缺字段时解析层会把价兜成 0，落成一根"地板价"假K线，
-     *    纵轴被拉到 0，真实的K线被压成一条平线。
-     *    注意只判"全 0"而不是"<=0"：负油价这类真实负价格不能被误伤。
-     */
+    /** 入库前滤掉画不出/画了会毁图的行：无时间戳、四价非有限值、四价全 0（负油价等真实负值不误伤） */
     private static List<Quote> sanitize(List<Quote> quotes) {
         List<Quote> out = new ArrayList<>();
         if (quotes == null) return out;
@@ -441,17 +395,7 @@ public class KLineView extends View {
         if (mStart > maxStart) mStart = maxStart;
     }
 
-    private void shiftWithoutClamp(int delta) {
-        mStart -= delta;
-    }
-
-    /**
-     * 双指收缩的下限（每根 K 线 / 每个点占的宽度）。
-     * 蜡烛图维持 2dp：再小就看不清影线与实体了。
-     * 分时折线放宽到 1dp；若这样还摆不下当天全部点（窄屏 / 240 个分钟点），
-     * 再按「主图宽 ÷ 点数」继续放宽 —— 目标是把一整天完整缩进同屏。
-     * 下限另兜 0.5dp，避免极端数据量下缩到不可辨识。
-     */
+    /** 缩放下限：蜡烛 2dp（再小看不清影线）；分时放宽到 1dp 并允许整日缩进同屏，兜底 0.5dp */
     private float minSlot() {
         if (!mLineMode) return dp(2);
         float fitAll = mData.isEmpty() ? dp(1) : mMainRect.width() / mData.size();
@@ -544,15 +488,7 @@ public class KLineView extends View {
         canvas.drawText("暂无行情数据", getWidth() / 2f, getHeight() / 2f, mTextPaint);
     }
 
-    /**
-     * 视窗内的 [最低, 最高]。
-     *
-     * 带迟滞（hysteresis）：
-     *  - 需要放大量程（出现了更高/更低的K线）立刻扩，保证蜡烛不出框；
-     *  - 需要收窄时，收窄幅度小于量程的 RANGE_DEAD_BAND 就维持不动。
-     * 这样最后一根K线每次刷新时的小幅跳动不会让整幅图上下平移（"整体抖动"）。
-     * padding 两边各留 6%，死区取 3% 远小于它，不会把K线挤出去。
-     */
+    /** 视窗 [最低, 最高]，量程带迟滞：扩立刻扩、收窄幅度在死区内不动，防刷新抖动 */
     private float[] visibleRange() {
         float min = Float.MAX_VALUE;
         float max = -Float.MAX_VALUE;
@@ -607,6 +543,14 @@ public class KLineView extends View {
             drawDashedLine(canvas, mMainRect.left, y, mMainRect.right, y, mGrid);
             canvas.drawText(fmt(priceAt(y, range)), mMainRect.right + dp(4), y + sp(3), mTextPaint);
         }
+        // 垂直网格线：与时间轴刻度同位（参考 PhoneStock 的经线），首条贴左边框不画
+        int step = Math.max(1, mVisible / 6);
+        int end = Math.min(mData.size(), mStart + mVisible);
+        float gridBottom = mPanelRect.isEmpty() ? mMainRect.bottom : mPanelRect.bottom;
+        for (int i = mStart + step; i < end; i += step) {
+            float x = xOf(i);
+            drawDashedLine(canvas, x, mMainRect.top, x, gridBottom, mGrid);
+        }
     }
 
     private void drawCandles(Canvas canvas, float[] range) {
@@ -646,13 +590,7 @@ public class KLineView extends View {
         return false;
     }
 
-    /**
-     * 折线（分时）模式：视窗内收盘价连成平滑曲线，下方填一层半透明面积，末端标出最新价。
-     *
-     * 曲线用单调三次插值（Fritsch–Carlson）而不是普通 Catmull-Rom：后者在拐点处会过冲，
-     * 画出数据里根本不存在的高点 / 低点，看着"平滑"了但读数是假的；
-     * 单调版本保证段内曲线不会越过相邻两点的值域，极值仍然落在真实数据点上。
-     */
+    /** 折线（分时）模式：收盘价平滑曲线 + 半透明面积 + 末端最新价；插值用单调三次（不过冲） */
     private void drawTrendLine(Canvas canvas, float[] range) {
         int first = Math.max(0, mStart);
         int last = Math.min(mData.size() - 1, mStart + mVisible - 1);
@@ -679,7 +617,7 @@ public class KLineView extends View {
             xs[i] = xOf(first + i);
             ys[i] = yOf(mData.get(first + i).close, range);
         }
-        float[] tangents = monotoneTangents(xs, ys, n);
+        float[] tangents = ChartMath.monotoneTangents(xs, ys, n);
 
         Path line = new Path();
         Path area = new Path();
@@ -710,16 +648,38 @@ public class KLineView extends View {
 
         mPaint.setColor(mTrend);
         canvas.drawCircle(xs[n - 1], ys[n - 1], dp(2.2f), mPaint);
+        drawAverageLine(canvas, range, first, n, xs);
         drawPrevCloseAxis(canvas, range);
     }
 
-    /**
-     * 分时图的骨架：昨收基准线 + 右侧百分比刻度。
-     *
-     * 分时图与普通折线的区别就在这一条线 —— 中国市场习惯以「昨收」为 0%，
-     * 线上百分比直观可辨；若无该线，孤立的折线无法判断当日涨跌。
-     * 百分比只标上/中/下三档，画在绘图区内侧，避免和右侧价格刻度打架。
-     */
+    /** 分时均价线（当日累计均价，平均持仓成本）；仅在真分时（有昨收）时画，日线降级折线不画 */
+    private void drawAverageLine(Canvas canvas, float[] range, int first, int n, float[] xs) {
+        if (mPrevClose <= 0f) return;
+        mLinePaint.setStyle(Paint.Style.STROKE);
+        mLinePaint.setStrokeWidth(dp(1));
+        mLinePaint.setPathEffect(null);
+        mLinePaint.setColor(mAvg);
+        float sum = 0f;
+        float lastX = 0f, lastY = 0f;
+        boolean hasLast = false;
+        for (int i = 0; i < n; i++) {
+            sum += mData.get(first + i).close;
+            float value = sum / (i + 1);
+            float y = yOf(value, range);
+            if (hasLast) canvas.drawLine(lastX, lastY, xs[i], y, mLinePaint);
+            lastX = xs[i];
+            lastY = y;
+            hasLast = true;
+        }
+        // 图例跟 MA 一行排：均价值画在最后
+        mTextPaint.setColor(mAvg);
+        mTextPaint.setTextSize(sp(9));
+        mTextPaint.setTextAlign(Paint.Align.LEFT);
+        canvas.drawText("均价 " + fmt(sum / n), mMainRect.left + MA_WINDOWS.length * dp(72) + dp(2),
+                mMainRect.top + sp(10), mTextPaint);
+    }
+
+    /** 分时骨架：昨收基准虚线 + 区内上/中/下三档百分比刻度 */
     private void drawPrevCloseAxis(Canvas canvas, float[] range) {
         float base = prevClose();
         if (base <= 0f) return;
@@ -742,55 +702,15 @@ public class KLineView extends View {
         return String.format(Locale.US, "%+.2f%%", (price - base) / base * 100f);
     }
 
-    /**
-     * 昨收：最后一根往前回溯到前一天的最后一根，取它的收盘。
-     * 分钟数据在库里通常也不只一天，这条线要拿的就是「今天从哪儿起步」那个价格。
-     */
+    /** 昨收：优先用外部给的；否则回溯到前一天最后一根取收盘（即「今天从哪儿起步」的价格） */
     private float prevClose() {
         if (mPrevClose > 0f) return mPrevClose;
         if (mData.isEmpty()) return 0f;
-        String lastDay = dayOf(mData.get(mData.size() - 1).time);
+        String lastDay = ChartTime.dayOf(mData.get(mData.size() - 1).time);
         if (lastDay == null) return 0f;
         int i = mData.size() - 1;
-        while (i > 0 && lastDay.equals(dayOf(mData.get(i - 1).time))) i--;
+        while (i > 0 && lastDay.equals(ChartTime.dayOf(mData.get(i - 1).time))) i--;
         return i > 0 ? mData.get(i - 1).close : mData.get(i).open;
-    }
-
-    /** K线时间的前 10 位就是日期 "YYYY-MM-DD"；格式不对（或数据源没给时间）返回 null */
-    private static String dayOf(String time) {
-        if (time == null || time.length() < 10) return null;
-        return time.substring(0, 10);
-    }
-
-    /**
-     * 单调三次插值的切线斜率（Fritsch–Carlson）：
-     * 相邻段异号（局部极值）时切线取 0，同号时取两侧斜率均值并限幅，
-     * 这样曲线一定落在相邻两点的值域内 —— 平滑了形状，但不会造出假的高点低点。
-     */
-    private static float[] monotoneTangents(float[] xs, float[] ys, int n) {
-        float[] m = new float[n];
-        if (n < 2) return m;
-        float[] d = new float[n - 1];
-        for (int i = 0; i < n - 1; i++) {
-            d[i] = (ys[i + 1] - ys[i]) / Math.max(1e-6f, xs[i + 1] - xs[i]);
-        }
-        if (n == 2) {
-            m[0] = d[0];
-            m[1] = d[0];
-            return m;
-        }
-        m[0] = d[0];
-        m[n - 1] = d[n - 2];
-        for (int i = 1; i < n - 1; i++) {
-            if (d[i - 1] * d[i] <= 0f) {
-                m[i] = 0f;                       // 局部极值：切线取平，曲线不会冲出值域
-            } else {
-                m[i] = (d[i - 1] + d[i]) * 0.5f;
-                float limit = 3f * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]));
-                if (Math.abs(m[i]) > limit) m[i] = limit * Math.signum(m[i]);
-            }
-        }
-        return m;
     }
 
     private void drawMovingAverages(Canvas canvas, float[] range) {
@@ -820,7 +740,7 @@ public class KLineView extends View {
                 mTextPaint.setTextSize(sp(9));
                 mTextPaint.setTextAlign(Paint.Align.LEFT);
                 canvas.drawText("MA" + MA_WINDOWS[m] + " " + (Float.isNaN(lastValue) ? "-" : fmt(lastValue)),
-                        mMainRect.left + m * dp(58) + dp(2), mMainRect.top + sp(10), mTextPaint);
+                        mMainRect.left + m * dp(72) + dp(2), mMainRect.top + sp(10), mTextPaint);
             }
         }
     }
@@ -879,15 +799,15 @@ public class KLineView extends View {
             Quote q = mData.get(i);
             float cx = xOf(i);
             int bullSlot = 0, bearSlot = 0;
-            for (int k = 0; k < MK_COUNT; k++) {
+            for (int k = 0; k < MarkEngine.MK_COUNT; k++) {
                 if ((bits & (1 << k)) == 0) continue;
-                if (MK_BULL[k]) {
+                if (MarkEngine.MK_BULL[k]) {
                     float y = Math.min(yOf(q.low, range) + sp(14) + bullSlot * step, mMainRect.bottom - sp(2));
-                    drawMarkGlyph(canvas, cx, y, true, MK_TEXT[k], markColor(k));
+                    drawMarkGlyph(canvas, cx, y, true, MarkEngine.MK_TEXT[k], markColor(k));
                     bullSlot++;
                 } else {
                     float y = Math.max(yOf(q.high, range) - sp(14) - bearSlot * step, mMainRect.top + sp(2));
-                    drawMarkGlyph(canvas, cx, y, false, MK_TEXT[k], markColor(k));
+                    drawMarkGlyph(canvas, cx, y, false, MarkEngine.MK_TEXT[k], markColor(k));
                     bearSlot++;
                 }
             }
@@ -897,15 +817,15 @@ public class KLineView extends View {
 
     private int markColor(int kind) {
         switch (kind) {
-            case MK_NINE_BUY:
+            case MarkEngine.MK_NINE_BUY:
                 return mDown;
-            case MK_NINE_SELL:
+            case MarkEngine.MK_NINE_SELL:
                 return mUp;
-            case MK_REBOUND:
-            case MK_FALLBACK:
+            case MarkEngine.MK_REBOUND:
+            case MarkEngine.MK_FALLBACK:
                 return mReboundColor;
-            case MK_MACD_GOLD:
-            case MK_KDJ_GOLD:
+            case MarkEngine.MK_MACD_GOLD:
+            case MarkEngine.MK_KDJ_GOLD:
                 return mUp;
             default:
                 return mDown;
@@ -1118,11 +1038,7 @@ public class KLineView extends View {
         canvas.drawText(text, mPanelRect.right + dp(4), Math.min(mPanelRect.bottom, y + sp(9)), mTextPaint);
     }
 
-    /**
-     * 底部时间轴：先按间距抽稀，再逐个做「贴边内移 + 与前标签防重叠」。
-     * 刚上市的股票只有十几根K线时，屏幕宽度摊到每根上的空间很窄，
-     * 若只按根数抽稀（老逻辑）会出现 step=1 的密集标签，文字互相压在一起。
-     */
+    /** 底部时间轴：按间距抽稀 + 贴边内移 + 与前标签防重叠 */
     private void drawTimeAxis(Canvas canvas) {
         // 基线在时间轴高度里垂直居中（写死 sp(12) 时，字体放大后会顶出画布底部）
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
@@ -1156,30 +1072,61 @@ public class KLineView extends View {
         if (mSelected < 0 || mSelected >= mData.size()) return;
         Quote q = mData.get(mSelected);
         float x = xOf(mSelected);
-        drawDashedLine(canvas, x, mMainRect.top, x, mPanelRect.isEmpty() ? mMainRect.bottom : mPanelRect.bottom,
-                mCursor);
-        drawDashedLine(canvas, mMainRect.left, yOf(q.close, range), x, yOf(q.close, range), mCursor);
+        float y = yOf(q.close, range);
+        float bottom = mPanelRect.isEmpty() ? mMainRect.bottom : mPanelRect.bottom;
+        drawDashedLine(canvas, x, mMainRect.top, x, bottom, mCursor);
+        drawDashedLine(canvas, mMainRect.left, y, x, y, mCursor);
         mPaint.setStyle(Paint.Style.FILL);
         mPaint.setColor(q.isUp() ? mUp : mDown);
-        canvas.drawCircle(x, yOf(q.close, range), Math.max(2.5f, dp(2.5f)), mPaint);
+        canvas.drawCircle(x, y, Math.max(2.5f, dp(2.5f)), mPaint);
+        // 光标读数钉在轴上（参考 PhoneStock）：右侧价格签 + 底部时间签
+        drawAxisTag(canvas, fmt(q.close), mMainRect.right + dp(1), y - sp(7), y + sp(7), true);
+        String label = formatTime(q.time, new SimpleDateFormat(timePattern(), Locale.US));
+        float cx = clamp(x, mMainRect.left + dp(20), mMainRect.right - dp(20));
+        drawAxisTag(canvas, label, cx - dp(20), mAxisTop, mAxisTop + mAxisHeight, false);
     }
 
-    /**
-     * 详情小窗口（浮窗）：主图/副图十字光标处弹出，显示该根K线的时间/开/高/低/收/量/额/振幅/涨跌，
-     * 拿得到实时盘口时再补上市值 / 流通市值 / 换手率 / 市盈率。
-     * 位置自动避让（光标在右半屏则浮窗放左侧，光标在上半屏则浮窗放下方）。
-     */
+    /** 轴上的小标签块：isPrice=true 时文字左对齐（价格轴），否则居中（时间轴） */
+    private void drawAxisTag(Canvas canvas, String text, float left, float top, float bottom, boolean isPrice) {
+        if (text == null || text.isEmpty()) return;
+        mTextPaint.setTextSize(sp(9));
+        mPaint.setStyle(Paint.Style.FILL);
+        mPaint.setColor(mCursor);
+        if (isPrice) {
+            float width = mTextPaint.measureText(text) + dp(6);
+            canvas.drawRect(left, top, left + width, bottom, mPaint);
+            mTextPaint.setTextAlign(Paint.Align.LEFT);
+            mTextPaint.setColor(mBg);
+            canvas.drawText(text, left + dp(3), (top + bottom) / 2f + sp(3), mTextPaint);
+        } else {
+            mTextPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawRect(left, top, left + dp(40), bottom, mPaint);
+            mTextPaint.setColor(mBg);
+            canvas.drawText(text, left + dp(20), (top + bottom) / 2f + sp(3), mTextPaint);
+        }
+    }
+
+    /** 详情浮窗：该根的时间/OHLC/量额/振幅/涨跌 + 副图指标联动 + 盘口（有则补），位置自动避让光标 */
     private void drawTooltip(Canvas canvas, float[] range) {
         if (mSelected < 0 || mSelected >= mData.size()) return;
         Quote q = mData.get(mSelected);
         float base = mSelected > 0 ? mData.get(mSelected - 1).close : q.open;
         List<String> rows = new ArrayList<>();
-        rows.add(q.time);
+        rows.add(ChartTime.briefTime(q.time));
         rows.add("开 " + fmt(q.open) + "   高 " + fmt(q.high));
         rows.add("低 " + fmt(q.low) + "   收 " + fmt(q.close));
         rows.add("量 " + (hasVolume() ? compact(q.volume) : "-")
                 + "   额 " + (q.amount > 0 ? compact(q.amount) : "-"));
         rows.add("振幅 " + String.format(Locale.US, "%.2f%%", q.amplitude(base)));
+        // 副图指标联动（参考 PhoneStock：光标浮窗里带出指标读数），与当前副图模式对应
+        String indicator = panelValueAt(mSelected);
+        if (indicator != null) rows.add(indicator);
+        // 分时模式下带出该时刻的均价（当日累计均值）
+        if (mLineMode && mPrevClose > 0f && mSelected < mData.size()) {
+            float sum = 0f;
+            for (int i = 0; i <= mSelected; i++) sum += mData.get(i).close;
+            rows.add("均价 " + fmt(sum / (mSelected + 1)));
+        }
         // 市值这类实时盘口数据只有部分标的拿得到（见 Snapshot），没有就不占行
         if (mSnapshot != null) {
             rows.add("市值 " + Snapshot.cap(mSnapshot.totalCap)
@@ -1228,6 +1175,37 @@ public class KLineView extends View {
         canvas.restoreToCount(save);
     }
 
+    /** 选中根对应的副图指标读数（无成交量面板返回 null；NaN 显示 -） */
+    private String panelValueAt(int index) {
+        if (index < 0 || index >= mData.size()) return null;
+        float[] closes = Indicators.closes(mData);
+        int mode = (mPanelMode == PANEL_RSI && mData.size() <= 14) ? PANEL_VOLUME : mPanelMode;
+        switch (mode) {
+            case PANEL_MACD: {
+                Indicators.Macd macd = Indicators.macd(closes, 12, 26, 9);
+                return String.format(Locale.US, "DIF %s  DEA %s  MACD %s",
+                        num2(macd.dif[index]), num2(macd.dea[index]), num2(macd.hist[index]));
+            }
+            case PANEL_RSI: {
+                float[] rsi = Indicators.rsi(closes, 14);
+                return "RSI " + num2(rsi[index]);
+            }
+            case PANEL_KDJ: {
+                Indicators.Kdj kdj = Indicators.kdj(Indicators.highs(mData), Indicators.lows(mData),
+                        closes, 9, 3, 3);
+                return String.format(Locale.US, "K %s  D %s  J %s",
+                        num2(kdj.k[index]), num2(kdj.d[index]), num2(kdj.j[index]));
+            }
+            default:
+                return null;    // 成交量面板：量/额已在上面单独一行
+        }
+    }
+
+    /** 两位小数；NaN（窗口不足）显示 - */
+    private static String num2(float value) {
+        return Float.isNaN(value) ? "-" : String.format(Locale.US, "%.2f", value);
+    }
+
     private void drawDashedLine(Canvas canvas, float x0, float y0, float x1, float y1, int color) {
         mLinePaint.setColor(color);
         mLinePaint.setStrokeWidth(1f);
@@ -1265,33 +1243,98 @@ public class KLineView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         if (mData.isEmpty()) return true;
         mScaleDetector.onTouchEvent(event);
+        mGestureDetector.onTouchEvent(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                mTouchDownX = event.getX();
-                mTouchDownY = event.getY();
                 mLastX = event.getX();
                 mMoved = false;
+                if (mVelocityTracker == null) {
+                    mVelocityTracker = VelocityTracker.obtain();
+                } else {
+                    mVelocityTracker.clear();
+                }
+                mVelocityTracker.addMovement(event);
+                mScroller.forceFinished(true);          // 落手即停住惯性
                 return true;
             case MotionEvent.ACTION_MOVE:
+                mVelocityTracker.addMovement(event);
+                if (mCrosshair) {
+                    // 长按跟随：光标吸附到最近的K线，滚动被挂起
+                    int hit = indexOfX(event.getX());
+                    if (hit >= 0 && hit != mSelected) {
+                        mSelected = hit;
+                        publishSelection();
+                        invalidate();
+                    }
+                    return true;
+                }
                 if (mScaling || event.getPointerCount() > 1) return true;
                 float dx = event.getX() - mLastX;
                 if (Math.abs(dx) > 1f) mMoved = true;
                 int shifted = (int) (dx / Math.max(mSlot, 1f));
                 if (shifted != 0) {
                     mStart -= shifted;
+                    mPendingTail = false;               // 用户主动离开最新端，刷新不再跟随
                     clampStart();
                     mLastX = event.getX();
                     invalidate();
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                if (!mMoved && !mScaling) handleTap(event.getX(), event.getY());
+                mVelocityTracker.addMovement(event);
+                if (mCrosshair) {
+                    // 抬手退出跟随模式；选中的那根保留（浮窗仍在）
+                    mCrosshair = false;
+                    recycleVelocity();
+                    return true;
+                }
+                if (!mMoved && !mScaling) {
+                    handleTap(event.getX(), event.getY());
+                } else if (!mScaling) {
+                    float vx = mVelocityTracker.getXVelocity();
+                    if (Math.abs(vx) > dp(50)) startFling(vx);
+                }
+                recycleVelocity();
                 return true;
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_POINTER_UP:
+                if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    mCrosshair = false;
+                    recycleVelocity();
+                }
                 return true;
             default:
                 return true;
+        }
+    }
+
+    private void recycleVelocity() {
+        if (mVelocityTracker != null) {
+            mVelocityTracker.recycle();
+            mVelocityTracker = null;
+        }
+    }
+
+    /** fling：把当前视窗起点换算到像素域交给 OverScroller，computeScroll 里再换算回根下标 */
+    private void startFling(float vx) {
+        int maxStart = Math.max(0, mData.size() - mVisible);
+        if (maxStart <= 0) return;
+        mScroller.fling((int) (mStart * mSlot), 0, (int) -vx, 0,
+                0, (int) (maxStart * mSlot), 0, 0);
+        postInvalidateOnAnimation();
+    }
+
+    @Override
+    public void computeScroll() {
+        if (mScroller.computeScrollOffset()) {
+            int newStart = Math.round(mScroller.getCurrX() / Math.max(mSlot, 1f));
+            int maxStart = Math.max(0, mData.size() - mVisible);
+            newStart = Math.max(0, Math.min(maxStart, newStart));
+            if (newStart != mStart) {
+                mStart = newStart;
+                mPendingTail = false;
+                invalidate();
+            }
         }
     }
 
@@ -1310,6 +1353,14 @@ public class KLineView extends View {
         invalidate();
     }
 
+    /** 收起选中详情（浮窗 + 十字光标），点标题栏 / 底部信息栏时调用 */
+    public void clearSelection() {
+        if (mSelected < 0) return;
+        mSelected = -1;
+        publishSelection();
+        invalidate();
+    }
+
     private void publishSelection() {
         if (mListener == null) return;
         if (mSelected < 0 || mSelected >= mData.size()) {
@@ -1323,8 +1374,8 @@ public class KLineView extends View {
         String cap = mSnapshot != null ? ("  市值 " + Snapshot.cap(mSnapshot.totalCap)) : "";
         mListener.onQuoteInfo(String.format(Locale.US,
                 "%s  开 %s 高 %s 低 %s 收 %s%s%s%s  涨跌 %+.2f%%",
-                q.time, fmt(q.open), fmt(q.high), fmt(q.low), fmt(q.close), volume, amount, cap,
-                q.changePercent(base)));
+                ChartTime.briefTime(q.time), fmt(q.open), fmt(q.high), fmt(q.low), fmt(q.close),
+                volume, amount, cap, q.changePercent(base)));
     }
 
     // ===== 工具 =====
@@ -1360,65 +1411,14 @@ public class KLineView extends View {
         return String.format(Locale.US, "%.0f", value);
     }
 
-    /** 时间轴格式（脚本 time_label_format）：日线按跨度降级，日内同日只显时分 */
+    /** 时间轴格式（脚本 time_label_format）：日线按跨度降级，日内同日只显时分（解析/格式化见 {@link ChartTime}） */
     private String timePattern() {
-        // 长周期直接按周期定格式：否则跨几十年的季/年线会退化成一堆相同年份标签
-        if ("1Y".equals(mInterval)) return "yyyy";
-        if ("1Q".equals(mInterval) || "1M".equals(mInterval)) return "yyyy-MM";
         int end = Math.min(mData.size(), mStart + mVisible) - 1;
-        if (end < mStart) return "MM-dd";
-        Date first = parseStamp(mData.get(mStart).time);
-        Date mid = parseStamp(mData.get((mStart + end) / 2).time);
-        Date last = parseStamp(mData.get(end).time);
-        if (first == null || last == null) return "MM-dd";
-        long days = (last.getTime() - first.getTime()) / 86400000L;
-        boolean sameYear = first.getYear() == last.getYear();
-        boolean intraday = hasTime(first) || (mid != null && hasTime(mid)) || hasTime(last);
-        if (!intraday) {
-            if (days <= 120 || (days <= 400 && sameYear)) return "MM-dd";
-            if (days <= 1200) return "yyyy-MM";
-            return "yyyy";
-        }
-        if (sameDay(first, last)) return "HH:mm";
-        if (days <= 3) return "MM-dd HH:mm";
-        return sameYear ? "MM-dd" : "yyyy-MM";
+        return ChartTime.pattern(mInterval, mData, mStart, end);
     }
 
     private String formatTime(String time, SimpleDateFormat fmt) {
-        Date stamp = parseStamp(time);
-        if (stamp == null) return time == null ? "" : time.substring(0, Math.min(10, time.length()));
-        // 季线标签写成 2024Q1：SimpleDateFormat 的季度符各版本表现不一致，手拼最稳
-        if ("1Q".equals(mInterval)) {
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(stamp);
-            return calendar.get(Calendar.YEAR) + "Q" + (calendar.get(Calendar.MONTH) / 3 + 1);
-        }
-        return fmt.format(stamp);
-    }
-
-    /** 兼容 'YYYY-MM-DD HH:MM:SS' / '... HH:MM' / 'YYYY-MM-DD' 三种写法（脚本 _parse_stamp） */
-    private static Date parseStamp(String text) {
-        if (text == null) return null;
-        String stamp = text.trim().replace('/', '-');
-        String[] patterns = {"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd"};
-        int[] lengths = {19, 16, 10};
-        for (int i = 0; i < patterns.length; i++) {
-            if (stamp.length() < lengths[i]) continue;
-            try {
-                return new SimpleDateFormat(patterns[i], Locale.US).parse(stamp.substring(0, lengths[i]));
-            } catch (Exception ignored) {
-                // 继续尝试下一种写法
-            }
-        }
-        return null;
-    }
-
-    private static boolean hasTime(Date stamp) {
-        return stamp.getHours() != 0 || stamp.getMinutes() != 0 || stamp.getSeconds() != 0;
-    }
-
-    private static boolean sameDay(Date a, Date b) {
-        return a.getYear() == b.getYear() && a.getMonth() == b.getMonth() && a.getDate() == b.getDate();
+        return ChartTime.format(mInterval, time, fmt);
     }
 
     private float dp(float value) {

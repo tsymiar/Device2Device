@@ -116,6 +116,25 @@ public class MarketWidgetProvider extends AppWidgetProvider {
         public String title() {
             return TextUtils.isEmpty(name) ? symbol : name;
         }
+
+        /**
+         * 「显示名 + 代码」拼一行：名称与代码完全一致（没名称时 title 回退成代码）就只出一份，
+         * 别拼出 "BTCUSDT  BTCUSDT" 这种重复。编辑界面（列表 / 曲线部件配置页）统一走这里。
+         */
+        public String displayLabel() {
+            String code = symbol == null ? "" : symbol.trim();
+            return code.equalsIgnoreCase(title()) ? title() : title() + "  " + code;
+        }
+
+        /** 编辑界面整行文本：名称(+代码) + 数据源；源名与名称/代码重复时省掉 */
+        public String detailLabel() {
+            String text = displayLabel();
+            String src = QuoteSource.label(source);
+            if (!src.equalsIgnoreCase(title()) && !src.equalsIgnoreCase(symbol)) {
+                text += " · " + src;
+            }
+            return text;
+        }
     }
 
     /** 单个小部件的标的配置 */
@@ -606,8 +625,14 @@ public class MarketWidgetProvider extends AppWidgetProvider {
     /** 行里那行小字：市场代码 + 市场（sh600519 · 沪 / BTCUSDT · 加密货币）；曲线部件也用它 */
     static String marketCode(Item item) {
         String code = item.symbol == null ? "" : item.symbol.trim();
+        // 名称行已经和代码一模一样时，小字只留市场标签，别把同一串代码印两遍
+        if (code.equalsIgnoreCase(item.title())) {
+            return marketTag(code, item.source);
+        }
         String tag = marketTag(code, item.source);
-        return TextUtils.isEmpty(tag) ? code : code + " · " + tag;
+        // 市场标签与名称重复时同样只出一份
+        if (TextUtils.isEmpty(tag) || tag.equalsIgnoreCase(item.title())) return code;
+        return code + " · " + tag;
     }
 
     private static String marketTag(String code, String source) {

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -854,6 +855,25 @@ public final class QuoteSource {
     /** 是否为商品 / 指数源（gold/xau/gc/crude/brent/ng/usd） */
     public static boolean isCommodity(String source) {
         return COMMODITY_SOURCES.contains(source);
+    }
+
+    /**
+     * 大致是否处于交易时段（北京时间粗判，休市时自动更新降频）：
+     * 加密货币 7×24；A股/基金工作日 9:30-11:30 / 13:00-15:00（含竞价缓冲）；
+     * 商品/外汇近似工作日连续、周末休市；auto 按标的形态分流。
+     */
+    public static boolean marketOpen(String source, String symbol) {
+        String src = source == null ? AUTO : source;
+        String sym = symbol == null ? "" : symbol.trim();
+        if (BINANCE.equals(src) || CRYPTO.matcher(sym).matches()) return true;
+        Calendar now = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"));
+        int dow = now.get(Calendar.DAY_OF_WEEK);
+        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return false;
+        boolean domestic = TENCENT.equals(src) || EAST.equals(src)
+                || (AUTO.equals(src) && DOMESTIC.matcher(sym).find());
+        if (!domestic) return true;     // 商品/外汇/其余：工作日近似连续交易
+        int hm = now.get(Calendar.HOUR_OF_DAY) * 100 + now.get(Calendar.MINUTE);
+        return (hm >= 915 && hm <= 1135) || (hm >= 1255 && hm <= 1505);
     }
 
     /** 输入框里已填的标的形态是否属于该数据源（切换数据源时用于判断是否替换为默认代码） */
