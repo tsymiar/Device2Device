@@ -416,14 +416,17 @@ public final class QuoteSource {
         int end = body.lastIndexOf('"');
         if (at < 0 || end <= at) return null;
         String[] f = body.substring(at + 1, end).split("~");
-        if (f.length < 46) return null;
+        // 列数不齐时市值记 0，不丢整份盘口
+        if (f.length < 40) return null;
         double price = number(f[3]);
         double prev = number(f[4]);
-        double percent = prev > 0d ? (price - prev) / prev * 100d : number(f[32]);
-        double totalCap = number(f[45]) * 1e8;
+        double percent = prev > 0d ? (price - prev) / prev * 100d
+                : (f.length > 32 ? number(f[32]) : 0d);
+        double totalCap = f.length > 45 ? number(f[45]) * 1e8 : 0d;
+        double floatCap = f.length > 44 ? number(f[44]) * 1e8 : 0d;
         if (price <= 0d && totalCap <= 0d) return null;
         return new Snapshot(f.length > 1 ? f[1] : "", price, percent, totalCap,
-                number(f[44]) * 1e8, number(f[39]), number(f[38]));
+                floatCap, number(f[39]), number(f[38]));
     }
 
     /**
@@ -1700,9 +1703,10 @@ public final class QuoteSource {
         }
         if (EAST.equals(name)) {
             Integer klt = EAST_KLT.get(request);
+            // fields2 须按 f51..f61 整段取，返回 CSV 才对得上列序
             String query = "?secid=" + code
                     + "&fields1=f1,f2,f3,f4,f5,f6"
-                    + "&fields2=f51,f52,f53,f54,f55,f56,f57"
+                    + "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
                     + "&klt=" + (klt == null ? 101 : klt)
                     + "&fqt=1&beg=19900101&end=20500101&lmt=" + rows;
             return Collections.singletonList(EAST_KLINE + query);
@@ -1851,7 +1855,7 @@ public final class QuoteSource {
         return quotes;
     }
 
-    /** 东财: data.klines = ["日期,开,收,高,低,量,额,..."] */
+    /** 东财: data.klines = ["日期,开,收,高,低,量,额,振幅,涨跌幅,涨跌额,换手率"] */
     private static List<Quote> parseEast(String body) throws Exception {
         JSONObject root = new JSONObject(body);
         JSONObject data = root.optJSONObject("data");
@@ -1864,7 +1868,8 @@ public final class QuoteSource {
             quotes.add(new Quote(normalizeDay(parts[0]),
                     (float) safe(parts[1]), (float) safe(parts[3]), (float) safe(parts[4]),
                     (float) safe(parts[2]), (float) safe(parts[5]),
-                    parts.length > 6 ? (float) safe(parts[6]) : (float) safe(parts[2])));
+                    parts.length > 6 ? (float) safe(parts[6]) : (float) safe(parts[2]),
+                    parts.length > 10 ? (float) safe(parts[10]) : 0f));
         }
         return quotes;
     }
@@ -2054,18 +2059,22 @@ public final class QuoteSource {
             else key = weekKey(quote.time);
             float[] bar = bars.get(key);
             if (bar == null) {
-                bars.put(key, new float[]{quote.open, quote.high, quote.low, quote.close});
+                // bar[4]: 区间累计换手率
+                bars.put(key, new float[]{quote.open, quote.high, quote.low, quote.close,
+                        quote.turnoverRate});
             } else {
                 if (quote.high > bar[1]) bar[1] = quote.high;
                 if (quote.low < bar[2]) bar[2] = quote.low;
                 bar[3] = quote.close;
+                bar[4] += quote.turnoverRate;
             }
             stamps.put(key, quote.time);
         }
         List<Quote> out = new ArrayList<>(bars.size());
         for (Map.Entry<String, float[]> entry : bars.entrySet()) {
             float[] bar = entry.getValue();
-            out.add(new Quote(stamps.get(entry.getKey()), bar[0], bar[1], bar[2], bar[3], 0f, bar[3]));
+            out.add(new Quote(stamps.get(entry.getKey()), bar[0], bar[1], bar[2], bar[3],
+                    0f, bar[3], bar[4]));
         }
         return out;
     }

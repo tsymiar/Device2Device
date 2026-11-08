@@ -145,6 +145,8 @@ public class MarketActivity extends AppCompatActivity {
     private String mName = "";          // 当前标的中文名（主图首行）
     private String mNameCode = "";      // mName 属于哪个代码（纯数字），换标的时据此判定这个名字会不会串
     private String mSymbol = "";        // 输入框内容（恢复上次选择时用）
+    /** 盘口快照对应的标的 */
+    private String mSnapshotCode = "";
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final Runnable mRefreshRunnable = new Runnable() {
@@ -846,14 +848,14 @@ public class MarketActivity extends AppCompatActivity {
         MarketHeatWidgetProvider.pushUpdate(MarketActivity.this);
     }
 
-    /**
-     * 实时盘口（市值 / 市盈 / 换手）：K线接口不给这些字段，单独问东财一次。
-     * 只有能换成 secid 的标的（A股 / 港股）才拿得到，其余回传 null，详情小窗自动少几行。
-     */
+    /** 实时盘口：只换标的时清空旧快照 */
     private void loadSnapshot(String code) {
         if (mChart == null) return;
         final int seq = mLoadSeq;
-        mChart.setSnapshot(null);      // 换标的先把上一只的市值清掉，免得串台
+        if (!code.equals(mSnapshotCode)) {
+            mSnapshotCode = code;
+            mChart.setSnapshot(null);
+        }
         QuoteSource.fetchSnapshot(code, snapshot -> {
             if (!isCurrent(seq) || snapshot == null) return;
             if (!alive()) return;

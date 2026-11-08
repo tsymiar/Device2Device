@@ -92,8 +92,20 @@ public class KLineView extends View {
     /** 分时图的昨收（基准价）：<=0 表示没给，按数据里回溯（见 {@code prevClose}） */
     private float mPrevClose = 0f;
     private QuoteInfoListener mListener;
-    /** 实时盘口快照（市值等 K 线里没有的数据），没有时为 null */
+    /** 实时盘口快照，没有时为 null */
     private Snapshot mSnapshot;
+    /** 浮窗静置自动收起的延时 */
+    private static final long TOOLTIP_IDLE_MS = 5000L;
+    private final Runnable mHideTooltip = new Runnable() {
+        @Override
+        public void run() {
+            if (mCrosshair) {
+                scheduleTooltipHide();
+                return;
+            }
+            clearSelection();
+        }
+    };
 
     private float mDensity = 2f;
     private final RectF mMainRect = new RectF();
@@ -162,6 +174,7 @@ public class KLineView extends View {
                 mSlot = dp(8);
                 mPendingTail = true;
                 mSelected = -1;
+                cancelTooltipHide();
                 computeVisible();
                 clampStart();
                 publishSelection();
@@ -298,6 +311,7 @@ public class KLineView extends View {
             mStart = Math.max(0, Math.min(keepStart, Math.max(0, mData.size() - 1)));
         }
         mSelected = (keepSelected >= 0 && keepSelected < mData.size()) ? keepSelected : -1;
+        if (mSelected < 0) cancelTooltipHide();
         computeVisible();
         clampStart();
         publishSelection();
@@ -341,6 +355,12 @@ public class KLineView extends View {
     }
 
     // ===== 布局 =====
+    @Override
+    protected void onDetachedFromWindow() {
+        cancelTooltipHide();
+        super.onDetachedFromWindow();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -1127,12 +1147,13 @@ public class KLineView extends View {
             for (int i = 0; i <= mSelected; i++) sum += mData.get(i).close;
             rows.add("均价 " + fmt(sum / (mSelected + 1)));
         }
-        // 市值这类实时盘口数据只有部分标的拿得到（见 Snapshot），没有就不占行
-        if (mSnapshot != null) {
-            rows.add("市值 " + Snapshot.cap(mSnapshot.totalCap)
-                    + "   流通 " + Snapshot.cap(mSnapshot.floatCap));
-            rows.add("换手 " + String.format(Locale.US, "%.2f%%", mSnapshot.turnoverRate)
-                    + "   市盈 " + String.format(Locale.US, "%.2f", mSnapshot.pe));
+        // 市值/流通/市盈/换手按选中根换算，取不到的项显示 -
+        DayStats stats = statsAt(mSelected);
+        if (stats.hasAny()) {
+            rows.add("市值 " + capOrDash(stats.totalCap)
+                    + "   流通 " + capOrDash(stats.floatCap));
+            rows.add("换手 " + pctOrDash(stats.turnover)
+                    + "   市盈 " + numOrDash(stats.pe));
         }
         rows.add("涨跌 " + String.format(Locale.US, "%+.2f%%", q.changePercent(base)));
         String[] lines = rows.toArray(new String[0]);
@@ -1173,6 +1194,63 @@ public class KLineView extends View {
             canvas.drawText(lines[i], boxX + pad, boxY + pad + lineH * i + sp(11), mTextPaint);
         }
         canvas.restoreToCount(save);
+    }
+
+    /** 选中那根的盘口口径：NaN = 这个字段取不到，浮窗里显示 - */
+    private static final class DayStats {
+        double totalCap = Double.NaN;
+        double floatCap = Double.NaN;
+        double pe = Double.NaN;
+        double turnover = Double.NaN;
+
+        boolean hasAny() {
+            return !Double.isNaN(totalCap) || !Double.isNaN(floatCap)
+                    || !Double.isNaN(pe) || !Double.isNaN(turnover);
+        }
+    }
+
+    /** 按最新一根的收盘价比，把实时盘口换算到选中根 */
+    private DayStats statsAt(int index) {
+        DayStats stats = new DayStats();
+        if (index < 0 || index >= mData.size()) return stats;
+        Quote q = mData.get(index);
+        Quote last = mData.get(mData.size() - 1);
+        double ratio = last.close > 0f ? q.close / last.close : 1d;
+        if (mSnapshot != null) {
+            if (mSnapshot.totalCap > 0d) stats.totalCap = mSnapshot.totalCap * ratio;
+            if (mSnapshot.floatCap > 0d) stats.floatCap = mSnapshot.floatCap * ratio;
+            if (mSnapshot.pe > 0d) stats.pe = mSnapshot.pe * ratio;
+        }
+        if (q.turnoverRate > 0f) {
+            stats.turnover = q.turnoverRate;
+        } else if (mSnapshot != null && mSnapshot.turnoverRate > 0d) {
+            // 其它源按成交量比折算，周期口径不符则留空
+            if (mLineMode) {
+                double total = 0d;
+                double until = 0d;
+                for (int i = 0; i < mData.size(); i++) {
+                    double v = Math.max(0d, mData.get(i).volume);
+                    total += v;
+                    if (i <= index) until += v;
+                }
+                if (total > 0d) stats.turnover = mSnapshot.turnoverRate * until / total;
+            } else if ("1d".equals(mInterval) && last.volume > 0f && q.volume > 0f) {
+                stats.turnover = mSnapshot.turnoverRate * q.volume / last.volume;
+            }
+        }
+        return stats;
+    }
+
+    private static String capOrDash(double value) {
+        return Double.isNaN(value) || value <= 0d ? "-" : Snapshot.cap(value);
+    }
+
+    private static String pctOrDash(double value) {
+        return Double.isNaN(value) ? "-" : String.format(Locale.US, "%.2f%%", value);
+    }
+
+    private static String numOrDash(double value) {
+        return Double.isNaN(value) ? "-" : String.format(Locale.US, "%.2f", value);
     }
 
     /** 选中根对应的副图指标读数（无成交量面板返回 null；NaN 显示 -） */
@@ -1255,6 +1333,7 @@ public class KLineView extends View {
                 }
                 mVelocityTracker.addMovement(event);
                 mScroller.forceFinished(true);          // 落手即停住惯性
+                if (mSelected >= 0) scheduleTooltipHide();
                 return true;
             case MotionEvent.ACTION_MOVE:
                 mVelocityTracker.addMovement(event);
@@ -1265,6 +1344,7 @@ public class KLineView extends View {
                         mSelected = hit;
                         publishSelection();
                         invalidate();
+                        scheduleTooltipHide();
                     }
                     return true;
                 }
@@ -1283,9 +1363,9 @@ public class KLineView extends View {
             case MotionEvent.ACTION_UP:
                 mVelocityTracker.addMovement(event);
                 if (mCrosshair) {
-                    // 抬手退出跟随模式；选中的那根保留（浮窗仍在）
                     mCrosshair = false;
                     recycleVelocity();
+                    scheduleTooltipHide();
                     return true;
                 }
                 if (!mMoved && !mScaling) {
@@ -1351,14 +1431,26 @@ public class KLineView extends View {
         mSelected = index;
         publishSelection();
         invalidate();
+        scheduleTooltipHide();
     }
 
-    /** 收起选中详情（浮窗 + 十字光标），点标题栏 / 底部信息栏时调用 */
+    /** 收起选中详情（浮窗 + 十字光标）：点标题栏 / 底部信息栏，或静置超时时调用 */
     public void clearSelection() {
+        cancelTooltipHide();
         if (mSelected < 0) return;
         mSelected = -1;
         publishSelection();
         invalidate();
+    }
+
+    /** 每次交互重排一次：主线程队列里始终只留一个自动收起任务 */
+    private void scheduleTooltipHide() {
+        cancelTooltipHide();
+        if (mSelected >= 0) postDelayed(mHideTooltip, TOOLTIP_IDLE_MS);
+    }
+
+    private void cancelTooltipHide() {
+        removeCallbacks(mHideTooltip);
     }
 
     private void publishSelection() {
@@ -1371,7 +1463,8 @@ public class KLineView extends View {
         float base = mSelected > 0 ? mData.get(mSelected - 1).close : q.open;
         String volume = hasVolume() ? ("  量 " + compact(q.volume)) : "";
         String amount = q.amount > 0 ? ("  额 " + compact(q.amount)) : "";
-        String cap = mSnapshot != null ? ("  市值 " + Snapshot.cap(mSnapshot.totalCap)) : "";
+        double capValue = statsAt(mSelected).totalCap;
+        String cap = Double.isNaN(capValue) ? "" : "  市值 " + Snapshot.cap(capValue);
         mListener.onQuoteInfo(String.format(Locale.US,
                 "%s  开 %s 高 %s 低 %s 收 %s%s%s%s  涨跌 %+.2f%%",
                 ChartTime.briefTime(q.time), fmt(q.open), fmt(q.high), fmt(q.low), fmt(q.close),

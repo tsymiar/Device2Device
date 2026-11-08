@@ -1,8 +1,8 @@
 [![Build Status](https://tsymiar.visualstudio.com/MyAutomatic/_apis/build/status/tsymiar.Device2Device?repoName=tsymiar%2FDevice2Device&branchName=main)](https://tsymiar.visualstudio.com/MyAutomatic/_build/latest?definitionId=72&repoName=tsymiar%2FDevice2Device&branchName=main)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/6cb8f83fb83d4e50a33bc39e470f2891)](https://app.codacy.com/gh/tsymiar/Device2Device/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-[![Anny](https://img.shields.io/badge/GitHub-naver%2Fanny-1f883d?logo=github)](https://github.com/naver/anny)
-[![KCP](https://img.shields.io/badge/GitHub-skywind3000%2Fkcp-2B90D9?logo=github)](https://github.com/skywind3000/kcp)
-[![MyAutomatic](https://img.shields.io/badge/tsymiar-MyAutomatic-8250df?logo=github)](https://github.com/tsymiar/MyAutomatic)
+[![Anny](https://img.shields.io/badge/GitHub-naver%2Fanny-1f8837?logo=github&logoColor=white)](https://github.com/naver/anny)
+[![KCP](https://img.shields.io/badge/GitHub-skywind3000%2Fkcp-0969ca?logo=github&logoColor=white)](https://github.com/skywind3000/kcp)
+[![MyAutomatic](https://img.shields.io/badge/GitHub-tsymiar%2Fscadup-8250ff?logo=github&logoColor=white)](https://github.com/tsymiar/scadup)
 
 # Device2Device
 
@@ -42,7 +42,7 @@ app/src/main/
 │   │                   #   FileMsg server, Receiver, Window, SaveData, Toast
 │   ├── dialog/         # ChatBox (multi-provider AI), FileMsg, LanMsg, Game (deduction board)
 │   ├── game/           # Deduction engine: propositions, voice samples, psych profile
-│   ├── widget/         # Market widgets: list + chart + heatmap (+ config activities)
+│   ├── widget/         # Market widgets: list + chart + heatmap, compass (tap to measure)
 │   ├── market/         # QuoteSource (11 sources), Quote, CapRow, Indicators
 │   ├── avatar/         # AnnyModel/Targets/Params, MeshBuilder, HumanMesh, Renderer, PhotoAnalyzer
 │   ├── acceleration/   # Sensor & voice modules
@@ -65,9 +65,11 @@ app/src/main/
 
 **LAN messenger** — `LanMsgDialog`: one KCP-over-UDP socket bound to `0.0.0.0:<port>` is both client and server — no connect handshake, peers are addressed by IP; periodic UDP-broadcast discovery with timeout eviction; oversized images are fragmented and reassembled on the peer; discovery address / port configurable.
 
-**Market quotes** — `MarketActivity` + `KLineView`; keyless feeds from `auto` (smart pick + fallback), `tencent`, `eastmoney`, `gold`/`xau`/`gc`, `crude`/`brent`/`ng`, `usd`, `binance`. Code / name / pinyin picker, candles + MA + indicators (MACD, RSI, KDJ), drag-pan, pinch-zoom, crosshair, 15 s refresh.
+**Market quotes** — `MarketActivity` + `KLineView`; keyless feeds from `auto` (smart pick + fallback), `tencent`, `eastmoney`, `gold`/`xau`/`gc`, `crude`/`brent`/`ng`, `usd`, `binance`. Code / name / pinyin picker, candles + MA + indicators (MACD, RSI, KDJ), drag-pan, pinch-zoom, crosshair bubble with the selected bar's cap / turnover / PE (auto-hides after 5 s idle), 15 s refresh.
 
 **Market widgets** — three home-screen widgets bring quotes to the launcher without opening the app. The **quote list** (2×2, resizable) shows several watched symbols at once; rows land one by one as responses arrive, so the widget fills in progressively instead of flashing in all at once. The **quote chart** (2×2, resizable) draws a single symbol's trend as a sparkline, and gold symbols additionally annotate the CNY-per-gram price. The **market cap heatmap** (4×4) paints a squarified treemap of the top-30 A-shares: tile area encodes market cap, colour encodes the daily change, and a tap opens the full quote page. All three share one repaint path that follows day/night mode, size themselves adaptively to their host, and refresh on the same 15 s cadence as the in-app K-line view; each widget ships a configuration activity for picking symbols and the refresh interval.
+
+**Compass widget** — tap-to-measure heading on the home screen: ticks, cardinal marks and needles rotate together with the measured azimuth, a fixed marker at the dial top points along the phone's forward direction, and the status text sits on a transparent band. The full-screen `CompassView` adds coordinates, 5° ticks and the same inward index line.
 
 **Messaging (C++ ↔ Java)** — thread-safe queue + `MASSAGER` enum bridging native events (toast, status, file progress, texture, socket state) to the UI.
 
@@ -117,8 +119,11 @@ MIT
 ## Recent Changes
 
 ### 2026-11
+- **Market:** K-line tooltip shows the selected bar's cap / float cap / PE (live snapshot scaled by close) and daily turnover from Eastmoney `f61`; auto-hides after 5 s idle.
+- **Compass:** widget dial rotates with azimuth, fixed heading marker, transparent status band; full-screen compass gained an inward index line.
 - **File transfer:** aligned protocol with `LinxSrvc` (Mac/Linux) — magic now embeds `PROTOCOL_VERSION`; `FileMsgSocket` kept in sync with `TransferEngine`.
-- **UI:** splash/auth animation shortened (~2000 ms → ~800 ms).
+- **UI:** splash/auth animation shortened (~2000 ms → ~800 ms); fixed the "源码" menu link, which pointed at a non-existent `/tree/main/Device2Device` path.
+- **Comments:** trimmed verbose inline notes across the touched modules.
 
 ### 2026-10
 - **LAN:** KCP-over-UDP messenger with UDP-broadcast discovery.

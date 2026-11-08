@@ -512,9 +512,6 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         } else if (itemId == R.id.url) {
             intent = new Intent(activity, MyGitActivity.class);
             activity.startActivity(intent);
-        } else if (itemId == R.id.more) {
-            intent = new Intent(activity, ThanksActivity.class);
-            activity.startActivity(intent);
         } else if (itemId == R.id.exit) {
             activity.finish();
         } else if (itemId != R.id.item) {

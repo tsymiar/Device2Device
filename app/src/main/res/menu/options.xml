@@ -13,9 +13,6 @@
         android:id="@+id/url"
         android:title="@string/url" />
     <item
-        android:id="@+id/more"
-        android:title="@string/thank" />
-    <item
         android:id="@+id/exit"
         android:title="@string/exit" />
 </menu>

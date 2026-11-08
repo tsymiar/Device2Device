@@ -223,12 +223,6 @@
                 <data android:scheme="file" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".activity.ThanksActivity"
-            android:configChanges="orientation|keyboardHidden"
-            android:label="@string/thank"
-            android:theme="@android:style/Theme.Material.Dialog.Alert"
-            tools:ignore="NewApi" />
 
         <!-- 拍照：把 app 私有目录的临时文件授权给系统相机应用写入 -->
         <provider

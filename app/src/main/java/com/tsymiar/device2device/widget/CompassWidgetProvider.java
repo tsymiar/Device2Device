@@ -9,7 +9,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RectF;
 import android.widget.RemoteViews;
 
 import com.tsymiar.device2device.R;
@@ -45,9 +44,10 @@ public class CompassWidgetProvider extends AppWidgetProvider {
     static Bitmap dial(float azimuth) {
         Bitmap bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bmp);
-        // 圆盘上移，底部留出独立文字条带：方位字/刻度/指针/状态文字按半径分层，互不重叠
+        // 盘面与指针同按 -azimuth 转，底部文字条不转
         float cx = SIZE / 2f, cy = SIZE / 2f - 14f;
         float r = 100f;
+        float angle = azimuth < 0f ? 0f : azimuth;
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setStyle(Paint.Style.FILL);
@@ -58,9 +58,9 @@ public class CompassWidgetProvider extends AppWidgetProvider {
         paint.setColor(0xFF5A6678);
         canvas.drawCircle(cx, cy, r, paint);
 
-        // 刻度：每 15° 一道，只占最外圈（80~90），不压到方位字
+        // 刻度：每 15° 一道，随盘面转
         for (int i = 0; i < 360; i += 15) {
-            float rad = (float) Math.toRadians(i - 90);
+            float rad = (float) Math.toRadians(i - 90 - angle);
             boolean major = i % 90 == 0;
             float len = major ? 10f : 6f;
             paint.setStrokeWidth(major ? 3f : 1.5f);
@@ -70,7 +70,7 @@ public class CompassWidgetProvider extends AppWidgetProvider {
                     cx + (r - 10) * cos, cy + (r - 10) * sin, paint);
         }
 
-        // 方位字：北/东/南/西
+        // 方位字：坐标定位保持正立
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(26f);
@@ -78,14 +78,13 @@ public class CompassWidgetProvider extends AppWidgetProvider {
         Paint.FontMetrics fm = paint.getFontMetrics();
         String[] names = {"北", "东", "南", "西"};
         for (int i = 0; i < names.length; i++) {
-            float rad = (float) Math.toRadians(i * 90 - 90);
+            float rad = (float) Math.toRadians(i * 90 - 90 - angle);
             float tx = cx + (r - 34f) * (float) Math.cos(rad);
             float ty = cy + (r - 34f) * (float) Math.sin(rad);
             canvas.drawText(names[i], tx, ty - (fm.ascent + fm.descent) / 2f, paint);
         }
 
-        // 指针：红指北、灰指南，随测得方位逆时针转；针尖半径 46 < 方位字内缘 53，转到任意角度都不压字
-        float angle = azimuth < 0f ? 0f : azimuth;
+        // 指针与盘面同步转，红针与 N 字重合
         float len = r - 54f;
         canvas.save();
         canvas.rotate(-angle, cx, cy);
@@ -97,25 +96,50 @@ public class CompassWidgetProvider extends AppWidgetProvider {
         paint.setColor(0xFFC9D1DC);
         canvas.drawCircle(cx, cy, 5f, paint);
 
-        // 状态文字放到圆盘外的专属条带里（圆盘底 214，条带 220~250），不再和「南」/指针叠在一起
+        // 盘顶固定标记：手机正前方
+        drawHeadingMarker(canvas, paint, cx, cy - r);
+
+        // 底部状态文字
         float bandTop = cy + r + 6f;
         float bandBottom = SIZE - 6f;
+        String text;
+        int textColor;
+        if (azimuth < 0f) {
+            textColor = 0xFF9AA4B2;
+            text = "点击测向";
+        } else {
+            textColor = 0xFFFFD54F;
+            text = direction(azimuth) + " " + Math.round(azimuth) + "°";
+        }
+        // 透明状态条，只留文字
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0xEE141A22);
-        canvas.drawRoundRect(new RectF(cx - 92f, bandTop, cx + 92f, bandBottom), 8f, 8f, paint);
         paint.setTextSize(18f);
         Paint.FontMetrics tf = paint.getFontMetrics();
         float baseY = (bandTop + bandBottom) / 2f - (tf.ascent + tf.descent) / 2f;
-        String text;
-        if (azimuth < 0f) {
-            paint.setColor(0xFF9AA4B2);
-            text = "点击测向";
-        } else {
-            paint.setColor(0xFFFFD54F);
-            text = direction(azimuth) + " " + Math.round(azimuth) + "°";
-        }
+        paint.setShadowLayer(3f, 0f, 1f, 0xCC000000);
+        paint.setColor(textColor);
         canvas.drawText(text, cx, baseY, paint);
+        paint.clearShadowLayer();
         return bmp;
+    }
+
+    /** 盘顶固定标记：倒三角 + 短指标线 */
+    private static void drawHeadingMarker(Canvas canvas, Paint paint, float cx, float dialTop) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xFFFFD54F);
+        paint.setShadowLayer(2f, 0f, 1f, 0xCC000000);
+        float half = 9f, height = 10f;
+        Path tri = new Path();
+        tri.moveTo(cx - half, dialTop - height - 2f);
+        tri.lineTo(cx + half, dialTop - height - 2f);
+        tri.lineTo(cx, dialTop - 2f);
+        tri.close();
+        canvas.drawPath(tri, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f);
+        canvas.drawLine(cx, dialTop + 2f, cx, dialTop + 9f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.clearShadowLayer();
     }
 
     /** 指针半边路径：north=true 是红色北针，false 是灰色南针 */

@@ -35,6 +35,7 @@ public class CompassView extends View {
     private final Paint mDegreePaint;
     private final Paint mCoordPaint;
     private final Paint mMarkerPaint;
+    private final Paint mMarkerLine;
     private final Paint mNorthPaint;
     private final Paint mSouthPaint;
     private final Paint mHubPaint;
@@ -73,6 +74,7 @@ public class CompassView extends View {
         mDegreePaint = textPaint(dp(11f), ui.textHint, false);
         mCoordPaint = textPaint(dp(22f), ui.textDim, false);   // 与放大后的方位文字尺寸相近
         mMarkerPaint = fill(ui.info);
+        mMarkerLine = stroke(ui.info, dp(2.5f));
         mNorthPaint = fill(ui.danger);
         mSouthPaint = fill(ui.textDim);
         mHubPaint = fill(ui.text);
@@ -126,16 +128,15 @@ public class CompassView extends View {
         float cx = w / 2f;
         float cy = top + (h - top - bottom) / 2f;
         float r = Math.min(w, h - top - bottom) / 2f - dp(6);
+        float dialTop = cy - r;
 
         if (mZoomed) {
             // 经纬度置于 view 顶端与倒三角之间（近似居中），倒三角指向盘顶，即手机正前方
-            float dialTop = cy - r;
             float markerTop = dialTop - dp(9);          // 倒三角的顶边
             Paint.FontMetrics fm = mCoordPaint.getFontMetrics();
             float coordBase = Math.max(markerTop / 2f - (fm.ascent + fm.descent) / 2f,
                     -fm.ascent + dp(2));
             drawFittedText(canvas, locationText(), cx, coordBase, mCoordPaint, w - dp(16));
-            drawHeadingMarker(canvas, cx, dialTop - dp(2));
         }
 
         canvas.drawCircle(cx, cy, r, mDialFill);
@@ -155,6 +156,8 @@ public class CompassView extends View {
         if (mZoomed) {
             // 度数画在盘面外圈，跟着方位角转但字保持正立
             drawDegreeLabels(canvas, cx, cy, r);
+            // 标记画在盘面之上，避免被盘底盖住
+            drawHeadingMarker(canvas, cx, dialTop - dp(2));
         }
 
         // 放大后字大一号并往下挪，跟上方经纬度呼应
@@ -166,7 +169,7 @@ public class CompassView extends View {
         }
     }
 
-    /** 圆盘上方的小倒三角：尖端对着盘顶，也就是手机正前方 */
+    /** 盘顶固定标记：倒三角 + 朝盘内的短指标线 */
     private void drawHeadingMarker(Canvas canvas, float cx, float tipY) {
         float half = dp(6);
         float height = dp(7);
@@ -176,6 +179,7 @@ public class CompassView extends View {
         mMarker.lineTo(cx, tipY);
         mMarker.close();
         canvas.drawPath(mMarker, mMarkerPaint);
+        canvas.drawLine(cx, tipY + dp(2), cx, tipY + dp(10), mMarkerLine);
     }
 
     /** 刻度 + N/E/S/W：平时每 15° 一格，放大后每 5° 一格，45° 的整数倍画长刻度 */

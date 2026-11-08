@@ -16,9 +16,16 @@ public class Quote {
     public final float close;
     public final float volume;
     public final float amount;
+    /** 该根换手率 %（东财 f61），0 = 源未给 */
+    public final float turnoverRate;
 
     public Quote(String time, float open, float high, float low,
                  float close, float volume, float amount) {
+        this(time, open, high, low, close, volume, amount, 0f);
+    }
+
+    public Quote(String time, float open, float high, float low,
+                 float close, float volume, float amount, float turnoverRate) {
         this.time = time;
         this.open = open;
         this.high = high;
@@ -26,6 +33,8 @@ public class Quote {
         this.close = close;
         this.volume = volume;
         this.amount = amount;
+        this.turnoverRate = (Float.isNaN(turnoverRate) || Float.isInfinite(turnoverRate)
+                || turnoverRate < 0f) ? 0f : turnoverRate;
     }
 
     /** 涨跌幅%（相对前一根收盘；base<=0 时按 0 处理，避免除零） */

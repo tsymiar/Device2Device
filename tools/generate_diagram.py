@@ -596,11 +596,11 @@ layer_boundaries = []  # (y_start, y_end, group_name, group_color)
 
 # ---- Layer 1: Activities — Indigo (Presentation / UI) ----
 # Grid 7-col × 2-row; SelectActivity is the hub above the grid.
-# Slot 6 (col 6 row 0) holds ThanksActivity; slot 13 (col 6 row 1) holds
-# MyGit + Bugger as stacked half-height mini cards.
+# Slot 6 (col 6 row 0) is empty since the "鸣谢" menu was removed;
+# slot 13 (col 6 row 1) holds MyGit + Bugger as stacked half-height mini cards.
 LAYER_ACTIVITIES = {
     "title":    "Activities Layer",
-    "subtitle": "Java / Android UI \u2014 14 Activity Screens",
+    "subtitle": "Java / Android UI \u2014 13 Activity Screens",
     "bar": INDIGO_500, "accent": INDIGO_900, "bg": INDIGO_50,
     "cols": 7, "rows": 2, "card_h": int(140*S), "v_gap": int(40*S),
     "gap_ratio": 0.40,
@@ -618,8 +618,8 @@ LAYER_ACTIVITIES = {
         ("GraphActivity",    INDIGO_700, ["Sensor / Menu Hub",   "Real-time Charts, Sub-nav"]),
         ("BtDialogActivity", INDIGO_800, ["Bluetooth Setup",     "Discoverability & Scanning"]),
         ("MainActivity",     INDIGO_900, ["Splash Screen",       "Auto-navigate Entry"]),
-        ("MarketActivity",   INDIGO_800, ["Market Quotes",       "K-Line, Widgets, Heatmap"]),
-        None,  # ThanksActivity — mini card
+        ("MarketActivity",   INDIGO_800, ["Market Quotes",       "K-Line, 4 Home Widgets"]),
+        None,
         # Row 1
         None,
         None,
@@ -630,8 +630,7 @@ LAYER_ACTIVITIES = {
         None,  # MyGit + Bugger — stacked mini cards
     ],
     "minis": {
-        6:  [("ThanksActivity", "Credits & Acknowledgements")],
-        13: [("MyGitActivity",  "GitHub Project Page"),
+        13: [("MyGitActivity",  "Source Repository Link"),
              ("BuggerActivity", "Bug Report & Feedback")],
     },
     "deps": [
@@ -645,12 +644,12 @@ LAYER_ACTIVITIES = {
     ],
 }
 
-# ---- Layer 2: Services, Dialogs & Events — Teal ----
+# ---- Layer 2: Services, Widgets & Events — Teal ----
 LAYER_SERVICES = {
-    "title":    "Services, Dialogs & Events",
-    "subtitle": "Java / Background Tasks & Floating UI \u2014 15 Components",
+    "title":    "Services, Widgets & Events",
+    "subtitle": "Java / Background Tasks & Floating UI \u2014 16 Components",
     "bar": TEAL_500, "accent": TEAL_900, "bg": TEAL_50,
-    "cols": 5, "rows": 3, "card_h": int(155*S), "v_gap": int(16*S),
+    "cols": 4, "rows": 4, "card_h": int(155*S), "v_gap": int(16*S),
     "gap_ratio": 0.30,
     "dep_color": TEAL_500, "mini_color": TEAL_900,
     "items": [
@@ -669,6 +668,7 @@ LAYER_SERVICES = {
         ("LanMsgDialog",           TEAL_800, ["LAN Messenger",         "KCP Text / Image"]),
         ("GameDialog",             TEAL_800, ["Voice Deduction Board", "Full-screen Game"]),
         ("EventNotify/Handle",     TEAL_900, ["Observer Events",       "Component Comm"]),
+        ("Home Widgets",           TEAL_800, ["Compass + 3 Market Widgets", "RemoteViews / Config"]),
     ],
     "deps": [
         (0, 1,  "pub/sub"),  # Subscribe → Publish
@@ -783,8 +783,8 @@ LAYER_COMM = {
         ("TCP Sockets",      BLUEGREY_800, ["Connection-oriented stream",
                                             "File transfer support",
                                             "HTTP embedded server"]),
-        ("DeepSeek AI API",  BLUEGREY_900, ["HTTPS REST integration",
-                                            "Chat / Reasoner models",
+        ("AI Model APIs",    BLUEGREY_900, ["DeepSeek / Ollama / OpenRouter",
+                                            "HTTPS REST integration",
                                             "Streaming response parsing"]),
     ],
 }
@@ -792,13 +792,14 @@ LAYER_COMM = {
 # ---- Layer 6: External Systems — Deep Purple ----
 LAYER_EXTERNAL = {
     "title":    "External Systems & APIs",
-    "subtitle": "Cloud / Remote / Peripheral \u2014 5 External Targets",
+    "subtitle": "Cloud / Remote / Peripheral \u2014 6 External Targets",
     "bar": PURPLE_500, "accent": PURPLE_900, "bg": PURPLE_50,
-    "cols": 5, "rows": 1, "card_h": int(195*S), "v_gap": int(16*S),
+    "cols": 6, "rows": 1, "card_h": int(195*S), "v_gap": int(16*S),
     "gap_ratio": None,
     "dep_color": PURPLE_500, "mini_color": PURPLE_900,
     "items": [
-        ("DeepSeek AI",       PINK_700,   ["Chat & Reasoner Models",  "REST API (HTTPS)",   "Streaming JSON Response"]),
+        ("AI Model APIs",     PINK_700,   ["DeepSeek / Ollama / OpenRouter", "REST API (HTTPS)", "Streaming JSON"]),
+        ("Market Data Feeds", AMBER_700,  ["Tencent / Eastmoney / Sina", "Binance / Frankfurter", "Keyless HTTPS"]),
         ("scadup Broker",     PURPLE_500, ["Message Broker (Remote)", "TCP Protocol",       "Pub/Sub Topic Routing"]),
         ("WiFi Network",      CYAN_700,   ["UDP Multicast Group",     "Device Discovery",   "Broadcast Communication"]),
         ("Bluetooth Devices", PURPLE_800, ["RFCOMM Serial Profile",   "Peripheral Connect", "SPP Data Exchange"]),
@@ -918,7 +919,7 @@ draw.text((MARGIN+LEFT_ZONE+int(30*S), legend_y+int(14*S)), "Layer Legend",
 
 legend_items = [
     (INDIGO_500,   "Activities Layer (Java UI)"),
-    (TEAL_500,     "Services, Dialogs & Events"),
+    (TEAL_500,     "Services, Widgets & Events"),
     (DORANGE_500,  "JNI Bridge (Java \u2194 C++)"),
     (GREEN_500,    "Native Layer (C++ / NDK)"),
     (BLUEGREY_600, "Communication Channels"),
