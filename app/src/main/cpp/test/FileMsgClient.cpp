@@ -75,7 +75,7 @@ int FileMsgClient::sendLocalFile(const std::string& ip, unsigned short port,
     FileMsgSocket client;
 
     // Progress callback — print transfer status
-    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status) {
+    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status, uint8_t) {
         if (total > 0) {
             printf("[Client] %.1f%% (%llu/%llu) %s\n",
                 (double)current / total * 100,

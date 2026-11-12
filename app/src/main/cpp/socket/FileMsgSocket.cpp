@@ -2,10 +2,13 @@
 // Created by Shenyrion on 2025.
 //
 // 协议与状态机对齐 MyAutomatic/LinxSrvc/Mac/Transfer 的 TransferEngine：
-//  - 64 字节协议头、统一大端（网络字节序）传输
+//  - 64 字节协议头（event 复用 reserved[0]）、统一大端（网络字节序）传输
 //  - 文件名做长度校验 + 路径净化（防 DoS / 路径穿越）
 //  - 分片大小按「剩余字节」计算（修正空文件与末片越界写坏文件的问题）
 //  - 客户端任务用 future 托管并在 accept 时回收（长跑不再堆积线程对象）
+//  - CMD_CANCEL / CMD_DELETE：分片边界取消 + 删除对端半截文件
+//  - CMD_REQUEST 带 event=PULL 时服务端代发文件（拉取模式）
+//  - 进度回调带事件码，日志按 1% 步进输出 MB/s
 //
 
 #include "FileMsgSocket.h"
@@ -20,6 +23,7 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <cerrno>
+#include <cstdio>
 #include <chrono>
 #include <algorithm>
 #include <memory>
@@ -117,8 +121,10 @@ static int sendAll(int sock, const void* buf, size_t len)
 
 // --- 可靠的 recv 辅助函数 ---
 // 使用 poll() 检测连接状态，以手动读循环替代 MSG_WAITALL，避免 SO_RCVTIMEO + MSG_WAITALL 的兼容性问题
-// 返回值: >0 成功（应等于len），0 客户端断开(EOF/POLLHUP)，-1 超时（可重试），-2 其他错误
-static int recvAll(int sock, void* buf, size_t len, int timeoutMs)
+// 返回值: >0 成功（应等于len），0 客户端断开(EOF/POLLHUP)，-1 超时（可重试），-2 其他错误，
+//         -3 runFlag 已被清false（主动停止）。注意：runFlag 是「运行标志」，true = 继续跑。
+static int recvAll(int sock, void* buf, size_t len, int timeoutMs,
+                   const std::atomic<bool>* runFlag = nullptr)
 {
     struct pollfd pfd {};
     pfd.fd = sock;
@@ -126,6 +132,9 @@ static int recvAll(int sock, void* buf, size_t len, int timeoutMs)
 
     size_t total = 0;
     while (total < len) {
+        // 运行标志被清 false：不必等满一次 poll 超时，立刻让调用方退出。
+        // -3 = 主动停止，区别于网络错误（-2）/ 空闲超时（-1）。
+        if (runFlag != nullptr && !runFlag->load()) return -3;
         int pr = poll(&pfd, 1, timeoutMs);
         if (pr == 0) {
             return -1;  // 超时，无数据
@@ -134,6 +143,9 @@ static int recvAll(int sock, void* buf, size_t len, int timeoutMs)
             if (errno == EINTR) continue;   // 信号中断，重试
             return -2;  // poll 错误
         }
+        // fd 已被 stopServer 关闭时 poll 返回 POLLNVAL。旧实现既不处理也不退出，
+        // 会在这里无限空转，导致 stopServer 的 f.wait() 永远等不到 clientHandler 结束。
+        if (pfd.revents & POLLNVAL) return -2;
         // 先读数据再判断断开，避免 POLLIN|POLLHUP 同时设置时丢弃数据
         if (pfd.revents & POLLIN) {
             ssize_t ret = recv(sock, (char*)buf + total, len - total, 0);
@@ -208,7 +220,11 @@ void ClientSessionMgr::closeAllSockets()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& pair : m_sessions) {
-        if (pair.second && pair.second->sock >= 0) {
+        if (!pair.second) continue;
+        // 先置失效：clientHandler / sendSliceData 拿 active 当运行标志，
+        // 否则正在传大文件的线程要等整份文件发完，stopServer 才能收尾。
+        pair.second->active.store(false);
+        if (pair.second->sock >= 0) {
             LOGI("closing client %s:%d (fd=%d)",
                 pair.second->clientIp.c_str(), pair.second->clientPort, pair.second->sock);
             shutdown(pair.second->sock, SHUT_RDWR);
@@ -233,6 +249,8 @@ FileMsgSocket::FileMsgSocket()
     , m_serverRunning(false)
     , m_connected(false)
     , m_running(false)
+    , m_backoffEnabled(false)
+    , m_cancelRequested(false)
     , m_serverPort(0)
 {}
 
@@ -266,6 +284,12 @@ int FileMsgSocket::createServerSocket(unsigned short port)
 #ifdef SO_NOSIGPIPE
     setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
 #endif
+    // accept() 也要有上限：shutdown() 未必能唤醒阻塞中的 accept。超时后
+    // fileServerProcess 会 continue，停止时则退出，保证 join() 不会挂住。
+    struct timeval acceptTv;
+    acceptTv.tv_sec = 1;
+    acceptTv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &acceptTv, sizeof(acceptTv));
 
     struct sockaddr_in addr {};
     addr.sin_family = AF_INET;
@@ -406,31 +430,45 @@ int FileMsgSocket::startServer(unsigned short port)
     return 0;
 }
 
-void FileMsgSocket::stopServer()
+void FileMsgSocket::interrupt()
 {
     m_serverRunning.store(false);
     m_running.store(false);
+    m_connected.store(false);
 
-    // 关闭所有客户端 socket，立即中断其阻塞的 recv() 调用
+    // 关闭所有客户端 socket，立即中断其阻塞的 recv() 调用，并让会话失效
     m_sessionMgr.closeAllSockets();
 
     if (m_serverSock >= 0) {
-        // shutdown 立即中断阻塞的 accept() 调用
+        // shutdown 唤醒阻塞的 accept()，close 立刻释放端口，
+        // 这样「Stop Server 后马上用同一端口重启」才能 bind 成功。
         shutdown(m_serverSock, SHUT_RDWR);
         close(m_serverSock);
         m_serverSock = -1;
     }
 
+    // 客户端 fd 不在这里碰：m_clientSock 由 disconnect() 在 m_sendMutex 下读写，
+    // 在 UI 线程直接 shutdown/close 会和它数据竞争。m_connected=false 已让
+    // postLocalFile / receivePullData 在分片边界停下，fd 交给后台析构持锁关闭。
+}
+
+void FileMsgSocket::stopServer()
+{
+    // 幂等：interrupt() 可能已在 UI 线程提前执行过
+    interrupt();
+
     if (m_serverThread.joinable()) {
         m_serverThread.join();
     }
 
-    // 安全等待所有客户端任务退出：必须在本对象析构前做完，
-    // 否则还在跑的 clientHandler 会访问已析构的 this。
+    // 必须在本对象析构前等所有 clientHandler 退出，否则它们会访问已析构的 this。
+    // 这一步可能耗时，调用方绝不能是 UI 线程（见 JniMethods.cpp 的 releaseFileMsg）。
     {
         std::lock_guard<std::mutex> lock(m_clientThreadMutex);
         for (std::future<void>& f : m_clientFutures) {
-            if (f.valid()) {
+            if (!f.valid()) continue;
+            if (f.wait_for(std::chrono::seconds(2)) != std::future_status::ready) {
+                LOGW("stopServer: client task still running after 2s, keep waiting");
                 f.wait();
             }
         }
@@ -471,11 +509,17 @@ void FileMsgSocket::disconnect()
     m_connected.store(false);
     m_running.store(false);
 
-    if (m_clientSock >= 0) {
-        LOGI("disconnect: closing connection to %s:%d (fd=%d)",
-            m_serverIp.c_str(), m_serverPort, (int)m_clientSock);
-        close(m_clientSock);
-        m_clientSock = -1;
+    // 持发送锁关 fd：等当前 sendAll 结束，防止 fd 被复用后把上一轮的数据发错连接；
+    // 先 shutdown 唤醒阻塞在 recv 上的调用方。
+    {
+        std::lock_guard<std::mutex> lock(m_sendMutex);
+        if (m_clientSock >= 0) {
+            LOGI("disconnect: closing connection to %s:%d (fd=%d)",
+                m_serverIp.c_str(), m_serverPort, (int)m_clientSock);
+            shutdown(m_clientSock, SHUT_RDWR);
+            close(m_clientSock);
+            m_clientSock = -1;
+        }
     }
 
     if (m_receiveThread.joinable()) {
@@ -485,18 +529,61 @@ void FileMsgSocket::disconnect()
     LOGI("FileMsgSocket disconnected");
 }
 
+void FileMsgSocket::cancelTransfer()
+{
+    m_cancelRequested.store(true);
+    LOGI("cancel requested — takes effect at next chunk boundary");
+}
+
+void FileMsgSocket::setBackoffEnabled(bool enabled)
+{
+    m_backoffEnabled.store(enabled);
+    LOGI("ENOTCONN backoff %s", enabled ? "enabled" : "disabled");
+}
+
+int FileMsgSocket::deletePartialFile(const std::string& fileName)
+{
+    if (fileName.empty()) {
+        LOGE("deletePartialFile: empty fileName");
+        return -1;
+    }
+    if (!m_connected.load()) {
+        LOGE("deletePartialFile: not connected");
+        return -2;
+    }
+
+    // header + filename 必须持锁按序发出（与服务端解析约定一致）
+    FileHeader header{};
+    fillHeader(header, CMD_DELETE);
+    header.fileNameLen = (uint32_t)fileName.size();
+
+    FileHeader netHeader = header;
+    headerToNet(netHeader);
+    {
+        std::lock_guard<std::mutex> lock(m_sendMutex);
+        if (sendAll(m_clientSock, &netHeader, sizeof(netHeader)) < 0 ||
+            sendAll(m_clientSock, fileName.c_str(), fileName.size()) < 0) {
+            LOGE("sendAll(delete request) failed (%s)", strerror(errno));
+            return -3;
+        }
+    }
+    LOGI("deletePartialFile: requested deletion of \"%s\" on peer", fileName.c_str());
+    return 0;
+}
+
 void FileMsgSocket::fileServerProcess()
 {
     struct sockaddr_in clientAddr {};
     socklen_t addrLen = sizeof(clientAddr);
 
     while (m_serverRunning.load()) {
+        addrLen = sizeof(clientAddr);
         int clientSock = accept(m_serverSock, (struct sockaddr*)&clientAddr, &addrLen);
         if (clientSock < 0) {
-            // accept 已由 stopServer() 中的 shutdown() 中断
-            if (m_serverRunning.load()) {
-                LOGE("accept() failed (%s)", strerror(errno));
-            }
+            if (!m_serverRunning.load()) break;   // 停止中，正常退出
+            // 监听 socket 设了 1s SO_RCVTIMEO：空闲超时不是错误，继续监听
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) continue;
+            LOGE("accept() failed (%s)", strerror(errno));
             break;
         }
 
@@ -542,6 +629,12 @@ void FileMsgSocket::fileServerProcess()
         sndTv.tv_sec  = SEND_TIMEOUT_SEC;
         sndTv.tv_usec = 0;
         setsockopt(clientSock, SOL_SOCKET, SO_SNDTIMEO, &sndTv, sizeof(sndTv));
+        // 接收超时兜底：recvAll 用 poll，但 poll 报可读后的 recv 仍可能阻塞；
+        // 停止时 fd 已被 shutdown/close，有了上限后台任务就能及时收尾。
+        struct timeval rcvTv;
+        rcvTv.tv_sec  = 2;
+        rcvTv.tv_usec = 0;
+        setsockopt(clientSock, SOL_SOCKET, SO_RCVTIMEO, &rcvTv, sizeof(rcvTv));
 
         // 为每个客户端创建独立任务处理
         std::lock_guard<std::mutex> lock(m_clientThreadMutex);
@@ -590,41 +683,55 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
     }
 
     if (m_progressCallback) {
-        m_progressCallback(0, 0, "Client connected from " + clientIp + ":" + std::to_string(clientPort));
+        m_progressCallback(0, 0, "Client connected from " + clientIp + ":" + std::to_string(clientPort),
+            FILE_EVT_CONNECTED);
     }
 
     std::string statusPrefix = "[" + clientIp + ":" + std::to_string(clientPort) + "] ";
 
-    // ── ENOTCONN / EBADF 处理 ──
-    // 一条已 accept 的 socket 在 recv 时返回 ENOTCONN（首次 SO_ERROR 还可能是 EBADF），
-    // 基本等于对端已经 RST/abort —— 这不是"系统还没准备好"那种能自愈的瞬时状态。
-    // 所以只给极短宽限，宽限用尽就判定连接已死并关闭；按指数退避重试十几次只会把
-    // 该处理线程阻塞数分钟（并产生大量日志）后无法恢复。
-    static constexpr int RECV_ERR_RETRY_MAX = 3;        // 仅覆盖极少数平台的瞬时异常
-    static constexpr int RECV_ERR_RETRY_DELAY_MS = 20;  // 固定 20ms，不做指数退避
+    // ── ENOTCONN / EBADF：对端已 abort/RST，连接已死且重试不会自愈 ──
+    // 默认短宽限后判死；指数退避会长时间占住线程，仅作为可选项（与 Mac/Transfer 一致）。
+    static constexpr int ENOTCONN_RETRY_MAX = 3;
+    static constexpr int ENOTCONN_RETRY_DELAY_US = 20000;  // 固定 20ms 宽限
+    static constexpr int BACKOFF_RETRY_MAX = 16;
+    static constexpr int BACKOFF_BASE_DELAY_US = 10000;    // 起始 10ms，逐次翻倍
     int errRetries = 0;
+    int lastLoggedPct = -1;   // 进度日志按 1% 步进去重
+    auto lastSpeedTime = std::chrono::steady_clock::now();
+    uint64_t lastSpeedBytes = 0;
 
     while (m_running.load() && session->active.load()) {
         FileHeader header{};
-        int ret = recvAll(sock, &header, sizeof(header), RECV_POLL_TIMEOUT_MS);
+        int ret = recvAll(sock, &header, sizeof(header), RECV_POLL_TIMEOUT_MS, &m_running);
         if (ret <= 0) {
+            if (ret == -3) {
+                LOGI("%s stopping (server stopped)", statusPrefix.c_str());
+                break;
+            }
             if (ret == -1) {
-                // 超时，回到 while 检查 m_running 是否被 stopServer() 置为 false
+                // 空闲连接每 5s 到此一次，回到 while 复查 m_running
                 errRetries = 0;
                 continue;
             }
             if (ret == -2) {
-                if (errRetries < RECV_ERR_RETRY_MAX) {
+                const bool backoff = m_backoffEnabled.load();
+                const int retryMax = backoff ? BACKOFF_RETRY_MAX : ENOTCONN_RETRY_MAX;
+                if (errRetries < retryMax) {
                     ++errRetries;
-                    LOGW("%s recv header ENOTCONN/EBADF, retry %d/%d (peer likely gone)",
-                        statusPrefix.c_str(), errRetries, RECV_ERR_RETRY_MAX);
-                    std::this_thread::sleep_for(
-                        std::chrono::milliseconds(RECV_ERR_RETRY_DELAY_MS));
+                    long delayUs = backoff
+                        ? (long)(BACKOFF_BASE_DELAY_US * (1LL << (errRetries - 1)))
+                        : (long)ENOTCONN_RETRY_DELAY_US;
+                    LOGW("%s recv header ENOTCONN/EBADF, retry %d/%d after %ldus (backoff=%d)",
+                        statusPrefix.c_str(), errRetries, retryMax, delayUs, (int)backoff);
+                    // tv_nsec 必须 < 1e9，退避后期要把整秒拆到 tv_sec
+                    timespec nap;
+                    nap.tv_sec = (time_t)(delayUs / 1000000);
+                    nap.tv_nsec = (long)((delayUs % 1000000) * 1000);
+                    nanosleep(&nap, nullptr);
                     continue;
                 }
-                // 宽限用尽：连接确已死亡，按对端断开处理
                 LOGW("%s recv header ENOTCONN persists after %d retries — peer aborted, closing (fd=%d)",
-                    statusPrefix.c_str(), RECV_ERR_RETRY_MAX, sock);
+                    statusPrefix.c_str(), retryMax, sock);
                 break;
             }
             if (ret == 0) {
@@ -645,7 +752,10 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             break;
         }
 
-        LOGI("%s Received command: %d", statusPrefix.c_str(), header.cmd);
+        // CMD_DATA 逐片打日志会刷屏，进度在分支内按 1% 步进打印
+        if (header.cmd != CMD_DATA) {
+            LOGI("%s Received command: %d", statusPrefix.c_str(), header.cmd);
+        }
         switch (header.cmd) {
         case CMD_REQUEST: {
             // 文件名长度必须校验：客户端可以伪造一个 4GB 的 fileNameLen，
@@ -658,7 +768,7 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             }
 
             std::string fileName(header.fileNameLen, '\0');
-            int r = recvAll(sock, &fileName[0], header.fileNameLen, RECV_POLL_TIMEOUT_MS);
+            int r = recvAll(sock, &fileName[0], header.fileNameLen, RECV_POLL_TIMEOUT_MS, &m_running);
             if (r <= 0) {
                 if (r == 0) {
                     LOGI("%s client disconnected while reading filename", statusPrefix.c_str());
@@ -674,9 +784,49 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             LOGI("%s FileMsgSocket incoming request: %s (%llu bytes)",
                 statusPrefix.c_str(), safeName.c_str(), (unsigned long long)header.fileSize);
 
+            // ── 拉取模式：按 event 码区分 push/pull（二者 fileSize 都可能为 0）──
+            if (header.event == FILE_EVT_REQUEST_PULL) {
+                std::string dir = m_savePath.empty() ? "./" : m_savePath;
+                if (!dir.empty() && dir.back() != '/' && dir.back() != '\\') {
+                    dir += "/";
+                }
+                std::string filePath = dir + safeName;
+
+                FileHeader resp{};
+                fillHeader(resp, CMD_RESPONSE);
+                struct stat st {};
+                if (stat(filePath.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+                    LOGW("%s pull request rejected: %s not found (fd=%d)",
+                        statusPrefix.c_str(), filePath.c_str(), sock);
+                    resp.fileSize = 0;   // 约定 fileSize=0 为拒绝
+                    if (sendHeader(sock, resp) < 0) {
+                        LOGE("%s sendHeader(pull reject) failed — closing", statusPrefix.c_str());
+                        session->active.store(false);
+                    }
+                    break;
+                }
+
+                resp.fileSize = (uint64_t)st.st_size;
+                if (sendHeader(sock, resp) < 0) {
+                    LOGE("%s sendHeader(pull accept) failed — closing", statusPrefix.c_str());
+                    session->active.store(false);
+                    break;
+                }
+
+                LOGI("%s serving pull request: %s (%llu bytes)", statusPrefix.c_str(),
+                    filePath.c_str(), (unsigned long long)st.st_size);
+                // 服务端代发：runFlag 传 session->active 而非 m_connected
+                sendSliceData(sock, filePath, (uint64_t)st.st_size, session->active);
+                break;
+            }
+
+            // ── push 模式：对端推文件过来 ──
             session->pendingFileName = safeName;
             session->pendingFileSize = header.fileSize;
             session->transSize = 0;
+            lastLoggedPct = -1;   // 新文件从 0% 重新计步
+            lastSpeedTime = std::chrono::steady_clock::now();
+            lastSpeedBytes = 0;
 
             FileHeader response{};
             fillHeader(response, CMD_RESPONSE);
@@ -688,7 +838,8 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             }
 
             if (m_progressCallback) {
-                m_progressCallback(0, header.fileSize, statusPrefix + "Receiving: " + safeName);
+                m_progressCallback(0, header.fileSize, statusPrefix + "Receiving: " + safeName,
+                    FILE_EVT_RECEIVE_START);
             }
             break;
         }
@@ -743,9 +894,21 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
             uint64_t remain = (header.fileSize > offset) ? (header.fileSize - offset) : 0;
             uint32_t dataSize = (remain > header.chunkSize) ? header.chunkSize : (uint32_t)remain;
 
+            // offset 与已收字节数不符 = 协议错位，继续写会写坏文件，判死
+            if (offset != session->transSize) {
+                LOGE("%s chunk out of order: chunk %u offset=%llu but received %llu — closing",
+                    statusPrefix.c_str(), header.currentChunk, (unsigned long long)offset,
+                    (unsigned long long)session->transSize);
+                if (session->recvFile.is_open()) session->recvFile.close();
+                session->active.store(false);
+                break;
+            }
+
             if (dataSize > 0) {
-                std::vector<char> buffer(dataSize);
-                int r = recvAll(sock, buffer.data(), dataSize, RECV_POLL_TIMEOUT_MS);
+                if (session->chunkBuf.size() < dataSize) {
+                    session->chunkBuf.resize(dataSize);
+                }
+                int r = recvAll(sock, session->chunkBuf.data(), dataSize, RECV_POLL_TIMEOUT_MS, &m_running);
                 if (r <= 0) {
                     if (r == 0) {
                         LOGI("%s client disconnected while receiving data (chunk %u/%u)",
@@ -758,13 +921,39 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
                     break;
                 }
 
-                session->recvFile.write(buffer.data(), r);
+                session->recvFile.write(session->chunkBuf.data(), r);
+                if (!session->recvFile.good()) {
+                    // 磁盘满/IO 错误时不中止会把损坏文件当成功传完
+                    LOGE("%s file write failed (disk full?) — closing", statusPrefix.c_str());
+                    session->recvFile.close();
+                    session->active.store(false);
+                    break;
+                }
                 session->transSize += r;
+
+                // 每增加 1% 打一次日志，避免逐分片刷屏
+                if (header.fileSize > 0) {
+                    int pct = (int)(session->transSize * 100 / header.fileSize);
+                    if (pct != lastLoggedPct) {
+                        auto now = std::chrono::steady_clock::now();
+                        double sec = std::chrono::duration<double>(now - lastSpeedTime).count();
+                        double mbps = sec > 0.001
+                            ? (double)(session->transSize - lastSpeedBytes) / sec / (1024.0 * 1024.0)
+                            : 0.0;
+                        LOGI("%s receiving: %d%% (%llu/%llu bytes, %.1f MB/s)",
+                            statusPrefix.c_str(), pct,
+                            (unsigned long long)session->transSize,
+                            (unsigned long long)header.fileSize, mbps);
+                        lastLoggedPct = pct;
+                        lastSpeedTime = now;
+                        lastSpeedBytes = session->transSize;
+                    }
+                }
             }
 
             if (m_progressCallback && session->transSize > 0) {
                 m_progressCallback(session->transSize, header.fileSize,
-                    statusPrefix + "Receiving...");
+                    statusPrefix + "Receiving...", FILE_EVT_NONE);
             }
             break;
         }
@@ -783,7 +972,8 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
                 if (!session->currentFilePath.empty()) {
                     status += "|" + session->currentFilePath;
                 }
-                m_progressCallback(header.fileSize, header.fileSize, status);
+                m_progressCallback(header.fileSize, header.fileSize, status,
+                    FILE_EVT_TRANSFER_COMPLETE);
             }
             session->currentFilePath.clear();
             break;
@@ -795,8 +985,70 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
                 session->recvFile.close();
             }
 
+            // 记录半截文件，等待对端 CMD_DELETE 精确删除
+            struct stat st {};
+            if (!session->currentFilePath.empty() &&
+                stat(session->currentFilePath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+                std::lock_guard<std::mutex> lock(m_partialMutex);
+                m_cancelledPartials[session->pendingFileName] = session->currentFilePath;
+            }
+
             if (m_progressCallback) {
-                m_progressCallback(0, header.fileSize, statusPrefix + "Transfer cancelled");
+                m_progressCallback(0, header.fileSize, statusPrefix + "Transfer cancelled",
+                    FILE_EVT_TRANSFER_CANCELLED);
+            }
+            break;
+        }
+        case CMD_DELETE: {
+            // 与 CMD_REQUEST 相同的文件名校验与读取
+            if (header.fileNameLen == 0 || header.fileNameLen > MAX_FILE_NAME_LEN) {
+                LOGE("%s invalid fileNameLen=%u (max %u) — closing",
+                    statusPrefix.c_str(), header.fileNameLen, MAX_FILE_NAME_LEN);
+                session->active.store(false);
+                break;
+            }
+            std::string fileName(header.fileNameLen, '\0');
+            int r = recvAll(sock, &fileName[0], header.fileNameLen, RECV_POLL_TIMEOUT_MS, &m_running);
+            if (r <= 0) {
+                LOGE("%s recv filename timeout — protocol desync, closing", statusPrefix.c_str());
+                session->active.store(false);
+                break;
+            }
+            std::string safeName = sanitizeFileName(fileName);
+
+            // 只删 CMD_CANCEL 时记录过的路径，原始文件名找不到记录则忽略
+            std::string partial;
+            {
+                std::lock_guard<std::mutex> lock(m_partialMutex);
+                auto it = m_cancelledPartials.find(safeName);
+                if (it != m_cancelledPartials.end()) {
+                    partial = it->second;
+                    m_cancelledPartials.erase(it);
+                }
+            }
+            struct stat st {};
+            if (partial.empty() || stat(partial.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+                LOGW("%s delete request: no partial file recorded for \"%s\"",
+                    statusPrefix.c_str(), safeName.c_str());
+                if (m_progressCallback) {
+                    m_progressCallback(0, 0, statusPrefix + "Partial not found: " + safeName,
+                        FILE_EVT_NONE);
+                }
+                break;
+            }
+            if (remove(partial.c_str()) != 0) {
+                LOGE("%s remove(%s) failed: %s", statusPrefix.c_str(), partial.c_str(), strerror(errno));
+                if (m_progressCallback) {
+                    m_progressCallback(0, 0, statusPrefix + "Partial delete failed: " + safeName,
+                        FILE_EVT_NONE);
+                }
+                break;
+            }
+            LOGI("%s deleted partial file: %s (%llu bytes)", statusPrefix.c_str(),
+                partial.c_str(), (unsigned long long)st.st_size);
+            if (m_progressCallback) {
+                m_progressCallback(0, 0, statusPrefix + "Partial deleted: " + safeName,
+                    FILE_EVT_NONE);
             }
             break;
         }
@@ -819,7 +1071,8 @@ void FileMsgSocket::clientHandler(int sock, const std::string& clientIp, unsigne
     LOGI("%s client disconnected", statusPrefix.c_str());
 
     if (m_progressCallback) {
-        m_progressCallback(0, 0, "Client disconnected: " + clientIp + ":" + std::to_string(clientPort));
+        m_progressCallback(0, 0, "Client disconnected: " + clientIp + ":" + std::to_string(clientPort),
+            FILE_EVT_DISCONNECTED);
     }
 }
 
@@ -851,7 +1104,8 @@ int FileMsgSocket::recvHeader(int sock, FileHeader& header)
     return -1;
 }
 
-int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t fileSize)
+int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t fileSize,
+                                const std::atomic<bool>& runFlag)
 {
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
@@ -866,8 +1120,18 @@ int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t
                         : (uint32_t)((fileSize + chunkSize - 1) / chunkSize);
     uint64_t totalSent = 0;
     int lastPct = -1;  // 去重进度回调
+    auto lastSpeedTime = std::chrono::steady_clock::now();
+    uint64_t lastSpeedBytes = 0;
+    bool cancelled = false;
+    int ret = 0;
 
-    for (uint32_t i = 0; i < chunkCount && m_connected.load(); ++i) {
+    for (uint32_t i = 0; i < chunkCount && runFlag.load(); ++i) {
+        // 取消在分片边界生效：向对端发 CMD_CANCEL，由其停止接收并记录半截文件
+        if (m_cancelRequested.exchange(false)) {
+            cancelled = true;
+            break;
+        }
+
         FileHeader header{};
         fillHeader(header, CMD_DATA);
         header.fileSize = fileSize;
@@ -876,14 +1140,14 @@ int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t
         header.currentChunk = i;
         header.transSize = totalSent;
 
-        if (sendHeader(sock, header) < 0) break;
+        if (sendHeader(sock, header) < 0) { ret = -3; break; }
 
         // 读取并发送数据（按剩余字节算，与服务端算法保持一致）
-        uint64_t remain = fileSize - (uint64_t)i * chunkSize;
-        uint32_t dataSize = (remain > chunkSize) ? chunkSize : (uint32_t)remain;
-
         std::streamsize bytesRead = 0;
-        if (dataSize > 0) {
+        if (fileSize > 0) {
+            uint64_t remain = fileSize - (uint64_t)i * chunkSize;
+            uint32_t dataSize = (remain > chunkSize) ? chunkSize : (uint32_t)remain;
+
             std::vector<char> buffer(dataSize);
             file.read(buffer.data(), dataSize);
             bytesRead = file.gcount();
@@ -891,34 +1155,60 @@ int FileMsgSocket::sendSliceData(int sock, const std::string& filePath, uint64_t
             std::lock_guard<std::mutex> lock(m_sendMutex);
             if (sendAll(sock, buffer.data(), bytesRead) < 0) {
                 LOGE("sendAll() failed at chunk %u/%u", i, chunkCount);
+                ret = -3;
                 break;
             }
         }
 
-        totalSent += bytesRead;
+        totalSent += (uint64_t)bytesRead;
 
-        // 进度回调（每 1% 变化时推送，去重避免刷爆消息队列）
+        // 进度回调（每 1% 变化时推送，去重避免刷爆消息队列）+ 速度日志
         if (m_progressCallback) {
             int pct = fileSize > 0 ? (int)(totalSent * 100 / fileSize) : 100;
             if (pct != lastPct) {
-                m_progressCallback(totalSent, fileSize, "Sending...");
+                auto now = std::chrono::steady_clock::now();
+                double sec = std::chrono::duration<double>(now - lastSpeedTime).count();
+                double mbps = sec > 0.001
+                    ? (double)(totalSent - lastSpeedBytes) / sec / (1024.0 * 1024.0) : 0.0;
+                LOGI("sendSliceData: %d%% (%llu/%llu bytes, %.1f MB/s)", pct,
+                    (unsigned long long)totalSent, (unsigned long long)fileSize, mbps);
+                m_progressCallback(totalSent, fileSize, "Sending...", FILE_EVT_NONE);
                 lastPct = pct;
+                lastSpeedTime = now;
+                lastSpeedBytes = totalSent;
             }
         }
     }
 
     file.close();
 
+    if (cancelled) {
+        FileHeader cancel{};
+        fillHeader(cancel, CMD_CANCEL);
+        cancel.fileSize = fileSize;
+        cancel.transSize = totalSent;
+        cancel.event = FILE_EVT_TRANSFER_CANCELLED;
+        sendHeader(sock, cancel);  // 尽力而为：对端可能已不在线
+        if (m_progressCallback) {
+            m_progressCallback(totalSent, fileSize, "Send cancelled", FILE_EVT_TRANSFER_CANCELLED);
+        }
+        LOGI("sendSliceData: cancelled at %llu/%llu bytes",
+            (unsigned long long)totalSent, (unsigned long long)fileSize);
+        return -2;
+    }
+    if (ret < 0) return ret;  // 发送失败：不发 COMPLETE，避免对端把半截文件当成功
+
     FileHeader complete{};
     fillHeader(complete, CMD_COMPLETE);
     complete.fileSize = fileSize;
     complete.transSize = totalSent;
+    complete.event = FILE_EVT_TRANSFER_COMPLETE;
     if (sendHeader(sock, complete) < 0) {
         LOGE("sendHeader(COMPLETE) failed (%s)", strerror(errno));
     }
 
     if (m_progressCallback) {
-        m_progressCallback(totalSent, fileSize, "Send complete!");
+        m_progressCallback(totalSent, fileSize, "Send complete!", FILE_EVT_TRANSFER_COMPLETE);
     }
 
     LOGI("FileMsgSocket sent complete: %llu bytes", (unsigned long long)totalSent);
@@ -931,6 +1221,7 @@ int FileMsgSocket::postLocalFile(const std::string& filePath)
         LOGE("server not connected");
         return -1;
     }
+    m_cancelRequested.store(false);  // 清掉上一次可能残留的取消请求
 
     // ── 发送前健康检查 ──
     // m_connected 可能在服务端主动断开后仍为 true（无后台线程同步更新），
@@ -1003,23 +1294,31 @@ int FileMsgSocket::postLocalFile(const std::string& filePath)
     }
 
     if (m_progressCallback) {
-        m_progressCallback(0, fileSize, "Transfer accepted");
+        // SEND_START 不受 JNI 节流：NONE 进度在快传时会被吞光，进度条没机会出现
+        m_progressCallback(0, fileSize, "Transfer accepted", FILE_EVT_SEND_START);
     }
 
-    return sendSliceData(m_clientSock, filePath, fileSize);
+    return sendSliceData(m_clientSock, filePath, fileSize, m_connected);
 }
 
 int FileMsgSocket::requestFile(const std::string& ip, unsigned short port, const std::string& fileName)
 {
+    if (fileName.empty()) {
+        LOGE("requestFile: empty fileName");
+        return -1;
+    }
+    m_cancelRequested.store(false);  // 清掉上一次可能残留的取消请求
+
     int ret = connectToServer(ip, port);
     if (ret < 0) {
         return ret;
     }
 
+    // 拉取请求：event=REQUEST_PULL 标识模式，fileSize=0 表示本端不带数据
     FileHeader header{};
     fillHeader(header, CMD_REQUEST);
+    header.event = FILE_EVT_REQUEST_PULL;
     header.fileNameLen = (uint32_t)fileName.size();
-    header.fileSize = 0;
 
     FileHeader netHeader = header;
     headerToNet(netHeader);
@@ -1027,13 +1326,180 @@ int FileMsgSocket::requestFile(const std::string& ip, unsigned short port, const
         std::lock_guard<std::mutex> lock(m_sendMutex);
         if (sendAll(m_clientSock, &netHeader, sizeof(netHeader)) < 0) {
             LOGE("sendAll(header) failed (%s)", strerror(errno));
-            return -1;
+            return -2;
         }
         if (sendAll(m_clientSock, fileName.c_str(), fileName.size()) < 0) {
             LOGE("sendAll(filename) failed (%s)", strerror(errno));
-            return -2;
+            return -3;
         }
     }
 
+    FileHeader response{};
+    if (recvHeader(m_clientSock, response) < 0 || response.cmd != CMD_RESPONSE) {
+        LOGE("recvHeader: no response from server");
+        return -4;
+    }
+    if (response.fileSize == 0) {
+        LOGE("pull request rejected by server: %s (not found or not a regular file)",
+            fileName.c_str());
+        return -5;
+    }
+
+    if (m_progressCallback) {
+        m_progressCallback(0, response.fileSize, "Pulling: " + fileName, FILE_EVT_RECEIVE_START);
+    }
+
+    return receivePullData(m_clientSock, fileName, response.fileSize);
+}
+
+// 拉取接收循环：分片语义与服务端 CMD_DATA 一致（顺序校验 / 写盘检查 / 1% 日志）
+int FileMsgSocket::receivePullData(int sock, const std::string& fileName, uint64_t fileSize)
+{
+    std::string dir = m_savePath.empty() ? "./" : m_savePath;
+    if (!dir.empty() && dir.back() != '/' && dir.back() != '\\') {
+        dir += '/';
+    }
+    std::string baseName = sanitizeFileName(fileName);
+    time_t now = time(nullptr);
+    struct tm tmBuf;
+    localtime_r(&now, &tmBuf);
+    char ts[32];
+    strftime(ts, sizeof(ts), "_%Y%m%d_%H%M%S", &tmBuf);
+    size_t dotPos = baseName.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        baseName.insert(dotPos, ts);
+    } else {
+        baseName += ts;
+    }
+    std::string filePath = dir + baseName;
+
+    std::ofstream out(filePath, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        LOGE("receivePullData: failed to open file %s", filePath.c_str());
+        return -1;
+    }
+    LOGI("receivePullData: saving to %s", filePath.c_str());
+
+    uint64_t received = 0;
+    int lastPct = -1;
+    auto lastSpeedTime = std::chrono::steady_clock::now();
+    uint64_t lastSpeedBytes = 0;
+    std::vector<char> buf;
+    bool completed = false;
+
+    while (m_connected.load()) {
+        // 本端取消拉取：停止落盘，连接保持，由上层决定是否断开
+        if (m_cancelRequested.exchange(false)) {
+            out.close();
+            if (m_progressCallback) {
+                m_progressCallback(received, fileSize, "Pull cancelled",
+                    FILE_EVT_TRANSFER_CANCELLED);
+            }
+            LOGI("receivePullData: cancelled at %llu/%llu bytes",
+                (unsigned long long)received, (unsigned long long)fileSize);
+            return -8;
+        }
+
+        FileHeader header{};
+        int ret = recvAll(sock, &header, sizeof(header), RECV_POLL_TIMEOUT_MS);
+        if (ret <= 0) {
+            LOGW("receivePullData: recv header failed (ret=%d) — aborting", ret);
+            out.close();
+            return -2;
+        }
+        headerToHost(header);
+
+        if (header.cmd == CMD_COMPLETE) {
+            completed = true;
+            break;
+        }
+        if (header.cmd == CMD_CANCEL) {
+            out.close();
+            if (m_progressCallback) {
+                m_progressCallback(received, fileSize, "Pull cancelled by peer",
+                    FILE_EVT_TRANSFER_CANCELLED);
+            }
+            LOGI("receivePullData: cancelled by peer at %llu/%llu bytes",
+                (unsigned long long)received, (unsigned long long)fileSize);
+            return -8;
+        }
+        if (header.cmd != CMD_DATA) {
+            LOGE("receivePullData: unexpected cmd %u — aborting", header.cmd);
+            out.close();
+            return -3;
+        }
+        if (header.chunkSize == 0 || header.currentChunk >= header.chunkCount) {
+            LOGE("receivePullData: invalid chunk meta: chunk %u/%u size=%u",
+                header.currentChunk, header.chunkCount, header.chunkSize);
+            out.close();
+            return -4;
+        }
+
+        uint64_t offset = (uint64_t)header.currentChunk * header.chunkSize;
+        if (offset != received) {
+            LOGE("receivePullData: chunk out of order: chunk %u offset=%llu but received %llu",
+                header.currentChunk, (unsigned long long)offset, (unsigned long long)received);
+            out.close();
+            return -5;
+        }
+
+        uint64_t remain = (fileSize > offset) ? (fileSize - offset) : 0;
+        uint32_t dataSize = (remain > header.chunkSize) ? header.chunkSize : (uint32_t)remain;
+        if (dataSize == 0) {
+            continue;
+        }
+
+        if (buf.size() < dataSize) {
+            buf.resize(dataSize);
+        }
+        int r = recvAll(sock, buf.data(), dataSize, RECV_POLL_TIMEOUT_MS);
+        if (r <= 0) {
+            LOGE("receivePullData: recv data failed (ret=%d)", r);
+            out.close();
+            return -6;
+        }
+        out.write(buf.data(), r);
+        if (!out.good()) {
+            LOGE("receivePullData: file write failed (disk full?) — aborting");
+            out.close();
+            return -7;
+        }
+        received += r;
+
+        if (m_progressCallback) {
+            m_progressCallback(received, fileSize, "Pulling: " + fileName, FILE_EVT_NONE);
+        }
+        int pct = fileSize > 0 ? (int)(received * 100 / fileSize) : 100;
+        if (pct != lastPct) {
+            auto now2 = std::chrono::steady_clock::now();
+            double sec = std::chrono::duration<double>(now2 - lastSpeedTime).count();
+            double mbps = sec > 0.001
+                ? (double)(received - lastSpeedBytes) / sec / (1024.0 * 1024.0) : 0.0;
+            LOGI("receivePullData: %d%% (%llu/%llu bytes, %.1f MB/s)", pct,
+                (unsigned long long)received, (unsigned long long)fileSize, mbps);
+            lastPct = pct;
+            lastSpeedTime = now2;
+            lastSpeedBytes = received;
+        }
+    }
+
+    out.close();
+
+    // 连接中途断开不能当成"传完"：否则半截文件会被搬到公共下载目录
+    if (!completed) {
+        LOGE("receivePullData: connection closed before CMD_COMPLETE — file incomplete");
+        if (m_progressCallback) {
+            m_progressCallback(received, fileSize, "Pull failed: connection lost", FILE_EVT_NONE);
+        }
+        return -2;
+    }
+
+    if (m_progressCallback) {
+        // "|" 后带真实落盘路径，上层据此搬到公共下载目录
+        m_progressCallback(fileSize, fileSize, "Pull complete!|" + filePath,
+            FILE_EVT_TRANSFER_COMPLETE);
+    }
+    LOGI("receivePullData: complete: %llu bytes -> %s",
+        (unsigned long long)received, filePath.c_str());
     return 0;
 }

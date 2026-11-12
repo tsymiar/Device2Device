@@ -30,6 +30,7 @@ import java.util.Locale;
  * K线视图 —— MyAutomatic/toolset/matkline.py 绘图部分的 Android 版。
  * 主图蜡烛/分时折线 + MA + 多空标记；副图 成交量/MACD/RSI/KDJ 单击切换；
  * 交互：拖动平移、惯性滚动、双指缩放、长按十字跟随、点按出详情浮窗。
+ * 头部第二行叠加「区间 ±x.xx%」：可见首尾收盘价的涨跌幅，随平移/缩放实时刷新。
  */
 public class KLineView extends View {
 
@@ -464,7 +465,7 @@ public class KLineView extends View {
         canvas.drawText(fit(label, right - left), left, sp(17), mTextPaint);
         mTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.NORMAL));
 
-        // 第二行：代码 / 周期 + 总市值（有名称时才另起一行，避免重复）+ 最新价与涨跌
+        // 第二行：代码 / 周期 + 总市值（有名称时才另起一行，避免重复）+ 可见区间涨跌幅 + 最新价与涨跌
         mTextPaint.setTextSize(sp(11));
         mTextPaint.setTextAlign(Paint.Align.LEFT);
         String code = mName.isEmpty() ? "" : mTitle + cap;
@@ -473,11 +474,16 @@ public class KLineView extends View {
             float base = mData.size() > 1 ? mData.get(mData.size() - 2).close : last.open;
             String price = String.format(Locale.US, "%s  %+.2f%%",
                     fmt(last.close), last.changePercent(base));
+            float priceWidth = mTextPaint.measureText(price);
             if (!code.isEmpty()) {
                 mTextPaint.setColor(mTextDim);
                 // 右侧价格为右对齐，代码行仅使用其左侧空间，避免与市值重叠
-                canvas.drawText(fit(code, right - left - mTextPaint.measureText(price) - dp(8)),
-                        left, sp(32), mTextPaint);
+                String fitted = fit(code, right - left - priceWidth - dp(8));
+                canvas.drawText(fitted, left, sp(32), mTextPaint);
+                drawRangeChange(canvas, left + mTextPaint.measureText(fitted) + dp(8),
+                        right - priceWidth - dp(8), sp(32));
+            } else {
+                drawRangeChange(canvas, left, right - priceWidth - dp(8), sp(32));
             }
             mTextPaint.setColor(last.isUp() ? mUp : mDown);
             mTextPaint.setTextAlign(Paint.Align.RIGHT);
@@ -486,6 +492,22 @@ public class KLineView extends View {
             mTextPaint.setColor(mTextDim);
             canvas.drawText(fit(code, right - left), left, sp(32), mTextPaint);
         }
+    }
+
+    /**
+     * 可见区域区间涨跌幅：可见首尾两根K线的收盘价之比，颜色随涨跌。
+     * 平移 / 缩放都会走到 onDraw，因此始终跟随当前视窗实时刷新。
+     */
+    private void drawRangeChange(Canvas canvas, float x, float limitRight, float y) {
+        if (mData.size() < 2 || mVisible <= 0 || x >= limitRight) return;
+        int start = Math.min(Math.max(0, mStart), mData.size() - 1);
+        int end = Math.min(mData.size() - 1, start + mVisible - 1);
+        if (end <= start) return;
+        float pct = mData.get(end).changePercent(mData.get(start).close);
+        String text = String.format(Locale.US, "区间 %+.2f%%", pct);
+        if (mTextPaint.measureText(text) > limitRight - x) return;   // 放不下就不出，别压到价格
+        mTextPaint.setColor(pct >= 0f ? mUp : mDown);
+        canvas.drawText(text, x, y, mTextPaint);
     }
 
     /** 把该行截到 availPx 之内，截了就在末尾补个省略号：加长过的名称不能撞到右边的价 */

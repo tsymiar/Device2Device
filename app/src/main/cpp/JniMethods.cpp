@@ -549,9 +549,48 @@ static int g_udpPort = 8899;
 // 文件传输
 static FileMsgSocket* g_fileMsg = nullptr;
 static std::mutex g_fileTransMutex;
+// 只保护「取消调用」与「销毁引擎实例」的并发：postLocalFile 会持 g_fileTransMutex
+// 阻塞整段传输，取消绝不能等那把锁，否则分片边界永远等不到取消。
+static std::mutex g_fileCancelMutex;
+/**
+ * 换出并异步销毁引擎。
+ * 析构里的 stopServer() 要 join accept 线程、等所有 clientHandler 退出，可能耗时数秒；
+ * 以前在 UI 线程同步 delete，点 Disconnect 会卡满 5s 触发 ANR（dropbox data_app_anr）。
+ * 这里只做毫秒级的 interrupt()（关监听 fd / 会话失效 / 置停止标志），慢活交后台线程。
+ */
+static void releaseFileMsg() {
+    FileMsgSocket* old = nullptr;
+    {
+        // 与 cancelFileTransfer() 共用这把锁：保证它不会在指针换出后还拿着旧对象
+        // 调 cancelTransfer()，否则异步析构会踩到已释放内存。
+        std::lock_guard<std::mutex> lock(g_fileCancelMutex);
+        old = g_fileMsg;
+        g_fileMsg = nullptr;
+    }
+    if (old == nullptr) return;
+    old->interrupt();
+    std::thread([old]() {
+        delete old;
+    }).detach();
+}
 // 接收落盘路径缓存：applySavePath() 通常先于 start/connect 调用，
 // 那时 g_fileMsg 还没创建，所以先把路径存在这里，建好实例再套用（否则会落到 "./"）。
 static std::string g_fileSavePath;
+static std::atomic<bool> g_fileBackoffEnabled(false);
+
+void FileMsgProgressCallback(uint64_t current, uint64_t total,
+                             const std::string& status, uint8_t event);
+
+// 新建引擎时把缓存的落盘路径 / 退避开关一并套上，避免各处重复
+static FileMsgSocket* newFileMsg() {
+    FileMsgSocket* p = new FileMsgSocket();
+    p->setProgressCallback(FileMsgProgressCallback);
+    if (!g_fileSavePath.empty()) {
+        p->setSavePath(g_fileSavePath);
+    }
+    p->setBackoffEnabled(g_fileBackoffEnabled.load());
+    return p;
+}
 
 JNIEXPORT jint JNICALL CPP_FUNC_FILE(convertAudioFiles)(JNIEnv* env, jclass, jstring from, jstring save)
 {
@@ -888,23 +927,24 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendKcpData)(JNIEnv* env, jclass, jstrin
 
 // ============ 文件传输 JNI 实现 ============
 
-void FileMsgProgressCallback(uint64_t current, uint64_t total, const std::string& status)
+void FileMsgProgressCallback(uint64_t current, uint64_t total, const std::string& status,
+                             uint8_t event)
 {
-    // 限频：最多每 100ms 推送一次进度，避免刷爆消息队列
+    // 限频：最多每 100ms 推送一次进度，避免刷爆消息队列；
+    // 带事件码的状态消息（连接/开始/完成/取消/断开）一律立即推送。
     static auto lastTime = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime).count();
 
-    // 传输完成/开始等状态消息立即推送
-    bool isStatusMsg = (current == 0 || current >= total);
-
-    if (!isStatusMsg && elapsed < 100) {
+    if (event == FILE_EVT_NONE && elapsed < 100) {
         return;
     }
     lastTime = now;
 
-    // 进度数据：format "status|current|total" 方便 Java 侧解析
-    std::string msg = status + "|" + std::to_string(current) + "|" + std::to_string(total);
+    // 格式 "status[|落盘路径]|current|total|event"：末段是事件码，
+    // Java 侧按事件判定状态，不再靠解析状态字符串。
+    std::string msg = status + "|" + std::to_string(current) + "|" + std::to_string(total)
+        + "|" + std::to_string((int)event);
     Message::instance().setMessage(msg, FILE_PROGRESS);
 }
 
@@ -915,17 +955,10 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startFileMsgServer)(JNIEnv*, jclass, jin
         LOGW("FileMsg server already running");
         return 0;
     }
-    g_fileMsg = new FileMsgSocket();
-    g_fileMsg->setProgressCallback(FileMsgProgressCallback);
-    // 套用缓存的接收落盘路径（Java 端 applySavePath 通常先于本调用，那时 g_fileMsg 还不存在）
-    if (!g_fileSavePath.empty()) {
-        g_fileMsg->setSavePath(g_fileSavePath);
-        LOGI("FileMsg server saving to: %s", g_fileSavePath.c_str());
-    }
+    g_fileMsg = newFileMsg();
     int ret = g_fileMsg->startServer((unsigned short)port);
     if (ret < 0) {
-        delete g_fileMsg;
-        g_fileMsg = nullptr;
+        releaseFileMsg();
         return ret;
     }
     Message::instance().setMessage("FileMsg Server Started on Port " + std::to_string(port), MSG_STAT);
@@ -937,18 +970,12 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(connectFileMsgServer)(JNIEnv* env, jclas
     std::string address = Jstring2Cstring(env, ip);
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
     if (g_fileMsg != nullptr) {
-        g_fileMsg->disconnect();
-        delete g_fileMsg;
+        releaseFileMsg();   // interrupt + 后台析构，不在调用线程等 disconnect
     }
-    g_fileMsg = new FileMsgSocket();
-    g_fileMsg->setProgressCallback(FileMsgProgressCallback);
-    if (!g_fileSavePath.empty()) {
-        g_fileMsg->setSavePath(g_fileSavePath);
-    }
+    g_fileMsg = newFileMsg();
     int ret = g_fileMsg->connectToServer(address, (unsigned short)port);
     if (ret < 0) {
-        delete g_fileMsg;
-        g_fileMsg = nullptr;
+        releaseFileMsg();
         return ret;
     }
     Message::instance().setMessage("Connected to FileMsg server " + address + ":" + std::to_string(port), MSG_STAT);
@@ -959,9 +986,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(disconnectFileMsg)(JNIEnv*, jclass)
 {
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
     if (g_fileMsg != nullptr) {
-        g_fileMsg->disconnect();
-        delete g_fileMsg;
-        g_fileMsg = nullptr;
+        releaseFileMsg();   // 断开与线程回收都交给后台，UI 立即返回
         Message::instance().setMessage("FileMsg disconnected", MSG_STAT);
     }
 }
@@ -975,12 +1000,45 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(postLocalFile)(JNIEnv* env, jclass, jstr
         return -1;
     }
     int ret = g_fileMsg->postLocalFile(path);
+    if (ret == -2) {
+        Message::instance().setMessage("File send cancelled: " + path, MSG_STAT);
+        return ret;
+    }
     if (ret < 0) {
-        Message::instance().setMessage("File send failed", MSG_STAT);
+        Message::instance().setMessage("File send failed (code " + std::to_string(ret) + ")", MSG_STAT);
         return ret;
     }
     Message::instance().setMessage("File send complete: " + path, MSG_STAT);
     return 0;
+}
+
+// 取消当前发送 / 拉取：绝不能拿 g_fileTransMutex（postLocalFile 整段传输都持有它），
+// 否则取消要等发送结束才生效，分片边界永远等不到。
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(cancelFileTransfer)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileCancelMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->cancelTransfer();
+    }
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(deletePartialFile)(JNIEnv* env, jclass, jstring fileName)
+{
+    std::string name = Jstring2Cstring(env, fileName);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg == nullptr || !g_fileMsg->isConnected()) {
+        return -2;
+    }
+    return g_fileMsg->deletePartialFile(name);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileBackoffEnabled)(JNIEnv*, jclass, jboolean enabled)
+{
+    g_fileBackoffEnabled.store(enabled == JNI_TRUE);
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->setBackoffEnabled(g_fileBackoffEnabled.load());
+    }
 }
 
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv* env, jclass, jstring ip, jint port, jstring fileName)
@@ -988,9 +1046,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(requestFile)(JNIEnv* env, jclass, jstrin
     std::string address = Jstring2Cstring(env, ip);
     std::string name = Jstring2Cstring(env, fileName);
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
-    if (g_fileMsg == nullptr || !g_fileMsg->isConnected()) {
-        LOGE("FileMsg not connected");
-        return -1;
+    // 拉取自带连接流程（Mac/Transfer 一致）：不必先点 Connect
+    if (g_fileMsg == nullptr) {
+        g_fileMsg = newFileMsg();
     }
     return g_fileMsg->requestFile(address, (unsigned short)port, name);
 }
@@ -1010,9 +1068,7 @@ JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileMsgServer)(JNIEnv*, jclass)
 {
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
     if (g_fileMsg != nullptr) {
-        g_fileMsg->stopServer();
-        delete g_fileMsg;
-        g_fileMsg = nullptr;
+        releaseFileMsg();   // stopServer 的 join / wait 在后台析构里做，Service 主线程不阻塞
         Message::instance().setMessage("FileMsg Server Exit", MSG_STAT);
     }
 }
@@ -1024,6 +1080,18 @@ JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass)
         return g_fileMsg->isConnected() ? JNI_TRUE : JNI_FALSE;
     }
     return JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgServerRunning)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    return (g_fileMsg != nullptr && g_fileMsg->isServerRunning()) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(getFileMsgClientCount)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileTransMutex);
+    return g_fileMsg != nullptr ? g_fileMsg->getClientCount() : 0;
 }
 
 // ============ 局域网文本消息（发现 + 收发，全部在 C++ 侧） ============

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 破坏性操作（取消传输 / 删除半截文件）的文字与描边：
+     可用时 ui_danger，禁用时退回弱一档的 ui_text_hint；日夜间各自取值。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ui_text_hint" android:state_enabled="false" />
+    <item android:color="@color/ui_danger" />
+</selector>

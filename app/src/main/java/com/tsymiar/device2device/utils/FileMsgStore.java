@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -14,6 +15,10 @@ import android.util.Log;
 import androidx.core.content.ContextCompat;
 
 import com.tsymiar.device2device.wrapper.NetworkWrapper;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -85,12 +90,48 @@ public final class FileMsgStore {
 
             boolean ok = saved != null;
             if (ok) {
+                recordPublished(app, saved);
                 if (!src.delete()) Log.w(TAG, "cannot remove staged file: " + srcPath);
             } else {
                 Log.w(TAG, "public save unavailable, kept at " + srcPath);
             }
             if (cb != null) cb.onDone(ok, ok ? saved : srcPath);
         }).start();
+    }
+
+    // ===== 已接收文件列表：只记成功落到公共目录的文件，新的在前，上限 RECEIVED_MAX 条 =====
+    private static final int RECEIVED_MAX = 20;
+    private static final String PREF_NAME = "file_msg";
+    private static final String PREF_RECEIVED = "received_files";
+
+    /** 成功搬到公共目录后登记一条（文件名 + 时间） */
+    public static void recordPublished(Context ctx, String dest) {
+        if (ctx == null || dest == null || dest.isEmpty()) return;
+        try {
+            SharedPreferences sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            JSONArray arr = new JSONArray(sp.getString(PREF_RECEIVED, "[]"));
+            JSONObject o = new JSONObject();
+            o.put("name", new File(dest).getName());
+            o.put("time", System.currentTimeMillis());
+            arr.put(0, o);
+            while (arr.length() > RECEIVED_MAX) {
+                arr.remove(arr.length() - 1);
+            }
+            sp.edit().putString(PREF_RECEIVED, arr.toString()).apply();
+        } catch (JSONException e) {
+            Log.w(TAG, "record received file failed: " + e.getMessage());
+        }
+    }
+
+    /** 已接收文件记录，新的在前；没有记录时返回空数组 */
+    public static JSONArray receivedList(Context ctx) {
+        if (ctx == null) return new JSONArray();
+        try {
+            SharedPreferences sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            return new JSONArray(sp.getString(PREF_RECEIVED, "[]"));
+        } catch (JSONException e) {
+            return new JSONArray();
+        }
     }
 
     /** 补搬：把 inbox 里残留的文件（收完时对话框已关、或上次没搬成功）全部搬到公共目录 */

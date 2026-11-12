@@ -11,6 +11,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -41,9 +42,13 @@ public class FileMsgServerService extends Service {
     public static final String ACTION_START = "com.tsymiar.device2device.filemsg.ACTION_START";
     public static final String ACTION_STOP = "com.tsymiar.device2device.filemsg.ACTION_STOP";
     public static final String ACTION_STATE = "com.tsymiar.device2device.filemsg.ACTION_STATE";
+    /** 接收进度刷新：file 为空表示一次传输结束，恢复常驻文案 */
+    public static final String ACTION_PROGRESS = "com.tsymiar.device2device.filemsg.ACTION_PROGRESS";
     public static final String EXTRA_PORT = "port";
     public static final String EXTRA_STATE = "state";
     public static final String EXTRA_REASON = "reason";
+    public static final String EXTRA_FILE = "file";
+    public static final String EXTRA_PCT = "pct";
     public static final String STATE_STARTED = "started";
     public static final String STATE_STOPPED = "stopped";
     public static final String STATE_FAILED = "failed";
@@ -86,9 +91,24 @@ public class FileMsgServerService extends Service {
         context.stopService(new Intent(context, FileMsgServerService.class));
     }
 
+    /** 接收进度上通知栏（SelectActivity 进度路由调用，服务没跑则忽略） */
+    public static void showProgress(Context context, String file, int pct) {
+        if (!sRunning) return;
+        Intent intent = new Intent(context, FileMsgServerService.class)
+                .setAction(ACTION_PROGRESS)
+                .putExtra(EXTRA_FILE, file)
+                .putExtra(EXTRA_PCT, pct);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+        } else {
+            context.startService(intent);
+        }
+    }
+
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private NotificationManager notificationManager;
+    private long lastProgressNotify;
 
     @Nullable
     @Override
@@ -102,6 +122,10 @@ public class FileMsgServerService extends Service {
         if (ACTION_STOP.equals(action)) {
             stopSelf();
             return START_NOT_STICKY;
+        }
+        if (ACTION_PROGRESS.equals(action)) {
+            showProgress(intent.getStringExtra(EXTRA_FILE), intent.getIntExtra(EXTRA_PCT, 0));
+            return START_STICKY;
         }
 
         int port = intent != null ? intent.getIntExtra(EXTRA_PORT, 0) : 0;
@@ -162,7 +186,11 @@ public class FileMsgServerService extends Service {
             channel.setShowBadge(false);
             notificationManager.createNotificationChannel(channel);
         }
+        startForeground(NOTIFICATION_ID, buildNotification(null, 0));
+    }
 
+    /** 常驻通知；receivingFile 非空时切接收进度样式（文件名 + 进度条） */
+    private Notification buildNotification(String receivingFile, int pct) {
         Intent open = new Intent(this, SelectActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int piFlags = PendingIntent.FLAG_UPDATE_CURRENT
@@ -180,19 +208,38 @@ public class FileMsgServerService extends Service {
             builder = new Notification.Builder(this);
         }
         builder.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("文件接收服务运行中")
-                .setContentText("对端连接 " + getEndpoint(this)
-                        + " · 保存到 " + FileMsgStore.publicDir())
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(pending)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止服务", stopPi);
+        if (receivingFile != null) {
+            builder.setContentTitle(receivingFile)
+                    .setContentText("接收中 · " + pct + "%")
+                    .setProgress(100, Math.max(0, Math.min(pct, 100)), false);
+        } else {
+            builder.setContentTitle("文件接收服务运行中")
+                    .setContentText("对端连接 " + getEndpoint(this)
+                            + " · 文件存至 " + FileMsgStore.publicDir());
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             builder.setPriority(Notification.PRIORITY_LOW);
         }
-        startForeground(NOTIFICATION_ID, builder.build());
+        return builder.build();
+    }
+
+    /** 接收进度刷新：file 为空 = 传输结束，恢复常驻文案；进度 1s 节流 */
+    private void showProgress(String file, int pct) {
+        boolean ended = file == null || file.isEmpty();
+        long now = SystemClock.elapsedRealtime();
+        if (!ended) {
+            if (now - lastProgressNotify < 1000) return;
+            lastProgressNotify = now;
+        } else {
+            lastProgressNotify = 0;
+        }
+        startForeground(NOTIFICATION_ID, buildNotification(ended ? null : file, pct));
     }
 
     /**

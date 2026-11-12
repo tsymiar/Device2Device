@@ -122,6 +122,9 @@ MIT
 - **Market:** K-line tooltip shows the selected bar's cap / float cap / PE (live snapshot scaled by close) and daily turnover from Eastmoney `f61`; auto-hides after 5 s idle.
 - **Compass:** widget dial rotates with azimuth, fixed heading marker, transparent status band; full-screen compass gained an inward index line.
 - **File transfer:** aligned protocol with `LinxSrvc` (Mac/Linux) — magic now embeds `PROTOCOL_VERSION`; `FileMsgSocket` kept in sync with `TransferEngine`.
+- **FileMsg dialog:** rebuilt as a two-page ViewPager (receive / send) with a shared status card, progress bar and log; receive page lists received files (persisted, newest first) with a shortcut to the system Downloads manager.
+- **FileMsg progress:** new `SEND_START` event (throttle-exempt) so the bar appears even on fast sends; disconnect/cancel are terminal — the bar drops on disconnect and freezes at the last refresh on cancel; routing resolves the live dialog via FragmentManager so events survive close/reopen; the status card follows the selected tab (server vs client state).
+- **FileMsg background:** while the receive server runs as a foreground service, the status-bar notification shows live receive progress (file name + percent + bar) when the dialog is closed, and restores the idle text on completion.
 - **UI:** splash/auth animation shortened (~2000 ms → ~800 ms); fixed the "源码" menu link, which pointed at a non-existent `/tree/main/Device2Device` path.
 - **Comments:** trimmed verbose inline notes across the touched modules.
 

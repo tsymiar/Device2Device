@@ -2,7 +2,6 @@
 
     <!-- ===== App ===== -->
     <string name="app_name">飞梭</string>
-    <string name="developing">开发中</string>
 
     <!-- ===== Render Mode Arrays ===== -->
     <string-array name="types">
@@ -45,15 +44,33 @@
     <!-- 默认值不是文案，不参与翻译 -->
     <string name="file_msg_default_ip" translatable="false">192.168.1.1</string>
     <string name="file_msg_default_port" translatable="false">8800</string>
-    <string name="file_msg_receiver">接收端（对端主动连接）</string>
     <string name="file_msg_start_server">Start Server</string>
-    <string name="file_msg_sender">发送端（主动连接对端）</string>
     <string name="file_msg_connect">Connect</string>
     <string name="file_msg_no_file">No file selected</string>
     <string name="file_msg_select">Select</string>
     <string name="file_msg_disconnect">Disconnect</string>
     <string name="file_msg_send">Send File</string>
+    <string name="file_msg_cancel">Cancel</string>
+    <string name="file_msg_delete_partial">Delete Partial</string>
+    <string name="file_msg_pull">Pull</string>
+    <string name="file_msg_remote_hint">Remote file name</string>
+    <string name="file_msg_pull_section">拉取（从对端取回文件）</string>
+    <string name="file_msg_received_files">已接收文件</string>
+    <string name="file_msg_open_downloads">打开下载目录</string>
+    <string name="file_msg_backoff">Exponential backoff</string>
+    <string name="file_msg_files">%1$d files selected</string>
     <string name="file_msg_log">LOG</string>
+    <string name="file_msg_log_empty">暂无事件 · Waiting for events</string>
+    <string name="file_msg_stop_server">Stop Server</string>
+    <string name="file_msg_state_idle">空闲 · 未连接</string>
+    <string name="file_msg_state_server">服务端运行中 · 等待对端连接</string>
+    <string name="file_msg_state_connected">已连接</string>
+    <string name="file_msg_state_busy">传输中…</string>
+    <string name="file_msg_tab_receive">接收端</string>
+    <string name="file_msg_tab_send">发送端</string>
+    <string name="file_msg_label_local_ip">本机 IP</string>
+    <string name="file_msg_label_listen_port">监听端口</string>
+    <string name="file_msg_receive_hint">启动后连接以上本机地址。对话框关闭后服务仍后台运行，需手动停止。</string>
     <!-- 清空：文件传输 / 局域网消息 / 状态卡片共用 -->
     <string name="action_clear">清空</string>
     <string name="section_network">🌐 Network</string>

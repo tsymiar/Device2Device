@@ -89,6 +89,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private final java.util.List<String> mKcpStatusLog = new java.util.ArrayList<>();
     /** 文件传输后台运行时打到 txt_hint 的滚动日志（对话框关着时唯一可见的出口） */
     private final java.util.List<String> mFileMsgHintLog = new java.util.ArrayList<>();
+    /** 通知栏接收进度展示的文件名（RECEIVE_START 时记录，常规进度消息不带文件名） */
+    private String mReceivingFile;
     private boolean mKcpServerStart = false;
     private boolean mKcpClientStart = false;
     private long mCurTime;
@@ -174,35 +176,46 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     setTextSafely(R.id.txt_status, msg.obj.toString());
                     break;
                 case Receiver.FILE_PROGRESS: {
-                    // 格式: "status[|落盘路径]|current|total" → 路由到文件传输对话框
-                    // 传输完成时 native 会在 status 后面追加一个真实落盘路径，
-                    // 所以 current/total 固定取最后两段，其余原样拼回 status。
+                    // 格式: "status[|落盘路径]|current|total|event"
+                    // 事件码由 native 回调携带，UI 按事件判定状态，不再解析状态字符串。
                     String data = msg.obj.toString();
-                    boolean dialogVisible = mFileMsgDialog != null && mFileMsgDialog.isShowing();
+                    FileMsgDialog.Progress progress = FileMsgDialog.Progress.parse(data);
+                    // 路由目标取 FragmentManager 里的活实例：mFileMsgDialog 在关闭重开 /
+                    // Activity 重建后会过期，isShowing() 判断错会把终态事件丢到主界面
+                    androidx.fragment.app.Fragment shown =
+                            getSupportFragmentManager().findFragmentByTag("file_trans");
+                    FileMsgDialog dialog = shown instanceof FileMsgDialog
+                            ? (FileMsgDialog) shown : mFileMsgDialog;
+                    boolean dialogVisible = dialog != null && dialog.isShowing();
+                    if (!progress.valid) {
+                        if (dialogVisible) dialog.updateStatus(data);
+                        else appendFileMsgHint(data);
+                        break;
+                    }
                     if (dialogVisible) {
-                        String[] parts = data.split("\\|");
-                        if (parts.length >= 3) {
-                            try {
-                                long total = Long.parseLong(parts[parts.length - 1]);
-                                long current = Long.parseLong(parts[parts.length - 2]);
-                                StringBuilder status = new StringBuilder();
-                                for (int i = 0; i < parts.length - 2; i++) {
-                                    if (i > 0) status.append('|');
-                                    status.append(parts[i]);
-                                }
-                                mFileMsgDialog.updateProgress(current, total, status.toString());
-                            } catch (NumberFormatException ignored) {
-                                mFileMsgDialog.updateStatus(data);
-                            }
-                        } else {
-                            mFileMsgDialog.updateStatus(data);
-                        }
+                        dialog.updateProgress(progress.current, progress.total,
+                                progress.status, progress.event);
                     } else {
                         // 对话框没开（服务端在后台跑）：把状态打到状态卡片的 txt_hint，
                         // 用户不打开对话框也能看到收发进度；文件照样要搬。
-                        showFileMsgHint(data);
+                        appendFileMsgHint(progress.hintLine());
+                        // 服务在跑时接收进度同时上通知栏；文件名只在 RECEIVE_START 里带，需先记住
+                        if (FileMsgServerService.isRunning()) {
+                            if (progress.event == FileMsgDialog.Progress.EVT_RECEIVE_START) {
+                                mReceivingFile = receivingName(progress.status);
+                            }
+                            boolean ended = progress.event == FileMsgDialog.Progress.EVT_TRANSFER_COMPLETE
+                                    || progress.event == FileMsgDialog.Progress.EVT_TRANSFER_CANCELLED
+                                    || progress.event == FileMsgDialog.Progress.EVT_DISCONNECTED;
+                            int pct = progress.total > 0
+                                    ? (int) (progress.current * 100 / progress.total) : 0;
+                            FileMsgServerService.showProgress(SelectActivity.this,
+                                    ended ? "" : (mReceivingFile != null ? mReceivingFile : ""),
+                                    ended ? 0 : pct);
+                            if (ended) mReceivingFile = null;
+                        }
                     }
-                    publishReceived(data);
+                    publishReceived(progress);
                     break;
                 }
                 case Receiver.TOAST:
@@ -1094,21 +1107,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
      * 与对话框是否在场无关 —— 服务端现在跑在前台服务里，对话框关着照样收文件，
      * 不搬时文件会一直躺在应用私有目录（用户看不到）。
      */
-    private void publishReceived(String data) {
-        // data 形如 "status[|落盘路径]|current|total"：末两段固定是 current/total，
-        // 前面重组回 status —— 只有完成消息的 status 里还会带一个 '|'，后面才是路径。
-        if (data == null) return;
-        String[] parts = data.split("\\|");
-        if (parts.length < 3) return;
-        StringBuilder status = new StringBuilder();
-        for (int i = 0; i < parts.length - 2; i++) {
-            if (i > 0) status.append('|');
-            status.append(parts[i]);
-        }
-        int bar = status.indexOf("|");
-        if (bar < 0) return;
-        String path = status.substring(bar + 1);
-        if (path.isEmpty()) return;
+    private void publishReceived(FileMsgDialog.Progress progress) {
+        if (progress == null || !progress.valid) return;
+        // 只有"传输完成"事件才带真实落盘路径；发送完成 / 取消 / 连接事件都不用搬。
+        if (progress.event != FileMsgDialog.Progress.EVT_TRANSFER_COMPLETE) return;
+        String path = progress.savedPath();
+        if (path == null || path.isEmpty()) return;
         FileMsgStore.publishAsync(this, path, (ok, dest) -> {
             if (!ok) return; // 失败则留在应用私有目录，不打扰
             // 对话框开着时由对话框自己打 "Saved:"，避免重复；关着才打到 txt_hint
@@ -1118,43 +1122,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         });
     }
 
-    /**
-     * 把一条文件传输事件转成可读文字（去掉 native 暂存路径那段）打到 txt_hint。
-     * data 形如 "status[|落盘路径]|current|total"：末两段是进度，前面是消息。
-     */
-    private void showFileMsgHint(String data) {
-        if (data == null) return;
-        String[] parts = data.split("\\|");
-        String line;
-        if (parts.length >= 3) {
-            try {
-                long total = Long.parseLong(parts[parts.length - 1]);
-                long current = Long.parseLong(parts[parts.length - 2]);
-                StringBuilder status = new StringBuilder();
-                for (int i = 0; i < parts.length - 2; i++) {
-                    if (i > 0) status.append('|');
-                    status.append(parts[i]);
-                }
-                String readable = stripPath(status.toString());
-                if (total > 0) {
-                    line = String.format(java.util.Locale.US, "%s  %d%% (%d/%d)",
-                            readable, (int) (current * 100 / total), current, total);
-                } else {
-                    line = readable;
-                }
-            } catch (NumberFormatException e) {
-                line = stripPath(data);
-            }
-        } else {
-            line = stripPath(data);
-        }
-        appendFileMsgHint(line);
-    }
-
-    /** 去掉 "msg|path" 里最后那段 native 暂存路径，只留给人看的状态 */
-    private static String stripPath(String s) {
-        int bar = s.indexOf('|');
-        return bar >= 0 ? s.substring(0, bar) : s;
+    /** 进度状态里的文件名："…[ip:port] Receiving: xxx.mp4" → xxx.mp4（通知栏展示用） */
+    private static String receivingName(String status) {
+        if (status == null) return "";
+        int idx = status.indexOf("Receiving: ");
+        return idx >= 0 ? status.substring(idx + "Receiving: ".length()) : "";
     }
 
     /** 文件传输日志滚动展示在状态卡片的 txt_hint（保留最近 6 条）。可能来自工作线程，统一切回主线程 */

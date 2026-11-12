@@ -1,15 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  File Message 对话框：左右滑两页（接收端 / 发送端），不再把两种角色堆在一屏。
+  · 标题 / 页签 / 状态进度 / 日志是共用区，只写一份，放在 ViewPager 外；
+  · 两页各自的专属控件在 page_file_msg_receive.xml / page_file_msg_send.xml，
+    地址输入行两页都 <include> 同一个 layout_file_msg_endpoint.xml；
+  · 每页自己是 NestedScrollView，外层不滚动，因此没有嵌套滚动抢触摸的问题；
+  · 高度自适应：根布局 wrap_content + WrapContentViewPager 按页面内容测高，
+    窗口用 WRAP_CONTENT，只有超过 88% 屏高时才兜底夹紧。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_lan_card"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="16dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="16dp">
 
+    <!-- ===== 标题栏（共用） ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -18,189 +32,102 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/file_msg_title"
-            android:textSize="20sp"
+            android:textColor="@color/ui_text"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/btn_file_trans_close"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:contentDescription="@string/close"
             android:focusable="true"
-            android:padding="4dp"
+            android:padding="12dp"
             android:src="@drawable/ic_close_small" />
     </LinearLayout>
 
-    <!-- 监听地址：服务端起来后填监听 IP:Port 并置灰不可编辑 -->
+    <!-- ===== 页签（点选或左右滑 ViewPager 都会切换） ===== -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_file_trans"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:background="@android:color/transparent"
+        app:tabGravity="fill"
+        app:tabIndicatorColor="@color/ui_accent"
+        app:tabIndicatorHeight="2dp"
+        app:tabMode="fixed"
+        app:tabSelectedTextColor="@color/ui_accent"
+        app:tabTextColor="@color/ui_text_dim" />
+
+    <!-- ===== 状态卡片（共用）：状态行 + 速度 + 进度 ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:orientation="horizontal">
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:hint="@string/file_msg_ip_hint">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_file_trans_ip"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textUri"
-                android:text="@string/file_msg_default_ip"
-                android:textColor="@color/ui_text_dim" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:hint="@string/file_msg_port_hint">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_file_trans_port"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:text="@string/file_msg_default_port"
-                android:textColor="@color/ui_text_dim" />
-        </com.google.android.material.textfield.TextInputLayout>
-    </LinearLayout>
-
-    <!-- ============ 接收端 / Server ============ -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:text="@string/file_msg_receiver"
-        android:textColor="@color/ui_accent"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-
-    <!-- 必须用 MaterialButton：普通 Button 在 MaterialComponents 主题下会被自动换成 MaterialButton，
-         它自己管背景，写 android:background 会被忽略，底色只能走 app:backgroundTint -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_file_trans_server"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="4dp"
-        android:text="@string/file_msg_start_server"
-        android:textColor="@color/sel_file_btn_text"
-        app:backgroundTint="@color/sel_file_btn_bg" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp"
-        android:background="@color/ui_divider" />
-
-    <!-- ============ 发送端 / Client ============ -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
-        android:text="@string/file_msg_sender"
-        android:textColor="@color/colorAccent"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_file_trans_connect"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="@string/file_msg_connect"
-        android:textColor="@color/sel_file_btn_text"
-        app:backgroundTint="@color/sel_file_btn_bg" />
-
-    <!-- 连接成功后才展开：文件选择 + 发送/断开，全部归到发送端一组 -->
-    <LinearLayout
-        android:id="@+id/client_panel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_lan_panel"
         android:orientation="vertical"
-        android:visibility="gone">
+        android:padding="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <View
+                android:id="@+id/v_file_trans_dot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_lan_dot" />
+
             <TextView
-                android:id="@+id/tv_file_trans_path"
+                android:id="@+id/tv_file_trans_state"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="@color/ui_card_alt"
-                android:ellipsize="middle"
-                android:hint="@string/file_msg_no_file"
+                android:ellipsize="end"
                 android:maxLines="1"
-                android:padding="12dp"
-                android:textColor="@color/ui_text_dim" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_file_trans_select"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/file_msg_select"
-                android:textColor="@color/sel_file_btn_text"
-                app:backgroundTint="@color/sel_file_btn_bg" />
+                android:text="@string/file_msg_state_idle"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/tv_file_trans_speed"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_marginTop="6dp"
+            android:textColor="@color/status_text"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_file_trans_disconnect"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="@string/file_msg_disconnect"
-                android:textColor="@color/sel_file_btn_text"
-                app:backgroundTint="@color/sel_file_btn_bg" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_file_trans_send"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:enabled="false"
-                android:text="@string/file_msg_send"
-                android:textColor="@color/sel_file_btn_text"
-                app:backgroundTint="@color/sel_file_btn_bg" />
-        </LinearLayout>
+        <ProgressBar
+            android:id="@+id/pb_file_trans"
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progressTint="@color/ui_accent"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <View
+    <!-- ===== 两页内容：接收端 / 发送端，左右滑切换 ===== -->
+    <com.tsymiar.device2device.view.WrapContentViewPager
+        android:id="@+id/vp_file_trans"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp"
-        android:background="@color/ui_divider" />
+        android:layout_height="wrap_content"
+        android:overScrollMode="never" />
 
-    <!-- ============ 日志 ============ -->
+    <!-- ===== 日志（共用） ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="2dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -209,7 +136,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/file_msg_log"
-            android:textColor="@color/ui_text_dim"
+            android:textColor="@color/ui_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -219,41 +146,48 @@
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
+            android:enabled="false"
             android:focusable="true"
-            android:paddingStart="8dp"
-            android:paddingEnd="4dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="4dp"
             android:text="@string/action_clear"
-            android:textColor="@color/status_text"
+            android:textColor="@color/sel_lan_link_text"
             android:textSize="12sp" />
     </LinearLayout>
 
     <ScrollView
         android:id="@+id/sv_file_trans_log"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:layout_marginBottom="8dp"
-        android:background="@color/ui_card_alt"
+        android:layout_height="110dp"
+        android:background="@drawable/bg_lan_panel"
         android:fillViewport="false"
-        android:padding="8dp">
+        android:padding="8dp"
+        android:scrollbars="vertical">
 
-        <TextView
-            android:id="@+id/tv_file_trans_log"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/ui_text_dim"
-            android:textSize="11sp"
-            android:typeface="monospace" />
-    </ScrollView>
+            android:orientation="vertical">
 
-    <ProgressBar
-        android:id="@+id/pb_file_trans"
-        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="8dp"
-        android:layout_marginBottom="8dp"
-        android:max="100"
-        android:visibility="gone" />
+            <TextView
+                android:id="@+id/tv_file_trans_log_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/file_msg_log_empty"
+                android:textColor="@color/ui_text_hint"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_file_trans_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="11sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+    </ScrollView>
 
 </LinearLayout>

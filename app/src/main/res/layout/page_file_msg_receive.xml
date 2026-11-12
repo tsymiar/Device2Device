@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ViewPager 第 0 页：只放接收端专属控件。标题 / 状态进度 / 日志在 dialog_file_msg.xml 共用一份。 -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="false"
+    android:overScrollMode="never">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <include
+            android:id="@+id/endpoint_receive"
+            layout="@layout/layout_file_msg_endpoint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_file_trans_server"
+            style="@style/FileMsgButtonFilled"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/file_msg_start_server" />
+
+        <!-- 与 Mac/Transfer 的设置项一致：ENOTCONN 是否走指数退避 -->
+        <CheckBox
+            android:id="@+id/cb_file_trans_backoff"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:buttonTint="@color/ui_accent"
+            android:text="@string/file_msg_backoff"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/file_msg_receive_hint"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="11sp" />
+
+        <!-- 已接收文件列表：无记录时隐藏，点条目 / 链接跳系统下载管理器 -->
+        <LinearLayout
+            android:id="@+id/received_files_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/FileMsgSectionTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/file_msg_received_files" />
+
+            <TextView
+                android:id="@+id/btn_file_trans_open_downloads"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="4dp"
+                android:text="@string/file_msg_open_downloads"
+                android:textColor="@color/sel_lan_link_text"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/received_files_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

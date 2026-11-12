@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 接收端 / 发送端共用的「IP + 端口」地址行。
+     两页各 <include> 一次，标签文案由 FileMsgDialog 按角色设置；
+     include 上指定不同 android:id，Java 用父 View 限定 findViewById 避免 id 冲突。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/ep_ip_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="@string/file_msg_ip_hint"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/ep_port_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="@string/file_msg_port_hint"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/ep_ip"
+            style="@style/FileMsgField"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="2"
+            android:inputType="textUri" />
+
+        <EditText
+            android:id="@+id/ep_port"
+            style="@style/FileMsgField"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:inputType="number" />
+    </LinearLayout>
+</LinearLayout>

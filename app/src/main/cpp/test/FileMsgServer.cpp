@@ -186,7 +186,7 @@ void FileMsgServer::runServerTest(unsigned short port)
     server.setSavePath("./received");
     MKDIR("./received");
 
-    server.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status) {
+    server.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status, uint8_t) {
         noteReceivedPath(status);
         if (status.find("Transfer complete!") != std::string::npos) {
             g_transferComplete.store(true);
@@ -244,7 +244,7 @@ int FileMsgServer::runClientTest(const std::string& ip, unsigned short port,
     }
 
     FileMsgSocket client;
-    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status) {
+    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status, uint8_t) {
         if (total > 0) {
             printf("[Client] %.1f%% (%llu/%llu) %s\n",
                 (double)current / total * 100,
@@ -286,7 +286,7 @@ bool FileMsgServer::runIntegrationTest(unsigned short port, const std::string& f
 
     FileMsgSocket server;
     server.setSavePath("./received");
-    server.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status) {
+    server.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status, uint8_t) {
         noteReceivedPath(status);
         if (status.find("Transfer complete!") != std::string::npos) {
             g_transferComplete.store(true);
@@ -312,7 +312,7 @@ bool FileMsgServer::runIntegrationTest(unsigned short port, const std::string& f
     g_serverReady.store(true);
 
     FileMsgSocket client;
-    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status) {
+    client.setProgressCallback([](uint64_t current, uint64_t total, const std::string& status, uint8_t) {
         if (total > 0) {
             printf("[Client] %.1f%% (%llu/%llu) %s\n",
                 (double)current / total * 100,

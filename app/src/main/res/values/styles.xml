@@ -23,4 +23,67 @@
         <item name="android:windowIsFloating">true</item>
     </style>
 
+    <!-- ===== File Message 对话框 =====
+         把重复的按钮 / 输入框视觉收到样式里，布局只留 id、文案和权重。
+         配色一律走 ui_* 语义色或带 enabled 态的 selector，日夜间自动切换。 -->
+
+    <style name="FileMsgSectionTitle">
+        <item name="android:textColor">@color/ui_accent</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FileMsgField">
+        <item name="android:background">@drawable/bg_lan_field</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">@color/ui_text</item>
+        <item name="android:textColorHint">@color/ui_text_hint</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!-- 主操作：Start Server / Connect / Send，实心底 + 40dp 胶囊 -->
+    <style name="FileMsgButtonFilled" parent="Widget.MaterialComponents.Button">
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/sel_file_btn_text</item>
+        <item name="android:textSize">12sp</item>
+        <item name="backgroundTint">@color/sel_file_btn_bg</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="rippleColor">@color/ui_ripple</item>
+    </style>
+
+    <!-- 次操作：Select / Disconnect / Pull，描边，禁用时边框收掉 -->
+    <style name="FileMsgButtonOutline" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">@color/sel_lan_link_text</item>
+        <item name="android:textSize">12sp</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="rippleColor">@color/ui_ripple</item>
+        <item name="strokeColor">@color/lan_btn_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- 破坏性操作：Cancel / Delete Partial，红色描边；禁用态退回灰色 -->
+    <style name="FileMsgButtonDanger" parent="FileMsgButtonOutline">
+        <item name="android:textColor">@color/sel_file_danger</item>
+        <item name="strokeColor">@color/sel_file_danger</item>
+    </style>
+
 </resources>

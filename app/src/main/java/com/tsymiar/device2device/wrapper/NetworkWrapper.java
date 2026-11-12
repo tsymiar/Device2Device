@@ -33,8 +33,17 @@ public class NetworkWrapper {
     // 发送文件
     public static native int postLocalFile(String filePath);
 
-    // 请求文件
+    /** 拉取对端文件（自带连接流程，不必先 Connect）；-5 表示对端没有该文件 */
     public static native int requestFile(String ip, int port, String fileName);
+
+    /** 请求取消当前发送/拉取，在下一个分片边界生效 */
+    public static native void cancelFileTransfer();
+
+    /** 请对端删除上次取消残留的半截文件（按原始文件名匹配） */
+    public static native int deletePartialFile(String fileName);
+
+    /** ENOTCONN 是否走指数退避（默认关闭） */
+    public static native void setFileBackoffEnabled(boolean enabled);
 
     public static native void setFileSavePath(String path);
 
@@ -43,6 +52,10 @@ public class NetworkWrapper {
 
     // 查询状态
     public static native boolean isFileMsgConnected();
+
+    public static native boolean isFileMsgServerRunning();
+
+    public static native int getFileMsgClientCount();
 
     // 局域网文本消息：收发走 KCP over UDP（一个绑本端口的 socket，按对端地址取 ikcp 会话直接发，
     // 大消息自动分片），设备发现走 UDP 广播，
