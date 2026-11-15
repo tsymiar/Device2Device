@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 联想候选的紧凑行：小字号、窄行距，避免默认候选框过大 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:maxLines="1"
+    android:ellipsize="end"
+    android:includeFontPadding="false"
+    android:textSize="12sp"
+    android:textColor="@color/ssh_output_text"
+    android:typeface="monospace" />

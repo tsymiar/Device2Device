@@ -130,4 +130,12 @@
     <color name="ui_bubble_self">#FFD81B60</color>
     <color name="ui_on_bubble_self">#FFFFFFFF</color>
     <color name="ui_on_bubble_self_dim">#CCFFFFFF</color>
+
+    <!-- ===== SSH 终端台配色：统一「墨青」终端色系（日间）===== -->
+    <color name="ssh_panel_bg">#FFFFFFFF</color>
+    <color name="ssh_output_bg">#FFEFF5F2</color>
+    <color name="ssh_output_text">#FF0F3E36</color>
+    <!-- 控制键：墨青浅底 pill；主操作（发送 / 连接）另用 ui_accent 实心 -->
+    <color name="ssh_key_bg">#FFDFF1EC</color>
+    <color name="ssh_key_text">#FF00695C</color>
 </resources>

@@ -26,7 +26,7 @@ import java.security.SecureRandom;
 /**
  * SSH 服务前台服务（形态对齐 HttpServerService）。
  *
- * 只开放命令执行和交互 shell，登录用「用户名 + 密码」：密码首次启动随机生成并落到
+ * 只开放命令执行和交互 shell，登录用「用户 + 密码」：密码首次启动随机生成并落到
  * SharedPreferences，页面 / 通知只展示连接串，避免通知栏里明文挂着密码。
  * 端口 2222 被占用时依次往后试 10 个，实际端口在状态里回传。
  */

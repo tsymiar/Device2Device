@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -84,6 +84,28 @@
     <style name="FileMsgButtonDanger" parent="FileMsgButtonOutline">
         <item name="android:textColor">@color/sel_file_danger</item>
         <item name="strokeColor">@color/sel_file_danger</item>
+    </style>
+
+    <!-- SSH 客户端控制键按钮：紧凑、圆角、info 配色 -->
+    <style name="CtrlKey" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/ssh_key_text</item>
+        <item name="backgroundTint">@color/ssh_key_bg</item>
+        <item name="cornerRadius">17dp</item>
+        <item name="rippleColor">@color/ui_ripple</item>
+    </style>
+
+    <!-- SSH 主操作键（发送）：实心墨青，突出层级 -->
+    <style name="CtrlKeyAccent" parent="CtrlKey">
+        <item name="android:textColor">@color/ui_on_fill</item>
+        <item name="backgroundTint">@color/ui_accent</item>
     </style>
 
 </resources>

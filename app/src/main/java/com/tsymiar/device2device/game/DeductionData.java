@@ -26,6 +26,7 @@ public final class DeductionData {
         public float basePitch = 1.0f;    // 基础音高（1.0 = 原始）
         public boolean locked = false;    // 是否已锁存（防止负片记忆覆盖）
         public int suspicionWeight = 0;   // 被推演为"有罪"的累计次数（回声强化）
+        public SpiritKind spiritKind = SpiritKind.PrimeEcho; // 关联的声灵（离奇魔幻基因）
 
         public int color() {
             switch (kind) {
@@ -44,6 +45,17 @@ public final class DeductionData {
             }
             return "";
         }
+    }
+
+    // ── 声灵类型（离奇魔幻基因）──
+    public enum SpiritKind {
+        PrimeEcho,    // 原初嗡鸣（源头）
+        Mirror,       // 镜声灵（反射）
+        Silence,      // 默声灵（消除）
+        Lie,          // 谎声灵（伪造）
+        Shattered,    // 碎璃声灵（背叛）
+        Wrath,        // 愤怒声灵
+        Count
     }
 
     // ── 三要素之二：干预动作 ──
@@ -157,5 +169,90 @@ public final class DeductionData {
         public String verdict = "";        // 对陈远山的最终判断
         public int totalDeductions = 0;
         public String summary = "";        // 心理侧写报告文本
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  离奇魔幻基因：声灵系统（与 Qt 端 DeductionData.h 同源，台词逐字一致）
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── 声灵结构（有自我意识、立场、好感度）──
+    public static class SpiritInfo {
+        public SpiritKind kind = SpiritKind.PrimeEcho;
+        public String name = "";            // 声灵名
+        public String title = "";           // 称号
+        public String stance = "";          // 立场/欲望
+        public float affinity = 0.0f;       // 好感度 0.0-1.0（越召唤越高）
+        public boolean manifested = false;  // 是否已显形（光晕）
+
+        public int color() {
+            switch (kind) {
+                case PrimeEcho:  return 0xFFFFDC78; // 金色
+                case Mirror:     return 0xFF96C8FF; // 淡蓝
+                case Silence:    return 0xFFC8B4FF; // 淡紫
+                case Lie:        return 0xFFFF8CB4; // 粉红
+                case Shattered:  return 0xFF78E6B4; // 青绿
+                case Wrath:      return 0xFFFF5A5A; // 血红
+            }
+            return 0xFFFFFFFF;
+        }
+    }
+
+    // 声灵库默认数据，由推演盘和回响引擎共用，避免两处各存一份副本
+    public static List<SpiritInfo> defaultSpirits() {
+        Object[][] defs = {
+                { SpiritKind.PrimeEcho, "原初嗡鸣", "万声之母", "它是起源，也是审判者。" },
+                { SpiritKind.Mirror,    "镜声灵",   "反射之灵", "它渴求真相，哪怕真相刺穿你。" },
+                { SpiritKind.Silence,   "默声灵",   "消除之灵", "它渴望寂静，代价是你的记忆。" },
+                { SpiritKind.Lie,       "谎声灵",   "伪造之灵", "它以谎言为食，也会用谎言喂养你。" },
+                { SpiritKind.Shattered, "碎璃声灵", "背叛之灵", "它附身于背叛者的脚步声。" },
+                { SpiritKind.Wrath,     "愤怒声灵", "暴怒之灵", "它煽动你的怒火，再从中取暖。" },
+        };
+        List<SpiritInfo> list = new ArrayList<>();
+        for (Object[] d : defs) {
+            SpiritInfo s = new SpiritInfo();
+            s.kind = (SpiritKind) d[0];
+            s.name = (String) d[1];
+            s.title = (String) d[2];
+            s.stance = (String) d[3];
+            list.add(s);
+        }
+        return list;
+    }
+
+    // ── 灵魂碎片（割舍声音后收集，拼成林薇母亲的脸）──
+    public static class SoulFragment {
+        public int id = -1;
+        public String name = "";        // 碎片名
+        public String source = "";      // 来源（割舍的声音/释放的声灵）
+        public boolean collected = false;
+        public boolean glowing = false; // 泛光状态
+    }
+
+    // 六块碎片拼成林薇母亲的脸，id 从 0 连续编号，收集逻辑按下标索引
+    public static void resetSoulFragments(List<SoulFragment> fragments) {
+        fragments.clear();
+        String[] names = { "眉骨", "左眼", "右眼", "鼻梁", "唇角", "下颌" };
+        for (int i = 0; i < names.length; ++i) {
+            SoulFragment f = new SoulFragment();
+            f.id = i;
+            f.name = names[i];
+            f.source = "割舍的声音";
+            fragments.add(f);
+        }
+    }
+
+    // ── 契约（与声灵缔结）──
+    public enum ContractSpirit {
+        None,
+        Mirror,   // 镜声灵契约：说出最恐惧的真话
+        Silence,  // 默声灵契约：删除最喜欢的记忆
+        Lie       // 谎声灵契约：撒一个会被识破的谎
+    }
+
+    // ── 偏差能量（原初嗡鸣倒计时）──
+    public static class DeviationEnergy {
+        public float amount = 0.0f;        // 偏差能量 0.0-1.0
+        public boolean overloaded = false; // 是否触发嗡鸣
+        public int releaseCount = 0;       // 释放声灵次数（触发逆向推演）
     }
 }

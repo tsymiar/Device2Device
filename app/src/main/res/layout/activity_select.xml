@@ -408,52 +408,6 @@
                         </LinearLayout>
                 </LinearLayout>
 
-                <!-- SSH 服务：已合入 Network 区域 -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_ssh_server"
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/ssh_server"
-                    android:textColor="@color/ui_on_fill"
-                    app:backgroundTint="@color/ui_accent"
-                    app:cornerRadius="20dp" />
-
-                <LinearLayout
-                    android:id="@+id/ssh_actions"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_ssh_copy"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:enabled="false"
-                        android:text="@string/ssh_server_copy"
-                        android:textColor="@color/ui_accent"
-                        app:cornerRadius="20dp"
-                        app:strokeColor="@color/ui_accent" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_ssh_stop"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:enabled="false"
-                        android:text="@string/ssh_server_stop"
-                        android:textColor="@color/ui_danger"
-                        app:cornerRadius="20dp"
-                        app:strokeColor="@color/ui_danger" />
-                </LinearLayout>
-
             </LinearLayout>
 
             <!-- 分割线 -->
@@ -628,6 +582,121 @@
                 app:cornerRadius="20dp"
                 app:strokeColor="@color/ui_accent"
                 app:strokeWidth="1dp" />
+
+            <!-- 分割线 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="12dp"
+                android:background="@color/ui_divider" />
+
+            <!-- ================ SSH 区域（可折叠，默认折叠） ================ -->
+            <LinearLayout
+                android:id="@+id/ssh_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground"
+                android:paddingVertical="8dp"
+                android:paddingHorizontal="4dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="18dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@color/ui_accent" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/section_ssh"
+                    android:textColor="@color/ui_accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/ssh_arrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="▼"
+                    android:textColor="@color/ui_accent"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 默认折叠，点标题栏展开 -->
+            <LinearLayout
+                android:id="@+id/ssh_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:orientation="vertical"
+                android:layout_marginBottom="8dp">
+
+                <!-- 启动 / 停止 SSH 服务（服务端） -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_ssh_server"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/ssh_server"
+                    android:textColor="@color/ui_on_fill"
+                    app:backgroundTint="@color/ui_accent"
+                    app:cornerRadius="20dp" />
+
+                <!-- 复制连接信息 / 停止 SSH：默认隐藏，服务跑起来后才出现 -->
+                <LinearLayout
+                    android:id="@+id/ssh_actions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ssh_copy"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:text="@string/ssh_server_copy"
+                        android:textColor="@color/ui_accent"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="@color/ui_accent" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ssh_stop"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:text="@string/ssh_server_stop"
+                        android:textColor="@color/ui_danger"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="@color/ui_danger" />
+                </LinearLayout>
+
+                <!-- SSH 客户端：连接任意 SSH 服务器（含本应用 SSH 服务端），位于复制/停止下方 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_ssh_client"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/ssh_client"
+                    android:textColor="@color/ui_accent"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="@color/ui_accent" />
+            </LinearLayout>
 
             <!-- 行情 K线（归入 Services 组） -->
             <com.google.android.material.button.MaterialButton

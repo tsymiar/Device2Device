@@ -502,8 +502,18 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_ssh_stop).setOnClickListener(v ->
                 SshServerService.stop(SelectActivity.this));
         findViewById(R.id.btn_ssh_copy).setOnClickListener(v -> copySshConnectionInfo());
+        // SSH 客户端：独立页面，连接任意 SSH 服务器（含本应用 SSH 服务端）
+        findViewById(R.id.btn_ssh_client).setOnClickListener(v ->
+                startActivity(new Intent(SelectActivity.this, SshClientActivity.class)));
 
-        // SSH 控制已合入 Network 区域（见 activity_select.xml 的 network_content），不再单独折叠
+        // SSH 区域折叠/展开：默认收起，点标题栏摊开；服务运行中由 showSshState() 强制展开
+        final LinearLayout sshContent = findViewById(R.id.ssh_content);
+        final TextView sshArrow = findViewById(R.id.ssh_arrow);
+        mSshContent = sshContent;
+        mSshArrow = sshArrow;
+        findViewById(R.id.ssh_header).setOnClickListener(v ->
+                setSectionExpanded(sshContent.getVisibility() != View.VISIBLE,
+                        sshContent, sshArrow));
 
         // 网络服务区域折叠/展开
         final LinearLayout networkContent = findViewById(R.id.network_content);

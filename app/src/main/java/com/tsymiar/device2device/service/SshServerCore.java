@@ -3,6 +3,7 @@ package com.tsymiar.device2device.service;
 import android.content.Context;
 import android.util.Log;
 
+import org.apache.sshd.common.AttributeRepository;
 import org.apache.sshd.common.util.security.SecurityUtils;
 import org.apache.sshd.server.SshServer;
 import org.apache.sshd.server.channel.ChannelSession;
@@ -25,6 +26,9 @@ import java.io.IOException;
  */
 final class SshServerCore {
     private static final String TAG = "SshServerCore";
+    /** 登录用户名写入会话属性，shell 启动时取出来构造对应用户的家目录与环境 */
+    private static final AttributeRepository.AttributeKey<String> ATTR_SSH_USER =
+            new AttributeRepository.AttributeKey<String>() {};
 
     private static volatile boolean sAndroidHooksInstalled;
 
@@ -79,19 +83,25 @@ final class SshServerCore {
         File keyFile = new File(appContext.getFilesDir(), "ssh_host_rsa_key");
         sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(keyFile.toPath()));
 
-        sshd.setPasswordAuthenticator((username, pwd, session) ->
-                user.equals(username) && password.equals(pwd));
+        sshd.setPasswordAuthenticator((username, pwd, session) -> {
+            boolean ok = user.equals(username) && password.equals(pwd);
+            // 登录成功才记用户名；shell 启动据此给出「对应账户」的家目录与 USER/HOME 环境
+            if (ok) {
+                session.setAttribute(ATTR_SSH_USER, username);
+            }
+            return ok;
+        });
 
         sshd.setShellFactory(new ShellFactory() {
             @Override
             public Command createShell(ChannelSession channel) {
-                return new SshShellCommand(appContext, rootDir, null);
+                return new SshShellCommand(appContext, rootDir, sessionUser(channel), null);
             }
         });
         sshd.setCommandFactory(new CommandFactory() {
             @Override
             public Command createCommand(ChannelSession channel, String command) {
-                return new SshShellCommand(appContext, rootDir, command);
+                return new SshShellCommand(appContext, rootDir, sessionUser(channel), command);
             }
         });
 
@@ -129,5 +139,11 @@ final class SshServerCore {
 
     synchronized boolean isRunning() {
         return server != null;
+    }
+
+    /** 从会话属性取登录用户名；取不到时退回服务配置的用户（理论不会发生） */
+    private static String sessionUser(ChannelSession channel) {
+        Object u = channel.getSession().getAttribute(ATTR_SSH_USER);
+        return u instanceof String ? (String) u : null;
     }
 }

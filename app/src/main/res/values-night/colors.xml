@@ -112,4 +112,11 @@
     <color name="colorPrimary">#FF4DB6AC</color>
     <color name="colorPrimaryDark">#FF004D40</color>
     <color name="colorAccent">#FFF48FB1</color>
+
+    <!-- ===== SSH 终端台配色（夜间）：墨青终端 ===== -->
+    <color name="ssh_panel_bg">#FF161D24</color>
+    <color name="ssh_output_bg">#FF0B1219</color>
+    <color name="ssh_output_text">#FFB8E4D8</color>
+    <color name="ssh_key_bg">#FF14302B</color>
+    <color name="ssh_key_text">#FF9FE3D8</color>
 </resources>

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:background="@color/ui_bg">
+
+    <!-- 连接配置（可折叠，紧凑） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/ssh_panel_bg"
+        android:padding="6dp"
+        android:layout_marginBottom="6dp">
+
+        <!-- 折叠把手：点此折叠/展开连接表单 -->
+        <LinearLayout
+            android:id="@+id/conn_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground"
+            android:paddingVertical="2dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔗 连接配置"
+                android:textColor="@color/ui_accent"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/conn_toggle_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▾"
+                android:textColor="@color/ui_accent"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 连接表单（可折叠隐藏） -->
+        <LinearLayout
+            android:id="@+id/conn_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <EditText
+                    android:id="@+id/et_host"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="3"
+                    android:minHeight="0dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:hint="@string/ssh_client_host"
+                    android:inputType="textUri"
+                    android:textSize="12sp" />
+                <EditText
+                    android:id="@+id/et_port"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:hint="@string/ssh_client_port"
+                    android:inputType="number"
+                    android:text="22"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+                <EditText
+                    android:id="@+id/et_user"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="0dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:hint="@string/ssh_client_user"
+                    android:textSize="12sp" />
+                <EditText
+                    android:id="@+id/et_pass"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:minHeight="0dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:hint="@string/ssh_client_password"
+                    android:inputType="textPassword"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_connect"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="@string/ssh_connect"
+                android:textSize="12sp"
+                android:textColor="@color/ui_on_fill"
+                app:backgroundTint="@color/ui_accent"
+                app:cornerRadius="17dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 输出区 -->
+    <ScrollView
+        android:id="@+id/sv_output"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/ssh_output_bg"
+        android:padding="10dp"
+        android:layout_marginBottom="6dp">
+        <TextView
+            android:id="@+id/tv_output"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/ssh_output_text"
+            android:textSize="12sp"
+            android:typeface="monospace" />
+    </ScrollView>
+
+    <!-- 命令输入区（始终显示）：控制键在上，输入框+发送在下 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/ssh_panel_bg"
+        android:padding="6dp"
+        android:layout_marginBottom="6dp">
+
+        <!-- 控制键行 -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/key_ctrlc"
+                    style="@style/CtrlKey"
+                    android:text="Ctrl-C" />
+                <Button
+                    android:id="@+id/key_up"
+                    style="@style/CtrlKey"
+                    android:text="↑" />
+                <Button
+                    android:id="@+id/key_down"
+                    style="@style/CtrlKey"
+                    android:text="↓" />
+                <Button
+                    android:id="@+id/key_font_minus"
+                    style="@style/CtrlKey"
+                    android:text="A-" />
+                <Button
+                    android:id="@+id/key_font_plus"
+                    style="@style/CtrlKey"
+                    android:text="A+" />
+                <Button
+                    android:id="@+id/key_clear"
+                    style="@style/CtrlKey"
+                    android:text="清理" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- 输入行：输入框 + 右侧发送键 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical">
+            <AutoCompleteTextView
+                android:id="@+id/et_cmd"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/ssh_client_command"
+                android:textSize="13sp"
+                android:enabled="false"
+                android:imeOptions="actionSend"
+                android:inputType="text"
+                android:completionThreshold="1"
+                android:dropDownHeight="96dp" />
+            <Button
+                android:id="@+id/key_enter"
+                style="@style/CtrlKeyAccent"
+                android:layout_marginStart="6dp"
+                android:text="发送 ↵" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
