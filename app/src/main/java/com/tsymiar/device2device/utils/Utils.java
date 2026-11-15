@@ -16,15 +16,22 @@
 
 package com.tsymiar.device2device.utils;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
+import android.text.TextUtils;
 import android.text.format.Formatter;
 
 import androidx.annotation.StringRes;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -294,5 +301,36 @@ public class Utils {
         } catch (Exception ignored) {}
 
         return "127.0.0.1";
+    }
+
+    /** 把分享进来的 content URI 复制到应用缓存，返回本地路径（失败返回 null） */
+    public static String copyUriToCache(Context context, Uri uri) {
+        if (context == null || uri == null) return null;
+        try {
+            ContentResolver resolver = context.getContentResolver();
+            String name = null;
+            try (Cursor cursor = resolver.query(uri, new String[]{"_display_name"},
+                    null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    name = cursor.getString(0);
+                }
+            }
+            if (TextUtils.isEmpty(name)) {
+                name = "share_" + System.currentTimeMillis();
+            }
+            File dest = new File(context.getCacheDir(), name);
+            try (InputStream in = resolver.openInputStream(uri);
+                 FileOutputStream out = new FileOutputStream(dest)) {
+                if (in == null) return null;
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    out.write(buf, 0, n);
+                }
+            }
+            return dest.getAbsolutePath();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

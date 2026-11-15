@@ -28,16 +28,36 @@
             android:layout_marginTop="12dp"
             android:text="@string/file_msg_start_server" />
 
-        <!-- 与 Mac/Transfer 的设置项一致：ENOTCONN 是否走指数退避 -->
-        <CheckBox
-            android:id="@+id/cb_file_trans_backoff"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:buttonTint="@color/ui_accent"
-            android:text="@string/file_msg_backoff"
-            android:textColor="@color/ui_text_dim"
-            android:textSize="12sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- 与 Mac/Transfer 的设置项一致：ENOTCONN 是否走指数退避 -->
+            <CheckBox
+                android:id="@+id/cb_file_trans_backoff"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:buttonTint="@color/ui_accent"
+                android:text="@string/file_msg_backoff"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="12sp" />
+
+            <!-- 与 Mac/Transfer 的 Server 页齿轮一致：广播开启后对端（含 Mac）可自动发现本机 -->
+            <CheckBox
+                android:id="@+id/cb_file_broadcast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:buttonTint="@color/ui_accent"
+                android:checked="true"
+                android:text="@string/file_msg_broadcast"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"

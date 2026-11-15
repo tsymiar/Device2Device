@@ -61,7 +61,7 @@ app/src/main/
 
 **Bluetooth** — scanning & pairing, bidirectional RFCOMM serial with directional commands, auto logging, draggable floating receive window.
 
-**Networking** — TCP / UDP multicast / KCP reliable UDP, LAN messenger (KCP-over-UDP text & image chat with UDP-broadcast peer discovery), Pub/Sub floating dialogs, chunked file transfer with progress, HTTP file server (FS + SAF, sortable listing, in-page viewer), SSH server on port 2222.
+**Networking** — TCP / UDP multicast / KCP reliable UDP, LAN messenger (KCP-over-UDP text & image chat with UDP-broadcast peer discovery), Pub/Sub floating dialogs, chunked file transfer with progress (LAN auto-discovery via UDP `8801` beacons), HTTP file server (FS + SAF, sortable listing, in-page viewer), SSH server on port 2222.
 
 **LAN messenger** — `LanMsgDialog`: one KCP-over-UDP socket bound to `0.0.0.0:<port>` is both client and server — no connect handshake, peers are addressed by IP; periodic UDP-broadcast discovery with timeout eviction; oversized images are fragmented and reassembled on the peer; discovery address / port configurable.
 
@@ -119,29 +119,25 @@ MIT
 ## Recent Changes
 
 ### 2026-11
-- **Market:** K-line tooltip shows the selected bar's cap / float cap / PE (live snapshot scaled by close) and daily turnover from Eastmoney `f61`; auto-hides after 5 s idle.
-- **Compass:** widget dial rotates with azimuth, fixed heading marker, transparent status band; full-screen compass gained an inward index line.
-- **File transfer:** aligned protocol with `LinxSrvc` (Mac/Linux) — magic now embeds `PROTOCOL_VERSION`; `FileMsgSocket` kept in sync with `TransferEngine`.
-- **FileMsg dialog:** rebuilt as a two-page ViewPager (receive / send) with a shared status card, progress bar and log; receive page lists received files (persisted, newest first) with a shortcut to the system Downloads manager.
-- **FileMsg progress:** new `SEND_START` event (throttle-exempt) so the bar appears even on fast sends; disconnect/cancel are terminal — the bar drops on disconnect and freezes at the last refresh on cancel; routing resolves the live dialog via FragmentManager so events survive close/reopen; the status card follows the selected tab (server vs client state).
-- **FileMsg background:** while the receive server runs as a foreground service, the status-bar notification shows live receive progress (file name + percent + bar) when the dialog is closed, and restores the idle text on completion.
-- **UI:** splash/auth animation shortened (~2000 ms → ~800 ms); fixed the "源码" menu link, which pointed at a non-existent `/tree/main/Device2Device` path.
-- **Comments:** trimmed verbose inline notes across the touched modules.
+- **File transfer:** `FileMsgSocket` aligned with LinxSrvc `TransferEngine` — `RESP_ACCEPT` (0-byte pulls), chunk validation, original-name saving with `-1/-2` dedupe, thread-safe progress callback, per-transfer cancel.
+- **FileMsg discovery:** LAN auto-discovery on UDP `8801` — 1 s beacon (global + subnet broadcast), unicast reply so both sides pair in one round trip, clickable device list, live broadcast toggle.
+- **FileMsg UI:** two-page dialog (receive / send) with shared status card and log; `SEND_START` progress event; disconnect / cancel are terminal; notification progress while the server runs in background; `ACTION_SEND` share entry shows a floating device picker (no app UI) and sends on tap.
+- **Market:** K-line tooltip with cap / float cap / PE / turnover, auto-hide after 5 s.
+- **Compass:** rotating widget dial, fixed heading marker, inward index line on the full-screen dial.
+- **UI:** shorter splash (~800 ms), fixed source link; trimmed verbose comments.
 
 ### 2026-10
-- **LAN:** KCP-over-UDP messenger with UDP-broadcast discovery.
-- **Game:** *Voiceprint Deduction* board (voice samples, proposition synthesis, 3 psychological traps).
-- **Market:** 4×4 market-cap heatmap widget; progressive quote-list widget; Zijin Mining default K-line.
-- **ChatBox:** multi-provider (DeepSeek / Ollama / OpenRouter) with editable Ollama host.
-- **Sensors:** Catmull-Rom smoothed decibel card.
-- **System:** SSH controls merged into Network; MediaCodec→TextureView; BT on worker thread.
-- **Avatar:** Air Bangs; Anny Bust; Hip Fullness calibration.
+- **LAN:** KCP-over-UDP messenger with broadcast discovery.
+- **Game:** *Voiceprint Deduction* board (voice samples, propositions, 3 psychological traps).
+- **Market:** market-cap heatmap + progressive quote-list widgets.
+- **ChatBox:** DeepSeek / Ollama / OpenRouter providers.
+- **System:** SSH controls merged into Network, MediaCodec→TextureView, BT on worker thread.
+- **Avatar / Sensors:** Air Bangs, Anny bust, hip calibration; smoothed decibel card.
 
 ### 2026-09
 - **Avatar:** Anny engine, face shapes/hairstyles, body measurements, photo fallback.
-- **Sensors:** scalable dashboard, full-screen compass/level, decibel card.
-- **Market:** K-line view (11 sources) + 2×2 quote list widget.
-- **System:** SSH server (2222), HTTP + SAF fixes, dark-mode spinner.
+- **Market / Sensors:** K-line view (11 sources) + quote-list widget; scalable dashboard, compass/level, decibel card.
+- **System:** SSH server (2222), HTTP + SAF fixes.
 
 ### 2026-06
 - **Messaging:** `MSG_HINT`, async Pub/Sub, subscription buffer fix, port parsing hardening.

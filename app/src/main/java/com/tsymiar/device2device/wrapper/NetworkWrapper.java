@@ -57,6 +57,28 @@ public class NetworkWrapper {
 
     public static native int getFileMsgClientCount();
 
+    // 文件传输的 LAN 自动发现（UDP 8801 信标）：服务端广播本机，客户端监听对端
+    /** 服务端是否对外广播信标（默认开，运行中拨动即时生效） */
+    public static native void setFileDiscoveryEnabled(boolean enabled);
+
+    public static native boolean isFileDiscoveryEnabled();
+
+    /** 服务端此刻是否真的在广播（需服务端已启动且开关打开） */
+    public static native boolean isFileBroadcasting();
+
+    /** 开始监听对端信标；发现结果通过 Receiver.FILE_PEER 回传（"ip:port;ip:port"） */
+    public static native void startFileDiscovery();
+
+    public static native void stopFileDiscovery();
+
+    public static native boolean isFileDiscoveryRunning();
+
+    /** 当前发现快照 "ip:port;ip:port"（"NONE" = 一台都没有），给不订阅消息的界面轮询用 */
+    public static native String getFileDiscoverPeers();
+
+    /** 当前传输进度 "current|total"（字节），通知栏轮询用 */
+    public static native String getFileTransferProgress();
+
     // 局域网文本消息：收发走 KCP over UDP（一个绑本端口的 socket，按对端地址取 ikcp 会话直接发，
     // 大消息自动分片），设备发现走 UDP 广播，
     // 发现结果与收发内容通过 Receiver.LAN_PEER / LAN_MESSAGE 回传

@@ -58,6 +58,7 @@ import com.tsymiar.device2device.wrapper.CallbackWrapper;
 import com.tsymiar.device2device.wrapper.NetworkWrapper;
 import com.tsymiar.device2device.wrapper.TimeWrapper;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -216,6 +217,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         }
                     }
                     publishReceived(progress);
+                    break;
+                }
+                case Receiver.FILE_PEER: {
+                    // 发现快照 "ip:port;ip:port"：只更新文件传输对话框的列表
+                    androidx.fragment.app.Fragment fileShown =
+                            getSupportFragmentManager().findFragmentByTag("file_trans");
+                    if (fileShown instanceof FileMsgDialog) {
+                        ((FileMsgDialog) fileShown).onPeerSnapshot(msg.obj.toString());
+                    }
                     break;
                 }
                 case Receiver.TOAST:
@@ -538,6 +548,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         showHttpState();
         showSshState();
     }
+
 
     private class BroadcastReceiverClass extends BroadcastReceiver {
         @SuppressLint("SetTextI18n")

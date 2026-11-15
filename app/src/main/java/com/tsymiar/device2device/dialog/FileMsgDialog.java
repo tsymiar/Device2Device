@@ -6,7 +6,6 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -15,7 +14,9 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.provider.DocumentsContract;
 import android.os.Bundle;
 import android.os.Looper;
 import android.text.TextUtils;
@@ -56,15 +57,15 @@ import com.tsymiar.device2device.utils.Utils;
 import com.tsymiar.device2device.wrapper.NetworkWrapper;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -79,6 +80,8 @@ public class FileMsgDialog extends DialogFragment {
     private static final String PREFS_CLIENT = "file_msg_client_prefs";
     private static final String KEY_PEER_IP = "peer_ip";
     private static final String KEY_PEER_PORT = "peer_port";
+    /** 上次是否开着局域网发现：开着就自动续上，省掉每次手点再等信标 */
+    private static final String KEY_DISCOVER = "discover_enabled";
 
     private EditText etIp, etPort, etRemote;      // 发送端：对端地址（会持久化）
     private EditText etLocalIp, etListenPort;     // 接收端：本机地址（只读）+ 监听端口
@@ -92,6 +95,18 @@ public class FileMsgDialog extends DialogFragment {
     private ScrollView svLog;
     private ProgressBar pbTransfer;
     private CheckBox cbBackoff;
+    private CheckBox cbBroadcast;                  // 接收端：是否对外广播信标
+    private CheckBox cbDiscover;                   // 发送端：是否监听对端信标
+    private LinearLayout discoverPeersList;        // 发送端：发现到的设备列表
+    private TextView tvDiscoverEmpty;
+    /** 发现到的设备：key = "ip:port"，value = {ip, port}，按发现顺序排 */
+    private final Map<String, String[]> discoverPeers = new LinkedHashMap<>();
+    /** 本对话框拉起的监听：关闭时由自己收掉 */
+    private boolean discovering = false;
+    /** 回填开关状态时置位，避免 setChecked 反过来触发一次真实开关 */
+    private boolean syncingSwitches = false;
+    /** 发现期间的 multicast 锁（部分 ROM 不持锁收不到广播） */
+    private WifiManager.MulticastLock discoverLock = null;
     /** 接收端页的已接收文件列表（Download/Device2Device，见 FileMsgStore） */
     private View receivedFilesHeader;
     private LinearLayout receivedFilesList;
@@ -316,6 +331,7 @@ public class FileMsgDialog extends DialogFragment {
         etListenPort.setText(getString(R.string.file_msg_default_port));
         btnStartServer = receive.findViewById(R.id.btn_file_trans_server);
         cbBackoff = receive.findViewById(R.id.cb_file_trans_backoff);
+        cbBroadcast = receive.findViewById(R.id.cb_file_broadcast);
         receivedFilesHeader = receive.findViewById(R.id.received_files_header);
         receivedFilesList = receive.findViewById(R.id.received_files_list);
         TextView openDownloadsBtn = receive.findViewById(R.id.btn_file_trans_open_downloads);
@@ -337,8 +353,20 @@ public class FileMsgDialog extends DialogFragment {
         btnCancel = send.findViewById(R.id.btn_file_trans_cancel);
         btnDeletePartial = send.findViewById(R.id.btn_file_trans_delete);
         btnPull = send.findViewById(R.id.btn_file_trans_pull);
+        cbDiscover = send.findViewById(R.id.cb_file_discover);
+        discoverPeersList = send.findViewById(R.id.ll_file_discover_peers);
+        tvDiscoverEmpty = send.findViewById(R.id.tv_file_discover_empty);
         clientPanel = send.findViewById(R.id.client_panel);
         restoreClientEndpoint();
+        // 发现开关 / 广播开关反映 native 的真实状态（对话框可反复开关，状态不丢）
+        if (cbBroadcast != null) {
+            cbBroadcast.setChecked(NetworkWrapper.isFileDiscoveryEnabled());
+        }
+        if (cbDiscover != null) {
+            discovering = NetworkWrapper.isFileDiscoveryRunning();
+            cbDiscover.setChecked(discovering);
+        }
+        renderDiscoverPeers();
 
         viewPager.setAdapter(new PageAdapter());
         viewPager.setOffscreenPageLimit(2);
@@ -360,6 +388,35 @@ public class FileMsgDialog extends DialogFragment {
         if (cbBackoff != null) {
             cbBackoff.setOnCheckedChangeListener((v, checked) ->
                     NetworkWrapper.setFileBackoffEnabled(checked));
+        }
+        if (cbBroadcast != null) {
+            cbBroadcast.setOnCheckedChangeListener((v, checked) -> {
+                if (syncingSwitches) return;
+                // 开关要即时生效：native 起停广播线程，JNI 用短锁，不挡传输
+                new Thread(() -> {
+                    NetworkWrapper.setFileDiscoveryEnabled(checked);
+                    final boolean enabled = NetworkWrapper.isFileDiscoveryEnabled();
+                    final boolean live = NetworkWrapper.isFileBroadcasting();
+                    runOnUiThreadSafe(() -> {
+                        appendLog(!enabled ? "Beacon broadcast off"
+                                : live ? "Beacon broadcast on (udp/8801)"
+                                : "Beacon broadcast armed - starts with the server");
+                        syncSwitchesFromNative();
+                    });
+                }, "file-msg-broadcast").start();
+            });
+        }
+        if (cbDiscover != null) {
+            cbDiscover.setOnCheckedChangeListener((v, checked) -> {
+                if (syncingSwitches) return;
+                toggleDiscovery(checked);
+            });
+            // 上次开着监听就自动续上：打开对话框立刻开始收信标，不用再手动勾一次
+            Context ctx = getContext();
+            if (!discovering && ctx != null && ctx.getSharedPreferences(PREFS_CLIENT,
+                    Context.MODE_PRIVATE).getBoolean(KEY_DISCOVER, false)) {
+                cbDiscover.setChecked(true);   // 触发 toggleDiscovery(true)
+            }
         }
 
         btnStartServer.setOnClickListener(v -> {
@@ -670,15 +727,24 @@ public class FileMsgDialog extends DialogFragment {
         }
     }
 
-    /** 跳系统下载管理器：接收的文件都在 Download/Device2Device 下，从那里能定位打开 */
+    /** 直接打开 Download/Device2Device 目录；没有支持目录的浏览器时回退到下载列表 */
     private void openDownloads() {
         Activity act = getActivity();
         if (act == null) return;
+        Uri dir = DocumentsContract.buildDocumentUri(
+                "com.android.externalstorage.documents",
+                "primary:" + FileMsgStore.publicDir());
         try {
-            act.startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            act.startActivity(new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(dir, DocumentsContract.Document.MIME_TYPE_DIR)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION));
         } catch (Exception e) {
-            Toast.makeText(act, R.string.file_msg_open_downloads, Toast.LENGTH_SHORT).show();
+            try {
+                act.startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception ignored) {
+                Toast.makeText(act, R.string.file_msg_open_downloads, Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -717,53 +783,171 @@ public class FileMsgDialog extends DialogFragment {
         filePickerLauncher.launch(intent);
     }
 
+    /** 选择器给的 content URI 复制到缓存后返回路径（与分享入口共用一套实现） */
     private String getPathFromUri(Uri uri) {
         if (uri == null) return null;
-        if (getContext() == null) return uri.getLastPathSegment();
-
-        // 使用 ContentResolver 复制文件到 app 私有目录
-        try {
-            ContentResolver resolver = getContext().getContentResolver();
-            String fileName = null;
-
-            String[] projection = {"_display_name"};
-            try (android.database.Cursor cursor = resolver.query(uri, projection, null, null, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int nameIndex = cursor.getColumnIndex("_display_name");
-                    if (nameIndex >= 0) {
-                        fileName = cursor.getString(nameIndex);
-                    }
-                }
-            }
-
-            if (fileName == null) {
-                fileName = "temp_file_" + System.currentTimeMillis();
-            }
-
-            File cacheDir = getContext().getCacheDir();
-            File tempFile = new File(cacheDir, fileName);
-
-            try (InputStream input = resolver.openInputStream(uri);
-                 FileOutputStream output = new FileOutputStream(tempFile)) {
-                if (input == null) return uri.getLastPathSegment();
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, bytesRead);
-                }
-            }
-
-            return tempFile.getAbsolutePath();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return uri.getLastPathSegment();
-        }
+        Context ctx = getContext();
+        return ctx == null ? uri.getLastPathSegment() : Utils.copyUriToCache(ctx, uri);
     }
 
     /** 收起进度条与速度行：断开 / 取消等终态动作的即时反馈，不等事件路由 */
     private void hideTransferBar() {
         if (pbTransfer != null) pbTransfer.setVisibility(View.GONE);
         if (tvSpeed != null) tvSpeed.setVisibility(View.GONE);
+    }
+
+    /** 监听对端信标：bind 与收包都在 native，起停放子线程（停止要 join 监听线程） */
+    private void toggleDiscovery(boolean enabled) {
+        discovering = enabled;
+        Context ctx = getContext();
+        if (ctx != null) {
+            ctx.getSharedPreferences(PREFS_CLIENT, Context.MODE_PRIVATE).edit()
+                    .putBoolean(KEY_DISCOVER, enabled).apply();
+        }
+        if (enabled) {
+            acquireDiscoverLock();
+        } else {
+            releaseDiscoverLock();
+            discoverPeers.clear();
+            renderDiscoverPeers();
+        }
+        new Thread(() -> {
+            if (enabled) {
+                NetworkWrapper.startFileDiscovery();
+            } else {
+                NetworkWrapper.stopFileDiscovery();
+            }
+            final boolean running = NetworkWrapper.isFileDiscoveryRunning();
+            runOnUiThreadSafe(() -> {
+                if (enabled && !running) {
+                    // 绑定失败（端口被占用等）：开关回退，别让界面显示"开着"却收不到信标
+                    discovering = false;
+                    releaseDiscoverLock();
+                    Context prefsCtx = getContext();
+                    if (prefsCtx != null) {
+                        prefsCtx.getSharedPreferences(PREFS_CLIENT, Context.MODE_PRIVATE)
+                                .edit().putBoolean(KEY_DISCOVER, false).apply();
+                    }
+                    appendLog("LAN discovery failed to start (udp/8801 busy?)");
+                } else {
+                    appendLog(enabled ? "LAN discovery listening on udp/8801"
+                            : "LAN discovery stopped");
+                }
+                syncSwitchesFromNative();
+            });
+        }, "file-msg-discovery").start();
+    }
+
+    private void runOnUiThreadSafe(Runnable action) {
+        Activity act = getActivity();
+        if (act != null) {
+            act.runOnUiThread(action);
+        }
+    }
+
+    /** 两个开关按 native 真实状态回填：服务端/广播起停后界面不会和实际脱节 */
+    private void syncSwitchesFromNative() {
+        syncingSwitches = true;
+        if (cbBroadcast != null) {
+            cbBroadcast.setChecked(NetworkWrapper.isFileDiscoveryEnabled());
+        }
+        if (cbDiscover != null) {
+            cbDiscover.setChecked(NetworkWrapper.isFileDiscoveryRunning());
+        }
+        syncingSwitches = false;
+    }
+
+    /** 部分 ROM 不持 multicast 锁收不到 UDP 广播（与 SelectActivity 的发现一致） */
+    private void acquireDiscoverLock() {
+        Context ctx = getContext();
+        if (ctx == null || discoverLock != null) return;
+        try {
+            WifiManager wm = (WifiManager) ctx.getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wm == null) return;
+            discoverLock = wm.createMulticastLock("file-msg-discover");
+            discoverLock.setReferenceCounted(false);
+            discoverLock.acquire();
+        } catch (Exception e) {
+            Log.w(TAG, "acquire multicast lock failed: " + e.getMessage());
+        }
+    }
+
+    private void releaseDiscoverLock() {
+        if (discoverLock == null) return;
+        try {
+            discoverLock.release();
+        } catch (Exception ignored) {
+        }
+        discoverLock = null;
+    }
+
+    /** native 推上来的发现快照 "ip:port;ip:port"（主线程调用），"NONE" 表示一台都没有 */
+    public void onPeerSnapshot(String peers) {
+        if (getActivity() == null) return;
+        Map<String, String[]> next = new LinkedHashMap<>();
+        // "NONE" 是 native 对空快照的占位（空消息会被消息队列当成"没有消息"丢掉）
+        if (peers != null && !"NONE".equals(peers)) {
+            for (String item : peers.split(";")) {
+                String entry = item.trim();
+                if (entry.isEmpty()) continue;
+                int idx = entry.lastIndexOf(':');
+                if (idx <= 0 || idx == entry.length() - 1) continue;
+                next.put(entry, new String[]{entry.substring(0, idx), entry.substring(idx + 1)});
+            }
+        }
+        // 地址上下线各记一条：列表之外也能从日志看出信标是从哪个地址来的
+        for (String key : next.keySet()) {
+            if (!discoverPeers.containsKey(key)) appendLog("Discovered: " + key);
+        }
+        for (String key : discoverPeers.keySet()) {
+            if (!next.containsKey(key)) appendLog("Peer offline: " + key);
+        }
+        discoverPeers.clear();
+        discoverPeers.putAll(next);
+        renderDiscoverPeers();
+    }
+
+    /** 按当前发现结果重画列表：一台一行，点行直接连（与 Mac/Transfer 的 Client 面板一致） */
+    private void renderDiscoverPeers() {
+        if (discoverPeersList == null) return;
+        discoverPeersList.removeAllViews();
+        if (tvDiscoverEmpty != null) {
+            tvDiscoverEmpty.setVisibility(discoverPeers.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+        Context ctx = getContext();
+        if (ctx == null) return;
+        for (Map.Entry<String, String[]> entry : discoverPeers.entrySet()) {
+            final String ip = entry.getValue()[0];
+            final String port = entry.getValue()[1];
+            TextView row = new TextView(ctx);
+            row.setText(ip + ":" + port);
+            row.setTextSize(12);
+            row.setTextColor(ContextCompat.getColor(ctx, R.color.ui_text));
+            row.setSingleLine(true);
+            row.setPadding((int) dp(10), (int) dp(10), (int) dp(10), (int) dp(10));
+            row.setBackgroundResource(R.drawable.bg_lan_field);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = (int) dp(6);
+            row.setLayoutParams(lp);
+            row.setOnClickListener(v -> connectToPeer(ip, port));
+            discoverPeersList.addView(row);
+        }
+    }
+
+    /** 点发现列表里的设备：填入对端地址后走与 Connect 按钮同一条流程 */
+    private void connectToPeer(String ip, String port) {
+        if (isBusy || isConnected || isServerStarted) {
+            Toast.makeText(getContext(), "Busy - disconnect current session first",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (etIp == null || etPort == null || btnConnect == null) return;
+        etIp.setText(ip);
+        etPort.setText(port);
+        appendLog("Discovered device: " + ip + ":" + port);
+        btnConnect.performClick();
     }
 
     private void updateUI() {
@@ -805,6 +989,8 @@ public class FileMsgDialog extends DialogFragment {
         btnDeletePartial.setEnabled(isConnected && !isBusy && pendingDeleteFile != null);
         btnPull.setEnabled(!isBusy && !isServerStarted);
         if (etRemote != null) etRemote.setEnabled(!isBusy);
+        // 服务端起停会带动广播线程，开关状态跟着 native 走
+        syncSwitchesFromNative();
     }
 
     /** 顶部状态卡片：一个圆点 + 一行文字，别让"服务端在跑/已连接/传输中"只藏在日志里。
@@ -1066,6 +1252,12 @@ public class FileMsgDialog extends DialogFragment {
         // 服务端由前台服务托管，这里不再停 —— 对话框关掉后对端照样能连上来收文件。
         // 只有显式点「Stop Server」才走 FileMsgServerService.stop()。
         saveClientEndpoint();   // 改了地址没点 Connect 也要记住
+        // 本对话框拉起的监听要收掉：native 线程与 8801 端口不能留在后台
+        if (discovering) {
+            discovering = false;
+            new Thread(NetworkWrapper::stopFileDiscovery, "file-msg-discovery").start();
+        }
+        releaseDiscoverLock();
         if (isConnected) {
             if (isBusy) NetworkWrapper.cancelFileTransfer();
             // onDestroy 也在主线程：断开可能等全局锁 / 后台线程，放到子线程避免 ANR

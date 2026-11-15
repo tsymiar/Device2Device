@@ -45,6 +45,22 @@
                 <action android:name="android.intent.action.CONNECTION" />
             </intent-filter>
         </activity>
+        <!-- 文件浏览器 / 相册「分享」：透明入口，只弹设备浮窗，不打开应用界面 -->
+        <activity android:name=".activity.ShareOverlayActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
         <activity android:name=".activity.TextureActivity"
             android:label="@string/title_texture" />
         <activity
@@ -171,6 +187,11 @@
         <service
             android:name=".service.FileMsgServerService"
             android:exported="false" />
+        <!-- 分享发送：前台服务跑传输，状态栏实时进度 + 取消/删除远程残留 -->
+        <service
+            android:name=".service.ShareSendService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <service android:name=".service.ToastNotificationService" />
         <service android:name=".acceleration.Voice.Voice"
             tools:ignore="MissingClass" />

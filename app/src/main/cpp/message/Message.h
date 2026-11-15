@@ -28,7 +28,9 @@ enum MASSAGER {
     /** 局域网文本消息：发现到的对端（CLEAR / ADD|ip|port|name / DEL|...） */
     LAN_PEER,
     /** 局域网文本消息：收到的内容 / 发送结果（RECV / SENT / SENDFAIL / LISTEN） */
-    LAN_MESSAGE
+    LAN_MESSAGE,
+    /** 文件传输发现到的对端快照："ip:port;ip:port"，空串表示一台都没有 */
+    FILE_PEER
 };
 
 struct Messaging {

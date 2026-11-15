@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <queue>
 #include <future>
+#include <map>
+#include <vector>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -577,6 +579,8 @@ static void releaseFileMsg() {
 // 那时 g_fileMsg 还没创建，所以先把路径存在这里，建好实例再套用（否则会落到 "./"）。
 static std::string g_fileSavePath;
 static std::atomic<bool> g_fileBackoffEnabled(false);
+// LAN 广播开关：默认开，随引擎实例下发（Server 页可关，运行中拨动即时生效）
+static std::atomic<bool> g_fileDiscoveryEnabled(true);
 
 void FileMsgProgressCallback(uint64_t current, uint64_t total,
                              const std::string& status, uint8_t event);
@@ -589,6 +593,7 @@ static FileMsgSocket* newFileMsg() {
         p->setSavePath(g_fileSavePath);
     }
     p->setBackoffEnabled(g_fileBackoffEnabled.load());
+    p->setDiscoveryEnabled(g_fileDiscoveryEnabled.load());
     return p;
 }
 
@@ -1092,6 +1097,148 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(getFileMsgClientCount)(JNIEnv*, jclass)
 {
     std::lock_guard<std::mutex> lock(g_fileTransMutex);
     return g_fileMsg != nullptr ? g_fileMsg->getClientCount() : 0;
+}
+
+// ============ 文件传输的 LAN 自动发现 ============
+
+// 发现监听独占一个引擎：Connect / Stop Server 换出 g_fileMsg 时不会顺手销毁监听线程
+static FileMsgSocket* g_fileDiscoveryEngine = nullptr;
+static std::shared_ptr<std::atomic<bool>> g_fileDiscoveryToken;
+static std::mutex g_fileDiscoveryMutex;
+static std::map<std::string, uint64_t> g_filePeers;   // "ip:port" -> 最近一次信标时间
+static std::string g_filePeersSnapshot;
+
+static uint64_t systemNowMs()
+{
+    return (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+// 引擎在任意线程回调：快照有变化才推给 Java，避免每个信标都刷一次列表
+static void FilePeerDiscovered(const std::string& ip, unsigned short port)
+{
+    std::string snapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_fileDiscoveryMutex);
+        const uint64_t now = systemNowMs();
+        g_filePeers[ip + ":" + std::to_string(port)] = now;
+
+        std::string list;
+        for (auto it = g_filePeers.begin(); it != g_filePeers.end();) {
+            // 本端 1s 一轮、Mac 3s 一轮：8s 没再听到（Mac 也够丢两轮）就当成下线
+            if (now > it->second + 8000) {
+                it = g_filePeers.erase(it);
+                continue;
+            }
+            if (!list.empty()) list += ';';
+            list += it->first;
+            ++it;
+        }
+        // 空消息会被 getMessage() 当成"没有消息"丢掉，所以空快照用 "NONE" 占位
+        if (list.empty()) list = "NONE";
+        if (list == g_filePeersSnapshot) return;
+        g_filePeersSnapshot = list;
+        snapshot = list;
+    }
+    Message::instance().setMessage(snapshot, FILE_PEER);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileDiscoveryEnabled)(JNIEnv*, jclass, jboolean enabled)
+{
+    // 只用取消锁做指针保护：传输中 g_fileTransMutex 会被持有整段，用它会拖到传完才生效
+    g_fileDiscoveryEnabled.store(enabled == JNI_TRUE);
+    std::lock_guard<std::mutex> lock(g_fileCancelMutex);
+    if (g_fileMsg != nullptr) {
+        g_fileMsg->setDiscoveryEnabled(g_fileDiscoveryEnabled.load());
+    }
+}
+
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileDiscoveryEnabled)(JNIEnv*, jclass)
+{
+    return g_fileDiscoveryEnabled.load() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileBroadcasting)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileCancelMutex);
+    return (g_fileMsg != nullptr && g_fileMsg->isBroadcasting()) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(startFileDiscovery)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileDiscoveryMutex);
+    if (g_fileDiscoveryEngine != nullptr && g_fileDiscoveryToken) {
+        return;   // 已在监听
+    }
+    if (g_fileDiscoveryEngine == nullptr) {
+        g_fileDiscoveryEngine = new FileMsgSocket();
+    }
+    g_filePeers.clear();
+    g_filePeersSnapshot = "NONE";
+    Message::instance().setMessage("NONE", FILE_PEER);
+
+    g_fileDiscoveryToken = g_fileDiscoveryEngine->startDiscovery(FilePeerDiscovered);
+    if (!g_fileDiscoveryToken) {
+        LOGE("startFileDiscovery failed (udp port 8801)");
+        delete g_fileDiscoveryEngine;   // 没有线程在跑，可直接删
+        g_fileDiscoveryEngine = nullptr;
+        Message::instance().setMessage("LAN discovery failed to start (udp/8801)", MSG_STAT);
+        return;
+    }
+    LOGI("FileMsg LAN discovery listening on udp/%u",
+        (unsigned)FileMsgSocket::DISCOVERY_PORT);
+}
+
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileDiscovery)(JNIEnv*, jclass)
+{
+    FileMsgSocket* engine = nullptr;
+    std::shared_ptr<std::atomic<bool>> token;
+    {
+        std::lock_guard<std::mutex> lock(g_fileDiscoveryMutex);
+        engine = g_fileDiscoveryEngine;
+        token = g_fileDiscoveryToken;
+        g_fileDiscoveryEngine = nullptr;
+        g_fileDiscoveryToken.reset();
+        g_filePeers.clear();
+        g_filePeersSnapshot = "NONE";
+    }
+    if (engine != nullptr) {
+        engine->conceal(token);   // join 监听线程（最坏一个 500ms tick）
+        delete engine;
+    }
+    Message::instance().setMessage("NONE", FILE_PEER);
+    LOGI("FileMsg LAN discovery stopped");
+}
+
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileDiscoveryRunning)(JNIEnv*, jclass)
+{
+    std::lock_guard<std::mutex> lock(g_fileDiscoveryMutex);
+    return (g_fileDiscoveryEngine != nullptr && g_fileDiscoveryToken) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL CPP_FUNC_NETWORK(getFileTransferProgress)(JNIEnv* env, jclass)
+{
+    uint64_t current = 0;
+    uint64_t total = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_fileCancelMutex);
+        if (g_fileMsg != nullptr) {
+            current = g_fileMsg->transferCurrent();
+            total = g_fileMsg->transferTotal();
+        }
+    }
+    const std::string snapshot = std::to_string(current) + "|" + std::to_string(total);
+    return env->NewStringUTF(snapshot.c_str());
+}
+
+JNIEXPORT jstring JNICALL CPP_FUNC_NETWORK(getFileDiscoverPeers)(JNIEnv* env, jclass)
+{
+    std::string snapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_fileDiscoveryMutex);
+        snapshot = g_filePeersSnapshot;
+    }
+    return env->NewStringUTF(snapshot.empty() ? "NONE" : snapshot.c_str());
 }
 
 // ============ 局域网文本消息（发现 + 收发，全部在 C++ 侧） ============

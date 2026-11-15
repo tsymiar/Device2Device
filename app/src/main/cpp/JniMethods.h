@@ -85,6 +85,18 @@ JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgConnected)(JNIEnv*, jclass)
 JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileMsgServerRunning)(JNIEnv*, jclass);
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(getFileMsgClientCount)(JNIEnv*, jclass);
 
+// 文件传输的 LAN 自动发现（UDP 8801 信标）：广播开关 + 对端监听
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(setFileDiscoveryEnabled)(JNIEnv*, jclass, jboolean enabled);
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileDiscoveryEnabled)(JNIEnv*, jclass);
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileBroadcasting)(JNIEnv*, jclass);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(startFileDiscovery)(JNIEnv*, jclass);
+JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopFileDiscovery)(JNIEnv*, jclass);
+JNIEXPORT jboolean JNICALL CPP_FUNC_NETWORK(isFileDiscoveryRunning)(JNIEnv*, jclass);
+// 当前发现快照 "ip:port;ip:port"（"NONE" = 一台都没有），供不订阅消息的界面轮询
+JNIEXPORT jstring JNICALL CPP_FUNC_NETWORK(getFileDiscoverPeers)(JNIEnv*, jclass);
+// 当前传输进度 "current|total"（字节），通知栏/浮窗轮询用
+JNIEXPORT jstring JNICALL CPP_FUNC_NETWORK(getFileTransferProgress)(JNIEnv*, jclass);
+
 // 局域网文本消息（C++ 实现：UDP 广播做设备发现，KCP over UDP 做收发，一个 socket 同时是客户端与服务端）
 JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(startLanMessenger)(JNIEnv*, jclass, jstring name, jstring selfIp, jint port);
 JNIEXPORT void JNICALL CPP_FUNC_NETWORK(stopLanMessenger)(JNIEnv*, jclass);

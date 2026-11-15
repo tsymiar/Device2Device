@@ -21,6 +21,45 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <!-- LAN 自动发现：与 Mac/Transfer 的 Client 面板一致，点列表里的设备直接连 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/FileMsgSectionTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/file_msg_discover" />
+
+            <CheckBox
+                android:id="@+id/cb_file_discover"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:buttonTint="@color/ui_accent"
+                android:text="@string/file_msg_discover_toggle"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_file_discover_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/file_msg_discover_empty"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:id="@+id/ll_file_discover_peers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_file_trans_connect"
             style="@style/FileMsgButtonFilled"
