@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/ssh_client_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -16,7 +17,6 @@
         android:padding="6dp"
         android:layout_marginBottom="6dp">
 
-        <!-- 折叠把手：点此折叠/展开连接表单 -->
         <LinearLayout
             android:id="@+id/conn_toggle"
             android:layout_width="match_parent"
@@ -44,7 +44,6 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- 连接表单（可折叠隐藏） -->
         <LinearLayout
             android:id="@+id/conn_body"
             android:layout_width="match_parent"
@@ -121,27 +120,92 @@
                 app:backgroundTint="@color/ui_accent"
                 app:cornerRadius="17dp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_ssh_conn_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/ui_text_dim"
+            android:textSize="10sp" />
     </LinearLayout>
 
-    <!-- 输出区 -->
-    <ScrollView
-        android:id="@+id/sv_output"
+    <!-- 终端区：ScrollView + 右下角悬浮发送键 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/ssh_output_bg"
-        android:padding="10dp"
         android:layout_marginBottom="6dp">
-        <TextView
-            android:id="@+id/tv_output"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/ssh_output_text"
-            android:textSize="12sp"
-            android:typeface="monospace" />
-    </ScrollView>
 
-    <!-- 命令输入区（始终显示）：控制键在上，输入框+发送在下 -->
+        <ScrollView
+            android:id="@+id/sv_output"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/ssh_output_bg"
+            android:padding="10dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/tv_output"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ssh_output_text"
+                    android:textSize="12sp"
+                    android:typeface="monospace" />
+
+                <!-- 输入框嵌在终端里：点终端任意空白处即聚焦这里，像 JuiceSSH 一样直接在终端打字 -->
+                <AutoCompleteTextView
+                    android:id="@+id/et_cmd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@null"
+                    android:hint="@string/ssh_client_command"
+                    android:textColor="@color/ssh_output_text"
+                    android:textSize="11sp"
+                    android:typeface="monospace"
+                    android:enabled="false"
+                    android:imeOptions="actionSend"
+                    android:inputType="text"
+                    android:completionThreshold="1"
+                    android:dropDownHeight="96dp" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- 浮在终端右下角的发送键：长按隐藏 -->
+        <FrameLayout
+            android:id="@+id/fab_send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="12dp">
+
+            <Button
+                android:id="@+id/key_enter"
+                style="@style/CtrlKeyAccent"
+                android:text="↵ 发送" />
+        </FrameLayout>
+
+        <!-- 隐藏后留下的恢复入口 -->
+        <TextView
+            android:id="@+id/fab_send_restore"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="14dp"
+            android:background="@drawable/bg_fab_restore"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="↵"
+            android:textColor="@color/ui_on_fill"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- 命令输入区：控制键在上，输入框+发送在下 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -150,7 +214,6 @@
         android:padding="6dp"
         android:layout_marginBottom="6dp">
 
-        <!-- 控制键行 -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -159,57 +222,24 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <Button
-                    android:id="@+id/key_ctrlc"
-                    style="@style/CtrlKey"
-                    android:text="Ctrl-C" />
-                <Button
-                    android:id="@+id/key_up"
-                    style="@style/CtrlKey"
-                    android:text="↑" />
-                <Button
-                    android:id="@+id/key_down"
-                    style="@style/CtrlKey"
-                    android:text="↓" />
-                <Button
-                    android:id="@+id/key_font_minus"
-                    style="@style/CtrlKey"
-                    android:text="A-" />
-                <Button
-                    android:id="@+id/key_font_plus"
-                    style="@style/CtrlKey"
-                    android:text="A+" />
-                <Button
-                    android:id="@+id/key_clear"
-                    style="@style/CtrlKey"
-                    android:text="清理" />
+                <!-- 编辑控制键（发送键已悬浮到终端右下角） -->
+                <Button android:id="@+id/key_esc" style="@style/CtrlKeyMini" android:text="Esc" />
+                <Button android:id="@+id/key_tab" style="@style/CtrlKeyMini" android:text="Tab" />
+                <Button android:id="@+id/key_ctrlc" style="@style/CtrlKeyMini" android:text="Ctrl-C" />
+                <Button android:id="@+id/key_home" style="@style/CtrlKeyMini" android:text="Home" />
+                <Button android:id="@+id/key_end" style="@style/CtrlKeyMini" android:text="End" />
+                <!-- 光标移动 -->
+                <Button android:id="@+id/key_left" style="@style/CtrlKeyMini" android:text="←" />
+                <Button android:id="@+id/key_right" style="@style/CtrlKeyMini" android:text="→" />
+                <!-- 历史回溯 -->
+                <Button android:id="@+id/key_up" style="@style/CtrlKeyMini" android:text="↑" />
+                <Button android:id="@+id/key_down" style="@style/CtrlKeyMini" android:text="↓" />
+                <!-- 显示与清理 -->
+                <Button android:id="@+id/key_font_minus" style="@style/CtrlKeyMini" android:text="A-" />
+                <Button android:id="@+id/key_font_plus" style="@style/CtrlKeyMini" android:text="A+" />
+                <Button android:id="@+id/key_theme" style="@style/CtrlKeyMini" android:text="主题" />
+                <Button android:id="@+id/key_clear" style="@style/CtrlKeyMini" android:text="清理" />
             </LinearLayout>
         </HorizontalScrollView>
-
-        <!-- 输入行：输入框 + 右侧发送键 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="6dp"
-            android:gravity="center_vertical">
-            <AutoCompleteTextView
-                android:id="@+id/et_cmd"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="@string/ssh_client_command"
-                android:textSize="13sp"
-                android:enabled="false"
-                android:imeOptions="actionSend"
-                android:inputType="text"
-                android:completionThreshold="1"
-                android:dropDownHeight="96dp" />
-            <Button
-                android:id="@+id/key_enter"
-                style="@style/CtrlKeyAccent"
-                android:layout_marginStart="6dp"
-                android:text="发送 ↵" />
-        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -65,7 +65,7 @@ public final class MarketPalette {
         textHint = color(c, R.color.market_text_hint);
         accent = color(c, R.color.market_accent);
         accentPressed = color(c, R.color.market_accent_pressed);
-        onAccent = color(c, R.color.market_on_accent);
+        onAccent = color(c, R.color.market_on_text);
         on = color(c, R.color.market_on);
         onPressed = color(c, R.color.market_on_pressed);
         onText = color(c, R.color.market_on_text);
@@ -80,7 +80,7 @@ public final class MarketPalette {
         dif = color(c, R.color.market_dif);
         dea = color(c, R.color.market_dea);
         rsi = color(c, R.color.market_rsi);
-        cursor = color(c, R.color.market_cursor);
+        cursor = color(c, R.color.market_flat);
         trend = color(c, R.color.market_trend);
         avg = color(c, R.color.market_avg);
         tooltipBg = color(c, R.color.market_tooltip_bg);

@@ -35,7 +35,6 @@
     <color name="market_text_hint">#FF8A94A6</color>
     <color name="market_accent">#FF00A97F</color>
     <color name="market_accent_pressed">#FF008A66</color>
-    <color name="market_on_accent">#FFFFFFFF</color>
     <color name="market_on">#FFF57C00</color>
     <color name="market_on_pressed">#FFE06000</color>
     <color name="market_on_text">#FFFFFFFF</color>
@@ -51,7 +50,6 @@
     <color name="market_dif">#FFE0821E</color>
     <color name="market_dea">#FF1E88E5</color>
     <color name="market_rsi">#FF8E24AA</color>
-    <color name="market_cursor">#FF64748B</color>
     <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF1E5FA8</color>
     <!-- 分时均价线（参考 PhoneStock 的黄色均价线：浅底取深金保证对比度） -->

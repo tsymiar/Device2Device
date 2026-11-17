@@ -36,18 +36,21 @@ UI layer in Java, heavy lifting in C++ via JNI.
 ```
 app/src/main/
 ├── java/com/tsymiar/device2device/
-│   ├── activity/       # 14: Main (dashboard) / Select / Market / Avatar / Texture /
-│   │                   #   Wave / Graph / Sensor / Bt* / Bugger / MyGit / Thanks
+│   ├── activity/       # Main (dashboard) / Select / Market / Avatar / Texture /
+│   │                   #   Wave / Graph / Sensor / Bt* / Bugger / MyGit / SshClient / Thanks
 │   ├── service/        # Subscribe, Publish, Http (:8080) & Ssh (:2222) server,
+│   │                   #   SshClientCore (interactive shell), SshClientService,
 │   │                   #   FileMsg server, Receiver, Window, SaveData, Toast
-│   ├── dialog/         # ChatBox (multi-provider AI), FileMsg, LanMsg, Game (deduction board)
+│   ├── dialog/         # ChatBox (multi-provider AI), FileMsg, LanMsg,
+│   │                   #   SshSessionList (bottom sheet), Game (deduction board)
 │   ├── game/           # Deduction engine: propositions, voice samples, psych profile
 │   ├── widget/         # Market widgets: list + chart + heatmap, compass (tap to measure)
 │   ├── market/         # QuoteSource (11 sources), Quote, CapRow, Indicators
 │   ├── avatar/         # AnnyModel/Targets/Params, MeshBuilder, HumanMesh, Renderer, PhotoAnalyzer
 │   ├── acceleration/   # Sensor & voice modules
-│   ├── entity/ event/  # Data entities, observer bus
-│   ├── utils/ view/    # Utilities (Atom, SoundRecord, HttpsRequest …), custom views
+│   ├── entity/ event/  # Data entities (incl. SshConnection), observer bus
+│   ├── utils/ view/    # Utilities (Atom, SoundRecord, HttpsRequest, Ssh session /
+│   │                   #   key / known-hosts stores …), custom views
 │   │                   #   (KLineView, DeductionBoard / DeductionGameScreen …)
 │   └── wrapper/        # JNI bridge: callback, network, view, media, time
 └── cpp/                # JniMethods, bitmap, callback, codec, convert, display,
@@ -66,6 +69,8 @@ app/src/main/
 **LAN messenger** — `LanMsgDialog`: one KCP-over-UDP socket bound to `0.0.0.0:<port>` is both client and server — no connect handshake, peers are addressed by IP; periodic UDP-broadcast discovery with timeout eviction; oversized images are fragmented and reassembled on the peer; discovery address / port configurable.
 
 **Market quotes** — `MarketActivity` + `KLineView`; keyless feeds from `auto` (smart pick + fallback), `tencent`, `eastmoney`, `gold`/`xau`/`gc`, `crude`/`brent`/`ng`, `usd`, `binance`. Code / name / pinyin picker, candles + MA + indicators (MACD, RSI, KDJ), drag-pan, pinch-zoom, crosshair bubble with the selected bar's cap / turnover / PE (auto-hides after 5 s idle), 15 s refresh.
+
+**SSH client** — JuiceSSH-style terminal on MINA SSHD: bottom-sheet session list (password / private-key auth, pinned host keys), terminal-as-input-line editing with Tab completion, history recall and repeat-on-hold arrows, ANSI day/night themes with pinch-zoom, and background keep-alive via a foreground service.
 
 **Market widgets** — three home-screen widgets bring quotes to the launcher without opening the app. The **quote list** (2×2, resizable) shows several watched symbols at once; rows land one by one as responses arrive, so the widget fills in progressively instead of flashing in all at once. The **quote chart** (2×2, resizable) draws a single symbol's trend as a sparkline, and gold symbols additionally annotate the CNY-per-gram price. The **market cap heatmap** (4×4) paints a squarified treemap of the top-30 A-shares: tile area encodes market cap, colour encodes the daily change, and a tap opens the full quote page. All three share one repaint path that follows day/night mode, size themselves adaptively to their host, and refresh on the same 15 s cadence as the in-app K-line view; each widget ships a configuration activity for picking symbols and the refresh interval.
 
@@ -119,12 +124,13 @@ MIT
 ## Recent Changes
 
 ### 2026-11
+- **SSH client:** session manager, terminal-as-input-line editing, CJK-safe UTF-8 decoding, ANSI themes with pinch-zoom, background keep-alive.
 - **File transfer:** `FileMsgSocket` aligned with LinxSrvc `TransferEngine` — `RESP_ACCEPT` (0-byte pulls), chunk validation, original-name saving with `-1/-2` dedupe, thread-safe progress callback, per-transfer cancel.
 - **FileMsg discovery:** LAN auto-discovery on UDP `8801` — 1 s beacon (global + subnet broadcast), unicast reply so both sides pair in one round trip, clickable device list, live broadcast toggle.
 - **FileMsg UI:** two-page dialog (receive / send) with shared status card and log; `SEND_START` progress event; disconnect / cancel are terminal; notification progress while the server runs in background; `ACTION_SEND` share entry shows a floating device picker (no app UI) and sends on tap.
 - **Market:** K-line tooltip with cap / float cap / PE / turnover, auto-hide after 5 s.
 - **Compass:** rotating widget dial, fixed heading marker, inward index line on the full-screen dial.
-- **UI:** shorter splash (~800 ms), fixed source link; trimmed verbose comments.
+- **UI:** shorter splash (~800 ms), fixed source link; trimmed verbose comments; merged duplicate resources (color/string dead code removed).
 
 ### 2026-10
 - **LAN:** KCP-over-UDP messenger with broadcast discovery.

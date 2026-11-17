@@ -102,6 +102,15 @@
         <item name="rippleColor">@color/ui_ripple</item>
     </style>
 
+    <!-- SSH 终端扩展控制键：比普通控制键更紧凑，方便一屏放下 Tab/Esc/方向键 -->
+    <style name="CtrlKeyMini" parent="CtrlKey">
+        <item name="android:layout_height">32dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textSize">11sp</item>
+        <item name="cornerRadius">16dp</item>
+    </style>
+
     <!-- SSH 主操作键（发送）：实心墨青，突出层级 -->
     <style name="CtrlKeyAccent" parent="CtrlKey">
         <item name="android:textColor">@color/ui_on_fill</item>

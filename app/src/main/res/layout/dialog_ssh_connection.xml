@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <EditText
+            android:id="@+id/et_ssh_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ssh_session_name"
+            android:inputType="text"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/et_ssh_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ssh_session_group"
+            android:inputType="text"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/et_ssh_host"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="3"
+                android:hint="@string/ssh_client_host"
+                android:inputType="textUri"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/et_ssh_port"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/ssh_client_port"
+                android:inputType="number"
+                android:text="22"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/et_ssh_user"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ssh_client_user"
+            android:inputType="text"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/rg_ssh_auth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <RadioButton
+                android:id="@+id/rb_ssh_password"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/ssh_session_auth_password"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rb_ssh_key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="@string/ssh_session_auth_key"
+                android:textSize="12sp" />
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/et_ssh_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/ssh_client_password"
+            android:inputType="textPassword"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/ssh_key_area"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_ssh_pick_key"
+                style="@style/CtrlKey"
+                android:layout_width="match_parent"
+                android:text="@string/ssh_session_pick_key" />
+
+            <TextView
+                android:id="@+id/tv_ssh_key_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/ssh_session_key_hint"
+                android:textColor="@color/ui_text_dim"
+                android:textSize="11sp" />
+
+            <EditText
+                android:id="@+id/et_ssh_key_pass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/ssh_session_key_pass"
+                android:inputType="textPassword"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

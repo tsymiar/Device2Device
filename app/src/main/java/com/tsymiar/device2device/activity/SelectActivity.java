@@ -41,6 +41,7 @@ import com.tsymiar.device2device.dialog.ChatBoxDialog;
 import com.tsymiar.device2device.dialog.FileMsgDialog;
 import com.tsymiar.device2device.dialog.GameDialog;
 import com.tsymiar.device2device.dialog.LanMsgDialog;
+import com.tsymiar.device2device.dialog.SshSessionListDialog;
 import com.tsymiar.device2device.entity.PubSubSetting;
 import com.tsymiar.device2device.entity.Receiver;
 import com.tsymiar.device2device.event.EventEntity;
@@ -70,6 +71,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     public static final int RequestAudio = 10003;
     public static final int RequestHttpFolder = 10004;
     private static final int RequestBatteryOptimize = 10005;
+    private SshSessionListDialog mSshSessionDialog;
     /** 单进程内只引导一次“忽略电池优化”，避免每次启动 HTTP 都打扰 */
     private static boolean sBatteryPromptShown = false;
     @SuppressLint("StaticFieldLeak")
@@ -512,9 +514,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_ssh_stop).setOnClickListener(v ->
                 SshServerService.stop(SelectActivity.this));
         findViewById(R.id.btn_ssh_copy).setOnClickListener(v -> copySshConnectionInfo());
-        // SSH 客户端：独立页面，连接任意 SSH 服务器（含本应用 SSH 服务端）
-        findViewById(R.id.btn_ssh_client).setOnClickListener(v ->
-                startActivity(new Intent(SelectActivity.this, SshClientActivity.class)));
+        // SSH 客户端：底部浮窗展示会话列表，点会话进入对应连接；
+        // 浮窗里的「临时连接」仍走原来的手动输入表单。
+        findViewById(R.id.btn_ssh_client).setOnClickListener(v -> {
+            if (mSshSessionDialog == null) {
+                mSshSessionDialog = new SshSessionListDialog(this);
+            }
+            mSshSessionDialog.show();
+        });
 
         // SSH 区域折叠/展开：默认收起，点标题栏摊开；服务运行中由 showSshState() 强制展开
         final LinearLayout sshContent = findViewById(R.id.ssh_content);
@@ -865,6 +872,10 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // SSH 会话浮窗里「选择私钥」的结果要转交回浮窗处理
+        if (mSshSessionDialog != null) {
+            mSshSessionDialog.onActivityResult(requestCode, resultCode, data);
+        }
         if (requestCode == RequestFloat) {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();

@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools" package="com.tsymiar.device2device">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
@@ -198,6 +199,11 @@
         <service android:name=".service.WindowService" />
         <service android:name=".service.ReceiverService" />
         <service android:name=".service.SaveDataService" />
+        <!-- SSH 客户端后台保活：状态栏常驻通知，点击回到会话 -->
+        <service
+            android:name=".service.SshClientService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <activity
             android:name=".activity.BtDialogActivity"
             android:exported="true"
@@ -257,7 +263,9 @@
         </provider>
         <activity android:name=".activity.SshClientActivity"
             android:label="@string/ssh_client_title"
-            android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar" />
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
 
     </application>
 

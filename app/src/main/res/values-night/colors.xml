@@ -19,7 +19,6 @@
     <color name="market_text_hint">#FF6B7280</color>
     <color name="market_accent">#FF00DCA0</color>
     <color name="market_accent_pressed">#FF00B384</color>
-    <color name="market_on_accent">#FF0A0A12</color>
     <color name="market_on">#FFFF964F</color>
     <color name="market_on_pressed">#FFE07A38</color>
     <color name="market_on_text">#FF0A0A12</color>
@@ -34,7 +33,6 @@
     <color name="market_dif">#FFFFA726</color>
     <color name="market_dea">#FF42A5F5</color>
     <color name="market_rsi">#FFAB47BC</color>
-    <color name="market_cursor">#FF9AA4B2</color>
     <!-- 分时折线（1 分钟） -->
     <color name="market_trend">#FF42A5F5</color>
     <!-- 分时均价线：深底取亮黄 -->

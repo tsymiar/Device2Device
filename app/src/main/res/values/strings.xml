@@ -322,7 +322,6 @@
     <string name="ssh_client_title">SSH 客户端</string>
     <string name="ssh_connect">连接</string>
     <string name="ssh_disconnect">断开</string>
-    <string name="ssh_send">发送</string>
     <string name="ssh_client_host">主机 / IP</string>
     <string name="ssh_client_port">端口</string>
     <string name="ssh_client_user">账号</string>
@@ -330,6 +329,26 @@
     <string name="ssh_client_command">输入命令…</string>
     <string name="ssh_client_need_host_user">请填写主机IP与账号</string>
     <string name="ssh_not_connected">尚未连接</string>
+
+    <!-- ===== SSH 会话管理（JuiceSSH 风格） ===== -->
+    <string name="ssh_sessions">SSH 会话</string>
+    <string name="ssh_session_new">＋ 新建会话</string>
+    <string name="ssh_session_temp">临时连接</string>
+    <string name="ssh_session_hint">点击会话直接连接，长按可编辑或删除。密钥与主机指纹仅保存在本机。</string>
+    <string name="ssh_session_empty">点「新建会话」添加，或「临时连接」直接连一次。</string>
+    <string name="ssh_session_name">会话名称（可选）</string>
+    <string name="ssh_session_group">分组（可选）</string>
+    <string name="ssh_session_auth_password">密码认证</string>
+    <string name="ssh_session_auth_key">私钥认证</string>
+    <string name="ssh_session_pick_key">选择私钥文件…</string>
+    <string name="ssh_session_key_hint">未选择私钥</string>
+    <string name="ssh_session_key_pass">私钥口令（可选）</string>
+    <string name="ssh_session_need_key">请先选择私钥文件</string>
+    <string name="ssh_session_edit">编辑</string>
+    <string name="ssh_session_delete">删除</string>
+    <string name="ssh_host_key_changed">⚠ 主机密钥变更！本次连接已拒绝。</string>
+    <string name="ssh_notify_title">SSH 连接中 · 点击返回</string>
+    <string name="ssh_notify_channel">SSH 后台连接</string>
 
     <!-- ===== Exit ===== -->
     <string name="exit_app">再次返回退出应用</string>
