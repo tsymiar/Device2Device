@@ -17,26 +17,45 @@ import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.util.AttributeSet;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.utils.SoundRecord;
 
+import java.nio.ShortBuffer;
+import java.util.ArrayList;
+
+/**
+ * 文件波形视图。
+ *
+ * 数据来源不是按帧平滑过的 frameGains，而是解码后的原始采样：加载时建一套
+ * min/max 包络金字塔（块大小 32、128、512……），绘制时每个屏幕像素列取
+ * 覆盖采样的 min/max 画竖线 —— 缩小不漏峰值、放大能看到真实采样细节。
+ *
+ * 交互：单指左右拖动平移；双指捏合连续缩放；双击放大；长按后左右拖动框选区域，
+ * 松手放大到该区域。
+ */
 public class WaveformsView extends View {
     // Colors
     private final Paint mSelectedLinePaint;
     private final Paint mUnselectedLinePaint;
     private final Paint mTimeValuePaint;
     private final Paint circlePaint;
-    Paint paintLine;
+    private final Paint mCenterLinePaint;
+    private final Paint mBorderLinePaint;
+    private final Paint mRegionFillPaint;
+    private final Paint mRegionBorderPaint;
+    /** 播放指示线：固定 1 像素，不随缩放变粗 */
+    private final Paint mPlayLinePaint;
     private int mLineOffset;
     private int mPlayFinish;
 
     private SoundRecord mSoundRecord;
     private int[] mLenByZoomLevel;
-    private double[][] mValuesByZoomLevel;
     private double[] mZoomFactorByZoomLevel;
-    private int[] mHeightsAtThisZoomLevel;
     private int mZoomLevel;
     private int mNumZoomLevels;
     private int mSampleRate;
@@ -47,8 +66,38 @@ public class WaveformsView extends View {
     private int mPlaybackPos;
     private boolean mInitialized;
     private float mDensity;
-    private float mInitialScaleSpan;
     private int state = 0;
+
+    /** 连续缩放倍率：1 = 整条波形刚好铺满一屏；双指捏合逐帧更新，画面跟手 */
+    private float mZoomFactor = 1f;
+    private static final float MIN_ZOOM = 0.25f;
+    private static final float MAX_ZOOM = 32f;
+    private final ScaleGestureDetector mScaleDetector;
+    private final GestureDetector mGestureDetector;
+
+    /** 原始采样（只读副本）与 min/max 包络金字塔 */
+    private ShortBuffer mRawSamples;
+    private int mNumSamples;
+    private int mChannels = 1;
+    private int mEnvMaxAbs = 1;
+    private final ArrayList<short[]> mEnvMin = new ArrayList<>();
+    private final ArrayList<short[]> mEnvMax = new ArrayList<>();
+    private int[] mEnvBlocks = new int[0];
+
+    /** 显示增益：和文件卡片的音量/增益滑杆联动，直接改变波形高度 */
+    private float mDisplayGain = 1f;
+
+    /** 单指平移 / 长按框选 */
+    private float mLastTouchX = -1f;
+    /** 平移不足一帧的位移留到下一次事件，避免整数截断导致拖动一顿一顿 */
+    private float mPanRemainder;
+    private boolean mRegionSelecting;
+    private int mRegionStartX;
+    private int mRegionEndX;
+
+    /** 批量绘制波形线的顶点缓冲（{@code x0,y0,x1,y1} × N），避免逐像素 drawLine */
+    private float[] mLines = new float[0];
+    private float[] mSelectedLines = new float[0];
 
     public int getPlayFinish() {
         return mPlayFinish;
@@ -76,49 +125,70 @@ public class WaveformsView extends View {
 
     public WaveformsView(Context context, AttributeSet attrs) {
         super(context, attrs);
-
-        // We don't want keys, the markers get these
         setFocusable(false);
-        circlePaint = new Paint();// 画圆
+
+        circlePaint = new Paint();
         circlePaint.setColor(Color.rgb(246, 131, 126));
         circlePaint.setAntiAlias(true);
-
-        Paint gridPaint = new Paint();
-        gridPaint.setAntiAlias(false);
-        gridPaint.setColor(getResources().getColor(R.color.grid_line));
+        mPlayLinePaint = new Paint();
+        mPlayLinePaint.setColor(Color.rgb(246, 131, 126));
+        mPlayLinePaint.setStrokeWidth(1f);
         mSelectedLinePaint = new Paint();
         mSelectedLinePaint.setAntiAlias(false);
-        mSelectedLinePaint.setColor(getResources().getColor(R.color.waveform_selected));
+        mSelectedLinePaint.setColor(Color.rgb(39, 199, 175));
         mUnselectedLinePaint = new Paint();
         mUnselectedLinePaint.setAntiAlias(false);
-        mUnselectedLinePaint.setColor(getResources().getColor(R.color.waveform_unselected));
-        Paint unselectedBkgndLinePaint = new Paint();
-        unselectedBkgndLinePaint.setAntiAlias(false);
-        unselectedBkgndLinePaint.setColor(getResources().getColor(R.color.waveform_unselected_overlay));
-        Paint borderLinePaint = new Paint();
-        borderLinePaint.setAntiAlias(true);
-        borderLinePaint.setStrokeWidth(1.5f);
-        borderLinePaint.setPathEffect(new DashPathEffect(new float[] { 3.0f, 2.0f }, 0.0f));
-        borderLinePaint.setColor(getResources().getColor(R.color.white));
-        Paint playbackLinePaint = new Paint();
-        playbackLinePaint.setAntiAlias(false);
-        playbackLinePaint.setColor(getResources().getColor(R.color.playback_indicator));
+        mUnselectedLinePaint.setColor(Color.rgb(39, 199, 175));
+        mCenterLinePaint = new Paint();
+        mCenterLinePaint.setColor(Color.rgb(39, 199, 175));
+        mBorderLinePaint = new Paint();
+        mBorderLinePaint.setColor(Color.rgb(169, 169, 169));
         mTimeValuePaint = new Paint();
         mTimeValuePaint.setTextSize(12);
         mTimeValuePaint.setAntiAlias(true);
         mTimeValuePaint.setColor(getResources().getColor(R.color.time_value));
         mTimeValuePaint.setShadowLayer(2, 1, 1, getResources().getColor(R.color.time_value_shadow));
+        mRegionFillPaint = new Paint();
+        mRegionFillPaint.setColor(Color.argb(56, 39, 199, 175));
+        mRegionFillPaint.setStyle(Paint.Style.FILL);
+        mRegionBorderPaint = new Paint();
+        mRegionBorderPaint.setColor(Color.rgb(39, 199, 175));
+        mRegionBorderPaint.setStrokeWidth(1.5f);
+        mRegionBorderPaint.setPathEffect(new DashPathEffect(new float[]{4f, 3f}, 0f));
 
         mSoundRecord = null;
         mLenByZoomLevel = null;
-        mValuesByZoomLevel = null;
-        mHeightsAtThisZoomLevel = null;
         mOffset = 0;
         mPlaybackPos = -1;
-        mSelectionStart = 0;
-        mSelectionEnd = 0;
         mDensity = 1.0f;
         mInitialized = false;
+
+        mScaleDetector = new ScaleGestureDetector(context,
+                new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override
+                    public boolean onScale(ScaleGestureDetector detector) {
+                        // 捏合焦点锁在两指中心，画面实时跟手
+                        setZoomFactor(mZoomFactor * detector.getScaleFactor(),
+                                detector.getFocusX());
+                        return true;
+                    }
+                });
+        mGestureDetector = new GestureDetector(context,
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public void onLongPress(MotionEvent e) {
+                        mRegionSelecting = true;
+                        mRegionStartX = mRegionEndX = (int) e.getX();
+                        invalidate();
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        // 双击就地放大一档
+                        setZoomFactor(mZoomFactor * 2f, e.getX());
+                        return true;
+                    }
+                });
     }
 
     public boolean hasSoundFile() {
@@ -129,8 +199,13 @@ public class WaveformsView extends View {
         mSoundRecord = soundRecord;
         mSampleRate = mSoundRecord.getSampleRate();
         mSamplesPerFrame = mSoundRecord.getSamplesPerFrame();
-        computeDoublesForAllZoomLevels();
-        mHeightsAtThisZoomLevel = null;
+        computeZoomBase();
+        buildEnvelope();
+        // 换文件时从"整条铺满一屏"开始，别把上一首的缩放/偏移带过来
+        mZoomFactor = 1f;
+        mOffset = 0;
+        mRegionSelecting = false;
+        mSelectionStart = mSelectionEnd = 0;
     }
 
     public boolean isInitialized() {
@@ -138,55 +213,75 @@ public class WaveformsView extends View {
     }
 
     public int getZoomLevel() {
-
         return mZoomLevel;
     }
 
+    /** level 0..4 映射到连续倍率 2×/1×/0.5×/0.25×/0.125×（兼容外部按级设置的调用） */
     public void setZoomLevel(int zoomLevel) {
-        while (mZoomLevel > zoomLevel) {
-            zoomIn();
-        }
-        while (mZoomLevel < zoomLevel) {
-            zoomOut();
-        }
+        setZoomFactor((float) Math.pow(2, 1 - zoomLevel), getMeasuredWidth() / 2f);
     }
 
     public boolean canZoomIn() {
-        return (mZoomLevel > 0);
-    }
-
-    public void zoomIn() {
-        if (canZoomIn()) {
-            mZoomLevel--;
-            mSelectionStart *= 2;
-            mSelectionEnd *= 2;
-            mHeightsAtThisZoomLevel = null;
-            int offsetCenter = mOffset + getMeasuredWidth() / 2;
-            offsetCenter *= 2;
-            mOffset = offsetCenter - getMeasuredWidth() / 2;
-            if (mOffset < 0)
-                mOffset = 0;
-            invalidate();
-        }
+        return mZoomFactor < MAX_ZOOM;
     }
 
     public boolean canZoomOut() {
-        return (mZoomLevel < mNumZoomLevels - 1);
+        return mZoomFactor > MIN_ZOOM;
+    }
+
+    public void zoomIn() {
+        setZoomFactor(mZoomFactor * 2f, getMeasuredWidth() / 2f);
     }
 
     public void zoomOut() {
-        if (canZoomOut()) {
-            mZoomLevel++;
-            mSelectionStart /= 2;
-            mSelectionEnd /= 2;
-            int offsetCenter = mOffset + getMeasuredWidth() / 2;
-            offsetCenter /= 2;
-            mOffset = offsetCenter - getMeasuredWidth() / 2;
-            if (mOffset < 0)
-                mOffset = 0;
-            mHeightsAtThisZoomLevel = null;
-            invalidate();
+        setZoomFactor(mZoomFactor / 2f, getMeasuredWidth() / 2f);
+    }
+
+    /** 连续设置缩放倍率，并把 (focusX, 焦点帧) 保持在原来的屏幕位置 */
+    private void setZoomFactor(float target, float focusX) {
+        target = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, target));
+        if (Math.abs(target - mZoomFactor) < 0.0005f) return;
+        float oldPxf = pixelsPerFrame();
+        float focusFrame = mOffset + focusX / oldPxf;
+        mZoomFactor = target;
+        float newPxf = pixelsPerFrame();
+        if (oldPxf > 0 && newPxf > 0) {
+            mOffset = Math.round(focusFrame - focusX / newPxf);
+            clampOffset();
         }
+        invalidate();
+    }
+
+    /** 把屏幕 [x0, x1] 这段区域放大到整屏显示 */
+    private void zoomToRegion(int x0, int x1) {
+        if (x1 - x0 < 12) return;
+        float pxf = pixelsPerFrame();
+        float startFrame = mOffset + x0 / pxf;
+        float target = mZoomFactor * (float) getMeasuredWidth() / (x1 - x0);
+        mZoomFactor = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, target));
+        mOffset = Math.round(startFrame);
+        clampOffset();
+        invalidate();
+    }
+
+    /** 每帧占多少像素：level-1 整条铺满一屏为基准，再乘用户缩放倍率 */
+    private float pixelsPerFrame() {
+        if (mLenByZoomLevel == null || mLenByZoomLevel.length < 2) return 1f;
+        int normal = Math.max(1, mLenByZoomLevel[1]);
+        return (float) getMeasuredWidth() / normal * mZoomFactor;
+    }
+
+    /** 当前倍率下一屏能显示的帧数 */
+    private int visibleFrames() {
+        return Math.max(1, (int) (getMeasuredWidth() / pixelsPerFrame()));
+    }
+
+    /** 偏移量约束在有效范围内：最多滚到"最后一屏"，最小 0 */
+    private void clampOffset() {
+        if (mLenByZoomLevel == null) return;
+        int maxOffset = Math.max(0, maxPos() - visibleFrames());
+        if (mOffset > maxOffset) mOffset = maxOffset;
+        if (mOffset < 0) mOffset = 0;
     }
 
     public int maxPos() {
@@ -194,32 +289,31 @@ public class WaveformsView extends View {
     }
 
     public int secondsToFrames(double seconds) {
-        return (int)(1.0 * seconds * mSampleRate / mSamplesPerFrame + 0.5);
+        return (int) (1.0 * seconds * mSampleRate / mSamplesPerFrame + 0.5);
     }
 
     public int secondsToPixels(double seconds) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int)(z * seconds * mSampleRate / mSamplesPerFrame + 0.5);
+        return (int) (z * seconds * mSampleRate / mSamplesPerFrame + 0.5);
     }
 
     public double pixelsToSeconds(int pixels) {
         double z = mZoomFactorByZoomLevel[0];
-        return (mSoundRecord.getNumFramesFloat() * 2 * (double)mSamplesPerFrame / (mSampleRate * z));
+        return (mSoundRecord.getNumFramesFloat() * 2 * (double) mSamplesPerFrame / (mSampleRate * z));
     }
 
     public int millisecsToPixels(int msecs) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int)((msecs * 1.0 * mSampleRate * z) / (1000.0 * mSamplesPerFrame) + 0.5);
+        return (int) ((msecs * 1.0 * mSampleRate * z) / (1000.0 * mSamplesPerFrame) + 0.5);
     }
 
     public int pixelsToMillisecs(int pixels) {
         double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int)(pixels * (1000.0 * mSamplesPerFrame) / (mSampleRate * z) + 0.5);
+        return (int) (pixels * (1000.0 * mSamplesPerFrame) / (mSampleRate * z) + 0.5);
     }
 
     public int pixelsToMillisecsTotal() {
-        double z = mZoomFactorByZoomLevel[mZoomLevel];
-        return (int)(mSoundRecord.getNumFramesFloat() * 1 * (1000.0 * mSamplesPerFrame) / (mSampleRate * 1) + 0.5);
+        return (int) (mSoundRecord.getNumFramesFloat() * 1000.0 * mSamplesPerFrame / mSampleRate + 0.5);
     }
 
     public void setParameters(int start, int end, int offset) {
@@ -244,18 +338,198 @@ public class WaveformsView extends View {
         mPlaybackPos = pos;
     }
 
-    public void recomputeHeights(float density) {
-        mHeightsAtThisZoomLevel = null;
-        mDensity = density;
-        mTimeValuePaint.setTextSize((int)(12 * density));
+    /** 波形显示增益（0.1× ~ 3×），与文件卡片的音量滑杆联动 */
+    public void setDisplayGain(float gain) {
+        mDisplayGain = Math.max(0.1f, Math.min(3f, gain));
         invalidate();
     }
 
-    protected void drawWaveformLine(Canvas canvas, int x, int y0, int y1, Paint paint) {
-        int pos = maxPos();
-        float rat = ((float)getMeasuredWidth() / pos);
-        canvas.drawLine((int)((x - mOffset) * rat), y0, (int)((x - mOffset) * rat), y1, paint);
+    public void recomputeHeights(float density) {
+        mDensity = density;
+        mTimeValuePaint.setTextSize((int) (12 * density));
+        invalidate();
     }
+
+    // ---------- 交互 ----------
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        mScaleDetector.onTouchEvent(event);
+        mGestureDetector.onTouchEvent(event);
+
+        int action = event.getActionMasked();
+        int x = (int) event.getX();
+        if (mRegionSelecting) {
+            if (action == MotionEvent.ACTION_MOVE) {
+                mRegionEndX = x;
+                invalidate();
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                if (action == MotionEvent.ACTION_UP) {
+                    zoomToRegion(Math.min(mRegionStartX, mRegionEndX),
+                            Math.max(mRegionStartX, mRegionEndX));
+                }
+                mRegionSelecting = false;
+                invalidate();
+            }
+            mLastTouchX = -1;
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            mLastTouchX = event.getX();
+            mPanRemainder = 0;
+            getParent().requestDisallowInterceptTouchEvent(true);
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            if (!mScaleDetector.isInProgress() && event.getPointerCount() == 1
+                    && mLastTouchX >= 0) {
+                // 单指拖动：用浮点 X 位移换算帧偏移，不足一帧的部分留到下次事件，
+                // 放大后也不会因为每次位移 <1 帧而完全不动
+                float dx = event.getX() - mLastTouchX;
+                mLastTouchX = event.getX();
+                mPanRemainder -= dx / pixelsPerFrame();
+                int whole = (int) mPanRemainder;
+                if (whole != 0) {
+                    int before = mOffset;
+                    mOffset += whole;
+                    mPanRemainder -= whole;
+                    clampOffset();
+                    if (mOffset != before + whole) mPanRemainder = 0; // 到边界了，别攒着回弹
+                    invalidate();
+                }
+            }
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL
+                || event.getPointerCount() > 1) {
+            mLastTouchX = -1;
+            mPanRemainder = 0;
+        }
+        return true;
+    }
+
+    // ---------- 波形数据 ----------
+
+    /** 时间/帧换算用的级别表；绘制已不再依赖分级高度数组 */
+    private void computeZoomBase() {
+        int numFrames = Math.max(1, mSoundRecord.getNumFrames());
+        mNumZoomLevels = 5;
+        mLenByZoomLevel = new int[5];
+        mZoomFactorByZoomLevel = new double[5];
+        mLenByZoomLevel[0] = numFrames * 2;
+        mZoomFactorByZoomLevel[0] = 2.0;
+        mLenByZoomLevel[1] = numFrames;
+        mZoomFactorByZoomLevel[1] = 1.0;
+        for (int j = 2; j < 5; j++) {
+            mLenByZoomLevel[j] = Math.max(1, mLenByZoomLevel[j - 1] / 2);
+            mZoomFactorByZoomLevel[j] = mZoomFactorByZoomLevel[j - 1] / 2.0;
+        }
+        mZoomLevel = 1;
+        mInitialized = true;
+    }
+
+    /**
+     * 一次性从解码采样建 min/max 包络金字塔：
+     * 块大小 32、128、512……每级 4 合 1，直到剩不到 512 块。
+     * 绘制时按每像素覆盖的采样数选层级，只读 4 个块就得到该列的峰值范围。
+     */
+    private void buildEnvelope() {
+        mEnvMin.clear();
+        mEnvMax.clear();
+        mEnvBlocks = new int[0];
+        ShortBuffer src = mSoundRecord.getSamples();
+        mNumSamples = mSoundRecord.getNumSamples();
+        mChannels = Math.max(1, mSoundRecord.getChannels());
+        mRawSamples = src != null ? src.duplicate() : null;
+        if (mRawSamples == null || mNumSamples <= 0) return;
+
+        final int base = 32;
+        int len = (mNumSamples + base - 1) / base;
+        short[] min = new short[len];
+        short[] max = new short[len];
+        int peak = 1;
+        for (int b = 0; b < len; b++) {
+            int from = b * base;
+            int to = Math.min(mNumSamples, from + base);
+            int lo = Short.MAX_VALUE;
+            int hi = 0;
+            for (int s = from; s < to; s++) {
+                int v = sampleAbs(s);
+                if (v < lo) lo = v;
+                if (v > hi) hi = v;
+            }
+            min[b] = (short) lo;
+            max[b] = (short) hi;
+            if (hi > peak) peak = hi;
+        }
+        mEnvMaxAbs = peak;
+        mEnvMin.add(min);
+        mEnvMax.add(max);
+
+        ArrayList<Integer> blocks = new ArrayList<>();
+        blocks.add(base);
+        while (min.length > 512) {
+            int prevLen = min.length;
+            int nextLen = (prevLen + 3) / 4;
+            short[] nextMin = new short[nextLen];
+            short[] nextMax = new short[nextLen];
+            for (int i = 0; i < nextLen; i++) {
+                int lo = Short.MAX_VALUE;
+                int hi = 0;
+                for (int j = i * 4; j < Math.min(prevLen, i * 4 + 4); j++) {
+                    if (min[j] < lo) lo = min[j];
+                    if (max[j] > hi) hi = max[j];
+                }
+                nextMin[i] = (short) lo;
+                nextMax[i] = (short) hi;
+            }
+            min = nextMin;
+            max = nextMax;
+            mEnvMin.add(min);
+            mEnvMax.add(max);
+            blocks.add(blocks.get(blocks.size() - 1) * 4);
+        }
+        mEnvBlocks = new int[blocks.size()];
+        for (int i = 0; i < blocks.size(); i++) {
+            mEnvBlocks[i] = blocks.get(i);
+        }
+    }
+
+    /** 第 s 个采样（单声道）的绝对振幅；Short.MIN_VALUE 取绝对值要特判 */
+    private int sampleAbs(int s) {
+        int v = mRawSamples.get(s * mChannels) & 0xFFFF;
+        if (v >= 0x8000) v = 0x10000 - v;
+        return v;
+    }
+
+    /** 查询 [s0, s1) 采样的振幅范围：lo = 最小绝对值，hi = 峰值 */
+    private void envelopeOf(int s0, int s1, int[] out) {
+        int span = s1 - s0;
+        int lo = Short.MAX_VALUE;
+        int hi = 0;
+        if (span <= 64 && mRawSamples != null) {
+            for (int s = s0; s < s1; s++) {
+                int v = sampleAbs(s);
+                if (v < lo) lo = v;
+                if (v > hi) hi = v;
+            }
+        } else if (mEnvBlocks.length > 0) {
+            int level = 0;
+            while (level + 1 < mEnvBlocks.length && mEnvBlocks[level + 1] <= span / 4) {
+                level++;
+            }
+            int block = mEnvBlocks[level];
+            short[] mins = mEnvMin.get(level);
+            short[] maxs = mEnvMax.get(level);
+            int b0 = s0 / block;
+            int b1 = Math.min(mins.length - 1, (s1 - 1) / block);
+            for (int b = b0; b <= b1; b++) {
+                if (mins[b] < lo) lo = mins[b];
+                if (maxs[b] > hi) hi = maxs[b];
+            }
+        }
+        out[0] = lo == Short.MAX_VALUE ? 0 : lo;
+        out[1] = hi;
+    }
+
+    // ---------- 绘制 ----------
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -263,242 +537,78 @@ public class WaveformsView extends View {
         int measuredWidth = getMeasuredWidth();
         int measuredHeight = getMeasuredHeight();
         int height = measuredHeight - mLineOffset;
+        float ctr = measuredHeight / 2f;
 
         canvas.drawARGB(255, 239, 239, 239);
+        canvas.drawLine(0, height * 0.5f + mLineOffset / 2, measuredWidth,
+                height * 0.5f + mLineOffset / 2, mCenterLinePaint);
+        canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, mBorderLinePaint);
+        canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth,
+                measuredHeight - mLineOffset / 2 - 1, mBorderLinePaint);
 
-        Paint centerLine = new Paint();
-        centerLine.setColor(Color.rgb(39, 199, 175));
-        canvas.drawLine(0, height * 0.5f + mLineOffset / 2, measuredWidth, height * 0.5f + mLineOffset / 2, centerLine);// 中心线
-
-        paintLine = new Paint();
-        paintLine.setColor(Color.rgb(169, 169, 169));
-        canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
-        canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth, measuredHeight - mLineOffset / 2 - 1,
-                paintLine);// 最下面的那根线
         if (state == 1) {
             mSoundRecord = null;
             state = 0;
-            return;
         }
+        if (mSoundRecord == null) return;
 
-        if (mSoundRecord == null) {
-            height = measuredHeight - mLineOffset;
-            centerLine = new Paint();
-            centerLine.setColor(Color.rgb(39, 199, 175));
-            canvas.drawLine(0, height * 0.5f + mLineOffset / 2, measuredWidth, height * 0.5f + mLineOffset / 2,
-                    centerLine);// 中心线
-            paintLine = new Paint();
-            paintLine.setColor(Color.rgb(169, 169, 169));
-            canvas.drawLine(0, mLineOffset / 2, measuredWidth, mLineOffset / 2, paintLine);// 最上面的那根线
-            canvas.drawLine(0, measuredHeight - mLineOffset / 2 - 1, measuredWidth,
-                    measuredHeight - mLineOffset / 2 - 1, paintLine);// 最下面的那根线
-            return;
+        int need = measuredWidth * 8;
+        if (mLines.length < need) {
+            mLines = new float[need];
+            mSelectedLines = new float[need];
         }
-        if (mHeightsAtThisZoomLevel == null)
-            computeIntsForThisZoomLevel();
+        float pxf = pixelsPerFrame();
+        int totalFrames = maxPos();
+        int samples = Math.min(mNumSamples, mSoundRecord.getNumSamples());
+        float scale = (height / 2f - 2f) / mEnvMaxAbs * mDisplayGain;
+        int[] env = new int[2];
+        int n = 0;
+        int ns = 0;
+        for (int x = 0; x < measuredWidth; x++) {
+            double frameStart = mOffset + x / pxf;
+            if (frameStart >= totalFrames) break;
+            int frame = (int) frameStart;
+            int s0 = (int) (frameStart * mSamplesPerFrame);
+            int s1 = Math.min(samples, (int) Math.ceil((frameStart + 1 / pxf) * mSamplesPerFrame));
+            if (s0 >= s1) continue;
+            envelopeOf(s0, s1, env);
+            int maxH = (int) (height / 2f - 1);
+            int hi = Math.min(maxH, (int) (env[1] * scale));
+            int lo = Math.min(hi, (int) (env[0] * scale));
+            if (hi <= 0) continue;
 
-        // Draw waveform
-        int start = mOffset;
-        int width = mHeightsAtThisZoomLevel.length - start;
-        int ctr = measuredHeight / 2;
-        if (width > measuredWidth)
-            width = measuredWidth;
+            boolean selected = frame >= mSelectionStart && frame < mSelectionEnd;
+            float[] dst = selected ? mSelectedLines : mLines;
+            int idx = selected ? ns : n;
+            // 上、下各一段：保留该像素列内的峰值范围，缩小也不丢尖峰
+            dst[idx] = x; dst[idx + 1] = ctr - hi; dst[idx + 2] = x; dst[idx + 3] = ctr - lo;
+            dst[idx + 4] = x; dst[idx + 5] = ctr + lo; dst[idx + 6] = x; dst[idx + 7] = ctr + hi;
+            if (selected) ns = idx + 8; else n = idx + 8;
 
-        // Draw grid
-        double onePixelInSecs = pixelsToSeconds(1);
-        boolean onlyEveryFiveSecs = (onePixelInSecs > 1.0 / 50.0);
-        double fractionalSecs = mOffset * onePixelInSecs;
-        int integerSecs = (int)fractionalSecs;
-        int i = 0;
-        while (i < width) {
-            i++;
-            fractionalSecs += onePixelInSecs;
-            int integerSecsNew = (int)fractionalSecs;
-            if (integerSecsNew != integerSecs) {
-                integerSecs = integerSecsNew;
+        }
+        if (n > 0) canvas.drawLines(mLines, 0, n, mUnselectedLinePaint);
+        if (ns > 0) canvas.drawLines(mSelectedLines, 0, ns, mSelectedLinePaint);
+
+        // 播放指示线：按帧→像素的反变换画一次。放大后一个帧可能占多个像素列，
+        // 放在循环里会画出一排相邻竖线（看起来变粗）；独立绘制始终 1px，
+        // 并且随 mOffset / pxf 一起移动，缩放/平移后仍对齐同一时间点。
+        if (mPlaybackPos >= 0 && mPlayFinish != 1 && pxf > 0) {
+            float playX = (mPlaybackPos - mOffset) * pxf;
+            if (playX >= 0 && playX <= measuredWidth) {
+                canvas.drawLine(playX, 0, playX, measuredHeight, mPlayLinePaint);
+                canvas.drawCircle(playX, mLineOffset / 4, mLineOffset / 4, circlePaint);
+                canvas.drawCircle(playX, measuredHeight - mLineOffset / 4,
+                        mLineOffset / 4, circlePaint);
             }
         }
 
-        // Draw waveform
-        for (i = 0; i < maxPos(); i++) {
-            Paint paint;
-            if (i + start >= mSelectionStart && i + start < mSelectionEnd) {
-                paint = mSelectedLinePaint;
-            } else {
-                paint = mUnselectedLinePaint;
-            }
-            paint.setColor(Color.rgb(39, 199, 175));
-            paint.setStrokeWidth(1);
-
-            drawWaveformLine(canvas, i, (ctr - mHeightsAtThisZoomLevel[start + i]),
-                    (ctr + 1 + mHeightsAtThisZoomLevel[start + i]), paint);
-
-            if (i + start == mPlaybackPos && mPlayFinish != 1) {
-                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), mLineOffset / 4, mLineOffset / 4, circlePaint);// 上圆
-                canvas.drawCircle(i * getMeasuredWidth() / maxPos(), getMeasuredHeight() - mLineOffset / 4,
-                        mLineOffset / 4, circlePaint);// 下圆
-                canvas.drawLine(i * getMeasuredWidth() / maxPos(), 0, i * getMeasuredWidth() / maxPos(),
-                        getMeasuredHeight(), circlePaint);// 垂直的线
-                // 画正在播放的线
-                // canvas.drawLine(i*getMeasuredWidth()/maxPos(), 0,
-                // i*getMeasuredWidth()/maxPos(), measuredHeight, paint);
-            }
-        }
-
-        // Draw time
-        double timeIntervalSecs = 1.0;
-        if (timeIntervalSecs / onePixelInSecs < 50) {
-            timeIntervalSecs = 5.0;
-        }
-        if (timeIntervalSecs / onePixelInSecs < 50) {
-            timeIntervalSecs = 15.0;
-        }
-    }
-
-    /**
-     * Called once when a new sound file is added
-     */
-    private void computeDoublesForAllZoomLevels() {
-        int numFrames = mSoundRecord.getNumFrames();
-        int[] frameGains = mSoundRecord.getFrameGains();
-        double[] smoothedGains = new double[numFrames];
-        if (numFrames == 1) {
-            smoothedGains[0] = frameGains[0];
-        } else if (numFrames == 2) {
-            smoothedGains[0] = frameGains[0];
-            smoothedGains[1] = frameGains[1];
-        } else if (numFrames > 2) {
-            smoothedGains[0] = (double)((frameGains[0] / 2.0) + (frameGains[1] / 2.0));
-            for (int i = 1; i < numFrames - 1; i++) {
-                smoothedGains[i] = (double)((frameGains[i - 1] / 3.0) + (frameGains[i] / 3.0)
-                        + (frameGains[i + 1] / 3.0));
-            }
-            smoothedGains[numFrames
-                    - 1] = (double)((frameGains[numFrames - 2] / 2.0) + (frameGains[numFrames - 1] / 2.0));
-        }
-
-        // Make sure the range is no more than 0 - 255
-        double maxGain = 1.0;
-        for (int i = 0; i < numFrames; i++) {
-            if (smoothedGains[i] > maxGain) {
-                maxGain = smoothedGains[i];
-            }
-        }
-        double scaleFactor = 1.0;
-        if (maxGain > 255.0) {
-            scaleFactor = 255 / maxGain;
-        }
-
-        // Build histogram of 256 bins and figure out the new scaled max
-        maxGain = 0;
-        int gainHist[] = new int[256];
-        for (int i = 0; i < numFrames; i++) {
-            int smoothedGain = (int)(smoothedGains[i] * scaleFactor);
-            if (smoothedGain < 0)
-                smoothedGain = 0;
-            if (smoothedGain > 255)
-                smoothedGain = 255;
-            if (smoothedGain > maxGain)
-                maxGain = smoothedGain;
-
-            gainHist[smoothedGain]++;
-        }
-
-        // Re-calibrate the min to be 5%
-        double minGain = 0;
-        int sum = 0;
-        while (minGain < 255 && sum < numFrames / 20) {
-            sum += gainHist[(int)minGain];
-            minGain++;
-        }
-
-        // Re-calibrate the max to be 99%
-        sum = 0;
-        while (maxGain > 2 && sum < numFrames / 100) {
-            sum += gainHist[(int)maxGain];
-            maxGain--;
-        }
-        if (maxGain <= 50) {
-            maxGain = 80;
-        } else if (maxGain > 50 && maxGain < 120) {
-            maxGain = 142;
-        } else {
-            maxGain += 10;
-        }
-
-        // Compute the heights
-        double[] heights = new double[numFrames];
-        double range = maxGain - minGain;
-        for (int i = 0; i < numFrames; i++) {
-            double value = (smoothedGains[i] * scaleFactor - minGain) / range;
-            if (value < 0.0)
-                value = 0.0;
-            if (value > 1.0)
-                value = 1.0;
-            heights[i] = value * value;
-        }
-
-        mNumZoomLevels = 5;
-        mLenByZoomLevel = new int[5];
-        mZoomFactorByZoomLevel = new double[5];
-        mValuesByZoomLevel = new double[5][];
-
-        // Level 0 is doubled, with interpolated values
-        mLenByZoomLevel[0] = numFrames * 2;
-        System.out.println("numFrames = " + numFrames);
-        mZoomFactorByZoomLevel[0] = 2.0;
-        mValuesByZoomLevel[0] = new double[mLenByZoomLevel[0]];
-        if (numFrames > 0) {
-            mValuesByZoomLevel[0][0] = 0.5 * heights[0];
-            mValuesByZoomLevel[0][1] = heights[0];
-        }
-        for (int i = 1; i < numFrames; i++) {
-            mValuesByZoomLevel[0][2 * i] = 0.5 * (heights[i - 1] + heights[i]);
-            mValuesByZoomLevel[0][2 * i + 1] = heights[i];
-        }
-
-        // Level 1 is normal
-        mLenByZoomLevel[1] = numFrames;
-        mValuesByZoomLevel[1] = new double[mLenByZoomLevel[1]];
-        mZoomFactorByZoomLevel[1] = 1.0;
-        for (int i = 0; i < mLenByZoomLevel[1]; i++) {
-            mValuesByZoomLevel[1][i] = heights[i];
-        }
-
-        // 3 more levels are each halved
-        for (int j = 2; j < 5; j++) {
-            mLenByZoomLevel[j] = mLenByZoomLevel[j - 1] / 2;
-            mValuesByZoomLevel[j] = new double[mLenByZoomLevel[j]];
-            mZoomFactorByZoomLevel[j] = mZoomFactorByZoomLevel[j - 1] / 2.0;
-            for (int i = 0; i < mLenByZoomLevel[j]; i++) {
-                mValuesByZoomLevel[j][i] = 0.5
-                        * (mValuesByZoomLevel[j - 1][2 * i] + mValuesByZoomLevel[j - 1][2 * i + 1]);
-            }
-        }
-
-        if (numFrames > 5000) {
-            mZoomLevel = 3;
-        } else if (numFrames > 1000) {
-            mZoomLevel = 2;
-        } else if (numFrames > 300) {
-            mZoomLevel = 1;
-        } else {
-            mZoomLevel = 0;
-        }
-
-        mInitialized = true;
-    }
-
-    /**
-     * Called the first time we need to draw when the zoom level has changed or
-     * the screen is resized
-     */
-    private void computeIntsForThisZoomLevel() {
-
-        int halfHeight = (getMeasuredHeight() / 2) - 1;
-        mHeightsAtThisZoomLevel = new int[mLenByZoomLevel[mZoomLevel]];
-        for (int i = 0; i < mLenByZoomLevel[mZoomLevel]; i++) {
-            mHeightsAtThisZoomLevel[i] = (int)(mValuesByZoomLevel[mZoomLevel][i] * halfHeight);
+        if (mRegionSelecting) {
+            int x0 = Math.min(mRegionStartX, mRegionEndX);
+            int x1 = Math.max(mRegionStartX, mRegionEndX);
+            canvas.drawRect(x0, mLineOffset / 2f, x1, measuredHeight - mLineOffset / 2f,
+                    mRegionFillPaint);
+            canvas.drawLine(x0, 0, x0, measuredHeight, mRegionBorderPaint);
+            canvas.drawLine(x1, 0, x1, measuredHeight, mRegionBorderPaint);
         }
     }
 }

@@ -239,8 +239,10 @@ private:
     std::string m_selfIp;
     std::string m_selfId;
     int m_port{ LAN_CHAT_PORT };
-    int m_discoveryPort{ LAN_DISCOVERY_PORT };
-    /** 发现广播目标地址；空或 255.255.255.255 走广播，其它地址 announce 会额外发一份 */
+    /** 发现端口可在运行中修改，announce 线程无锁读，所以用原子 */
+    std::atomic<int> m_discoveryPort{ LAN_DISCOVERY_PORT };
+    /** 发现广播目标地址；由 m_configMutex 保护，避免与 announce 线程同时读写 string */
+    mutable std::mutex m_configMutex;
     std::string m_discoveryAddress{ "255.255.255.255" };
 
     /** UDP socket used for discovery: announcing and receiving, reusing UdpSocket */

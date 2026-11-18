@@ -1,6 +1,8 @@
 package com.tsymiar.device2device.service;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Process;
 import android.os.StatFs;
@@ -101,7 +103,19 @@ class SshShellCommand implements Command, Runnable {
             env.put("USER", userName);
             env.put("HOME", userHome.getAbsolutePath());
             env.put("SHELL", "/system/bin/sh");
-            env.put("PATH", "/system/bin:/system/xbin:/sbin");
+            // Termux 风格的应用内前缀：用户可以往 $PREFIX/bin 放自己的可执行文件/脚本，
+            // 外部命令会继承这里的 PATH 和 PREFIX，不需要 root 也不用装 Termux。
+            File prefix = new File(userHome, "usr");
+            File bin = new File(prefix, "bin");
+            File lib = new File(prefix, "lib");
+            File tmp = new File(prefix, "tmp");
+            if (!bin.exists()) bin.mkdirs();
+            if (!lib.exists()) lib.mkdirs();
+            if (!tmp.exists()) tmp.mkdirs();
+            env.put("PREFIX", prefix.getAbsolutePath());
+            env.put("PATH", bin.getAbsolutePath() + ":/system/bin:/system/xbin:/sbin");
+            env.put("TMPDIR", tmp.getAbsolutePath());
+            env.put("LANG", "C.UTF-8");
             env.put("PWD", userHome.getAbsolutePath());
             if (!env.containsKey("TERM")) {
                 env.put("TERM", "xterm");
@@ -213,6 +227,8 @@ class SshShellCommand implements Command, Runnable {
                 o.println("Device2Device shell —— 已登录为 " + state.userName
                         + "，家目录 " + state.userHome.getAbsolutePath());
                 o.println("内置命令集，输入 help 查看；支持 ; && || 串联、> >> < 重定向、* ? 通配");
+                o.println("应用内环境 PREFIX=" + state.env.get("PREFIX")
+                        + "，$PREFIX/bin 中的程序可直接运行（pkg 查看）");
                 o.print(prompt());
                 o.flush();
                 Log.i(TAG, "shell loop start, hasPty=" + hasPty + ", echoInput=" + echoInput);
@@ -573,6 +589,15 @@ class SshShellCommand implements Command, Runnable {
                 return duCmd(args, o);
             case "stat":
                 return statCmd(args, o);
+            case "prefix":
+                o.println(state.env.get("PREFIX"));
+                return 0;
+            case "pkg":
+                return prefixPkg(args, o);
+            case "which":
+                return whichCmd(args, o);
+            case "termux":
+                return termuxBridge(args, o);
             case "clear":
                 for (int i = 0; i < 40; i++) {
                     o.println();
@@ -581,6 +606,86 @@ class SshShellCommand implements Command, Runnable {
             default:
                 return external(joinRaw(Arrays.asList(args)), o, e);
         }
+    }
+
+    /** 列出应用内 $PREFIX/bin 里可用的程序（Termux 的 pkg list-installed 的轻量版） */
+    private int prefixPkg(String[] args, PrintStream o) {
+        File bin = new File(state.env.get("PREFIX"), "bin");
+        File[] files = bin.listFiles();
+        if (files == null || files.length == 0) {
+            o.println("$PREFIX/bin 为空。可以把可执行文件放进去：");
+            o.println("  " + bin.getAbsolutePath());
+            o.println("例如：cp /sdcard/Download/busybox $PREFIX/bin/ && chmod 755 $PREFIX/bin/busybox");
+            return 0;
+        }
+        Arrays.sort(files, Comparator.comparing(File::getName));
+        o.println("应用内 $PREFIX/bin (" + files.length + ") :");
+        for (File f : files) {
+            o.println("  " + f.getName() + (f.canExecute() ? "" : "  (不可执行)"));
+        }
+        return 0;
+    }
+
+    /** 在 PATH 中查找可执行文件，行为对齐 which */
+    private int whichCmd(String[] args, PrintStream o) {
+        if (args.length < 2) {
+            o.println("用法: which <命令> [命令...]");
+            return 2;
+        }
+        int missing = 0;
+        String[] dirs = state.env.get("PATH").split(File.pathSeparator);
+        for (int i = 1; i < args.length; i++) {
+            String name = args[i];
+            File found = null;
+            if (name.contains("/")) {
+                File f = new File(name);
+                if (f.isFile() && f.canExecute()) found = f;
+            } else {
+                for (String dir : dirs) {
+                    File f = new File(dir, name);
+                    if (f.isFile() && f.canExecute()) {
+                        found = f;
+                        break;
+                    }
+                }
+            }
+            if (found == null) {
+                missing++;
+            } else {
+                o.println(found.getAbsolutePath());
+            }
+        }
+        return missing == 0 ? 0 : 1;
+    }
+
+    /**
+     * Termux 桥接：
+     * - termux          说明应用内环境
+     * - termux open     若设备装了 Termux，则拉起它（只是打开 App，不接管 SSH 会话）
+     */
+    private int termuxBridge(String[] args, PrintStream o) {
+        if (args.length > 1 && "open".equalsIgnoreCase(args[1])) {
+            try {
+                Intent intent = appContext.getPackageManager()
+                        .getLaunchIntentForPackage("com.termux");
+                if (intent == null) {
+                    o.println("未安装 Termux。本 SSH 服务已内置应用内 $PREFIX 环境，无需 Termux。");
+                    return 1;
+                }
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                appContext.startActivity(intent);
+                o.println("已请求启动 Termux（会话仍在 SSH 内）。");
+                return 0;
+            } catch (ActivityNotFoundException ex) {
+                o.println("Termux 启动失败: " + ex.getMessage());
+                return 1;
+            }
+        }
+        o.println("应用内模拟环境：$PREFIX=" + state.env.get("PREFIX"));
+        o.println("  PATH = " + state.env.get("PATH"));
+        o.println("  把可执行文件放到 $PREFIX/bin 后即可直接按名字运行；pkg 可列出已放入的程序。");
+        o.println("  termux open 可在设备装有 Termux 时拉起它（不接管当前 SSH 会话）。");
+        return 0;
     }
 
     private void help(PrintStream o) {
@@ -598,6 +703,9 @@ class SshShellCommand implements Command, Runnable {
         o.println("  hostname             设备名");
         o.println("  df / du              存储剩余 / 目录占用");
         o.println("  ip                   当前 Wi-Fi 局域网 IP");
+        o.println("  prefix / pkg         应用内 $PREFIX 路径 / 列出 $PREFIX/bin 中的程序");
+        o.println("  which <cmd>          在 PATH（含 $PREFIX/bin）中查找可执行文件");
+        o.println("  termux [open]        应用内环境说明 / 拉起设备上的 Termux App");
         o.println("  mkdir [-p] / rm [-r] / touch / cp [-r] / mv   文件操作");
         o.println("  head [-n N] / tail [-n N] / wc / grep / sort / uniq   文本处理");
         o.println("  find [dir] -name PAT 按名查找");
@@ -1192,8 +1300,16 @@ class SshShellCommand implements Command, Runnable {
     /** 非内置命令交给 /system/bin/sh -c，被沙箱拦下则提示 */
     private int external(String raw, PrintStream o, PrintStream e) {
         try {
-            final java.lang.Process process =
-                    Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", raw}, null, state.cwd);
+            // 把会话环境（PATH/PREFIX/HOME/TMPDIR...）传给子进程，
+            // 这样 $PREFIX/bin 里的程序可以直接按名字调用，行为接近 Termux
+            String[] envp = new String[state.env.size() + 1];
+            int idx = 0;
+            for (Map.Entry<String, String> kv : state.env.entrySet()) {
+                envp[idx++] = kv.getKey() + "=" + kv.getValue();
+            }
+            envp[idx] = "ANDROID_ROOT=/system";
+            final java.lang.Process process = Runtime.getRuntime().exec(
+                    new String[]{"/system/bin/sh", "-c", raw}, envp, state.cwd);
             Thread pump = new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -1346,6 +1462,10 @@ class SshShellCommand implements Command, Runnable {
             case "find":
             case "du":
             case "stat":
+            case "prefix":
+            case "pkg":
+            case "which":
+            case "termux":
             case "clear":
                 return true;
             default:

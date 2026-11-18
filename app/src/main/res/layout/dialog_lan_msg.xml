@@ -19,7 +19,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/lan_msg_title"
+            android:text="@string/lan_msg"
             android:textColor="@color/lan_accent"
             android:textSize="16sp"
             android:textStyle="bold" />

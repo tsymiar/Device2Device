@@ -12,6 +12,8 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
+import java.util.Locale;
+
 /**
  * 录音时的实时分贝图：上方是当前分贝数字，下方是滚动的历史曲线，虚线标出峰值。
  *
@@ -25,7 +27,8 @@ import androidx.annotation.Nullable;
  */
 public class DecibelView extends View {
 
-    private static final int MAX_BARS = 72;
+    /** 历史柱数：72 → 120，时间轴更细，短促的声响也看得出来 */
+    private static final int MAX_BARS = 120;
     /** 显示下限：30 dB 约等于安静的室内，低于该值时贴底边绘制，否则安静环境下整片为空 */
     private static final float MIN_DB = 30f;
     /** 显示上限：0 dBFS（满刻度）按 1 Pa = 94 dB SPL 换算 */
@@ -40,9 +43,9 @@ public class DecibelView extends View {
      */
     private static final float SMOOTH = 0.85f;
 
-    /** 实时曲线的绘制形态：点一下卡片循环切换 */
+    /** 实时曲线的绘制形态：点一下卡片循环切换（面积填充在快速跳动时太闪，不再提供） */
     public enum Style {
-        BAR("柱状"), LINE("折线"), AREA("面积");
+        BAR("柱状"), LINE("折线");
         public final String label;
 
         Style(String label) {
@@ -56,9 +59,11 @@ public class DecibelView extends View {
     private final Paint mValuePaint;
     private final Paint mBarPaint;
     private final Paint mLinePaint;
-    private final Paint mAreaPaint;
     private final Paint mPeakPaint;
     private final Paint mPeakTextPaint;
+    private final Paint mGridPaint;
+    private final Paint mGridTextPaint;
+    private final Paint mInstTextPaint;
     private final RectF mRect = new RectF();
     private final Path mPath = new Path();
     private final float mDensity;
@@ -68,6 +73,8 @@ public class DecibelView extends View {
     private int mCount;
     private float mCurrent = MIN_DB;
     private float mPeak = MIN_DB;
+    /** 当前 20ms 音频块的瞬时峰值，和 RMS 分开显示 */
+    private float mInstPeak = MIN_DB;
 
     public DecibelView(Context context) {
         this(context, null);
@@ -95,11 +102,14 @@ public class DecibelView extends View {
         mLinePaint.setStrokeCap(Paint.Cap.ROUND);
         // 折线改曲线之后拐角变多，尖角接合（MITER）在急弯处会支出来一小截
         mLinePaint.setStrokeJoin(Paint.Join.ROUND);
-        mAreaPaint = fill(0x5543A047);
         mPeakPaint = stroke(0xFFE53935, dp(1));
         mPeakPaint.setPathEffect(new DashPathEffect(new float[]{dp(4), dp(3)}, 0));
         mPeakTextPaint = paint(dp(10f), 0xFFE53935, false);
-        // 点卡片切图形：柱状 → 折线 → 面积
+        mGridPaint = stroke((strokeColor & 0x00FFFFFF) | 0x22000000, dp(1));
+        mGridPaint.setPathEffect(new DashPathEffect(new float[]{dp(2), dp(3)}, 0));
+        mGridTextPaint = paint(dp(9f), titleColor, false);
+        mInstTextPaint = paint(dp(10f), 0xFFFFA726, false);
+        // 点卡片切图形：柱状 ↔ 折线
         setOnClickListener(v -> cycleStyle());
     }
 
@@ -122,7 +132,20 @@ public class DecibelView extends View {
 
     /** 当前分贝值（标准声压级 dB SPL：安静 ≈ 30 dB，正常说话 60 dB 上下） */
     public void setLevel(double dbSpl) {
-        mCurrent = (float) dbSpl;
+        setLevel(dbSpl, dbSpl);
+    }
+
+    /**
+     * @param dbSpl RMS 电平
+     * @param peakDbSpl 当前音频块的瞬时峰值
+     */
+    public void setLevel(double dbSpl, double peakDbSpl) {
+        float instant = (float) dbSpl;
+        // 平滑 RMS：读数仍精确到 0.1 dB，但不跟着每个音频块乱跳
+        mCurrent = mCount == 0 ? instant : mCurrent * 0.7f + instant * 0.3f;
+        // 瞬时峰值：跳变立即跟上，回落时慢慢衰减，避免数字闪烁
+        float peak = (float) Math.max(instant, peakDbSpl);
+        mInstPeak = mCount == 0 ? peak : Math.max(peak, mInstPeak - 0.8f);
         System.arraycopy(mHistory, 1, mHistory, 0, MAX_BARS - 1);
         mHistory[MAX_BARS - 1] = mCurrent;
         if (mCount < MAX_BARS) mCount++;
@@ -137,6 +160,7 @@ public class DecibelView extends View {
     public void reset() {
         mCurrent = MIN_DB;
         mPeak = MIN_DB;
+        mInstPeak = MIN_DB;
         mCount = 0;
         for (int i = 0; i < mHistory.length; i++) {
             mHistory[i] = MIN_DB;
@@ -162,28 +186,44 @@ public class DecibelView extends View {
         canvas.drawRect(mRect, mPanelStroke);
 
         float pad = dp(12);
-        float left = pad;
+        // 左侧给刻度数字留一条独立沟槽，避免贴着卡片边缘被裁掉
+        float left = pad + dp(22);
         float right = w - pad;
         mTitlePaint.setTextAlign(Paint.Align.LEFT);
         canvas.drawText("实时分贝 (dB SPL) · " + mStyle.label + "（点击切换）",
-                left, pad + dp(12), mTitlePaint);
+                pad, pad + dp(12), mTitlePaint);
 
         mValuePaint.setTextAlign(Paint.Align.RIGHT);
-        canvas.drawText(mCurrent <= MIN_DB + 0.5f ? "静音" : String.format("%.0f dB", mCurrent),
+        canvas.drawText(mCurrent <= MIN_DB + 0.5f ? "静音"
+                        : String.format(Locale.getDefault(), "%.1f dB", mCurrent),
                 right, pad + dp(22), mValuePaint);
+        mInstTextPaint.setTextAlign(Paint.Align.RIGHT);
+        canvas.drawText(mInstPeak <= MIN_DB + 0.5f ? ""
+                        : String.format(Locale.getDefault(), "瞬时 %.1f dB", mInstPeak),
+                right, pad + dp(34), mInstTextPaint);
 
-        float top = pad + dp(30);
+        float top = pad + dp(42);
         float bottom = h - pad - dp(6);
         float areaH = Math.max(dp(10), bottom - top);
         float slot = (right - left) / MAX_BARS;
+
+        // 10 dB 一格的刻度线 + 数字，读图时不用猜当前柱有多高
+        float[] ticks = {40f, 55f, 70f, 85f};
+        mGridTextPaint.setTextAlign(Paint.Align.RIGHT);
+        for (float db : ticks) {
+            float y = bottom - areaH * ratioOf(db);
+            if (y < top - dp(2) || y > bottom + dp(2)) continue;
+            canvas.drawLine(left, y, right, y, mGridPaint);
+            // 数字右对齐画在沟槽里，并把基线钳在绘图区内，靠边的刻度也不会被裁切
+            float labelY = Math.max(top + dp(8), Math.min(bottom - dp(2), y + dp(3)));
+            canvas.drawText(String.format(Locale.getDefault(), "%.0f", db),
+                    left - dp(5), labelY, mGridTextPaint);
+        }
 
         // 同一种历史数据、三种画法：右边是最新的一点
         switch (mStyle) {
             case LINE:
                 drawHistoryLine(canvas, left, bottom, slot, areaH);
-                break;
-            case AREA:
-                drawHistoryArea(canvas, left, bottom, slot, areaH);
                 break;
             case BAR:
             default:
@@ -196,8 +236,8 @@ public class DecibelView extends View {
             float y = bottom - areaH * ratioOf(mPeak);
             canvas.drawLine(left, y, right, y, mPeakPaint);
             mPeakTextPaint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText(String.format("全程峰值 %.0f dB", mPeak),
-                    left, Math.max(pad + dp(24), y - dp(4)), mPeakTextPaint);
+            canvas.drawText(String.format(Locale.getDefault(), "全程峰值 %.1f dB", mPeak),
+                    left, Math.max(top + dp(10), y - dp(4)), mPeakTextPaint);
         }
     }
 
@@ -218,14 +258,6 @@ public class DecibelView extends View {
         buildHistoryPath(left, bottom, slot, areaH, false);
         mLinePaint.setColor(barColor(mCurrent));
         canvas.drawPath(mPath, mLinePaint);
-    }
-
-    /** 面积：折线下方填一层半透明同色，视觉上更像声压的「起伏」 */
-    private void drawHistoryArea(Canvas canvas, float left, float bottom, float slot, float areaH) {
-        buildHistoryPath(left, bottom, slot, areaH, true);
-        mAreaPaint.setColor(areaColor(mCurrent));
-        canvas.drawPath(mPath, mAreaPaint);
-        drawHistoryLine(canvas, left, bottom, slot, areaH);
     }
 
     /**
@@ -286,10 +318,6 @@ public class DecibelView extends View {
     private static float ratioOf(float db) {
         float ratio = (db - MIN_DB) / (MAX_DB - MIN_DB);
         return Math.max(0.02f, Math.min(1f, ratio));
-    }
-
-    private static int areaColor(float db) {
-        return (barColor(db) & 0x00FFFFFF) | 0x55000000;
     }
 
     private static int barColor(float db) {

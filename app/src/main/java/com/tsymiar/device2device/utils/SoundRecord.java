@@ -35,6 +35,7 @@ import androidx.core.app.ActivityCompat;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -99,9 +100,10 @@ public class SoundRecord {
         }
     }
 
-    // TODO(nfaralli): what is the real list of supported extensions? Is it device dependent?
+    // 容器格式交给 MediaExtractor 解码；raw pcm 没有头部，走 createPcm()
     private static String[] getSupportedExtensions() {
-        return new String[]{"mp3", "wav", "3gpp", "3gp", "amr", "aac", "m4a", "ogg"};
+        return new String[]{"mp3", "wav", "3gpp", "3gp", "3g2", "amr", "aac", "m4a",
+                "ogg", "flac", "opus", "webm", "mkv"};
     }
 
     public static boolean isFilenameSupported(String filename) {
@@ -112,6 +114,57 @@ public class SoundRecord {
             }
         }
         return false;
+    }
+
+    /**
+     * 加载裸 PCM（16bit LE 交错采样，没有文件头，所以采样率/声道数必须显式给出）。
+     *
+     * 与 {@link #create(String, ProgressListener)} 的区别：不经过 MediaExtractor / MediaCodec，
+     * 直接把文件读进解码缓冲区，后面的波形包络与播放走的是同一套数据。
+     */
+    public static SoundRecord createPcm(String fileName, int sampleRate, int channels,
+                                        ProgressListener progressListener) throws IOException {
+        File f = new File(fileName);
+        if (!f.exists()) throw new java.io.FileNotFoundException(fileName);
+        int len = (int) f.length();
+        if (len < 2 || (len & 1) != 0) {
+            throw new IOException("PCM 文件长度必须是偶数（16bit 采样）");
+        }
+        channels = Math.max(1, Math.min(2, channels));
+        sampleRate = Math.max(1000, Math.min(384000, sampleRate));
+
+        SoundRecord r = new SoundRecord();
+        r.setProgressListener(progressListener);
+        r.mInputFile = f;
+        r.mFileType = "pcm";
+        r.mFileSize = len;
+        r.mSampleRate = sampleRate;
+        r.mChannels = channels;
+        r.mNumSamples = len / (2 * channels);
+        r.mAvgBitRate = sampleRate * channels * 16 / 1000;
+
+        ByteBuffer bytes = ByteBuffer.allocate(len).order(ByteOrder.LITTLE_ENDIAN);
+        FileInputStream in = new FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            int n;
+            int read = 0;
+            while ((n = in.read(buf)) > 0) {
+                bytes.put(buf, 0, n);
+                read += n;
+                if (progressListener != null
+                        && !progressListener.reportProgress((double) read / len)) {
+                    break;
+                }
+            }
+        } finally {
+            in.close();
+        }
+        bytes.rewind();
+        r.mDecodedBytes = bytes;
+        r.mDecodedSamples = bytes.asShortBuffer();
+        r.computeFrameGains();
+        return r;
     }
 
     // Create and return a SoundFile object using the file fileName.
@@ -388,41 +441,40 @@ public class SoundRecord {
         codec.release();
         codec = null;
 
-        // 按帧大小把采样数换算成帧数。
-        mNumFrames = mNumSamples / getSamplesPerFrame();
+        computeFrameGains();
+        // DumpSamples();  // Uncomment this line to dump the samples in a TSV file.
+    }
 
-        mNumFramesFloat = (float) mNumSamples / getSamplesPerFrame();
-        if (mNumSamples % getSamplesPerFrame() != 0) {
+    /** 按固定帧长统计每帧增益，供 SamplePlayer 及旧的时间/帧换算使用 */
+    private void computeFrameGains() {
+        int spf = getSamplesPerFrame();
+        mNumFrames = mNumSamples / spf;
+        mNumFramesFloat = (float) mNumSamples / spf;
+        if (mNumSamples % spf != 0) {
             mNumFrames++;
         }
         mFrameGains = new int[mNumFrames];
         mFrameLens = new int[mNumFrames];
         mFrameOffsets = new int[mNumFrames];
-        int j;
-        int gain, value;
-        int frameLens = (int) ((1000 * mAvgBitRate / 8) *
-                ((float) getSamplesPerFrame() / mSampleRate));
-        for (i = 0; i < mNumFrames; i++) {
-            gain = -1;
-            for (j = 0; j < getSamplesPerFrame(); j++) {
-                value = 0;
+        int frameLens = (int) ((1000 * mAvgBitRate / 8) * ((float) spf / mSampleRate));
+        mDecodedSamples.rewind();
+        for (int i = 0; i < mNumFrames; i++) {
+            int gain = -1;
+            for (int j = 0; j < spf; j++) {
+                int value = 0;
                 for (int k = 0; k < mChannels; k++) {
                     if (mDecodedSamples.remaining() > 0) {
-                        value += Math.abs(mDecodedSamples.get());
+                        value += Math.abs((int) mDecodedSamples.get());
                     }
                 }
                 value /= mChannels;
-                if (gain < value) {
-                    gain = value;
-                }
+                if (gain < value) gain = value;
             }
-            mFrameGains[i] = (int) Math.sqrt(gain);  // here gain = sqrt(max value of 1st channel)...
-            mFrameLens[i] = frameLens;  // totally not accurate...
-            mFrameOffsets[i] = (int) (i * (1000 * mAvgBitRate / 8) *  //  = i * frameLens
-                    ((float) getSamplesPerFrame() / mSampleRate));
+            mFrameGains[i] = (int) Math.sqrt(Math.max(0, gain));
+            mFrameLens[i] = frameLens;
+            mFrameOffsets[i] = (int) (i * (1000 * mAvgBitRate / 8) * ((float) spf / mSampleRate));
         }
         mDecodedSamples.rewind();
-        // DumpSamples();  // Uncomment this line to dump the samples in a TSV file.
     }
 
     private void RecordAudio() {

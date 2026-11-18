@@ -45,8 +45,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class BtRemoteActivity extends Activity {
@@ -62,10 +64,14 @@ public class BtRemoteActivity extends Activity {
     private Vibrator mVibrator;
 
     private TextView mText, mSdt;
+    /** 收到的字符命令累积在这里，通过 startService 送到已有的悬浮窗 */
+    private String mReceivedText = "";
     private ImageView mImg, mSwitch0, mUp, mRight, mLeft, mDown;
     private EditText mEditText;
 
     private final TouchHandler touchHandler = new TouchHandler(this);
+    /** 接收线程把读到的字符命令送回主线程；弱引用持有 Activity，不因线程存活而泄漏 */
+    private final BtUiHandler uiHandler = new BtUiHandler(this);
     private boolean mSwitchToggled = false;
 
     private BroadcastReceiver exitReceiver;
@@ -141,28 +147,20 @@ public class BtRemoteActivity extends Activity {
         Bundle bundle = intent.getExtras();
         String address = bundle != null ? bundle.getString("address") : null;
         if (address == null) return;
+        // 返回前台时若上一条 SPP 连接还活着，不要重复 connect（否则旧 socket 泄漏、接收线程双开）
+        if (mBtSocket != null && mBtSocket.isConnected()) return;
 
         BluetoothDevice device = mBtAdapter.getRemoteDevice(address);
+        Log.i(TAG, "connect start: address=" + address + " type=" + device.getType()
+                + " bond=" + device.getBondState());
 
-        try {
-            mBtSocket = createBluetoothSocket(device);
-        } catch (Exception e) {
-            Log.e(TAG, "Socket creation failed", e);
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
-                    != PackageManager.PERMISSION_GRANTED) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    ActivityCompat.requestPermissions(this,
-                            new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
-                }
-                return;
-            }
-            mBtAdapter.disable();
-            Toast.makeText(getBaseContext(), "连接失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        final List<BluetoothSocket> candidates = createCandidateSockets(device);
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "无法创建蓝牙连接", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        final BluetoothSocket socket = mBtSocket;
         Toast.makeText(this, "连接中:\n" + address, Toast.LENGTH_SHORT).show();
         /**
          * BluetoothSocket.connect() 是阻塞的：它要跟对端握手，对端不应答时能卡几十秒。
@@ -171,26 +169,38 @@ public class BtRemoteActivity extends Activity {
          * 所以连接整个挪到后台线程，结果回到主线程再 Toast / finish / 起接收线程。
          */
         new Thread(() -> {
-            boolean ok = false;
+            BluetoothSocket connected = null;
             String err = null;
-            try {
-                // cancelDiscovery 在 Android 12+ 需要 BLUETOOTH_SCAN，没权限就别调，免得抛 SecurityException
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
-                        == PackageManager.PERMISSION_GRANTED) {
-                    mBtAdapter.cancelDiscovery();
-                }
-                socket.connect();
-                ok = true;
-            } catch (Exception e) {
-                err = e.getMessage();
-                Log.e(TAG, "Connect failed", e);
+            // 标准 SPP UUID 常常因为远端没注册 SDP 而失败，逐个回退到反射指定 RFCOMM 通道
+            for (BluetoothSocket candidate : candidates) {
                 try {
-                    socket.close();
+                    // cancelDiscovery 在 Android 12+ 需要 BLUETOOTH_SCAN，没权限就别调，免得抛 SecurityException
+                    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        mBtAdapter.cancelDiscovery();
+                    }
+                    candidate.connect();
+                    connected = candidate;
+                    err = null;
+                    break;
+                } catch (Exception e) {
+                    if (err == null) err = e.getMessage();
+                    Log.w(TAG, "connect attempt failed: " + candidate + " -> " + e.getMessage());
+                    try {
+                        candidate.close();
+                    } catch (IOException ignored) {}
+                }
+            }
+            for (BluetoothSocket candidate : candidates) {
+                if (candidate == connected) continue;
+                try {
+                    candidate.close();
                 } catch (IOException ignored) {}
             }
-            final boolean connected = ok;
+            final boolean ok = connected != null;
             final String error = err;
-            runOnUiThread(() -> onConnectResult(connected, error, address, socket));
+            final BluetoothSocket connectedSocket = connected;
+            runOnUiThread(() -> onConnectResult(ok, error, address, connectedSocket));
         }, "bt-connect").start();
     }
 
@@ -201,6 +211,8 @@ public class BtRemoteActivity extends Activity {
      * 把字段置空了，那时再去读字段就是 NPE。
      */
     private void onConnectResult(boolean connected, String error, String address, BluetoothSocket socket) {
+        Log.i(TAG, "connect result: connected=" + connected + " error=" + error
+                + " address=" + address);
         if (isFinishing() || isDestroyed()) {
             return;
         }
@@ -210,6 +222,9 @@ public class BtRemoteActivity extends Activity {
             return;
         }
         mBtSocket = socket;
+        if (mText != null) {
+            mText.setText("已连接: " + address);
+        }
         mToast = Toast.makeText(this, "蓝牙地址:\n" + address, Toast.LENGTH_LONG);
         mToast.setGravity(Gravity.RIGHT, 0, 30);
         mToast.show();
@@ -371,31 +386,50 @@ public class BtRemoteActivity extends Activity {
         }
     }
 
-    private BluetoothSocket createBluetoothSocket(BluetoothDevice device)
-            throws IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        // Try insecure first for broader compatibility
-        try {
-            Method m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", UUID.class);
-            return (BluetoothSocket) m.invoke(device, MY_UUID);
-        } catch (Exception e) {
-            Log.w(TAG, "Insecure RFComm failed, trying standard", e);
-        }
+    /** 按兼容性列出 SPP socket：标准 UUID + 反射指定的 RFCOMM 通道 */
+    private List<BluetoothSocket> createCandidateSockets(BluetoothDevice device) {
+        List<BluetoothSocket> list = new ArrayList<>();
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
                 != PackageManager.PERMISSION_GRANTED) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
-            }
+            return list;
         }
-        return device.createRfcommSocketToServiceRecord(MY_UUID);
+        try {
+            list.add(device.createInsecureRfcommSocketToServiceRecord(MY_UUID));
+        } catch (Exception e) {
+            Log.w(TAG, "createInsecureRfcomm failed: " + e.getMessage());
+        }
+        try {
+            list.add(device.createRfcommSocketToServiceRecord(MY_UUID));
+        } catch (Exception e) {
+            Log.w(TAG, "createRfcomm failed: " + e.getMessage());
+        }
+        // 非标准 SPP 设备常把串口开在 RFCOMM 1/2/3 通道上，反射是最后手段
+        try {
+            Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+            for (int channel : new int[]{1, 2, 3}) {
+                try {
+                    list.add((BluetoothSocket) method.invoke(device, channel));
+                } catch (Exception e) {
+                    Log.w(TAG, "reflect createRfcommSocket(" + channel + ") failed: "
+                            + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "no reflection createRfcommSocket: " + e.getMessage());
+        }
+        return list;
     }
 
     @SuppressLint({"RtlHardcoded"})
     private void sendData(String message) {
         if (mOutStream == null || message == null) return;
-        byte[] msgBuffer = message.getBytes();
+        byte[] msgBuffer = message.getBytes(StandardCharsets.UTF_8);
         try {
             mOutStream.write(msgBuffer);
+            mOutStream.flush();
+            if (mText != null) {
+                mText.setText("已发送: " + (message.isEmpty() ? "NULL" : message));
+            }
             if (mBtAdapter.getState() != BluetoothAdapter.STATE_OFF) {
                 String display = message.isEmpty() ? "NULL" : message;
                 mToast = Toast.makeText(getBaseContext(), "  " + display + "\n" + msgBuffer.length + " 字节已发送", Toast.LENGTH_SHORT);
@@ -433,39 +467,67 @@ public class BtRemoteActivity extends Activity {
 
         @Override
         public void run() {
-            Looper.prepare();
+            if (mmInStream == null) return;
             byte[] buffer = new byte[1024];
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try {
                     int bytes = mmInStream.read(buffer);
-                    String str = new String(buffer, 0, bytes);
+                    if (bytes <= 0) break;
+                    String str = new String(buffer, 0, bytes, StandardCharsets.UTF_8);
                     uiHandler.obtainMessage(READ, bytes, -1, str).sendToTarget();
                 } catch (Exception e) {
                     uiHandler.obtainMessage(READ, -1, -1, e.getMessage()).sendToTarget();
                     break;
                 }
             }
-            Looper.loop();
         }
     }
 
-    // ---- Static Handlers (no memory leaks) ----
+    // ---- Handlers ----
 
-    private static final Handler uiHandler = new Handler(Looper.getMainLooper()) {
+    /** 接收线程回传 UI 的弱引用 Handler */
+    private static class BtUiHandler extends Handler {
+        private final WeakReference<BtRemoteActivity> ref;
+
+        BtUiHandler(BtRemoteActivity activity) {
+            super(Looper.getMainLooper());
+            ref = new WeakReference<>(activity);
+        }
+
         @Override
         public void handleMessage(@NonNull Message msg) {
-            // Handled per-instance via weak-reference lookup — but since
-            // we always run on the current resumed activity, use a simple
-            // activity tracker pattern instead.
-            // Data is forwarded via broadcast, so no activity ref needed.
-            // The toast error is harmless if activity is gone.
-            if (msg.what == READ && msg.arg1 < 0) {
-                // read error — ignore silently if activity is dead
-                return;
+            BtRemoteActivity activity = ref.get();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+            if (msg.what != READ) return;
+            if (msg.arg1 < 0) {
+                activity.onReadError(String.valueOf(msg.obj));
+            } else if (msg.obj instanceof String) {
+                activity.onReceived((String) msg.obj);
             }
-            // Normal data path uses broadcasts — no strong activity ref needed
         }
-    };
+    }
+
+    /** 把收到的字符命令送到悬浮窗 ReceiverService */
+    private void onReceived(String text) {
+        if (text == null || text.isEmpty()) return;
+        mReceivedText += (mReceivedText.isEmpty() ? "" : "\n") + text.trim();
+        if (mReceivedText.length() > 4000) {
+            mReceivedText = mReceivedText.substring(mReceivedText.length() - 4000);
+        }
+        Intent hint = new Intent(this, ReceiverService.class);
+        hint.putExtra("cmd", mReceivedText);
+        startService(hint);
+        if (mText != null && mText.getText().toString().startsWith("已连接")) {
+            mText.setText("收到: " + text.trim());
+        }
+    }
+
+    private void onReadError(String error) {
+        if (mText != null) {
+            mText.setText("蓝牙连接断开: " + error);
+        }
+        onReceived("[断开] " + error);
+    }
 
     /**
      * TouchHandler uses the main looper to repeat-send commands.

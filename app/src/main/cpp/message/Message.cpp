@@ -4,12 +4,15 @@
 
 #include "Message.h"
 
+#include <android/log.h>
+
 std::queue <Messaging> Message::m_msgQue;
 std::mutex Message::m_mtx;
 
 namespace {
 
-const size_t MAX_QUEUED = 512;
+// Java 侧 50ms 轮询，正常一秒只出 20 条；512 太容易被一次图片 Base64 洪峰冲掉回执。
+const size_t MAX_QUEUED = 2048;
 
 bool contByte(unsigned char c)
 {
@@ -104,8 +107,14 @@ void Message::setMessage(const std::string& message, MASSAGER massager)
     messaging.massager = massager;
     messaging.message = message;
     toUtf8Safe(messaging.message);
+    size_t dropped = 0;
     while (m_msgQue.size() >= MAX_QUEUED) {
         m_msgQue.pop();
+        ++dropped;
+    }
+    if (dropped > 0) {
+        __android_log_print(ANDROID_LOG_WARN, "MessageQueue",
+                            "queue full, dropped %zu oldest events (new one kept)", dropped);
     }
     m_msgQue.emplace(std::move(messaging));
 }

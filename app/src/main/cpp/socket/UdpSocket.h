@@ -2,6 +2,7 @@
 #define DEVICE2DEVICE_UdpSocket_H
 
 #include <arpa/inet.h>
+#include <atomic>
 #include <string>
 
 struct NetProtocol {
@@ -91,7 +92,7 @@ private:
     std::string m_ip = {};
     int m_port = 0;
     /** stop 标志：置上之后 Receiver 的循环退出、receive() 不再读 */
-    bool m_flag = false;
+    std::atomic<bool> m_flag{false};
     bool m_broadcast = false;
     std::string m_multicastGroup;
     bool m_multicast = false;

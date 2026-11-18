@@ -7,11 +7,14 @@ import android.util.Log;
 import com.tsymiar.device2device.utils.SshKnownHostsStore;
 
 import org.apache.sshd.client.SshClient;
+import org.apache.sshd.client.channel.ChannelExec;
 import org.apache.sshd.client.channel.ChannelShell;
+import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.common.config.keys.FilePasswordProvider;
 import org.apache.sshd.common.keyprovider.FileKeyPairProvider;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,8 +25,11 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * SSH 客户端核心（薄封装 Apache MINA SSHD client）。
@@ -194,14 +200,46 @@ public final class SshClientCore {
         return serverFingerprint;
     }
 
-    /** 同一 session 上单独开 exec channel 取远端命令表，不污染交互终端（须后台线程调用） */
+    /**
+     * 在同一 session 上单独开 exec channel 执行命令（须后台线程调用）。
+     * 不用 executeRemoteCommand()：它引用的 java.rmi.RemoteException 在 Android 上不存在。
+     */
     public String execRemote(String command) throws Exception {
         ClientSession s = session;
         if (s == null || !s.isOpen()) {
             throw new IOException("not connected");
         }
-        // 三参数重载的 OutputStream 是 stderr，返回值才是按 charset 解码的 stdout
-        return s.executeRemoteCommand(command, new java.io.ByteArrayOutputStream(), StandardCharsets.UTF_8);
+        ChannelExec channel = null;
+        try {
+            channel = s.createExecChannel(command);
+            ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+            ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+            channel.setOut(stdout);
+            channel.setErr(stderr);
+            if (!channel.open().await(10, TimeUnit.SECONDS)) {
+                throw new java.net.SocketTimeoutException("open exec channel timeout: " + command);
+            }
+            Set<ClientChannelEvent> events = channel.waitFor(
+                    EnumSet.of(ClientChannelEvent.CLOSED, ClientChannelEvent.EXIT_STATUS),
+                    TimeUnit.SECONDS.toMillis(15));
+            if (events != null && events.contains(ClientChannelEvent.TIMEOUT)) {
+                throw new java.net.SocketTimeoutException("remote command timeout: " + command);
+            }
+            Integer status = channel.getExitStatus();
+            if (status != null && status != 0) {
+                String err = stderr.toString(StandardCharsets.UTF_8.name()).trim();
+                throw new IOException("remote command failed (" + status + ")"
+                        + (err.isEmpty() ? "" : ": " + err));
+            }
+            return stdout.toString(StandardCharsets.UTF_8.name());
+        } finally {
+            if (channel != null) {
+                try {
+                    channel.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
     }
 
     /** 发送文本（不含换行则不会执行） */

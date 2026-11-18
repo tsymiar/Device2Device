@@ -6,6 +6,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.PixelFormat;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -17,12 +18,16 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.speech.RecognizerIntent;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,6 +53,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class WaveActivity extends AppCompatActivity {
 
@@ -80,6 +86,21 @@ public class WaveActivity extends AppCompatActivity {
     private MaterialButton mTimeInBtn;
     private MaterialButton mTimeOutBtn;
     private TextView mTimeLabel;
+    /** 文件模式信息区：格式、时长、采样率与手势提示 */
+    private View mFileInfoCard;
+    private TextView mFileInfoTitle;
+    private TextView mFileInfoDetail;
+    private TextView mFileInfoHint;
+    private MaterialButton mPlayToggleBtn;
+    private MaterialButton mSpeedBtn;
+    private SeekBar mSeekProgress;
+    private SeekBar mSeekGain;
+    private TextView mTimeCurrent;
+    private TextView mTimeTotal;
+    private TextView mGainLabel;
+    private boolean mPlaying;
+    private boolean mSeeking;
+    private float mPlaySpeed = 1f;
 
     private WaveCanvas mWaveCanvas;
     private File mFile;
@@ -153,6 +174,63 @@ public class WaveActivity extends AppCompatActivity {
         mTimeInBtn = findViewById(R.id.wave_time_in);
         mTimeOutBtn = findViewById(R.id.wave_time_out);
         mTimeLabel = findViewById(R.id.wave_time_label);
+        mFileInfoCard = findViewById(R.id.file_info_card);
+        mFileInfoTitle = findViewById(R.id.file_info_title);
+        mFileInfoDetail = findViewById(R.id.file_info_detail);
+        mFileInfoHint = findViewById(R.id.file_info_hint);
+        mPlayToggleBtn = findViewById(R.id.btn_play_toggle);
+        mSpeedBtn = findViewById(R.id.btn_speed);
+        mSeekProgress = findViewById(R.id.seek_progress);
+        mSeekGain = findViewById(R.id.seek_gain);
+        mTimeCurrent = findViewById(R.id.tv_time_current);
+        mTimeTotal = findViewById(R.id.tv_time_total);
+        mGainLabel = findViewById(R.id.tv_gain);
+
+        if (mPlayToggleBtn != null) {
+            mPlayToggleBtn.setOnClickListener(v -> togglePlayback());
+        }
+        if (mSpeedBtn != null) {
+            mSpeedBtn.setOnClickListener(v -> cycleSpeed());
+        }
+        if (mSeekProgress != null) {
+            mSeekProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!mSeeking) return;
+                    setTimeText(mTimeCurrent, progress);
+                    // 拖动时波形上的播放指示线跟着走
+                    mWaveform.setPlayback(mWaveform.millisecsToPixels(progress));
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                    mSeeking = true;
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    mSeeking = false;
+                    if (mPlayer == null) return;
+                    mPlayer.seekTo(seekBar.getProgress());
+                    handler.removeMessages(MSG_UPDATE_WAV);
+                    handler.sendEmptyMessage(MSG_UPDATE_WAV);
+                }
+            });
+        }
+        if (mSeekGain != null) {
+            mSeekGain.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    applyGain(progress);
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) { }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) { }
+            });
+        }
 
         // 幅度（Y 轴）缩放：最大 20×
         mZoomInBtn.setOnClickListener(v -> {
@@ -184,7 +262,10 @@ public class WaveActivity extends AppCompatActivity {
         findViewById(R.id.wave_read).setOnClickListener(view -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("audio/*");
+            // 裸 PCM 常被标成 application/octet-stream，不能只收 audio/*
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                    new String[]{"audio/*", "application/octet-stream"});
             startActivityForResult(intent, REQUEST_CODE_PICK_AUDIO);
         });
 
@@ -209,6 +290,13 @@ public class WaveActivity extends AppCompatActivity {
                 if (checkAudioPermissions()) {
                     mStatView.setVisibility(View.GONE);
                     mZoomBar.setVisibility(View.VISIBLE);
+                    if (mFileInfoCard != null) mFileInfoCard.setVisibility(View.GONE);
+                    if (mPlaying && mPlayer != null) {
+                        mPlayer.pause();
+                        mPlaying = false;
+                        handler.removeMessages(MSG_UPDATE_WAV);
+                        setPlayButtonText();
+                    }
                     // 分贝卡片只在录音中露脸（startDrawWave 里会 reset 历史与峰值）
                     if (mDecibelView != null) mDecibelView.setVisibility(View.VISIBLE);
                     startDrawWave();
@@ -258,54 +346,230 @@ public class WaveActivity extends AppCompatActivity {
 
     // ---------- 音频文件加载 & 播放 ----------
 
+    /** 解码器抽象：容器走 MediaExtractor，裸 PCM 走 createPcm */
+    private interface SoundLoader {
+        SoundRecord load() throws Exception;
+    }
+
     private void loadWaveFile(String filePath) {
-        try {
-            Thread.sleep(300);
-        } catch (InterruptedException e) {
-            handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, e.toString()));
+        Log.i(TAG, "loadWaveFile path=" + filePath);
+        // 裸 PCM 没有文件头，必须问清采样率/声道；其余格式按魔数识别的扩展名交给 MediaExtractor
+        if (filePath.toLowerCase(Locale.ROOT).endsWith(".pcm")) {
+            showPcmFormatPicker(filePath);
+            return;
         }
+        startAudioLoad(() -> SoundRecord.create(filePath, fraction -> {
+            handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS,
+                    String.format(Locale.getDefault(), "加载中 %d%%", (int) (fraction * 100))));
+            return true;
+        }));
+    }
 
-        mFile = new File(filePath);
-        mSoundRecord = new SoundRecord(this);
+    private void loadPcmFile(String path, int sampleRate, int channels) {
+        Log.i(TAG, "loadPcmFile path=" + path + " rate=" + sampleRate + " ch=" + channels);
+        startAudioLoad(() -> SoundRecord.createPcm(path, sampleRate, channels, fraction -> {
+            handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS,
+                    String.format(Locale.getDefault(), "加载中 %d%%", (int) (fraction * 100))));
+            return true;
+        }));
+    }
+
+    /** 选择裸 PCM 的采样率/声道（文件里没有这些信息，选错了只会音高/速度不对） */
+    private void showPcmFormatPicker(String path) {
+        final int[] rates = {16000, 44100, 48000, 8000};
+        final int[] channels = {1, 1, 2, 1};
+        String[] items = {
+                "16 kHz · 单声道（录音默认）",
+                "44.1 kHz · 单声道（CD）",
+                "48 kHz · 立体声（视频音轨）",
+                "8 kHz · 单声道（电话音质）"
+        };
+        final int[] picked = {0};
+        new AlertDialog.Builder(this)
+                .setTitle("PCM 音频格式")
+                .setMessage("裸 PCM 没有文件头，请选择录制时的采样率与声道")
+                .setSingleChoiceItems(items, 0, (dialog, which) -> picked[0] = which)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("加载", (dialog, which) ->
+                        loadPcmFile(path, rates[picked[0]], channels[picked[0]]))
+                .show();
+    }
+
+    /** 容器与 PCM 共用的后台加载 + UI 落地 */
+    private void startAudioLoad(SoundLoader loader) {
+        Log.i(TAG, "startAudioLoad begin");
         mLoadingKeepGoing = true;
-
+        handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, ""));
         mLoadSoundFileThread = new Thread(() -> {
+            SoundRecord record;
             try {
-                mSoundRecord = SoundRecord.create(mFile.getAbsolutePath(), fractionComplete -> {
-                    handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, fractionComplete + "%"));
-                    return true;
-                });
-                if (mSoundRecord == null) {
+                record = loader.load();
+                if (record == null) {
+                    Log.e(TAG, "startAudioLoad: decode returned null");
                     handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS,
                             "unsupported audio format"));
                     return;
                 }
-
-                mPlayer = new SamplePlayer(mSoundRecord);
+                Log.i(TAG, "decoded type=" + record.getFiletype() + " samples="
+                        + record.getNumSamples() + " rate=" + record.getSampleRate()
+                        + " ch=" + record.getChannels());
+                mPlayer = new SamplePlayer(record);
+                Log.i(TAG, "SamplePlayer created");
             } catch (final Exception e) {
+                Log.e(TAG, "startAudioLoad failed", e);
                 handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, e.toString()));
                 return;
             }
 
             if (mLoadingKeepGoing) {
                 runOnUiThread(() -> {
-                    mWaveform.setSoundFile(mSoundRecord);
+                    mSoundRecord = record;
+                    mWaveform.setSoundFile(record);
                     DisplayMetrics metrics = new DisplayMetrics();
                     getWindowManager().getDefaultDisplay().getMetrics(metrics);
                     mDensity = metrics.density;
                     mWaveform.recomputeHeights(mDensity);
                     mWaveView.setVisibility(View.INVISIBLE);
                     mWaveform.setVisibility(View.VISIBLE);
+                    showFileInfo(record);
+                    applyGain(mSeekGain != null ? mSeekGain.getProgress() : 100);
+                    if (mPlayer != null) mPlayer.setSpeed(mPlaySpeed);
                     playWaveAudio(0);
                 });
             }
-            handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, "loaded wave file."));
         });
         mLoadSoundFileThread.start();
     }
 
-    /** 从 content URI 复制音频文件到缓存目录，返回绝对路径。通过文件头魔数检测类型，避免 ContentResolver.query */
-    private String copyUriToFile(Uri uri) {
+    /** 显示文件信息与播放控制 */
+    @SuppressLint("SetTextI18n")
+    private void showFileInfo(SoundRecord record) {
+        if (mFileInfoCard == null) return;
+        mFileInfoCard.setVisibility(View.VISIBLE);
+        if (mFileInfoTitle != null) {
+            mFileInfoTitle.setText("音频文件 · " + record.getFiletype().toUpperCase(Locale.ROOT));
+        }
+        if (mFileInfoDetail != null) {
+            float seconds = record.getSampleRate() > 0
+                    ? (float) record.getNumSamples() / record.getSampleRate() : 0f;
+            int total = Math.round(seconds);
+            String duration = String.format(Locale.getDefault(), "%02d:%02d", total / 60, total % 60);
+            mFileInfoDetail.setText(String.format(Locale.getDefault(),
+                    "时长 %s · %d Hz · %d 声道 · %d 采样",
+                    duration, record.getSampleRate(), record.getChannels(), record.getNumSamples()));
+        }
+        if (mFileInfoHint != null) {
+            mFileInfoHint.setText("单指左右滑动平移 · 双指缩放 · 双击放大 · 长按框选放大");
+        }
+        int totalMs = mWaveform.pixelsToMillisecsTotal();
+        if (mSeekProgress != null) {
+            mSeekProgress.setMax(Math.max(1, totalMs));
+            mSeekProgress.setProgress(0);
+        }
+        setTimeText(mTimeCurrent, 0);
+        setTimeText(mTimeTotal, totalMs);
+        mPlaying = false;
+        mSeeking = false;
+        setPlayButtonText();
+    }
+
+    private static void setTimeText(TextView view, int msecs) {
+        if (view == null) return;
+        int secs = Math.max(0, msecs) / 1000;
+        view.setText(String.format(Locale.getDefault(), "%02d:%02d", secs / 60, secs % 60));
+    }
+
+    private void setPlayButtonText() {
+        if (mPlayToggleBtn != null) {
+            mPlayToggleBtn.setText(mPlaying ? "⏸ 暂停" : "▶ 播放");
+        }
+    }
+
+    /** 播放 / 暂停切换；拖动进度条不影响这里的状态 */
+    private void togglePlayback() {
+        if (mPlayer == null || mFileInfoCard == null
+                || mFileInfoCard.getVisibility() != View.VISIBLE) return;
+        if (mPlaying) {
+            mPlayer.pause();
+            mPlaying = false;
+            handler.removeMessages(MSG_UPDATE_WAV);
+        } else {
+            mPlayer.start();
+            mPlaying = true;
+            handler.removeMessages(MSG_UPDATE_WAV);
+            handler.sendEmptyMessage(MSG_UPDATE_WAV);
+        }
+        setPlayButtonText();
+    }
+
+    /** 倍速循环 0.5× → 1× → 2×，播放指示线由 SamplePlayer 的进度自然反映 */
+    private void cycleSpeed() {
+        float[] speeds = {0.5f, 1f, 2f};
+        int next = 0;
+        for (float s : speeds) {
+            if (Math.abs(s - mPlaySpeed) < 0.01f) break;
+            next++;
+        }
+        mPlaySpeed = speeds[next % speeds.length];
+        if (mPlayer != null) mPlayer.setSpeed(mPlaySpeed);
+        if (mSpeedBtn != null) {
+            mSpeedBtn.setText(String.format(Locale.getDefault(), "速度 %.1f×", mPlaySpeed));
+        }
+    }
+
+    /**
+     * 音量 0~100% 控制播放增益；波形显示增益允许放大到 200%，
+     * 所以波形高度会直接跟着滑杆变化，方便看安静片段。
+     */
+    private void applyGain(int percent) {
+        float gain = percent / 100f;
+        if (mPlayer != null) mPlayer.setVolume(Math.min(1f, gain));
+        mWaveform.setDisplayGain(gain);
+        if (mGainLabel != null) {
+            mGainLabel.setText(String.format(Locale.getDefault(), "%d%%", percent));
+        }
+    }
+
+    /**
+     * 取 SAF 文档的真实文件名。
+     *
+     * uri.getLastPathSegment() 在 DocumentsProvider 下往往是 "audio:1234" 这种文档 id，
+     * 不含 ".pcm"，裸 PCM 就会被误判成 wav 走 MediaExtractor 而失败。
+     */
+    private String queryDisplayName(Uri uri) {
+        String name = null;
+        try {
+            Cursor c = getContentResolver().query(uri,
+                    new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        int idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                        if (idx >= 0) name = c.getString(idx);
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "queryDisplayName failed", e);
+        }
+        if (TextUtils.isEmpty(name)) {
+            String last = uri.getLastPathSegment();
+            if (last != null) {
+                try {
+                    name = java.net.URLDecoder.decode(last, "UTF-8");
+                } catch (Exception ignored) {
+                    name = last;
+                }
+            }
+        }
+        Log.i(TAG, "queryDisplayName=" + name + " uri=" + uri);
+        return name;
+    }
+
+    /** 从 content URI 复制音频文件到缓存目录，返回绝对路径。优先用文件名后缀，其次靠魔数 */
+    private String copyUriToFile(Uri uri, String displayName) {
         try {
             // 读取所有数据到内存
             InputStream is = getContentResolver().openInputStream(uri);
@@ -320,8 +584,11 @@ public class WaveActivity extends AppCompatActivity {
             byte[] data = baos.toByteArray();
             if (data.length == 0) return null;
 
-            // 通过文件头魔数检测音频类型
-            String ext = detectAudioExtension(data);
+            // 裸 PCM 没有魔数，只能看文件名；其余类型靠文件头识别
+            String lowerName = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
+            String ext = lowerName.contains(".pcm") ? ".pcm" : detectAudioExtension(data);
+            Log.i(TAG, "copyUriToFile name=" + displayName + " ext=" + ext
+                    + " bytes=" + data.length);
             File tempFile = new File(getCacheDir(), "picked_audio_"
                     + System.currentTimeMillis() + ext);
             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
@@ -344,19 +611,33 @@ public class WaveActivity extends AppCompatActivity {
         if (data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S') {
             return ".ogg";
         }
+        // FLAC: "fLaC"
+        if (data[0] == 'f' && data[1] == 'L' && data[2] == 'a' && data[3] == 'C') {
+            return ".flac";
+        }
+        // WebM / Matroska: EBML 头 1A 45 DF A3
+        if ((data[0] & 0xFF) == 0x1A && (data[1] & 0xFF) == 0x45
+                && (data[2] & 0xFF) == 0xDF && (data[3] & 0xFF) == 0xA3) {
+            return ".webm";
+        }
         // AMR: "#!AMR"
         if (data.length >= 6 && data[0] == '#' && data[1] == '!' && data[2] == 'A'
                 && data[3] == 'M' && data[4] == 'R') {
             return ".amr";
         }
-        // MP3: ID3 tag or sync word 0xFF 0xFB / 0xFF 0xF3
-        if ((data[0] == 'I' && data[1] == 'D' && data[2] == '3')
-                || (data[0] == (byte) 0xFF && (data[1] & 0xFE) == 0xFA)) {
+        // MP3: ID3 tag
+        if (data[0] == 'I' && data[1] == 'D' && data[2] == '3') {
             return ".mp3";
         }
-        // AAC ADTS: 0xFF 0xF1
-        if (data[0] == (byte) 0xFF && (data[1] & 0xF6) == 0xF0) {
-            return ".aac";
+        if (data[0] == (byte) 0xFF) {
+            // AAC ADTS: 0xFF 0xF1（MPEG-4）/ 0xFF 0xF9（MPEG-2）
+            if (data[1] == (byte) 0xF1 || data[1] == (byte) 0xF9) {
+                return ".aac";
+            }
+            // MPEG 音频帧（0xFB / 0xFA / 0xF3 / 0xF2 等，同步字高 3 位为 111）
+            if ((data[1] & 0xE0) == 0xE0) {
+                return ".mp3";
+            }
         }
         // MP4/M4A/3GP: "ftyp" at offset 4
         if (data.length >= 8 && data[4] == 'f' && data[5] == 't'
@@ -380,9 +661,13 @@ public class WaveActivity extends AppCompatActivity {
             mWaveform.setPlayback(-1);
             updatePlaybackProgress();
             handler.removeMessages(MSG_UPDATE_WAV);
+            mPlaying = false;
+            runOnUiThread(this::setPlayButtonText);
         });
         mPlayer.seekTo(playStartMillis);
         mPlayer.start();
+        mPlaying = true;
+        setPlayButtonText();
         handler.sendEmptyMessage(MSG_UPDATE_WAV);
     }
 
@@ -390,15 +675,24 @@ public class WaveActivity extends AppCompatActivity {
         int current = mPlayer.getCurrentPosition();
         int frames = mWaveform.millisecsToPixels(current);
         mWaveform.setPlayback(frames);
+        if (!mSeeking) {
+            if (mSeekProgress != null) {
+                mSeekProgress.setProgress(Math.min(mPlayFullMillis, current));
+            }
+            setTimeText(mTimeCurrent, current);
+        }
         if (current >= mPlayFullMillis) {
             mWaveform.setPlayFinish(1);
             if (mPlayer.isPlaying()) {
                 mPlayer.pause();
                 handler.removeMessages(MSG_UPDATE_WAV);
             }
+            mPlaying = false;
+            setPlayButtonText();
         } else {
             mWaveform.setPlayFinish(0);
-            mWaveView.invalidate();
+            // 文件模式显示的是 mWaveform，mWaveView 仅用于录音预览
+            mWaveform.invalidate();
         }
     }
 
@@ -435,8 +729,8 @@ public class WaveActivity extends AppCompatActivity {
         mWaveCanvas.startRecording(audioRecord, bufSize / 2, mWaveView, FILE_NAME, DATA_DIRECTORY,
                 msg -> true);
         // 实时分贝：WaveCanvas 已经换算成标准声压级（dB SPL），直接交给分贝卡片
-        mWaveCanvas.setDecibelListener(db -> runOnUiThread(() -> {
-            if (mDecibelView != null) mDecibelView.setLevel(db);
+        mWaveCanvas.setDecibelListener((db, peak) -> runOnUiThread(() -> {
+            if (mDecibelView != null) mDecibelView.setLevel(db, peak);
         }));
 
         mRecordBtn.setText(getString(R.string.recording_state));
@@ -467,8 +761,9 @@ public class WaveActivity extends AppCompatActivity {
         }
         if (requestCode == REQUEST_CODE_PICK_AUDIO && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
+            Log.i(TAG, "pick audio result uri=" + uri);
             if (uri != null) {
-                String path = copyUriToFile(uri);
+                String path = copyUriToFile(uri, queryDisplayName(uri));
                 if (path != null) {
                     mWaveView.setVisibility(View.VISIBLE);
                     mWaveform.setVisibility(View.INVISIBLE);

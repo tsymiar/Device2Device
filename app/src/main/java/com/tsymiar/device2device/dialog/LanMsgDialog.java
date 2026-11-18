@@ -142,6 +142,10 @@ public class LanMsgDialog extends Dialog {
 
     /** native 侧正在收尾：这期间不能再启动，否则新旧两轮订阅会抢同一个端口 */
     private boolean mStopping = false;
+    /** 收尾期间又有启动请求（多半是回前台自动恢复），收尾完成后补启动 */
+    private boolean mPendingStart = false;
+    /** 退出页面导致的停止：收尾完成后也不要自动恢复 */
+    private boolean mShuttingDown = false;
 
     /** 广播接收在部分 ROM 上要持有 MulticastLock 才不被过滤掉 */
     private WifiManager.MulticastLock mMulticastLock = null;
@@ -162,6 +166,8 @@ public class LanMsgDialog extends Dialog {
      * 两张图一起卡在"发送中"。图文交替连发时这个窗口必中。
      */
     private final java.util.ArrayDeque<View> mPendingImageRows = new java.util.ArrayDeque<>();
+    /** 本地气泡等待 SENDING 事件绑定 id */
+    private final java.util.ArrayDeque<View> mPendingTextRows = new java.util.ArrayDeque<>();
 
     public LanMsgDialog(@NonNull Context context) {
         super(context);
@@ -415,7 +421,12 @@ public class LanMsgDialog extends Dialog {
     @SuppressLint("SetTextI18n")
     public void startMessenger() {
         if (mStarted) return;
-        if (mStopping) return;   // 上一轮的 native 收尾还没走完，这时重启会和旧线程抢同一个端口
+        if (mStopping) {
+            // 退到后台超时自动停、回到前台时 native 可能还在 join 线程；
+            // 记下来等收尾完成后补一次，否则就再也起不来了
+            mPendingStart = true;
+            return;
+        }
         int port = readPort();
         if (port <= 0) {
             Toast.makeText(getContext(), R.string.lan_msg_bad_port, Toast.LENGTH_SHORT).show();
@@ -482,6 +493,13 @@ public class LanMsgDialog extends Dialog {
         stopMessenger(false);
     }
 
+    /** 退出页面：停监听，且明确禁止 native 收尾完成后再自动拉起来 */
+    public void shutdown() {
+        mShuttingDown = true;
+        mPendingStart = false;
+        stopMessenger(false);
+    }
+
     /**
      * @param autoStopped true 表示这次是"退到后台超时"自动停的，回到前台会自动恢复；
      *                    用户自己点「停止」、退出页面都是 false，不该被重新拉起来。
@@ -489,10 +507,13 @@ public class LanMsgDialog extends Dialog {
     public void stopMessenger(boolean autoStopped) {
         if (mStopping) return;
         mStopping = true;
+        mPendingStart = false;
         mStarted = false;
         mAutoStopped = autoStopped;
         mTarget = null;
         mPeers.clear();
+        mPendingTextRows.clear();
+        mPendingImageRows.clear();
         refreshPeerLabels();
         releaseMulticastLock();
         if (btnStart != null) {
@@ -523,6 +544,10 @@ public class LanMsgDialog extends Dialog {
                 }
                 if (isShowing()) {
                     setState(false, getContext().getString(R.string.lan_msg_stopped));
+                }
+                if (mPendingStart && !mShuttingDown) {
+                    mPendingStart = false;
+                    startMessenger();
                 }
             });
         }, "lan-msg-stop").start();
@@ -589,11 +614,20 @@ public class LanMsgDialog extends Dialog {
             Toast.makeText(getContext(), R.string.lan_msg_empty, Toast.LENGTH_SHORT).show();
             return;
         }
-        // 真正的发送结果（SENT / SENDFAIL）由 LAN_MESSAGE 事件回传，这里只负责派发
+        // 本机气泡立刻画出来，不等 native 的 SENDING 事件：
+        // 事件队列延迟/丢事件时至少自己发的内容一直在，送达状态由事件回填
+        View row = appendChat("我 → " + mTarget.ip + "：" + text, KIND_SELF, null,
+                getContext().getString(R.string.lan_msg_sending));
         int ret = NetworkWrapper.sendLanMessage(mTarget.ip, mTarget.port, text);
         if (ret < 0) {
+            if (row != null) {
+                updateBubbleStatus(row, getContext().getString(R.string.lan_msg_undelivered), true);
+            }
             appendChat("发送失败(" + ret + ") → " + mTarget.ip, KIND_ERROR);
             return;
+        }
+        if (row != null) {
+            mPendingTextRows.add(row);
         }
         if (etMsg != null) {
             etMsg.setText("");
@@ -650,9 +684,9 @@ public class LanMsgDialog extends Dialog {
             // 缩到显示尺寸要在编码之后：编码那一步不回收传入的 bitmap，但这里缩完会回收原件
             final Bitmap show = downscaleForDisplay(bmp);
             new Handler(Looper.getMainLooper()).post(() -> {
-                // 气泡先绘制（bitmap 仅此处持有），id 由随后的 SENDINGIMG 事件绑定
+                // 气泡先绘制（小图），大图留给点击预览；id 由随后的 SENDINGIMG 事件绑定
                 View row = appendImage(show, KIND_SELF, null,
-                        getContext().getString(R.string.lan_msg_sending));
+                        getContext().getString(R.string.lan_msg_sending), bmp);
                 // 建失败就别入队：native 也不会为这次发送抛 SENDINGIMG，队列会错位
                 if (row != null) {
                     mPendingImageRows.add(row);
@@ -683,15 +717,16 @@ public class LanMsgDialog extends Dialog {
         return decode(uri, IMAGE_SEND_MAX_PX, true);
     }
 
-    /** 显示用再缩一档：气泡只有屏幕一半宽，按原尺寸留着只是白占内存 */
+    /**
+     * 显示用再缩一档：气泡只有屏幕一半宽，按原尺寸留着只是白占内存。
+     * 不回收原图 —— 它要留给点击后的大图预览。
+     */
     private Bitmap downscaleForDisplay(Bitmap src) {
         int max = Math.max(src.getWidth(), src.getHeight());
         if (max <= IMAGE_SHOW_MAX_PX) return src;
         float scale = (float) IMAGE_SHOW_MAX_PX / max;
-        Bitmap out = Bitmap.createScaledBitmap(src,
+        return Bitmap.createScaledBitmap(src,
                 Math.round(src.getWidth() * scale), Math.round(src.getHeight() * scale), true);
-        if (out != src) src.recycle();
-        return out;
     }
 
     private Bitmap decode(Uri uri, int maxSide, boolean exact) {
@@ -806,7 +841,7 @@ public class LanMsgDialog extends Dialog {
         BitmapFactory.decodeByteArray(raw, 0, raw.length, bounds);
         int sample = 1;
         int max = Math.max(bounds.outWidth, bounds.outHeight);
-        while (max / sample > IMAGE_SHOW_MAX_PX) {
+        while (max / sample > IMAGE_SEND_MAX_PX) {
             sample *= 2;
         }
         BitmapFactory.Options opt = new BitmapFactory.Options();
@@ -895,9 +930,10 @@ public class LanMsgDialog extends Dialog {
             case "RECVIMG":
                 // p = [RECVIMG, peerIp, name, base64]
                 if (p.length >= 4) {
-                    Bitmap photo = decodeReceived(p[3]);
-                    if (photo != null) {
-                        appendImage(photo, KIND_PEER, null, p[2]);
+                    Bitmap full = decodeReceived(p[3]);
+                    if (full != null) {
+                        // 气泡里放小图，点开看按发送尺寸解码的大图
+                        appendImage(downscaleForDisplay(full), KIND_PEER, null, p[2], full);
                     } else {
                         appendChat(p[2] + " 发来一张图片（解码失败）", KIND_ERROR);
                     }
@@ -912,10 +948,16 @@ public class LanMsgDialog extends Dialog {
                 }
                 break;
             case "SENDING":
-                // p = [SENDING, ip, id, body]
-                if (p.length >= 4) {
-                    appendChat("我 → " + p[1] + "：" + p[3], KIND_SELF, p[2],
-                            getContext().getString(R.string.lan_msg_sending));
+                // p = [SENDING, ip, id, body]：气泡已在 sendMessage() 里画好，这里只绑 id。
+                // 队列为空说明是别处发来的事件（比如页面重建后），兜底补一条气泡。
+                if (p.length >= 3) {
+                    View row = mPendingTextRows.poll();
+                    if (row != null) {
+                        row.setTag(p[2]);
+                    } else if (p.length >= 4) {
+                        appendChat("我 → " + p[1] + "：" + p[3], KIND_SELF, p[2],
+                                getContext().getString(R.string.lan_msg_sending));
+                    }
                 }
                 break;
             case "SENDINGIMG":
@@ -967,13 +1009,18 @@ public class LanMsgDialog extends Dialog {
         appendRow(line, null, kind, null, null);
     }
 
-    private void appendChat(String line, int kind, String tagId, String status) {
-        appendRow(line, null, kind, tagId, status);
+    private View appendChat(String line, int kind, String tagId, String status) {
+        return appendRow(line, null, kind, tagId, status);
     }
 
     /** 图片消息：正文位置放一张图，时间戳和送达状态跟文本消息一样 */
     private View appendImage(Bitmap image, int kind, String tagId, String status) {
-        return appendRow(null, image, kind, tagId, status);
+        return appendRow(null, image, image, kind, tagId, status);
+    }
+
+    /** @param preview 点击气泡时放大的原图；为 null 时用气泡里的缩略图 */
+    private View appendImage(Bitmap image, int kind, String tagId, String status, Bitmap preview) {
+        return appendRow(null, image, preview, kind, tagId, status);
     }
 
     /**
@@ -990,6 +1037,11 @@ public class LanMsgDialog extends Dialog {
      * @return 这一行的 root View，null 表示没加进去
      */
     private View appendRow(String line, Bitmap image, int kind, String tagId, String status) {
+        return appendRow(line, image, image, kind, tagId, status);
+    }
+
+    private View appendRow(String line, Bitmap image, Bitmap preview,
+                           int kind, String tagId, String status) {
         if (llChat == null) return null;
         if ((line == null || line.isEmpty()) && image == null) return null;
         View row = LayoutInflater.from(getContext())
@@ -1008,7 +1060,8 @@ public class LanMsgDialog extends Dialog {
         if (image != null && photo != null) {
             photo.setImageBitmap(image);
             photo.setVisibility(View.VISIBLE);
-            applyLayoutGravity(photo, gravity);
+            final Bitmap big = preview != null && !preview.isRecycled() ? preview : image;
+            photo.setOnClickListener(v -> showImagePreview(big));
             if (bubble != null) {
                 bubble.setVisibility(View.GONE);
             }
@@ -1056,6 +1109,30 @@ public class LanMsgDialog extends Dialog {
         scrollChatToBottom();
         updateClearEnabled();
         return row;
+    }
+
+    /** 点图片气泡：按图片大小弹一个普通对话框（不超过屏幕 85%），再点一下或点外部关掉 */
+    private void showImagePreview(Bitmap image) {
+        if (image == null || image.isRecycled()) return;
+        ImageView big = new ImageView(getContext());
+        big.setImageBitmap(image);
+        big.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        big.setAdjustViewBounds(true);
+        android.util.DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
+        big.setMaxWidth((int) (dm.widthPixels * 0.85f));
+        big.setMaxHeight((int) (dm.heightPixels * 0.85f));
+        big.setBackgroundColor(Color.BLACK);
+        final Dialog preview = new Dialog(getContext());
+        preview.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        big.setOnClickListener(v -> preview.dismiss());
+        preview.setContentView(big);
+        preview.setCanceledOnTouchOutside(true);
+        Window window = preview.getWindow();
+        if (window != null) {
+            window.setLayout(WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+        preview.show();
     }
 
     /**
@@ -1110,6 +1187,8 @@ public class LanMsgDialog extends Dialog {
     private void clearChat() {
         if (llChat == null || llChat.getChildCount() == 0) return;
         llChat.removeAllViews();
+        mPendingTextRows.clear();
+        mPendingImageRows.clear();
         if (tvChatHint != null) {
             tvChatHint.setVisibility(View.VISIBLE);
         }

@@ -149,6 +149,7 @@
     <string name="available">可配对设备：</string>
     <string name="scan">点击搜索</string>
     <string name="none_found">附近设备:</string>
+    <string name="bt_unknown_device">null</string>
     <string name="title_paired_devices">已与手机配对设备:</string>
     <string name="none_paired">没有已配对设备</string>
     <string name="scanning">正在搜索…</string>
@@ -209,7 +210,7 @@
     <string name="kcp_listen">KCP 监听 0.0.0.0:%1$d（本机 %2$s）</string>
     <string name="kcp_target_empty">先填对端 IP</string>
     <string name="group_kcp">KCP</string>
-    <string name="group_discover">detect</string>
+    <string name="group_discover">Group</string>
     <string name="discover_btn">discover</string>
     <string name="discover_end">end</string>
     <string name="discover_empty">未发现设备</string>
@@ -270,8 +271,7 @@
     <string name="http_copy_done">访问地址已复制：\n%1$s</string>
 
     <!-- ===== LAN Text Messenger ===== -->
-    <string name="lan_msg">📡 局域网消息</string>
-    <string name="lan_msg_title">📡 局域网消息 · LAN Messenger</string>
+    <string name="lan_msg">📡 LAN Messenger</string>
     <string name="lan_msg_name_hint">本机名</string>
     <string name="lan_msg_default_name">Android</string>
     <string name="lan_msg_port">39001</string>
@@ -302,6 +302,8 @@
     <string name="lan_msg_encoding">正在处理图片…</string>
     <string name="lan_msg_image_failed">图片读取失败</string>
     <string name="lan_msg_image_too_large">图片压缩后仍超出上限，未发送</string>
+    <string name="lan_notify_channel">局域网消息</string>
+    <string name="lan_notify_image">[图片]</string>
 
     <!-- ===== 聊天框附件 ===== -->
     <string name="chat_attach_with_content">附件：%1$s（正文已附）</string>

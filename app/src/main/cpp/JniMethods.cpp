@@ -1288,6 +1288,9 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanMessage)(JNIEnv* env, jclass,
     if (address.empty() || port <= 0 || body.empty()) {
         return -1;
     }
+    // 和 stopLanMessenger() 共用一把锁：否则消息可能在 stop() 清空 outbox 之后才入队，
+    // 残留到下轮 start() 被误发出去
+    std::lock_guard<std::mutex> lock(g_lanMutex);
     if (!LanMessenger::instance().isRunning()) {
         return -2;
     }
@@ -1304,6 +1307,7 @@ JNIEXPORT jint JNICALL CPP_FUNC_NETWORK(sendLanImage)(JNIEnv* env, jclass,
     if (address.empty() || port <= 0 || body.empty()) {
         return -1;
     }
+    std::lock_guard<std::mutex> lock(g_lanMutex);
     if (!LanMessenger::instance().isRunning()) {
         return -2;
     }

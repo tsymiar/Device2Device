@@ -2,6 +2,9 @@ package com.tsymiar.device2device.activity;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -11,6 +14,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -35,6 +39,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.dialog.ChatBoxDialog;
@@ -101,6 +107,20 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     FileMsgDialog mFileMsgDialog;
     /** 局域网文本消息对话框：复用同一个实例，事件转发才有稳定的落点 */
     LanMsgDialog mLanMsgDialog;
+    /**
+     * 页面是否在前台：后台收到局域网消息时不弹对话框（弹了也看不见），
+     * 改发状态栏通知，点击通知回到本页并展开对话框。
+     */
+    private volatile boolean mResumed = false;
+    /** 局域网消息通知渠道：新消息覆盖上一条，始终只有一个通知 */
+    private static final String LAN_NOTIFY_CHANNEL = "lan_msg";
+    private static final int LAN_NOTIFY_ID = 2001;
+    /** 通知点击打开对话框的标记：onCreate / onNewIntent 里检查 */
+    public static final String EXTRA_SHOW_LAN_MSG = "show_lan_msg";
+    /** native 事件轮询线程：Activity 销毁必须停，否则线程和 Activity 一起泄漏 */
+    private volatile boolean mStopPolling;
+    private Thread mPollThread;
+    private volatile boolean mActivityDestroyed;
     /** SSH 正在启动（还没收到服务广播）：这段时间置灰启动按钮，避免连点 */
     private boolean mSshStarting = false;
     /** 最近一次 SSH 启动失败的原因：显示在状态卡片里，直到下次启动成功或手动再启动 */
@@ -172,7 +192,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         @Override
         public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
-            if (msg.obj == null) return;
+            // Activity 已经销毁后不再碰 UI（轮询线程退出前的在途消息）
+            if (mActivityDestroyed || msg.obj == null) return;
             switch (msg.what) {
                 case Receiver.MSG_STAT:
                 case Receiver.SUBSCRIBER:
@@ -267,15 +288,22 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
                         mLanMsgDialog.onMessageEvent(lanEvent);
                     } else if (mLanMsgDialog != null) {
-                        // 对话框收起了但监听还在跑。两类事件要分开对待：
-                        //  - 对端发来的内容：把界面弹回来，不然只落到状态卡片上很容易漏看；
+                        // 对话框收起了但监听还在跑。三类事件分开对待：
+                        //  - 对端发来的内容：
+                        //      前台把界面弹回来，不然只落到状态卡片上很容易漏看；
+                        //      后台（对话框弹了也看不见）发一条状态栏通知，显示消息内容，
+                        //      点击通知回到本页并展开对话框；
                         //  - 自己发消息的回执（DELIVERED / UNDELIVERED / SENDFAIL / SENDINGIMG）：
                         //    照旧转给对话框，那些气泡行还在它里面，不转时回执就落到状态卡片上
                         //    被丢掉，重新打开对话框看到的一直是"发送中"。
                         boolean incoming = isIncomingLanMessage(lanEvent);
                         if (incoming && !SelectActivity.this.isFinishing()
                                 && !SelectActivity.this.isDestroyed()) {
-                            mLanMsgDialog.show();
+                            if (mResumed) {
+                                mLanMsgDialog.show();
+                            } else {
+                                notifyIncomingLanMessage(lanEvent);
+                            }
                         }
                         mLanMsgDialog.onMessageEvent(lanEvent);
                     } else {
@@ -298,6 +326,87 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
      */
     private static boolean isIncomingLanMessage(String event) {
         return event != null && (event.startsWith("RECV|") || event.startsWith("RECVIMG|"));
+    }
+
+    // ---------- 局域网消息状态栏通知 ----------
+
+    /**
+     * 后台收到对端消息时发一条状态栏通知。
+     *
+     * 标题是对端名字，内容是消息文本（图片消息显示 [图片]）；一条新消息直接覆盖上一条，
+     * 避免长聊把通知栏刷爆。点击通知回到本页并展开对话框（EXTRA_SHOW_LAN_MSG）。
+     */
+    private void notifyIncomingLanMessage(String event) {
+        NotificationManagerCompat nm = NotificationManagerCompat.from(this);
+        if (!nm.areNotificationsEnabled()) return;
+
+        String[] p = event.split("\\|");
+        if (p.length < 4) return;
+        String name = p[2];
+        String body = event.startsWith("RECVIMG|")
+                ? getString(R.string.lan_notify_image) : p[3];
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(LAN_NOTIFY_CHANNEL,
+                    getString(R.string.lan_notify_channel),
+                    NotificationManager.IMPORTANCE_HIGH);
+            nm.createNotificationChannel(ch);
+        }
+
+        Intent intent = new Intent(this, SelectActivity.class)
+                .putExtra(EXTRA_SHOW_LAN_MSG, true)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pi = PendingIntent.getActivity(this, LAN_NOTIFY_ID, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(this, LAN_NOTIFY_CHANNEL)
+                        .setSmallIcon(R.drawable.ic_launcher)
+                        .setContentTitle(name)
+                        .setContentText(body)
+                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                        .setContentIntent(pi)
+                        .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setAutoCancel(true);
+        try {
+            nm.notify(LAN_NOTIFY_ID, builder.build());
+        } catch (SecurityException ignored) {
+            // 用户在系统设置里关掉了通知权限，不打扰
+        }
+    }
+
+    /** 回到本页后把局域网消息对话框弹出来，并清掉消息通知 */
+    private void cancelLanMsgNotification() {
+        NotificationManagerCompat.from(this).cancel(LAN_NOTIFY_ID);
+    }
+
+    /** 从通知点回来（onCreate / onNewIntent）或点主界面按钮：弹出对话框 */
+    private void openLanMsgDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        if (mLanMsgDialog == null) {
+            mLanMsgDialog = new LanMsgDialog(SelectActivity.this);
+        }
+        if (!mLanMsgDialog.isShowing()) {
+            mLanMsgDialog.show();
+        }
+        cancelLanMsgNotification();
+    }
+
+    /** 通知点击入口：带 EXTRA_SHOW_LAN_MSG 的 Intent 才弹对话框 */
+    private void maybeOpenLanMsgDialog(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_SHOW_LAN_MSG, false)) {
+            openLanMsgDialog();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // singleTop：点通知回来时复用本实例，监听状态不丢
+        maybeOpenLanMsgDialog(intent);
     }
 
     /**
@@ -363,8 +472,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         mSubscribeIntent = new Intent(SelectActivity.this, SubscribeService.class);
         mPublisherIntent = new Intent(SelectActivity.this, PublishService.class);
 
-        new Thread(() -> {
-            do {
+        mStopPolling = false;
+        mPollThread = new Thread(() -> {
+            while (!mStopPolling && !Thread.currentThread().isInterrupted()) {
                 Receiver receiver = new Receiver();
                 CallbackWrapper wrapper = new CallbackWrapper();
                 receiver = wrapper.getMessage(receiver);
@@ -377,10 +487,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    Thread.currentThread().interrupt();
+                    break;
                 }
-            } while (true);
-        }).start();
+            }
+        }, "native-event-poll");
+        mPollThread.start();
 
         findViewById(R.id.btn_texture)
                 .setOnClickListener(v -> startActivity(new Intent(SelectActivity.this, TextureActivity.class)));
@@ -498,16 +610,10 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_http_copy).setOnClickListener(v -> copyHttpAccessUrl());
         findViewById(R.id.btn_clear_status).setOnClickListener(v -> clearStatusCard());
 
-        // 局域网文本消息对话框（发现 + 收发都在 C++ 侧）
-        findViewById(R.id.btn_lan_msg).setOnClickListener(v -> {
-            if (SelectActivity.this.isFinishing() || SelectActivity.this.isDestroyed()) return;
-            if (mLanMsgDialog == null) {
-                mLanMsgDialog = new LanMsgDialog(SelectActivity.this);
-            }
-            if (!mLanMsgDialog.isShowing()) {
-                mLanMsgDialog.show();
-            }
-        });
+        // 局域网文本消息对话框（发现 + 收发都在 C++ 侧）；状态栏通知点击也走同一入口
+        findViewById(R.id.btn_lan_msg).setOnClickListener(v -> openLanMsgDialog());
+        // 从状态栏通知直接启动（进程被杀后点通知）：带标记就弹对话框
+        maybeOpenLanMsgDialog(getIntent());
 
         // SSH 服务同样交给前台服务：启动 / 复制连接信息 / 停止
         findViewById(R.id.btn_ssh_server).setOnClickListener(v -> startSshServer());
@@ -674,6 +780,36 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        mResumed = true;
+        // 人已经回来了，消息通知没有存在的必要
+        cancelLanMsgNotification();
+        showHttpState();
+        showSshState();
+        // 换过 WiFi 时本机 IP 会变，每次回前台重新同步一次对端地址提示
+        refreshKcpSelfAddress();
+        // HTTP / SSH 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && (HttpServerService.isRunning() || SshServerService.isRunning())) {
+            maybeRequestBatteryOptimization();
+        }
+        // START_STICKY 重建服务可能晚于页面恢复，稍后再同步一次
+        handler.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                showHttpState();
+                showSshState();
+            }
+        }, 400);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mResumed = false;
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
         // 退到后台：到点还没回来就把监听收掉。回前台由 onStart 撤掉这个定时
@@ -684,11 +820,23 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     public void onDestroy() {
         handler.removeCallbacks(mSshStartTimeout);
+        mActivityDestroyed = true;
+        mStopPolling = true;
+        if (mPollThread != null) {
+            mPollThread.interrupt();
+            try {
+                mPollThread.join(300);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            mPollThread = null;
+        }
+        handler.removeCallbacksAndMessages(null);
         handler.removeCallbacks(mLanIdleStop);
         // dismiss() 已经不停监听了（关对话框后还要继续收消息），所以退出页面得在这里
         // 显式收掉：不然 39001 端口和那几个 native 线程会一直挂在后台
         if (mLanMsgDialog != null) {
-            mLanMsgDialog.stopMessenger();
+            mLanMsgDialog.shutdown();
             mLanMsgDialog.dismiss();
         }
         SelectActivity.this.unregisterReceiver(mBroadcastReceiverClass);
@@ -845,27 +993,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             if (mDiscoverLock != null && mDiscoverLock.isHeld()) mDiscoverLock.release();
         } catch (Exception ignored) {
         }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        showHttpState();
-        showSshState();
-        // 换过 WiFi 时本机 IP 会变，每次回前台重新同步一次对端地址提示
-        refreshKcpSelfAddress();
-        // HTTP / SSH 运行中且未处于系统“忽略电池优化”白名单时，前台引导一次
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && (HttpServerService.isRunning() || SshServerService.isRunning())) {
-            maybeRequestBatteryOptimization();
-        }
-        // START_STICKY 重建服务可能晚于页面恢复，稍后再同步一次
-        handler.postDelayed(() -> {
-            if (!isFinishing() && !isDestroyed()) {
-                showHttpState();
-                showSshState();
-            }
-        }, 400);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)

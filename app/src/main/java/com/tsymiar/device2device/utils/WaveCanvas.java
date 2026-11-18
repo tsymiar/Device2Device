@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * 波形和写入文件使用了两个不同的线程，以免造成卡机现象
@@ -68,6 +69,12 @@ public class WaveCanvas {
      * 手机麦克风没有校准，这里是工程上通用的参考换算，够用来看相对大小。
      */
     private volatile double mCurrentDb = DB_SPL_FLOOR;
+    /** 当前缓冲块的瞬时峰值声压级，和 RMS 一起送到分贝卡片 */
+    private volatile double mCurrentPeakDb = DB_SPL_FLOOR;
+    /** 分贝卡片 10Hz 推送，波形仍 200Hz 绘制：减少数字/柱子闪烁 */
+    private long mLastDbPush;
+    private double mDisplayedDb = DB_SPL_FLOOR;
+    private long mLastDbTextTime;
     private float mZoomY = 1.0f;// Y轴缩放倍率（幅度）
     private float mZoomX = 1.0f;// X轴缩放倍率（时基，越大时间窗口越短）
     private Paint mPaintDbBg;
@@ -198,9 +205,16 @@ public class WaveCanvas {
                     // 在后台线程中基于原始 buffer 计算实时分贝
                     if (readSize > 0) {
                         double sum = 0;
+                        int peakAbs = 0;
                         for (int i = 0; i < readSize; i++) {
-                            sum += (double) buffer[i] * buffer[i];
+                            int sample = buffer[i];
+                            sum += (double) sample * sample;
+                            int abs = sample < 0 ? -sample : sample;
+                            if (abs > peakAbs) peakAbs = abs;
                         }
+                        mCurrentPeakDb = peakAbs <= 0 ? DB_SPL_FLOOR
+                                : Math.max(DB_SPL_FLOOR, DB_SPL_AT_FULL_SCALE
+                                + 20.0 * Math.log10(peakAbs / 32768.0));
                         double rms = Math.sqrt(sum / readSize);
                         if (rms <= 0) {
                             mCurrentDb = DB_SPL_FLOOR;
@@ -254,8 +268,10 @@ public class WaveCanvas {
                     }
                 }
                 if (arrBuf != null) {
-                    if (mDecibelListener != null) {
-                        mDecibelListener.onDecibelChanged(mCurrentDb);
+                    long now = new Date().getTime();
+                    if (mDecibelListener != null && now - mLastDbPush >= 90) {
+                        mDecibelListener.onDecibelChanged(mCurrentDb, mCurrentPeakDb);
+                        mLastDbPush = now;
                     }
                     simpleDraw(arrBuf, sfv.getHeight() / 2);// 把缓冲区数据画出来
                 }
@@ -351,7 +367,13 @@ public class WaveCanvas {
                 prevBottom = y1;
             }
             // 在画布右上角绘制实时分贝
-            String dbText = String.format("%.0f dB", mCurrentDb);
+            // 波形照常 200Hz 绘制，但数字只 10Hz 更新，不然数字一直闪
+            long now = new Date().getTime();
+            if (now - mLastDbTextTime >= 90) {
+                mDisplayedDb = mCurrentDb;
+                mLastDbTextTime = now;
+            }
+            String dbText = String.format(Locale.getDefault(), "%.1f dB", mDisplayedDb);
             float textW = mPaintDbText.measureText(dbText);
             float textH = mPaintDbText.getTextSize();
             float padX = 14, padY = 8;
@@ -436,8 +458,13 @@ public class WaveCanvas {
      * 实时分贝回调接口
      */
     public interface DecibelListener {
-        /** 回传标准声压级 dB SPL（安静 ≈ 30 dB，正常说话 60 dB 上下） */
-        void onDecibelChanged(double dbSpl);
+        /**
+         * 回传标准声压级 dB SPL（安静 ≈ 30 dB，正常说话 60 dB 上下）
+         *
+         * @param dbSpl RMS 电平
+         * @param peakDbSpl 当前块的瞬时峰值
+         */
+        void onDecibelChanged(double dbSpl, double peakDbSpl);
     }
 
     public void setDecibelListener(DecibelListener listener) {

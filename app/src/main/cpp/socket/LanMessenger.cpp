@@ -137,6 +137,7 @@ void LanMessenger::setDiscoveryPort(int port)
 
 void LanMessenger::setDiscoveryAddress(const std::string& addr)
 {
+    std::lock_guard<std::mutex> lock(m_configMutex);
     m_discoveryAddress = addr.empty() ? "255.255.255.255" : addr;
 }
 
@@ -169,14 +170,14 @@ int LanMessenger::start(const std::string& name, const std::string& selfIp, int 
     // ---- Discovery UDP: reuses UdpSocket ----
     // Broadcast must be on, and the timeout lets discoveryLoop exit promptly instead of
     // blocking in recvfrom for a full timeout
-    m_discovery.setPort(m_discoveryPort);
+    m_discovery.setPort(m_discoveryPort.load());
     m_discovery.enableBroadcast(true);
     if (isMulticast(m_discoveryAddress)) {
         m_discovery.setMulticastGroup(m_discoveryAddress);
     }
     m_discovery.setRecvTimeoutMs(500);
     if (m_discovery.open() < 0) {
-        LOGE("discovery bind %d fail\n", m_discoveryPort);
+        LOGE("discovery bind %d fail\n", m_discoveryPort.load());
         return -2;
     }
 
@@ -202,7 +203,7 @@ int LanMessenger::start(const std::string& name, const std::string& selfIp, int 
     pushEvent(LAN_MESSAGE,
               "LISTEN|" + m_selfIp + "|" + std::to_string(m_port) + "|" + m_name);
     LOGI("LAN messenger started: name=%s self=%s chat=%d discovery=%d\n",
-         m_name.c_str(), m_selfIp.c_str(), m_port, m_discoveryPort);
+         m_name.c_str(), m_selfIp.c_str(), m_port, m_discoveryPort.load());
     return 0;
 }
 
@@ -286,7 +287,7 @@ void LanMessenger::announceOnce()
                           + sanitize(m_name) + "|" + std::to_string(m_port);
     // Global broadcast plus this machine's /24 broadcast: some networks block 255.255.255.255,
     // so sending both reaches more peers
-    m_discovery.sendTo("255.255.255.255", m_discoveryPort,
+    m_discovery.sendTo("255.255.255.255", m_discoveryPort.load(),
                        payload.data(), payload.size());
 
     struct in_addr self {};
@@ -298,7 +299,7 @@ void LanMessenger::announceOnce()
         char buf[INET_ADDRSTRLEN] = {0};
         if (inet_ntop(AF_INET, &bc, buf, sizeof(buf)) != nullptr
             && bcast != 0xFFFFFFFFu) {
-            m_discovery.sendTo(buf, m_discoveryPort, payload.data(), payload.size());
+            m_discovery.sendTo(buf, m_discoveryPort.load(), payload.data(), payload.size());
         }
     }
     // 已知对端再单播一份：部分路由器开着 AP 隔离 / 过滤广播帧，广播到不了，单播却可以，
@@ -313,13 +314,18 @@ void LanMessenger::announceOnce()
     }
     for (const auto& ip : targets) {
         if (!ip.empty() && ip != m_selfIp) {
-            m_discovery.sendTo(ip.c_str(), m_discoveryPort, payload.data(), payload.size());
+            m_discovery.sendTo(ip.c_str(), m_discoveryPort.load(), payload.data(), payload.size());
         }
     }
     // 可选的组播/单播发现地址（如 224.224.224.224）：广播被部分网络过滤时，
     // 走组播或手动指定地址能绕过；空或就是广播地址时不重复发
-    if (!m_discoveryAddress.empty() && m_discoveryAddress != "255.255.255.255") {
-        m_discovery.sendTo(m_discoveryAddress.c_str(), m_discoveryPort, payload.data(), payload.size());
+    std::string extraAddr;
+    {
+        std::lock_guard<std::mutex> lock(m_configMutex);
+        extraAddr = m_discoveryAddress;
+    }
+    if (!extraAddr.empty() && extraAddr != "255.255.255.255") {
+        m_discovery.sendTo(extraAddr.c_str(), m_discoveryPort.load(), payload.data(), payload.size());
     }
 }
 
@@ -330,7 +336,7 @@ void LanMessenger::replyOnce(const std::string& ip)
     }
     std::string payload = std::string(kReply) + "|" + m_selfId + "|"
                           + sanitize(m_name) + "|" + std::to_string(m_port);
-    m_discovery.sendTo(ip.c_str(), m_discoveryPort, payload.data(), payload.size());
+    m_discovery.sendTo(ip.c_str(), m_discoveryPort.load(), payload.data(), payload.size());
 }
 
 void LanMessenger::announceLoop()

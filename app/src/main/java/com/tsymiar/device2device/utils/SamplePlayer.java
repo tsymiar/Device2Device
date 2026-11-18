@@ -90,6 +90,18 @@ public class SamplePlayer {
         mListener = listener;
     }
 
+    /** 播放音量：0 ~ 1（AudioTrack 直接混音增益） */
+    public void setVolume(float volume) {
+        mAudioTrack.setVolume(Math.max(0f, Math.min(1f, volume)));
+    }
+
+    /** 播放倍速：0.5 / 1 / 2。改的是 AudioTrack 采样速率，进度仍按源文件帧数计算 */
+    public void setSpeed(float speed) {
+        float s = Math.max(0.25f, Math.min(4f, speed));
+        int rate = (int) (mSampleRate * s);
+        if (rate > 0) mAudioTrack.setPlaybackRate(rate);
+    }
+
     public boolean isPlaying() {
         return mAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_PLAYING;
     }

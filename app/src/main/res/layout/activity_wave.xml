@@ -176,75 +176,237 @@
         app:layout_constraintStart_toEndOf="@id/wave_read"
         app:layout_constraintTop_toTopOf="@id/wave_read" />
 
-    <!-- 语音识别区域分隔线 -->
-    <View
-        android:id="@+id/divider"
-        android:layout_width="0dp"
-        android:layout_height="1dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="16dp"
-        android:background="?android:attr/listDivider"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/wave_read" />
-
-    <!-- 语音识别入口按钮 -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_speak"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/speak"
-        android:textSize="13sp"
-        app:icon="@android:drawable/ic_btn_speak_now"
-        app:iconGravity="textStart"
-        app:iconPadding="8dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/divider" />
-
-    <!-- 语音识别结果 -->
+    <!-- 文件模式：占用波形下方的空白，展示音频元数据与手势说明；录音时隐藏 -->
     <com.google.android.material.card.MaterialCardView
-        android:id="@+id/result_card"
+        android:id="@+id/file_info_card"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="12dp"
         android:visibility="gone"
         app:cardCornerRadius="8dp"
         app:cardElevation="1dp"
         app:contentPadding="12dp"
-        app:layout_constraintBottom_toTopOf="@id/db_meter"
+        app:layout_constraintBottom_toTopOf="@id/voice_area"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_speak"
-        app:layout_constraintVertical_bias="0"
+        app:layout_constraintTop_toBottomOf="@id/wave_read"
         app:strokeColor="@color/ui_stroke"
         app:strokeWidth="0.5dp">
 
-        <TextView
-            android:id="@+id/tv_result"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp"
-            tools:text="@string/speech_to_text" />
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/file_info_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/ui_accent"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="音频文件 · WAV" />
+
+            <TextView
+                android:id="@+id/file_info_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="3dp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp"
+                tools:text="时长 00:12 · 44100 Hz · 1 声道" />
+
+            <!-- 播放 / 暂停 + 倍速 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_play_toggle"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:text="▶ 播放"
+                    android:textSize="12sp"
+                    app:cornerRadius="18dp"
+                    app:strokeColor="@color/ui_accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_speed"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="8dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:text="速度 1.0×"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 播放进度：拖动定位，波形上的播放指示线同步 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tv_time_current"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="11sp" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/tv_time_total"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seek_progress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <!-- 音量 / 波形增益：音量影响播放，增益同时改变波形高度 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="音量/增益"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="11sp" />
+
+                <SeekBar
+                    android:id="@+id/seek_gain"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="200"
+                    android:progress="100" />
+
+                <TextView
+                    android:id="@+id/tv_gain"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="100%"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="?android:attr/listDivider" />
+
+            <TextView
+                android:id="@+id/file_info_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp"
+                tools:text="单指左右滑动平移 · 双指缩放" />
+        </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 录音时的实时分贝图：占住页面下方空着的那块；只在录音中显示（默认 gone） -->
+    <!-- 录音时的实时分贝图：占住波形与底部语音区之间的空位；只在录音中显示（默认 gone） -->
     <com.tsymiar.device2device.view.DecibelView
         android:id="@+id/db_meter"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="12dp"
-        android:layout_marginBottom="16dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/voice_area"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/result_card" />
+        app:layout_constraintTop_toBottomOf="@id/wave_read" />
+
+    <!-- 语音输入整体固定在页面最下方：分隔线 + 说话按钮 + 识别结果 -->
+    <LinearLayout
+        android:id="@+id/voice_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            android:background="?android:attr/listDivider" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_speak"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:text="@string/speak"
+            android:textSize="13sp"
+            app:icon="@android:drawable/ic_btn_speak_now"
+            app:iconGravity="textStart"
+            app:iconPadding="8dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/result_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="1dp"
+            app:contentPadding="12dp"
+            app:strokeColor="@color/ui_stroke"
+            app:strokeWidth="0.5dp">
+
+            <TextView
+                android:id="@+id/tv_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="16sp"
+                tools:text="@string/speech_to_text" />
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

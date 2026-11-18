@@ -36,7 +36,10 @@ public class BtDevicesActivity extends Activity {
     private static final String TAG = "BtDevicesActivity";
 
     private BluetoothAdapter mBtAdapter;
+    private ArrayAdapter<String> mPairedDevicesArrayAdapter;
     private ArrayAdapter<String> mNewDevicesArrayAdapter;
+    /** 未配对设备点击后先配对，配对成功再进 Serial 连接页 */
+    private String mPendingConnectAddress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,12 +60,12 @@ public class BtDevicesActivity extends Activity {
             v.setVisibility(View.GONE);
         });
 
-        ArrayAdapter<String> pairedAdapter = new ArrayAdapter<>(this, R.layout.item_device);
+        mPairedDevicesArrayAdapter = new ArrayAdapter<>(this, R.layout.item_device);
         mNewDevicesArrayAdapter = new ArrayAdapter<>(this, R.layout.item_device);
 
         ListView pairedList = findViewById(R.id.devlist_paired_devices);
         assert pairedList != null;
-        pairedList.setAdapter(pairedAdapter);
+        pairedList.setAdapter(mPairedDevicesArrayAdapter);
         pairedList.setOnItemClickListener(mDeviceClickListener);
 
         ListView newDevicesList = findViewById(R.id.new_devices);
@@ -75,6 +78,10 @@ public class BtDevicesActivity extends Activity {
         registerReceiver(mReceiver, filter);
         filter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         registerReceiver(mReceiver, filter);
+        // 配对状态变化：未配对设备发起 createBond() 后靠它决定何时进连接页
+        registerReceiver(mReceiver, new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
+        // ACTION_FOUND 时 getName() 经常还是 null，名字会通过这个广播随后送达
+        registerReceiver(mReceiver, new IntentFilter(BluetoothDevice.ACTION_NAME_CHANGED));
 
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -95,7 +102,7 @@ public class BtDevicesActivity extends Activity {
                         != PackageManager.PERMISSION_GRANTED) {
                     return;
                 }
-                pairedAdapter.add(device.getName() + "\n" + device.getAddress());
+                mPairedDevicesArrayAdapter.add(deviceLabel(device));
             }
         } else {
             Toast toast = Toast.makeText(this, R.string.none_paired, Toast.LENGTH_SHORT);
@@ -181,26 +188,98 @@ public class BtDevicesActivity extends Activity {
 
     private final AdapterView.OnItemClickListener mDeviceClickListener =
             (av, v, arg2, arg3) -> {
-                if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_SCAN)
-                        != PackageManager.PERMISSION_GRANTED) {
+                if (!hasConnectPermission()) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         ActivityCompat.requestPermissions(BtDevicesActivity.this,
-                                new String[]{Manifest.permission.BLUETOOTH_SCAN}, 0);
+                                new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
                     }
                     return;
                 }
-                mBtAdapter.cancelDiscovery();
+                if (ActivityCompat.checkSelfPermission(getBaseContext(), Manifest.permission.BLUETOOTH_SCAN)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    mBtAdapter.cancelDiscovery();
+                }
 
                 String info = ((TextView) v).getText().toString();
                 String address = info.substring(info.length() - 17);
+                BluetoothDevice device = mBtAdapter.getRemoteDevice(address);
+                Log.i(TAG, "device clicked: address=" + address
+                        + " name=" + device.getName() + " type=" + device.getType()
+                        + " bond=" + device.getBondState());
+                if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                    connectTo(address);
+                    return;
+                }
 
-                Intent intent = new Intent(BtDevicesActivity.this, BtRemoteActivity.class);
-                Bundle bundle = new Bundle();
-                bundle.putString("address", address);
-                intent.putExtras(bundle);
-                sendBroadcast(intent);
-                startActivity(intent);
+                // 搜索到的新设备：先配对。配对结果由 ACTION_BOND_STATE_CHANGED 接手；
+                // 不配对直接连 SPP 在多数 Android 版本上会失败（尤其需要 PIN 的设备）。
+                mPendingConnectAddress = address;
+                String label = device.getName();
+                Toast.makeText(this, "正在配对 "
+                        + (label == null || label.trim().isEmpty() ? device.getAddress() : label)
+                        + "…", Toast.LENGTH_SHORT).show();
+                try {
+                    if (!device.createBond()) {
+                        mPendingConnectAddress = null;
+                        Toast.makeText(this, "配对发起失败", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    mPendingConnectAddress = null;
+                    Log.e(TAG, "createBond failed: " + address, e);
+                    Toast.makeText(this, "配对失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             };
+
+    private boolean hasConnectPermission() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * 设备名在发现阶段经常还没解析出来（getName() == null），
+     * 先用"未知设备 + MAC"占位，等 ACTION_NAME_CHANGED 到了再替换。
+     */
+    private String deviceLabel(BluetoothDevice device, String name) {
+        String n = name;
+        if (n == null || n.trim().isEmpty()) {
+            n = getString(R.string.bt_unknown_device);
+        }
+        return n + "\n" + device.getAddress();
+    }
+
+    private String deviceLabel(BluetoothDevice device) {
+        return deviceLabel(device, device.getName());
+    }
+
+    /** 按 MAC 找到列表行替换标签；新设备列表里没有就补一行 */
+    private void updateDeviceLabel(BluetoothDevice device, String name) {
+        String label = deviceLabel(device, name);
+        replaceOrAdd(mPairedDevicesArrayAdapter, device.getAddress(), label, false);
+        replaceOrAdd(mNewDevicesArrayAdapter, device.getAddress(), label, true);
+    }
+
+    private void replaceOrAdd(ArrayAdapter<String> adapter, String address,
+                              String label, boolean addIfMissing) {
+        if (adapter == null) return;
+        for (int i = 0; i < adapter.getCount(); i++) {
+            String item = adapter.getItem(i);
+            if (item != null && item.endsWith(address)) {
+                adapter.remove(item);
+                adapter.insert(label, i);
+                return;
+            }
+        }
+        if (addIfMissing) adapter.add(label);
+    }
+
+    /** 配对完成（或本来就是已配对设备）：进 Serial 页由 BtRemoteActivity 建 SPP 连接 */
+    private void connectTo(String address) {
+        Intent intent = new Intent(BtDevicesActivity.this, BtRemoteActivity.class);
+        Bundle bundle = new Bundle();
+        bundle.putString("address", address);
+        intent.putExtras(bundle);
+        startActivity(intent);
+    }
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -217,7 +296,28 @@ public class BtDevicesActivity extends Activity {
                     return;
                 }
                 if (device != null && device.getBondState() != BluetoothDevice.BOND_BONDED) {
-                    mNewDevicesArrayAdapter.add(device.getName() + "\n" + device.getAddress());
+                    updateDeviceLabel(device, device.getName());
+                }
+            } else if (BluetoothDevice.ACTION_NAME_CHANGED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (device == null) return;
+                String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+                if (name == null || name.trim().isEmpty()) name = device.getName();
+                updateDeviceLabel(device, name);
+            } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (device == null || mPendingConnectAddress == null) return;
+                if (!mPendingConnectAddress.equals(device.getAddress())) return;
+                int state = device.getBondState();
+                Log.i(TAG, "bond state changed: address=" + device.getAddress()
+                        + " state=" + state + " pending=" + mPendingConnectAddress);
+                if (state == BluetoothDevice.BOND_BONDED) {
+                    mPendingConnectAddress = null;
+                    Toast.makeText(BtDevicesActivity.this, "配对成功，正在连接…", Toast.LENGTH_SHORT).show();
+                    connectTo(device.getAddress());
+                } else if (state == BluetoothDevice.BOND_NONE) {
+                    mPendingConnectAddress = null;
+                    Toast.makeText(BtDevicesActivity.this, "配对失败或被取消", Toast.LENGTH_SHORT).show();
                 }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 setProgressBarIndeterminateVisibility(false);

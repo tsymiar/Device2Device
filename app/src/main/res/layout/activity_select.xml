@@ -133,7 +133,7 @@
                 android:layout_height="wrap_content"
                 android:visibility="gone"
                 android:orientation="vertical"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="4dp">
 
                 <!-- Event + Time -->
                 <LinearLayout
@@ -176,7 +176,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="6dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -209,14 +209,14 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="6dp"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="6dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="6dp"
+                        android:layout_marginBottom="4dp"
                         android:text="@string/group_discover"
                         android:textColor="@color/ui_accent"
                         android:textSize="12sp"
@@ -264,7 +264,7 @@
                         android:id="@+id/ll_discover_peers"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:orientation="vertical" />
                 </LinearLayout>
 
@@ -272,14 +272,14 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="4dp"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="6dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="6dp"
+                            android:layout_marginBottom="4dp"
                             android:text="@string/group_kcp"
                             android:textColor="@color/ui_accent"
                             android:textSize="12sp"
@@ -323,7 +323,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
+                            android:layout_marginTop="4dp"
                             android:orientation="horizontal">
 
                             <EditText
@@ -363,7 +363,7 @@
                             android:id="@+id/txt_kcp_self"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:text="@string/kcp_self_unknown"
@@ -375,7 +375,7 @@
                             android:id="@+id/kcp_text_row"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="2dp"
                             android:orientation="horizontal"
                             android:visibility="gone">
 
@@ -415,7 +415,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="4dp"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="8dp"
                 android:background="@color/ui_divider" />
 
             <!-- ================ 高级功能区域 ================ -->
