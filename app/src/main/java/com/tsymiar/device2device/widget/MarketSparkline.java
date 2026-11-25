@@ -24,7 +24,7 @@ import com.tsymiar.device2device.market.MarketPalette;
  * 两个必须守住的限制：
  * - **体积**：AppWidget 更新走 Binder 事务，整个更新包有体积上限。位图太大不是慢，
  *   而是整个部件更新失败、桌面直接不给你画（现象就是加了部件一直空白）。
- *   所以这里按 MAX_W / MAX_H 硬性夹住 px 尺寸，且按设备密度换算后还要再夹一次。
+ *   超过上限时按 MAX_W / MAX_H 等比缩小，保持宽高比。
  * - **透明**：位图背景要透明（部件是圆角卡片，实色底会把圆角压成直角），
  *   因此必须用 ARGB_8888；RGB_565 没有 alpha 通道，透明区会变成黑块。
  *
@@ -36,9 +36,9 @@ public final class MarketSparkline {
 
     private static final String TAG = "MarketSparkline";
 
-    /** Binder 事务兜底：超出这两个值之后，一次 AppWidget 更新可能直接失败 */
+    /** Binder 事务兜底：位图体积上限 */
     private static final int MAX_W = 520;
-    private static final int MAX_H = 220;
+    private static final int MAX_H = 440;
     private static final int MIN_W = 48;
     private static final int MIN_H = 24;
 
@@ -62,12 +62,17 @@ public final class MarketSparkline {
         if (context == null || closes == null || closes.length < 2) return null;
         DisplayMetrics dm = context.getResources().getDisplayMetrics();
         float density = dm == null ? 1f : dm.density;
-        int w = clamp(Math.round(widthDp * density), MIN_W, MAX_W);
-        int h = clamp(Math.round(heightDp * density), MIN_H, MAX_H);
+        int rawW = Math.round(widthDp * density);
+        int rawH = Math.round(heightDp * density);
+        // 超限时等比缩小，保持位图比例与曲线框一致
+        float shrink = Math.min(1f, Math.min(MAX_W / (float) Math.max(1, rawW),
+                MAX_H / (float) Math.max(1, rawH)));
+        int w = Math.max(MIN_W, Math.round(rawW * shrink));
+        int h = Math.max(MIN_H, Math.round(rawH * shrink));
         try {
             Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             if (!draw(new Canvas(bitmap), MarketPalette.of(context), closes, base,
-                    w, h, density, haloColor)) {
+                    w, h, rawW, rawH, density, haloColor)) {
                 bitmap.recycle();
                 return null;
             }
@@ -81,7 +86,7 @@ public final class MarketSparkline {
 
     /** @return false 表示这条曲线没什么可画的（价格全相等且无基准），调用方按空数据处理 */
     private static boolean draw(Canvas canvas, MarketPalette p, float[] closes, float base,
-                                int w, int h, float density, int haloColor) {
+                                int w, int h, int rawW, int rawH, float density, int haloColor) {
         float min = Float.MAX_VALUE;
         float max = -Float.MAX_VALUE;
         for (float value : closes) {
@@ -101,12 +106,20 @@ public final class MarketSparkline {
             span = max - min;
         }
 
-        float stroke = 1.4f * density;
-        // 末点圆点：只比线宽粗一倍多点，再大就从图上跳出来（描边也只宽一丝，见 halo）
-        float dot = 1.5f * density;
-        float padX = Math.max(1f, stroke);
-        float padTop = dot + stroke + 1f;
-        float padBottom = dot + stroke + 1f;
+        // 按显示尺寸算视觉粗细，再换算到位图里（位图会被放大 1/bitmapScale 倍）
+        float displayW = rawW > 0 ? rawW : w;
+        float displayH = rawH > 0 ? rawH : h;
+        float sizeScale = clamp(Math.min(displayW / (160f * density),
+                displayH / (70f * density)), 0.8f, 1.8f);
+        float bitmapScale = (float) w / Math.max(1, displayW);
+        float stroke = 1.4f * density * sizeScale * bitmapScale;
+        // 末点与线宽同比缩放，pad 按描边外沿留出空间
+        float unit = Math.max(0.5f, bitmapScale);
+        float dot = Math.max(2f * unit, stroke * 1.15f);
+        float halo = dot + Math.max(1f * unit, stroke * 0.55f);
+        float padX = Math.max(stroke, unit) + unit;
+        float padTop = Math.max(halo, dot + stroke) + unit;
+        float padBottom = padTop;
         float usableH = h - padTop - padBottom;
         if (usableH <= 1f) return false;
 
@@ -150,9 +163,11 @@ public final class MarketSparkline {
             float baseY = padTop + (max - base) / span * usableH;
             Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             basePaint.setStyle(Paint.Style.STROKE);
-            basePaint.setStrokeWidth(Math.max(1f, density * 0.7f));
+            basePaint.setStrokeWidth(Math.max(unit, stroke * 0.5f));
             basePaint.setColor(p.grid);
-            basePaint.setPathEffect(new DashPathEffect(new float[]{4f * density, 3f * density}, 0f));
+            basePaint.setPathEffect(new DashPathEffect(new float[]{
+                    4f * sizeScale * density * bitmapScale,
+                    3f * sizeScale * density * bitmapScale}, 0f));
             canvas.drawLine(padX, baseY, w - padX, baseY, basePaint);
         }
 
@@ -166,8 +181,6 @@ public final class MarketSparkline {
 
         // 最新价：实心圆点 + 一圈底色描边，把末点从渐变里拎出来
         float lastY = padTop + (max - last) / span * usableH;
-        // 描边只比圆点宽一丝：够隔开下面的渐变填充就行，再宽就成了「一个大圈套个小点」
-        float halo = dot + 0.6f * density;
         Paint haloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         haloPaint.setStyle(Paint.Style.FILL);
         haloPaint.setColor(haloColor);
@@ -180,6 +193,10 @@ public final class MarketSparkline {
     }
 
     private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
+    }
+
+    private static float clamp(float value, float min, float max) {
         return Math.max(min, Math.min(value, max));
     }
 }

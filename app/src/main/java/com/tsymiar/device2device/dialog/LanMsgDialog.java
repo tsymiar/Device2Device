@@ -119,6 +119,9 @@ public class LanMsgDialog extends Dialog {
     /** 发现广播地址/端口（与收发 KCP 端口 39001 分开；默认广播 255.255.255.255 + 端口 39000） */
     private EditText etDiscoveryAddr;
     private EditText etDiscoveryPort;
+    /** 启动后折叠的两行配置：本机身份 / 发现设置（启动后这几个字段都被锁定） */
+    private View rowIdentity;
+    private View rowDiscovery;
     private int mDiscoveryPort = 39000;
     /** 消息区最多保留的条数，长聊也不会把内存撑大 */
     private static final int MAX_CHAT_LINES = 300;
@@ -190,6 +193,8 @@ public class LanMsgDialog extends Dialog {
         etPort = findViewById(R.id.et_lan_port);
         etDiscoveryAddr = findViewById(R.id.et_lan_discovery_addr);
         etDiscoveryPort = findViewById(R.id.et_lan_discovery_port);
+        rowIdentity = findViewById(R.id.row_lan_identity);
+        rowDiscovery = findViewById(R.id.row_lan_discovery);
         btnStart = findViewById(R.id.btn_lan_start);
         btnRefresh = findViewById(R.id.btn_lan_refresh);
         vDot = findViewById(R.id.v_lan_dot);
@@ -405,6 +410,22 @@ public class LanMsgDialog extends Dialog {
 
     // ---------- 启停 ----------
 
+    /** 折叠配置行，空出的高度补给聊天区 */
+    private void setConfigVisible(boolean visible) {
+        int v = visible ? View.VISIBLE : View.GONE;
+        if (rowIdentity != null) rowIdentity.setVisibility(v);
+        if (rowDiscovery != null) rowDiscovery.setVisibility(v);
+        if (svChat != null) {
+            ViewGroup.LayoutParams lp = svChat.getLayoutParams();
+            if (lp != null) {
+                // 两行配置共 88dp，折叠后补给聊天框
+                float density = getContext().getResources().getDisplayMetrics().density;
+                lp.height = Math.round((visible ? 150f : 238f) * density);
+                svChat.setLayoutParams(lp);
+            }
+        }
+    }
+
     private void toggleStart() {
         if (mStarted) {
             stopMessenger();
@@ -475,6 +496,7 @@ public class LanMsgDialog extends Dialog {
             // 名称于启动时传递给对端，中途修改不会同步，因此启动后即锁定，以免误认为已生效
             etName.setEnabled(false);
         }
+        setConfigVisible(false);
         setState(true, getContext().getString(R.string.lan_msg_listening,
                 Utils.getLocalWifiIp(getContext()), port, name));
         updateSendEnabled();
@@ -532,6 +554,7 @@ public class LanMsgDialog extends Dialog {
         if (etName != null) {
             etName.setEnabled(true);
         }
+        setConfigVisible(true);
         setState(false, getContext().getString(R.string.lan_msg_stopping));
         updateSendEnabled();
 

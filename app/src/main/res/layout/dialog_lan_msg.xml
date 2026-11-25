@@ -68,6 +68,7 @@
 
     <!-- 本机身份：名字 + 端口 -->
     <LinearLayout
+        android:id="@+id/row_lan_identity"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
@@ -112,6 +113,7 @@
 
     <!-- 发现设置：地址（可空=广播；可填 224.224.224.224 组播或单播）+ 端口（默认 39000） -->
     <LinearLayout
+        android:id="@+id/row_lan_discovery"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"

@@ -222,6 +222,36 @@
                         android:textSize="12sp"
                         android:textStyle="bold" />
 
+                    <!-- 发现方式：局域网广播 / 蓝牙 Classic 扫描，同一套「发现设备 / end」按钮 -->
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/tg_discover_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        app:checkedButton="@+id/btn_mode_lan"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_mode_lan"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="@string/discover_mode_lan"
+                            android:textSize="11sp"
+                            app:cornerRadius="16dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_mode_bt"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="@string/discover_mode_bt"
+                            android:textSize="11sp"
+                            app:cornerRadius="16dp" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

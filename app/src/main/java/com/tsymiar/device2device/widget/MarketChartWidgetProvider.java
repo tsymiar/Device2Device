@@ -66,14 +66,8 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
     /** 没配过周期时的默认：日线各数据源都支持，也最能代表"最近这段走势" */
     public static final String DEFAULT_INTERVAL = "1d";
 
-    /**
-     * 曲线位图之外被占掉的高度 / 宽度（dp）：根布局 padding + 标题行 + 价格行 + 底部一行。
-     *
-     * 更新时间与周期/高低并排靠右、不再自己占一行，所以这里少算十来 dp，
-     * 曲线相应拿到更多高度。估小一点没关系：ImageView 是 weight=1 的，多出来的空间
-     * 由 fitXY 铺满，不会把曲线裁掉。
-     */
-    private static final int CHART_CHROME_DP = 76;
+    /** 曲线之外的占用高度（dp） */
+    private static final int CHART_CHROME_DP = 90;
     private static final int CHART_SIDE_DP = 18;
     /** 黄金那行人民币标注占掉的高度（dp）：只有显示时才从曲线高度里扣 */
     private static final int NOTE_DP = 12;
@@ -173,6 +167,12 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    /** 日线不显示时间 */
+    private static String metaOf(Row row) {
+        if (row == null || "1d".equals(row.interval)) return "";
+        return MarketWidgetProvider.now();
+    }
+
     /** 把所有实例按当前配置重画（曲线位图与文字色都重取，数据走缓存，不联网） */
     public static void repaintAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
@@ -184,7 +184,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
             if (row == null) continue;
             try {
                 manager.updateAppWidget(widgetId,
-                        views(context, manager, widgetId, row, MarketWidgetProvider.now()));
+                        views(context, manager, widgetId, row, metaOf(row)));
             } catch (Throwable t) {
                 Log.w(TAG, "chart widget repaint failed", t);
             }
@@ -283,7 +283,7 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         if (row != null) {
             try {
                 manager.updateAppWidget(widgetId,
-                        views(context, manager, widgetId, row, MarketWidgetProvider.now()));
+                        views(context, manager, widgetId, row, metaOf(row)));
             } catch (Throwable t) {
                 Log.w(TAG, "chart widget render failed", t);
             }
@@ -552,10 +552,8 @@ public class MarketChartWidgetProvider extends AppWidgetProvider {
         views.setTextViewTextSize(R.id.widget_note, TypedValue.COMPLEX_UNIT_SP,
                 clampSp(wdp / 28, 8, 11));
 
-        // 曲线按部件当前实际尺寸画：2x2 的小格子和拉到最大的 4x3 差得远，按一个尺寸画会被
-        // fitXY 拉伸到发虚。尺寸变了由 onAppWidgetOptionsChanged 再刷一次。
-        // 2x2 高度有限，固定的 CHART_CHROME_DP 会把曲线挤没，这里按高度比例给曲线留地儿
-        int chrome = size[1] <= 170 ? Math.round(size[1] * 0.52f) : CHART_CHROME_DP;
+        // 按部件当前尺寸绘制，拉伸后由 onAppWidgetOptionsChanged 重画
+        int chrome = Math.min(CHART_CHROME_DP, Math.round(size[1] * 0.53f));
         if (note) chrome += NOTE_DP;    // 黄金多一行标注，避免曲线被压缩
         int chartW = Math.max(1, size[0] - CHART_SIDE_DP);
         int chartH = Math.max(1, size[1] - chrome);

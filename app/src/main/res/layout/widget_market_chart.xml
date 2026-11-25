@@ -84,8 +84,7 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 曲线主体：吃掉上部标题与下部价格行之间的全部剩余空间。
-         scaleType=fitXY：位图比例与实际框略有出入时铺满，不留黑边 -->
+    <!-- 曲线主体：铺满标题与价格行之间的空间 -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

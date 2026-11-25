@@ -27,9 +27,14 @@ final class ChartTime {
         return time.substring(0, 10);
     }
 
-    /** 详情浮窗展示用：分钟级K线把秒截掉（"… HH:mm:ss" → "… HH:mm"），其余原样 */
+    /** 详情浮窗展示用：分钟级截秒，日线及以上只显日期 */
     static String briefTime(String time) {
-        return time != null && time.length() == 19 && time.charAt(16) == ':'
+        if (time == null) return null;
+        // 日线及以上时间戳是 00:00:00，只取日期
+        if (time.length() >= 19 && "00:00:00".equals(time.substring(11, 19))) {
+            return dayOf(time);
+        }
+        return time.length() == 19 && time.charAt(16) == ':'
                 ? time.substring(0, 16) : time;
     }
 

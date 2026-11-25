@@ -429,8 +429,8 @@ public class SshClientActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         if (mCore.isConnected()) {
-            // 连接时返回键退到后台，由状态栏通知再回来
-            moveTaskToBack(true);
+            // 只结束本页，连接由前台服务保持
+            finish();
         } else {
             super.onBackPressed();
         }

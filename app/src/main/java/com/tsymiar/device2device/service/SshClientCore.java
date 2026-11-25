@@ -302,9 +302,9 @@ public final class SshClientCore {
                         l.onOutput(chunk);
                     }
                 }
-                // EOF 时冲刷解码器里可能残留的序列
-                CharBuffer tail = CharBuffer.allocate(8);
-                decoder.flush(tail);
+                // EOF：以 endOfInput=true 结束解码，不能直接 flush（状态非法会抛异常）
+                CharBuffer tail = CharBuffer.allocate(16);
+                decoder.decode(ByteBuffer.allocate(0), tail, true);
                 tail.flip();
                 if (tail.hasRemaining()) {
                     OutputListener l = outputListener;

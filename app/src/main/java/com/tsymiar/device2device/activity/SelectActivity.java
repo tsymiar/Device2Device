@@ -1,10 +1,14 @@
 package com.tsymiar.device2device.activity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -39,9 +43,11 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.dialog.ChatBoxDialog;
 import com.tsymiar.device2device.dialog.FileMsgDialog;
@@ -69,6 +75,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class SelectActivity extends AppCompatActivity implements EventHandle {
     private static final String TAG = SelectActivity.class.getCanonicalName();
@@ -77,6 +84,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     public static final int RequestAudio = 10003;
     public static final int RequestHttpFolder = 10004;
     private static final int RequestBatteryOptimize = 10005;
+    private static final int RequestBluetooth = 10006;
+    private static final int RequestEnableBt = 10007;
     private SshSessionListDialog mSshSessionDialog;
     /** 单进程内只引导一次“忽略电池优化”，避免每次启动 HTTP 都打扰 */
     private static boolean sBatteryPromptShown = false;
@@ -152,8 +161,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     private WifiManager.MulticastLock mDiscoverLock = null;
     /** 本次发现是否由本页拉起：若由本页拉起，退出页面时负责收掉，别人（消息对话框）拉起的不管 */
     private boolean mDiscoverStarted = false;
-    /** 已发现设备：key = ip:port，value = {name, ip, port}，按发现顺序排 */
+    /** 发现方式：局域网广播或蓝牙 Classic 扫描 */
+    private static final int MODE_LAN = 0;
+    private static final int MODE_BT = 1;
+    private int mDiscoverMode = MODE_LAN;
+    /** 已发现设备：LAN 时 key=ip:port / value={name, ip, port}；BT 时 key=MAC / value={name, MAC, ""} */
     private final Map<String, String[]> mDiscoverPeers = new LinkedHashMap<>();
+    private BluetoothAdapter mBtAdapter;
+    private BroadcastReceiver mBtReceiver;
 
     public static SelectActivity getInstance() {
         return mainActivity;
@@ -519,7 +534,21 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             TextView tv = findViewById(R.id.txt_event);
             tv.setText(event.getEvent().toString() + ", value = " + mGValue);
         });
-        // 设备发现：复用局域网消息的 UDP 广播发现，只列设备，不做后续操作
+        // 发现方式切换
+        MaterialButtonToggleGroup discoverModes = findViewById(R.id.tg_discover_mode);
+        if (discoverModes != null) {
+            discoverModes.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                int mode = checkedId == R.id.btn_mode_bt ? MODE_BT : MODE_LAN;
+                if (mode == mDiscoverMode) return;
+                stopDiscoveryQuietly();
+                mDiscoverMode = mode;
+                mDiscoverPeers.clear();
+                updateDiscoverList();
+                setTextSafely(R.id.txt_hint, getString(
+                        mode == MODE_BT ? R.string.discover_mode_bt : R.string.discover_mode_lan));
+            });
+        }
         findViewById(R.id.btn_discover).setOnClickListener(v -> startDiscovery());
         findViewById(R.id.btn_discover_stop).setOnClickListener(v -> stopDiscovery());
         findViewById(R.id.btn_subscribe).setOnClickListener(v -> {
@@ -865,16 +894,22 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     /** 发现广播自己的端口（默认 39000，与收发的 39001 分开，可单独改） */
     private static final int DISCOVERY_PORT = 39000;
 
-    /**
-     * 点「发现设备」：把局域网消息那套发现拉起来（已经有人在用就复用），
-     * 再广播一轮喊话。结果只落到本页的设备列表里，不做选中 / 发送。
-     */
+    /** 按当前选项启动发现 */
     private void startDiscovery() {
+        if (mDiscoverMode == MODE_BT) {
+            startBtDiscovery();
+        } else {
+            startLanDiscovery();
+        }
+    }
+
+    /** 局域网广播发现，只列设备 */
+    private void startLanDiscovery() {
         acquireDiscoverLock();
         String selfIp = Utils.getLocalWifiIp(this);
         // 发现用广播地址 + 自己的端口，与收发（KCP 会话端口）分开设：改这一个不动那一个
         NetworkWrapper.setLanDiscoveryPort(DISCOVERY_PORT);
-        int ret = NetworkWrapper.startLanMessenger(android.os.Build.MODEL, selfIp, LAN_DISCOVER_PORT);
+        int ret = NetworkWrapper.startLanMessenger(Build.MODEL, selfIp, LAN_DISCOVER_PORT);
         // ret==1 表示已经在跑（消息对话框先拉起的），那份不由本页负责收
         if (ret == 0) {
             mDiscoverStarted = true;
@@ -891,8 +926,27 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 discoveryAddress(selfIp), DISCOVERY_PORT));
     }
 
-    /** 停止发现：只收本页自己拉起的那一轮，消息对话框那份留给对话框自己管 */
+    /** 停止发现：按当前选项收掉对应那一轮 */
     private void stopDiscovery() {
+        if (mDiscoverMode == MODE_BT) {
+            stopBtDiscovery(true);
+        } else {
+            stopLanDiscovery();
+            setTextSafely(R.id.txt_hint, getString(R.string.discover_stopped));
+        }
+    }
+
+    /** 切换时静默清理上一轮 */
+    private void stopDiscoveryQuietly() {
+        if (mDiscoverMode == MODE_BT) {
+            stopBtDiscovery(false);
+        } else {
+            stopLanDiscovery();
+        }
+    }
+
+    /** 只收本页自己拉起的局域网发现，消息对话框那份留给对话框自己管 */
+    private void stopLanDiscovery() {
         if (mDiscoverStarted) {
             NetworkWrapper.stopLanMessenger();
             mDiscoverStarted = false;
@@ -900,7 +954,115 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         releaseDiscoverLock();
         mDiscoverPeers.clear();
         updateDiscoverList();
-        setTextSafely(R.id.txt_hint, getString(R.string.discover_stopped));
+    }
+
+    // ===== 蓝牙发现 =====
+
+    private boolean hasBtPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
+                    == PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private String[] btPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return new String[]{Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT};
+        }
+        return new String[]{Manifest.permission.ACCESS_FINE_LOCATION};
+    }
+
+    private void startBtDiscovery() {
+        BluetoothManager bm = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBtAdapter = bm == null ? null : bm.getAdapter();
+        if (mBtAdapter == null) {
+            setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_unsupported));
+            return;
+        }
+        if (!hasBtPermissions()) {
+            ActivityCompat.requestPermissions(this, btPermissions(), RequestBluetooth);
+            return;
+        }
+        if (!mBtAdapter.isEnabled()) {
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), RequestEnableBt);
+            return;
+        }
+        startBtScan();
+    }
+
+    private void startBtScan() {
+        stopBtDiscovery(false);
+        mDiscoverPeers.clear();
+        // 已配对设备也列出来，仅展示
+        Set<BluetoothDevice> bonded = mBtAdapter.getBondedDevices();
+        for (BluetoothDevice device : bonded) {
+            String name = device.getName();
+            mDiscoverPeers.put(device.getAddress(), new String[]{
+                    TextUtils.isEmpty(name) ? getString(R.string.bt_unknown_device) : name,
+                    device.getAddress(), ""});
+        }
+        mBtReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (action == null) return;
+                BluetoothDevice device;
+                if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device == null || !hasBtPermissions()) return;
+                    String name = device.getName();
+                    mDiscoverPeers.put(device.getAddress(), new String[]{
+                            TextUtils.isEmpty(name) ? getString(R.string.bt_unknown_device) : name,
+                            device.getAddress(), ""});
+                    updateDiscoverList();
+                } else if (BluetoothDevice.ACTION_NAME_CHANGED.equals(action)) {
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device == null) return;
+                    String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+                    if (TextUtils.isEmpty(name)) name = device.getName();
+                    String[] peer = mDiscoverPeers.get(device.getAddress());
+                    if (peer != null) {
+                        peer[0] = TextUtils.isEmpty(name)
+                                ? getString(R.string.bt_unknown_device) : name;
+                        updateDiscoverList();
+                    }
+                } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                    setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_finished));
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothDevice.ACTION_NAME_CHANGED);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        registerReceiver(mBtReceiver, filter);
+        mBtAdapter.startDiscovery();
+        updateDiscoverList();
+        setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_started));
+    }
+
+    private void stopBtDiscovery(boolean showHint) {
+        if (mBtAdapter != null && hasBtPermissions()) {
+            try {
+                if (mBtAdapter.isDiscovering()) mBtAdapter.cancelDiscovery();
+            } catch (Exception ignored) {
+            }
+        }
+        if (mBtReceiver != null) {
+            try {
+                unregisterReceiver(mBtReceiver);
+            } catch (IllegalArgumentException ignored) {
+            }
+            mBtReceiver = null;
+        }
+        mDiscoverPeers.clear();
+        updateDiscoverList();
+        if (showHint) setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_stopped));
     }
 
     /** 发现喊话的两个目标地址：全局广播 + 本机 /24 广播，两者都写进 hint 才看得出用的是哪个 */
@@ -920,6 +1082,8 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
      * 只维护列表展示，解析规则与 LanMsgDialog.onPeerEvent 一致。
      */
     private void onDiscoverPeerEvent(String event) {
+        // 蓝牙模式忽略 LAN 事件
+        if (mDiscoverMode != MODE_LAN) return;
         if (event == null || event.isEmpty()) return;
         String[] p = event.split("\\|");
         if (p.length == 0) return;
@@ -964,7 +1128,10 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             TextView name = row.findViewById(R.id.tv_peer_name);
             TextView addr = row.findViewById(R.id.tv_peer_addr);
             if (name != null) name.setText(peer[0]);
-            if (addr != null) addr.setText(peer[1] + ":" + peer[2]);
+            if (addr != null) {
+                addr.setText(TextUtils.isEmpty(peer[2])
+                        ? peer[1] : peer[1] + ":" + peer[2]);
+            }
             box.addView(row);
         }
     }
@@ -999,6 +1166,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RequestEnableBt) {
+            if (resultCode == RESULT_OK) {
+                startBtDiscovery();
+            } else {
+                setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_enable));
+            }
+            return;
+        }
         // SSH 会话浮窗里「选择私钥」的结果要转交回浮窗处理
         if (mSshSessionDialog != null) {
             mSshSessionDialog.onActivityResult(requestCode, resultCode, data);
@@ -1038,6 +1213,22 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             if (data != null && mLanMsgDialog != null) {
                 mLanMsgDialog.handleImageResult(data.getData());
             }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != RequestBluetooth) return;
+        boolean granted = grantResults.length > 0;
+        for (int result : grantResults) {
+            if (result != PackageManager.PERMISSION_GRANTED) granted = false;
+        }
+        if (granted) {
+            startBtDiscovery();
+        } else {
+            setTextSafely(R.id.txt_hint, getString(R.string.discover_bt_permission));
         }
     }
 
