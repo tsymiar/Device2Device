@@ -12,6 +12,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.view.DeductionGameScreen;
 import com.tsymiar.device2device.view.GameUi;
 
@@ -37,7 +38,7 @@ public class GameDialog extends Dialog {
 
         // 右上角退出按钮：贴边小尺寸，避开游戏顶部标题/仪表区
         TextView close = new TextView(context);
-        close.setText("✕");
+        close.setText(R.string.close_icon);
         close.setTextColor(GameUi.TEXT_DIM);
         close.setTextSize(16);
         close.setGravity(Gravity.CENTER);

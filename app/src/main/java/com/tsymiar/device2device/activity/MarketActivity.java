@@ -485,7 +485,7 @@ public class MarketActivity extends AppCompatActivity {
         mStatus = new TextView(this);
         mStatus.setTextColor(C_TEXT_DIM);
         mStatus.setTextSize(11);
-        mStatus.setText("加载中…");
+        mStatus.setText(R.string.market_loading);
         mStatus.setIncludeFontPadding(false);
         // 行高按真实字高算（跟随系统字号），否则放大字体后固定 16dp 装不下，两行会挤在一起
         Paint.FontMetrics fm = mStatus.getPaint().getFontMetrics();
@@ -497,7 +497,7 @@ public class MarketActivity extends AppCompatActivity {
         mHint = new TextView(this);
         mHint.setTextColor(C_TEXT_HINT);
         mHint.setTextSize(11);
-        mHint.setText("可直接输入名称/拼音（紫金矿业、zjky）或代码 · 拖动查看历史 · 双指缩放 · 单击副图切换 成交量/MACD/RSI/KDJ");
+        mHint.setText(R.string.market_hint);
         mHint.setIncludeFontPadding(false);
         mHint.setHeight(rowHeight);
         mHint.setGravity(Gravity.CENTER_VERTICAL);
@@ -588,7 +588,7 @@ public class MarketActivity extends AppCompatActivity {
     /** 次要按钮：关=描边灰，开=橙色实心 */
     private TextView refreshButton() {
         TextView button = new TextView(this);
-        button.setText("自动更新 关");
+        button.setText(R.string.market_auto_update_off);
         button.setGravity(Gravity.CENTER);
         button.setTextSize(12);
         button.setPadding(dp(10), 0, dp(10), 0);
@@ -734,7 +734,7 @@ public class MarketActivity extends AppCompatActivity {
         }
         dismissPickDialog();
         mPickDialog = new AlertDialog.Builder(this)
-                .setTitle("选择标的")
+                .setTitle(R.string.title_select_symbol)
                 .setItems(labels, (dialog, which) -> {
                     if (!alive()) return;
                     applySymbol(items.get(which));

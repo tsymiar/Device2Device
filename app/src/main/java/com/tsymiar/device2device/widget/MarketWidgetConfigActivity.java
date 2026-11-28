@@ -169,8 +169,8 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
 
         // 页面标题省掉（ActionBar 上已经有「行情小部件设置」），说明文字直接顶到上面
         TextView hint = new TextView(this);
-        hint.setText("可以放多个标的（自选股 / 黄金 / 原油 / 加密货币均可）；"
-                + "长按或拖 ☰ 调整顺序，每行小字标注市场代码，超出高度可上下滚动。");
+        hint.setText(getString(R.string.hint_widget_symbols)
+                + getString(R.string.hint_widget_drag));
         hint.setTextColor(C_DIM);
         hint.setTextSize(12);
         hint.setPadding(0, 0, 0, dp(12));
@@ -210,7 +210,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         row.setClipToPadding(false);
 
         TextView label = new TextView(this);
-        label.setText("数据源");
+        label.setText(R.string.label_data_source);
         label.setTextColor(C_DIM);
         label.setTextSize(13);
         label.setIncludeFontPadding(false);
@@ -306,7 +306,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         row.addView(mSymbolEdit);
 
         TextView add = new TextView(this);
-        add.setText("添加");
+        add.setText(R.string.action_add);
         add.setGravity(Gravity.CENTER);
         add.setTextColor(C_ON_PRIMARY);
         add.setTextSize(14);
@@ -360,7 +360,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         section.addView(mList);
 
         mEmpty = new TextView(this);
-        mEmpty.setText("还没有标的，先在上面添加一个（默认跟随行情页当前标的）");
+        mEmpty.setText(R.string.widget_empty_symbols);
         mEmpty.setTextColor(C_DIM);
         mEmpty.setTextSize(12);
         mEmpty.setPadding(0, dp(10), 0, dp(10));
@@ -377,8 +377,8 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         if (mEmpty != null) mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         if (mAdapter != null) mAdapter.notifyDataSetChanged();
         if (mListLabel != null) {
-            mListLabel.setText("已选标的（" + mItems.size() + "）"
-                    + (mItems.size() > 1 ? " · 长按或拖 ☰ 可调整顺序" : ""));
+            mListLabel.setText(getString(R.string.widget_selected_count, mItems.size())
+                    + (mItems.size() > 1 ? getString(R.string.widget_drag_hint) : ""));
         }
     }
 
@@ -400,7 +400,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
 
             // 拖动手柄：40dp 高，和输入框同一档，按下就开始拖
             TextView handle = new TextView(parent.getContext());
-            handle.setText("☰");
+            handle.setText(R.string.drag_handle);
             handle.setTextColor(C_DIM);
             handle.setTextSize(15);
             handle.setGravity(Gravity.CENTER);
@@ -416,7 +416,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
             TextView remove = new TextView(parent.getContext());
-            remove.setText("删除");
+            remove.setText(R.string.action_delete);
             remove.setGravity(Gravity.CENTER);
             remove.setTextColor(C_DIM);
             remove.setTextSize(13);
@@ -566,7 +566,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         row.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
         TextView cancel = new TextView(this);
-        cancel.setText("取消");
+        cancel.setText(R.string.action_cancel);
         cancel.setGravity(Gravity.CENTER);
         cancel.setTextColor(C_TEXT);
         cancel.setTextSize(15);
@@ -578,7 +578,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
         row.addView(cancel, lp);
 
         TextView ok = new TextView(this);
-        ok.setText("添加到桌面");
+        ok.setText(R.string.action_add_to_home);
         ok.setGravity(Gravity.CENTER);
         ok.setTextColor(C_ON_PRIMARY);
         ok.setTextSize(15);
@@ -680,7 +680,7 @@ public class MarketWidgetConfigActivity extends AppCompatActivity {
             labels[i] = same ? s.code : s.name + "  " + s.code;
         }
         new AlertDialog.Builder(this)
-                .setTitle("选择标的")
+                .setTitle(R.string.title_select_symbol)
                 .setItems(labels, (dialog, which) -> add(items.get(which).code, items.get(which).name))
                 .setNegativeButton("取消", null)
                 .show();

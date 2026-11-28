@@ -2,7 +2,6 @@ package com.tsymiar.device2device.service;
 
 import android.annotation.SuppressLint;
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -32,6 +31,7 @@ import com.tsymiar.device2device.activity.BtDevicesActivity;
 import java.lang.ref.WeakReference;
 
 public class ReceiverService extends Service {
+    private static final String TAG = "ReceiverService";
     private static final String CHANNEL_ID = "receiver_channel";
 
     /**
@@ -73,16 +73,9 @@ public class ReceiverService extends Service {
     }
 
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    getString(R.string.title),
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Receiver service notification");
-            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.createNotificationChannel(channel);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, getString(R.string.title),
+                NotificationManager.IMPORTANCE_LOW, "Receiver service notification", false);
     }
 
     private void startForegroundService() {
@@ -104,7 +97,7 @@ public class ReceiverService extends Service {
                 .setContentTitle(getText(R.string.edit_text))
                 .setContentText(getText(R.string.back))
                 .setContentIntent(pendingIntent)
-                .setSmallIcon(R.drawable.ic_none)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setWhen(System.currentTimeMillis())
                 .build();
 
@@ -206,7 +199,9 @@ public class ReceiverService extends Service {
         if (wm != null && view != null) {
             try {
                 wm.removeView(view);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException e) {
+                Log.d(TAG, "view already detached from window manager", e);
+            }
         }
         added = false;
         super.onDestroy();

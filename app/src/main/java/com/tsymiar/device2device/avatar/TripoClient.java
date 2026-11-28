@@ -128,26 +128,29 @@ public final class TripoClient {
                                     String mime) throws Exception {
         String boundary = "----TripoBoundary" + System.currentTimeMillis();
         HttpURLConnection conn = open(BASE + "/files", apiKey);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setUseCaches(false);
-        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-        conn.setFixedLengthStreamingMode(bodyLength(boundary, fileName, mime, data.length));
-        OutputStream os = conn.getOutputStream();
-        os.write(("--" + boundary + "\r\n"
-                + "Content-Disposition: form-data; name=\"file\"; filename=\"" + fileName + "\"\r\n"
-                + "Content-Type: " + mime + "\r\n\r\n").getBytes("UTF-8"));
-        os.write(data);
-        os.write(("\r\n--" + boundary + "--\r\n").getBytes("UTF-8"));
-        os.flush();
-        os.close();
+        try {
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setUseCaches(false);
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+            conn.setFixedLengthStreamingMode(bodyLength(boundary, fileName, mime, data.length));
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(("--" + boundary + "\r\n"
+                        + "Content-Disposition: form-data; name=\"file\"; filename=\"" + fileName + "\"\r\n"
+                        + "Content-Type: " + mime + "\r\n\r\n").getBytes("UTF-8"));
+                os.write(data);
+                os.write(("\r\n--" + boundary + "--\r\n").getBytes("UTF-8"));
+            }
 
-        String body = read(conn);
-        JSONObject json = new JSONObject(body);
-        check(json);
-        String token = json.optJSONObject("data").optString("file_token", null);
-        if (token == null) throw new Exception("上传未返回 file_token：" + body);
-        return token;
+            String body = read(conn);
+            JSONObject json = new JSONObject(body);
+            check(json);
+            String token = json.optJSONObject("data").optString("file_token", null);
+            if (token == null) throw new Exception("上传未返回 file_token：" + body);
+            return token;
+        } finally {
+            conn.disconnect();
+        }
     }
 
     /** 2) 建任务拿 task_id */
@@ -163,27 +166,34 @@ public final class TripoClient {
         sb.append('}');
 
         HttpURLConnection conn = open(BASE + "/generation/image-to-model", apiKey);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/json");
-        OutputStream os = conn.getOutputStream();
-        os.write(sb.toString().getBytes("UTF-8"));
-        os.flush();
-        os.close();
+        try {
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(sb.toString().getBytes("UTF-8"));
+            }
 
-        String body = read(conn);
-        JSONObject json = new JSONObject(body);
-        check(json);
-        String taskId = json.optJSONObject("data").optString("task_id", null);
-        if (taskId == null) throw new Exception("未返回 task_id：" + body);
-        return taskId;
+            String body = read(conn);
+            JSONObject json = new JSONObject(body);
+            check(json);
+            String taskId = json.optJSONObject("data").optString("task_id", null);
+            if (taskId == null) throw new Exception("未返回 task_id：" + body);
+            return taskId;
+        } finally {
+            conn.disconnect();
+        }
     }
 
     /** 3) 查任务状态 */
     public static JSONObject queryTask(String apiKey, String taskId) throws Exception {
         HttpURLConnection conn = open(BASE + "/tasks/" + taskId, apiKey);
-        conn.setRequestMethod("GET");
-        return new JSONObject(read(conn));
+        try {
+            conn.setRequestMethod("GET");
+            return new JSONObject(read(conn));
+        } finally {
+            conn.disconnect();
+        }
     }
 
     /** 4) 下载模型文件 */
@@ -192,19 +202,18 @@ public final class TripoClient {
         conn.setConnectTimeout(CONNECT_MS);
         conn.setReadTimeout(DOWNLOAD_READ_MS);
         conn.setInstanceFollowRedirects(true);
-        InputStream in = conn.getInputStream();
-        File parent = out.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            Log.w(TAG, "mkdirs failed " + parent);
-        }
-        FileOutputStream fos = new FileOutputStream(out);
         try {
-            byte[] buf = new byte[32768];
-            int n;
-            while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+            File parent = out.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                Log.w(TAG, "mkdirs failed " + parent);
+            }
+            try (InputStream in = conn.getInputStream();
+                 FileOutputStream fos = new FileOutputStream(out)) {
+                byte[] buf = new byte[32768];
+                int n;
+                while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+            }
         } finally {
-            fos.close();
-            in.close();
             conn.disconnect();
         }
     }
@@ -230,12 +239,14 @@ public final class TripoClient {
         int code = conn.getResponseCode();
         InputStream in = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
         if (in == null) throw new Exception("HTTP " + code + "（无响应体）");
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        int n;
-        while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
-        in.close();
-        String body = new String(bos.toByteArray(), "UTF-8");
+        String body;
+        try (InputStream stream = in) {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = stream.read(buf)) > 0) bos.write(buf, 0, n);
+            body = new String(bos.toByteArray(), "UTF-8");
+        }
         if (code >= 400) {
             String msg = body;
             try {
@@ -243,10 +254,8 @@ public final class TripoClient {
             } catch (Exception ignore) {
                 // 非 JSON 错误体直接用原文
             }
-            conn.disconnect();
             throw new Exception("HTTP " + code + " " + msg);
         }
-        conn.disconnect();
         return body;
     }
 

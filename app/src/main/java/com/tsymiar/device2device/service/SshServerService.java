@@ -1,7 +1,6 @@
 package com.tsymiar.device2device.service;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -230,13 +229,9 @@ public class SshServerService extends Service {
         if (notificationManager == null) {
             notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "SSH 服务", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("SSH 服务后台运行常驻通知");
-            channel.setShowBadge(false);
-            notificationManager.createNotificationChannel(channel);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, "SSH 服务", NotificationManager.IMPORTANCE_LOW,
+                "SSH 服务后台运行常驻通知", false);
 
         Intent open = new Intent(this, SelectActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -255,7 +250,7 @@ public class SshServerService extends Service {
             builder = new Notification.Builder(this);
         }
         // 密码不放通知：通知栏对其它应用可见，密码只在页面里给出
-        builder.setSmallIcon(R.mipmap.ic_launcher)
+        builder.setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle("SSH 服务运行中")
                 .setContentText(command + " · " + root)
                 .setCategory(Notification.CATEGORY_SERVICE)

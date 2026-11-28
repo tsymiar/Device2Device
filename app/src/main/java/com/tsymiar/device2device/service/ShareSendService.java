@@ -1,7 +1,6 @@
 package com.tsymiar.device2device.service;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -73,12 +72,9 @@ public class ShareSendService extends Service {
     public void onCreate() {
         super.onCreate();
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                    getString(R.string.file_msg_share_channel), NotificationManager.IMPORTANCE_LOW);
-            channel.setShowBadge(false);
-            notificationManager.createNotificationChannel(channel);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, getString(R.string.file_msg_share_channel),
+                NotificationManager.IMPORTANCE_LOW, null, false);
     }
 
     @Override
@@ -230,7 +226,7 @@ public class ShareSendService extends Service {
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID)
                 : new Notification.Builder(this);
-        builder.setSmallIcon(R.mipmap.ic_launcher)
+        builder.setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle(getString(R.string.file_msg_share_title, peer))
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))

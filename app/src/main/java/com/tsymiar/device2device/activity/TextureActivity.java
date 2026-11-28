@@ -7,6 +7,7 @@ import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
@@ -19,6 +20,8 @@ import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,6 +38,7 @@ import java.util.Locale;
 
 public class TextureActivity extends AppCompatActivity
         implements AdapterView.OnItemSelectedListener, TextureView.SurfaceTextureListener {
+    private static final String TAG = "TextureActivity";
     private static final int REQUEST_CODE_PICK_FILE = 200;
 
     /** 渲染模式 */
@@ -268,13 +272,15 @@ public class TextureActivity extends AppCompatActivity
         // 图片走纹理/原始通道，视频走 MediaCodec 硬解，两类都放出来
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
-        startActivityForResult(intent, REQUEST_CODE_PICK_FILE);
+        pickFileLauncher.launch(intent);
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_PICK_FILE && resultCode == RESULT_OK && data != null) {
+    private final ActivityResultLauncher<Intent> pickFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> onPickedFileResult(result.getResultCode(), result.getData()));
+
+    private void onPickedFileResult(int resultCode, Intent data) {
+        if (resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             if (uri != null) {
                 String path = copyUriToFile(uri);
@@ -756,7 +762,9 @@ public class TextureActivity extends AppCompatActivity
             if (n < 12) return false;
             return header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79
                     && header[7] == 0x70;   // "ftyp"
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            Log.d(TAG, "read file magic failed", e);
+        }
         return false;
     }
 
@@ -784,7 +792,9 @@ public class TextureActivity extends AppCompatActivity
             if (header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
                     && n >= 12 && header[8] == 0x57 && header[9] == 0x45
                     && header[10] == 0x42 && header[11] == 0x50) return true;
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            Log.d(TAG, "read image magic failed", e);
+        }
         return false;
     }
 

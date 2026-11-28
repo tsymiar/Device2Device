@@ -24,6 +24,11 @@ import androidx.core.app.ActivityCompat;
 
 import com.tsymiar.device2device.R;
 
+/**
+ * 本类沿用平台 Activity（透明弹窗样式依赖当前 Window 配置），
+ * 因此仍使用 startActivityForResult；结果全部在 onActivityResult 中闭环处理。
+ */
+@SuppressWarnings("deprecation")
 public class BtDialogActivity extends Activity {
     public static final String TAG = "Connection";
     public static final String ACTION_EXIT_BLUETOOTH = "com.tsymiar.device2device.EXIT_BLUETOOTH";
@@ -154,7 +159,9 @@ public class BtDialogActivity extends Activity {
         if (exitReceiver != null) {
             try {
                 unregisterReceiver(exitReceiver);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException e) {
+                Log.d(TAG, "exit receiver was not registered", e);
+            }
         }
     }
 

@@ -29,7 +29,7 @@ public class SensorActivity extends Activity {
 
         SensorManager mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         List<Sensor> deviceSensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
-        bar.setText("手机上共有" + deviceSensors.size() + "个传感器：");
+        bar.setText(getString(R.string.sensor_count, deviceSensors.size()));
 
         StringBuilder sb = new StringBuilder();
         int index = 0;

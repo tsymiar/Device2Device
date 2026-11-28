@@ -300,7 +300,7 @@ public class SshClientActivity extends AppCompatActivity {
         mKeyTheme.setOnClickListener(v -> {
             mThemeIndex = (mThemeIndex + 1) % THEMES.length;
             applyTheme();
-            Toast.makeText(this, "终端主题：" + THEMES[mThemeIndex].name, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.ssh_theme_prefix, THEMES[mThemeIndex].name), Toast.LENGTH_SHORT).show();
         });
         mKeyClear.setOnClickListener(v -> clearHistory());
 
@@ -536,7 +536,7 @@ public class SshClientActivity extends AppCompatActivity {
                 + "上次：" + e.expected + "\n本次：" + e.actual
                 + "\n\n若服务器确实重装过，可信任新密钥并重试。";
         new AlertDialog.Builder(this)
-                .setTitle("⚠ 主机密钥变更")
+                .setTitle(R.string.ssh_hostkey_changed)
                 .setMessage(msg)
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton("信任并重试", (dialog, which) -> {
@@ -836,10 +836,11 @@ public class SshClientActivity extends AppCompatActivity {
     }
 
     private void updateConnStatus() {
-        String name = mConn == null ? "临时连接" : mConn.displayName();
+        String name = mConn == null ? getString(R.string.ssh_temp_connection) : mConn.displayName();
         String fp = mCore.getServerFingerprint();
-        mConnStatus.setText("会话：" + name
-                + (TextUtils.isEmpty(fp) ? "" : "  ·  指纹 " + fp.substring(0, Math.min(fp.length(), 24)) + "…"));
+        String fpSuffix = TextUtils.isEmpty(fp) ? ""
+                : getString(R.string.ssh_fingerprint_suffix, fp.substring(0, Math.min(fp.length(), 24)));
+        mConnStatus.setText(getString(R.string.ssh_conn_status, name, fpSuffix));
     }
 
     /** 静默拉取对端命令表与 bash 历史，作为输入框联想候选；不写入终端输出 */
@@ -997,7 +998,7 @@ public class SshClientActivity extends AppCompatActivity {
         if (mCmd != null) {
             mCmd.dismissDropDown();
         }
-        Toast.makeText(this, "已清空命令历史", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.ssh_cleared_history, Toast.LENGTH_SHORT).show();
     }
 
     /**

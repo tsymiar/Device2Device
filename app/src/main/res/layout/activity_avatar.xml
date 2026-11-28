@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF0E1116"
+    android:background="@color/avatar_bg"
     android:orientation="vertical">
 
     <!-- 3D 预览：等身比例人体模型（含地面网格与身高标尺） -->
@@ -17,7 +17,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#FF2A3342" />
+        android:background="@color/avatar_panel" />
 
     <!-- 参数面板：由 AvatarActivity 按当前选项动态填充 -->
     <ScrollView

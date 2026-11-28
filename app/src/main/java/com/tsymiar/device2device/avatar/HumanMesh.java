@@ -834,8 +834,9 @@ public final class HumanMesh {
         } else {
             mtlName = mtlName + ".mtl";
         }
-        try {
-            BufferedWriter w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(objFile)));
+        File mtlFile = new File(objFile.getParentFile(), mtlName);
+        try (BufferedWriter w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(objFile)));
+             BufferedWriter m = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(mtlFile)))) {
             w.write("# Device2Device Avatar 3D\n");
             w.write("# height(m)=" + fmt(r.heightM) + " vertices=" + r.vertices
                     + " triangles=" + r.triangles + "\n");
@@ -867,10 +868,6 @@ public final class HumanMesh {
                     w.write("f " + a + "//" + a + " " + b + "//" + b + " " + c + "//" + c + "\n");
                 }
             }
-            w.close();
-
-            File mtlFile = new File(objFile.getParentFile(), mtlName);
-            BufferedWriter m = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(mtlFile)));
             m.write("# Device2Device Avatar 3D materials\n");
             for (MeshBuilder.Part part : r.parts) {
                 m.write("newmtl " + part.name + "\n");
@@ -880,7 +877,6 @@ public final class HumanMesh {
                 m.write("Ns 20\n");
                 m.write("illum 2\n\n");
             }
-            m.close();
             return true;
         } catch (Exception e) {
             Log.e(TAG, "write obj failed", e);

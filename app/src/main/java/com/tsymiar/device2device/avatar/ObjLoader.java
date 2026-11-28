@@ -35,7 +35,7 @@ public final class ObjLoader {
 
     public static LoadResult load(InputStream in, float targetHeightM, int color) {
         LoadResult out = new LoadResult();
-        try {
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(in))) {
             ArrayList<Float> pos = new ArrayList<>(30000);
             ArrayList<Float> nrm = new ArrayList<>(30000);
             ArrayList<Float> idx = new ArrayList<>(30000);      // 三角形：v 下标
@@ -44,7 +44,6 @@ public final class ObjLoader {
             ArrayList<String> groupName = new ArrayList<>();
             boolean hasVn = false;
 
-            BufferedReader r = new BufferedReader(new InputStreamReader(in));
             String line;
             String currentGroup = "model";
             int faceCount = 0;
@@ -111,7 +110,6 @@ public final class ObjLoader {
                     }
                 }
             }
-            r.close();
 
             int vertexCount = pos.size() / 3;
             if (vertexCount < 3 || faceCount == 0) {

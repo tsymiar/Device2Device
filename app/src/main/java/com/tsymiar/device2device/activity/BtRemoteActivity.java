@@ -14,7 +14,6 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -35,8 +34,11 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.utils.AppDataPaths;
 import com.tsymiar.device2device.utils.ExitAll;
 import com.tsymiar.device2device.service.ReceiverService;
 
@@ -55,6 +57,7 @@ public class BtRemoteActivity extends Activity {
     private static final String TAG = "BtRemoteActivity";
     private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final int READ = 1;
+    private static final int REQ_BT_CONNECT = 1001;
 
     private BluetoothAdapter mBtAdapter;
     private BluetoothSocket mBtSocket;
@@ -156,12 +159,12 @@ public class BtRemoteActivity extends Activity {
 
         final List<BluetoothSocket> candidates = createCandidateSockets(device);
         if (candidates.isEmpty()) {
-            Toast.makeText(this, "无法创建蓝牙连接", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.bt_connect_failed_create, Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        Toast.makeText(this, "连接中:\n" + address, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.bt_connecting, address), Toast.LENGTH_SHORT).show();
         /**
          * BluetoothSocket.connect() 是阻塞的：它要跟对端握手，对端不应答时能卡几十秒。
          * 放在 onResume() 里跑就是主线程卡死 —— 输入派发超过 5 秒系统就按 ANR 把进程杀掉，
@@ -188,14 +191,18 @@ public class BtRemoteActivity extends Activity {
                     Log.w(TAG, "connect attempt failed: " + candidate + " -> " + e.getMessage());
                     try {
                         candidate.close();
-                    } catch (IOException ignored) {}
+                    } catch (IOException closeErr) {
+                        Log.d(TAG, "close failed candidate failed", closeErr);
+                    }
                 }
             }
             for (BluetoothSocket candidate : candidates) {
                 if (candidate == connected) continue;
                 try {
                     candidate.close();
-                } catch (IOException ignored) {}
+                } catch (IOException e) {
+                    Log.d(TAG, "close spare candidate failed", e);
+                }
             }
             final boolean ok = connected != null;
             final String error = err;
@@ -217,22 +224,22 @@ public class BtRemoteActivity extends Activity {
             return;
         }
         if (!connected) {
-            Toast.makeText(getBaseContext(), "连接失败: " + error, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getBaseContext(), getString(R.string.bt_connect_failed, error), Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
         mBtSocket = socket;
         if (mText != null) {
-            mText.setText("已连接: " + address);
+            mText.setText(getString(R.string.bt_connected, address));
         }
-        mToast = Toast.makeText(this, "蓝牙地址:\n" + address, Toast.LENGTH_LONG);
+        mToast = Toast.makeText(this, getString(R.string.bt_address, address), Toast.LENGTH_LONG);
         mToast.setGravity(Gravity.RIGHT, 0, 30);
         mToast.show();
 
         try {
             mOutStream = socket.getOutputStream();
         } catch (IOException e) {
-            Toast.makeText(getBaseContext(), "无法获取输出流: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(getBaseContext(), getString(R.string.bt_no_output_stream, e.getMessage()), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -269,7 +276,8 @@ public class BtRemoteActivity extends Activity {
             mSwitch0.setOnClickListener(v -> {
                 mSwitchToggled = !mSwitchToggled;
                 if (mSwitchToggled) {
-                    mSwitch0.setColorFilter(getResources().getColor(R.color.green_ok), PorterDuff.Mode.SRC_IN);
+                    mSwitch0.setColorFilter(ContextCompat.getColor(this, R.color.green_ok),
+                            PorterDuff.Mode.SRC_IN);
                 } else {
                     mSwitch0.clearColorFilter();
                 }
@@ -308,15 +316,16 @@ public class BtRemoteActivity extends Activity {
         // mSdt click opens saved file
         if (mSdt != null) {
             mSdt.setOnClickListener(v -> {
-                mSdt.setTextColor(getResources().getColor(R.color.green_ok));
-                File dir = new File(Environment.getExternalStorageDirectory() + "/Device2Device");
-                File file = new File(dir, getString(R.string.file_local));
+                mSdt.setTextColor(ContextCompat.getColor(BtRemoteActivity.this, R.color.green_ok));
+                File file = AppDataPaths.getSensorDataFile(BtRemoteActivity.this);
                 if (!file.exists()) {
-                    Toast.makeText(BtRemoteActivity.this, "文件不存在", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(BtRemoteActivity.this, R.string.bt_file_not_found, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Intent fi = new Intent(Intent.ACTION_VIEW);
-                fi.setDataAndType(Uri.fromFile(file), "text/*");
+                Uri uri = FileProvider.getUriForFile(BtRemoteActivity.this,
+                        getString(R.string.file_provider_authority), file);
+                fi.setDataAndType(uri, "text/*");
                 fi.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 startActivity(fi);
             });
@@ -369,7 +378,7 @@ public class BtRemoteActivity extends Activity {
 
     private void checkBTState() {
         if (mBtAdapter == null) {
-            Toast.makeText(getBaseContext(), "Bluetooth not supported", Toast.LENGTH_LONG).show();
+            Toast.makeText(getBaseContext(), R.string.bt_not_supported, Toast.LENGTH_LONG).show();
             finish();
         } else if (!mBtAdapter.isEnabled()) {
             finish();
@@ -378,11 +387,11 @@ public class BtRemoteActivity extends Activity {
                     != PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     ActivityCompat.requestPermissions(this,
-                            new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
+                            new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT_CONNECT);
                 }
                 return;
             }
-            startActivityForResult(enableIntent, 1);
+            startActivity(enableIntent);
         }
     }
 
@@ -428,11 +437,13 @@ public class BtRemoteActivity extends Activity {
             mOutStream.write(msgBuffer);
             mOutStream.flush();
             if (mText != null) {
-                mText.setText("已发送: " + (message.isEmpty() ? "NULL" : message));
+                mText.setText(getString(R.string.bt_sent,
+                    message.isEmpty() ? getString(R.string.null_text) : message));
             }
             if (mBtAdapter.getState() != BluetoothAdapter.STATE_OFF) {
                 String display = message.isEmpty() ? "NULL" : message;
-                mToast = Toast.makeText(getBaseContext(), "  " + display + "\n" + msgBuffer.length + " 字节已发送", Toast.LENGTH_SHORT);
+                mToast = Toast.makeText(getBaseContext(),
+                        getString(R.string.bt_sent_bytes, display, msgBuffer.length), Toast.LENGTH_SHORT);
                 mToast.setGravity(Gravity.RIGHT, 0, 10);
                 mToast.show();
             }
@@ -441,14 +452,14 @@ public class BtRemoteActivity extends Activity {
                     != PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     ActivityCompat.requestPermissions(this,
-                            new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
+                            new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT_CONNECT);
                 }
                 return;
             }
             mBtAdapter.disable();
-            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), 2);
+            startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
             finish();
-            Toast.makeText(getBaseContext(), "发送失败", Toast.LENGTH_LONG).show();
+            Toast.makeText(getBaseContext(), R.string.bt_send_failed, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -461,7 +472,9 @@ public class BtRemoteActivity extends Activity {
             InputStream instr = null;
             try {
                 instr = socket.getInputStream();
-            } catch (IOException ignored) {}
+            } catch (IOException e) {
+                Log.e(TAG, "open bluetooth input stream failed", e);
+            }
             mmInStream = instr;
         }
 
@@ -518,13 +531,13 @@ public class BtRemoteActivity extends Activity {
         hint.putExtra("cmd", mReceivedText);
         startService(hint);
         if (mText != null && mText.getText().toString().startsWith("已连接")) {
-            mText.setText("收到: " + text.trim());
+            mText.setText(getString(R.string.bt_received, text.trim()));
         }
     }
 
     private void onReadError(String error) {
         if (mText != null) {
-            mText.setText("蓝牙连接断开: " + error);
+            mText.setText(getString(R.string.bt_disconnected, error));
         }
         onReceived("[断开] " + error);
     }
@@ -567,17 +580,23 @@ public class BtRemoteActivity extends Activity {
         if (exitReceiver != null) {
             try {
                 unregisterReceiver(exitReceiver);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException e) {
+                Log.d(TAG, "exit receiver was not registered", e);
+            }
         }
     }
 
     private void closeSocket() {
         try {
             if (mOutStream != null) mOutStream.close();
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            Log.d(TAG, "close output stream failed", e);
+        }
         try {
             if (mBtSocket != null) mBtSocket.close();
-        } catch (IOException ignored) {}
+        } catch (IOException e) {
+            Log.d(TAG, "close bluetooth socket failed", e);
+        }
         mOutStream = null;
         mBtSocket = null;
     }

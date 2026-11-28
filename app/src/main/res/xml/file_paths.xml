@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 拍照临时文件：app 私有 Pictures 目录，经 FileProvider 授权给相机应用写入 -->
     <external-files-path name="avatar_pictures" path="Pictures/" />
+    <!-- 串口/传感器数据与录音：AppDataPaths 统一放在 app 私有 external 目录下 -->
+    <external-files-path name="app_data" path="." />
 </paths>

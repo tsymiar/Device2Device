@@ -17,9 +17,9 @@ public class Receiver {
     public static final int KCP_VIEW = 9;
     public static final int KCP_HINT = 10;
     public static final int KCP_CLIENT = 11;
-    public static final int LAN_PEER = 12;
-    public static final int LAN_MESSAGE = 13;
-    public static final int FILE_PEER = 14;
+    public static final int FILE_PEER = 12;
+    public static final int LAN_PEER = 13;
+    public static final int LAN_MESSAGE = 14;
     public int receiver;
     public String message;
 

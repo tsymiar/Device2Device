@@ -205,7 +205,7 @@ public class FileMsgDialog extends DialogFragment {
                     openFilePicker();
                 } else {
                     if (getContext() != null) {
-                        Toast.makeText(getContext(), "Storage permission required", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), R.string.file_storage_permission, Toast.LENGTH_SHORT).show();
                     }
                 }
             }
@@ -452,8 +452,8 @@ public class FileMsgDialog extends DialogFragment {
                         appendLog(String.format("Connected to %s:%d", ip, port));
                     } else {
                         appendLog(String.format("Connect failed: %s:%d (code %d)", ip, port, ret));
-                        Toast.makeText(getContext(), "连接失败, 请检查IP/端口: " + ret,
-                                Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(),
+                                getString(R.string.file_connect_failed, ret), Toast.LENGTH_SHORT).show();
                     }
                     updateUI();
                 });
@@ -462,16 +462,16 @@ public class FileMsgDialog extends DialogFragment {
 
         btnSendFile.setOnClickListener(v -> {
             if (!isConnected) {
-                Toast.makeText(getContext(), "Not connected", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), R.string.file_not_connected, Toast.LENGTH_SHORT).show();
                 return;
             }
             if (selectedFiles.isEmpty()) {
-                Toast.makeText(getContext(), "Please select a file", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), R.string.file_select_file, Toast.LENGTH_SHORT).show();
                 return;
             }
             for (String path : selectedFiles) {
                 if (!new File(path).exists()) {
-                    Toast.makeText(getContext(), "File not found: " + path, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), getString(R.string.file_not_found, path), Toast.LENGTH_SHORT).show();
                     return;
                 }
             }
@@ -502,7 +502,7 @@ public class FileMsgDialog extends DialogFragment {
             if (isBusy) return;
             String name = etRemote.getText() == null ? "" : etRemote.getText().toString().trim();
             if (name.isEmpty()) {
-                Toast.makeText(getContext(), "Please enter a remote file name", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), R.string.file_remote_name, Toast.LENGTH_SHORT).show();
                 return;
             }
             String ip = etIp.getText() == null ? "" : etIp.getText().toString().trim();
@@ -939,8 +939,7 @@ public class FileMsgDialog extends DialogFragment {
     /** 点发现列表里的设备：填入对端地址后走与 Connect 按钮同一条流程 */
     private void connectToPeer(String ip, String port) {
         if (isBusy || isConnected || isServerStarted) {
-            Toast.makeText(getContext(), "Busy - disconnect current session first",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.file_busy, Toast.LENGTH_SHORT).show();
             return;
         }
         if (etIp == null || etPort == null || btnConnect == null) return;

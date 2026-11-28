@@ -29,6 +29,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -247,7 +249,7 @@ public class AvatarActivity extends AppCompatActivity {
         mNote.setTextSize(11);
         mNote.setTextColor(0xFF6B7280);
         mNote.setPadding(0, dp(4), 0, dp(8));
-        mNote.setText("未选择照片：使用默认形象，可在下方手动调参。");
+        mNote.setText(R.string.avatar_no_photo);
         mControls.addView(mNote);
 
         // ---- 性别 ----
@@ -722,9 +724,9 @@ public class AvatarActivity extends AppCompatActivity {
             box.addView(row);
         }
         holder[0] = new AlertDialog.Builder(this)
-                .setTitle("选择" + title)
+                .setTitle(getString(R.string.avatar_choose_title, title))
                 .setView(box)
-                .setNegativeButton("关闭", null)
+                .setNegativeButton(R.string.action_close, null)
                 .show();
     }
 
@@ -866,7 +868,7 @@ public class AvatarActivity extends AppCompatActivity {
         intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         try {
-            startActivityForResult(Intent.createChooser(intent, "选择照片"), REQ_PICK);
+            photoLauncher.launch(Intent.createChooser(intent, getString(R.string.avatar_pick_photo)));
         } catch (Exception e) {
             Log.w(TAG, "pick photo failed", e);
             toast("无法打开相册");
@@ -901,7 +903,7 @@ public class AvatarActivity extends AppCompatActivity {
                             Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
             }
-            startActivityForResult(intent, REQ_SHOT);
+            shotLauncher.launch(intent);
         } catch (Exception e) {
             Log.e(TAG, "camera failed", e);
             toast("无法启动相机：" + e.getMessage());
@@ -920,20 +922,36 @@ public class AvatarActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK) return;
-        if (requestCode == REQ_PICK && data != null && data.getData() != null) {
-            handlePhoto(data.getData());
-        } else if (requestCode == REQ_SHOT && mCameraUri != null) {
-            handlePhoto(mCameraUri);
-        } else if (requestCode == REQ_OBJ && data != null && data.getData() != null) {
-            handleObj(data.getData());
-        } else if (requestCode == REQ_ANNY && data != null && data.getData() != null) {
-            handleAnny(data.getData());
-        }
-    }
+    private final ActivityResultLauncher<Intent> photoLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() == RESULT_OK && data != null && data.getData() != null) {
+                    handlePhoto(data.getData());
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> shotLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK && mCameraUri != null) {
+                    handlePhoto(mCameraUri);
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> objLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() == RESULT_OK && data != null && data.getData() != null) {
+                    handleObj(data.getData());
+                }
+            });
+
+    private final ActivityResultLauncher<Intent> annyLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() == RESULT_OK && data != null && data.getData() != null) {
+                    handleAnny(data.getData());
+                }
+            });
 
     /** 选择第三方 OBJ（MakeHuman / Blender / Ready Player Me 等导出的人体） */
     private void importObj() {
@@ -941,7 +959,7 @@ public class AvatarActivity extends AppCompatActivity {
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         try {
-            startActivityForResult(Intent.createChooser(intent, "选择 OBJ 模型"), REQ_OBJ);
+            objLauncher.launch(Intent.createChooser(intent, getString(R.string.avatar_pick_obj)));
         } catch (Exception e) {
             Log.w(TAG, "pick obj failed", e);
             toast("无法打开文件选择器");
@@ -986,7 +1004,7 @@ public class AvatarActivity extends AppCompatActivity {
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         try {
-            startActivityForResult(Intent.createChooser(intent, "选择 anny.mhb"), REQ_ANNY);
+            annyLauncher.launch(Intent.createChooser(intent, getString(R.string.avatar_pick_anny)));
         } catch (Exception e) {
             Log.w(TAG, "pick anny failed", e);
             toast("无法打开文件选择器");
@@ -1026,14 +1044,14 @@ public class AvatarActivity extends AppCompatActivity {
         box.setPadding(dp(14), dp(8), dp(14), dp(4));
 
         TextView keyLabel = new TextView(this);
-        keyLabel.setText("API Key（tripo3d.com 后台获取，仅保存在本机）");
+        keyLabel.setText(R.string.avatar_api_key_label);
         keyLabel.setTextSize(12);
         keyLabel.setTextColor(C_SUB);
         box.addView(keyLabel);
 
         final EditText keyEdit = new EditText(this);
         keyEdit.setBackground(rounded(C_FIELD, C_STROKE));
-        keyEdit.setHint("tsk_…");
+        keyEdit.setHint(R.string.avatar_api_key_hint);
         keyEdit.setHintTextColor(0xFF6B7280);
         keyEdit.setText(mTripoKey);
         keyEdit.setSingleLine();
@@ -1043,7 +1061,7 @@ public class AvatarActivity extends AppCompatActivity {
         box.addView(keyEdit);
 
         TextView faceLabel = new TextView(this);
-        faceLabel.setText("面数上限（手机建议 8000~30000，越大越精细也越慢）");
+        faceLabel.setText(R.string.avatar_face_limit);
         faceLabel.setTextSize(12);
         faceLabel.setTextColor(C_SUB);
         faceLabel.setPadding(0, dp(8), 0, 0);
@@ -1060,7 +1078,7 @@ public class AvatarActivity extends AppCompatActivity {
         box.addView(faceEdit);
 
         final android.widget.CheckBox textureBox = new android.widget.CheckBox(this);
-        textureBox.setText("生成贴图（关闭则只出几何，速度更快）");
+        textureBox.setText(R.string.avatar_texture);
         textureBox.setChecked(true);
         textureBox.setTextColor(C_TEXT);
         textureBox.setTextSize(12);
@@ -1068,7 +1086,7 @@ public class AvatarActivity extends AppCompatActivity {
         box.addView(textureBox);
 
         new AlertDialog.Builder(this)
-                .setTitle("Tripo3D 照片生成 3D")
+                .setTitle(R.string.tripo_title)
                 .setView(box)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始生成", (dialog, which) -> {
@@ -1104,44 +1122,46 @@ public class AvatarActivity extends AppCompatActivity {
         opt.texture = texture;
         opt.pbr = false;
 
-        toast("已提交 Tripo3D，通常需要 1~3 分钟…");
-        mStat.setText("Tripo3D：正在上传照片…");
+        toast(getString(R.string.tripo_submitted));
+        mStat.setText(R.string.tripo_uploading);
         new Thread(() -> {
             Bitmap bmp = decode(mPhotoUri, 1024);
             if (bmp == null) {
-                runOnUiThread(() -> toast("读取照片失败"));
+                runOnUiThread(() -> toast(getString(R.string.avatar_read_photo_failed)));
                 return;
             }
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             bmp.compress(Bitmap.CompressFormat.JPEG, 92, bos);
             if (bos.size() > 18 * 1024 * 1024) {          // 接口限制 20MB
-                runOnUiThread(() -> toast("照片太大，请换一张更小的"));
+                runOnUiThread(() -> toast(getString(R.string.avatar_photo_too_large)));
                 return;
             }
             TripoClient.Outcome res = TripoClient.generate(key, bos.toByteArray(), opt, out,
-                    (stage, percent) -> runOnUiThread(() -> mStat.setText("Tripo3D：" + stage)));
+                    (stage, percent) -> runOnUiThread(() ->
+                            mStat.setText(getString(R.string.tripo_progress, stage))));
             if (res.file == null) {
-                final String err = res.error == null ? "未知错误" : res.error;
+                final String err = res.error == null
+                        ? getString(R.string.unknown_error) : res.error;
                 runOnUiThread(() -> {
-                    mStat.setText("Tripo3D 失败：" + err);
-                    toast("Tripo3D 失败：" + err);
+                    mStat.setText(getString(R.string.tripo_failed, err));
+                    toast(getString(R.string.tripo_failed, err));
                 });
                 return;
             }
             GlbLoader.LoadResult loaded = GlbLoader.load(res.file, target, mProfile.top);
             runOnUiThread(() -> {
                 if (loaded.mesh == null) {
-                    mStat.setText("Tripo3D 模型载入失败：" + loaded.error);
-                    toast("模型载入失败：" + loaded.error);
+                    mStat.setText(getString(R.string.tripo_load_failed, loaded.error));
+                    toast(getString(R.string.model_load_failed, loaded.error));
                     return;
                 }
                 mBuildSeq++;                       // 作废排队中的参数化建模结果
                 mMesh = loaded.mesh;
                 mGl.setMesh(loaded.mesh);
-                mStat.setText("Tripo3D 模型：" + loaded.mesh.vertices + " 顶点 / "
-                        + loaded.mesh.triangles + " 三角面 · 已归一化为 "
-                        + Math.round(mProfile.heightCm) + " cm");
-                toast("Tripo3D 生成完成");
+                mStat.setText(getString(R.string.tripo_model,
+                        loaded.mesh.vertices, loaded.mesh.triangles,
+                        Math.round(mProfile.heightCm)));
+                toast(getString(R.string.tripo_done));
             });
         }).start();
     }
@@ -1219,7 +1239,7 @@ public class AvatarActivity extends AppCompatActivity {
         box.addView(big, new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("素材预览")
+                .setTitle(R.string.material_preview)
                 .setView(box)
                 .setPositiveButton("关闭", null)
                 .show();
@@ -1357,7 +1377,7 @@ public class AvatarActivity extends AppCompatActivity {
     private void pickCup(final int pos) {
         if (pos < 0 || pos >= BodyProfile.BUST_CUP_CM.length) return;
         final float target = BodyProfile.BUST_CUP_CM[pos];
-        if (mStat != null) mStat.setText("按罩杯反解丰满度中…");
+        if (mStat != null) mStat.setText(R.string.cup_solving);
         mBuildExecutor.execute(new Runnable() {
             @Override
             public void run() {

@@ -515,7 +515,7 @@ public class GraphActivity extends AppCompatActivity implements SensorEventListe
         } else if (itemId == R.id.exit) {
             activity.finish();
         } else if (itemId != R.id.item) {
-            Toast.makeText(GraphActivity.this, "select item", Toast.LENGTH_SHORT).show();
+            Toast.makeText(GraphActivity.this, R.string.select_item, Toast.LENGTH_SHORT).show();
         } else {
             return false;
         }

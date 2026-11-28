@@ -26,6 +26,7 @@ import android.net.wifi.WifiManager;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.text.format.Formatter;
+import android.util.Log;
 
 import androidx.annotation.StringRes;
 
@@ -46,6 +47,7 @@ import java.util.Enumeration;
  * Kitchen sink for small utility functions
  */
 public class Utils {
+    private static final String TAG = "Utils";
     public static double median(ArrayList<Double> arrList) {
         ArrayList<Double> lst = new ArrayList<>(arrList);
         Collections.sort(lst);
@@ -265,7 +267,9 @@ public class Utils {
                     return Formatter.formatIpAddress(ip);
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.d(TAG, "WifiManager IP lookup failed, try network interfaces", e);
+        }
 
         // 备选：遍历网络接口。
         // 注意别挑到 VPN(tun*) / 拨号(ppp*) / 蜂窝(rmnet*、ccmni*) 这类网卡 ——
@@ -298,7 +302,9 @@ public class Utils {
                 }
             }
             if (fallback != null) return fallback.getHostAddress();
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.w(TAG, "enumerate network interfaces failed", e);
+        }
 
         return "127.0.0.1";
     }

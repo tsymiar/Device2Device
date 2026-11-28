@@ -147,8 +147,8 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         scroll.addView(root);
 
         TextView hint = new TextView(this);
-        hint.setText("只绘制走势曲线，一次只盯一个标的（自选股 / 黄金 / 原油 / 加密货币均可）；"
-                + "周期决定曲线里一个点代表多久 —— 当天的分时用分钟级表示，近一周的日线用天表示。");
+        hint.setText(getString(R.string.hint_chart_only_trend)
+                + getString(R.string.hint_chart_period));
         hint.setTextColor(C_DIM);
         hint.setTextSize(12);
         hint.setPadding(0, 0, 0, dp(12));
@@ -260,7 +260,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         row.addView(mSymbolEdit);
 
         TextView use = new TextView(this);
-        use.setText("选它");
+        use.setText(R.string.action_use_it);
         use.setGravity(Gravity.CENTER);
         use.setTextColor(C_ON_PRIMARY);
         use.setTextSize(14);
@@ -286,7 +286,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         card.setLayoutParams(lp);
 
         TextView label = new TextView(this);
-        label.setText("当前标的");
+        label.setText(R.string.label_current_symbol);
         label.setTextColor(C_DIM);
         label.setTextSize(12);
         card.addView(label);
@@ -335,7 +335,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         row.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(40), 1f);
         TextView cancel = new TextView(this);
-        cancel.setText("取消");
+        cancel.setText(R.string.action_cancel);
         cancel.setGravity(Gravity.CENTER);
         cancel.setTextColor(C_TEXT);
         cancel.setTextSize(15);
@@ -347,7 +347,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
         row.addView(cancel, lp);
 
         TextView ok = new TextView(this);
-        ok.setText("添加到桌面");
+        ok.setText(R.string.action_add_to_home);
         ok.setGravity(Gravity.CENTER);
         ok.setTextColor(C_ON_PRIMARY);
         ok.setTextSize(15);
@@ -414,7 +414,7 @@ public class MarketChartConfigActivity extends AppCompatActivity {
             labels[i] = items.get(i).name + "  " + items.get(i).code;
         }
         new AlertDialog.Builder(this)
-                .setTitle("选择标的")
+                .setTitle(R.string.title_select_symbol)
                 .setItems(labels, (dialog, which) -> useSymbol(items.get(which).code, items.get(which).name))
                 .setNegativeButton("取消", null)
                 .show();

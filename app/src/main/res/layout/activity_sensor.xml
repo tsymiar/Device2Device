@@ -10,7 +10,7 @@
         android:layout_height="wrap_content"
         android:text=""
         android:textColor="@color/ui_text_dim"
-        android:textSize="30sp" />
+        android:textSize="@dimen/text_title" />
 
     <TextView
         android:id="@+id/hello"
@@ -26,12 +26,11 @@
         android:id="@+id/image"
         style="?android:attr/buttonBarButtonStyle"
         android:layout_width="wrap_content"
-        android:layout_height="40dp"
+        android:layout_height="@dimen/hit_target"
         android:layout_alignParentEnd="true"
-        android:layout_alignParentRight="true"
         android:layout_alignParentBottom="true"
         android:layout_toEndOf="@id/hello"
-        android:layout_toRightOf="@id/hello"
+        android:contentDescription="@string/exit"
         android:scaleType="centerInside"
         android:src="@android:drawable/ic_menu_close_clear_cancel"
         android:translationY="-20dp" />

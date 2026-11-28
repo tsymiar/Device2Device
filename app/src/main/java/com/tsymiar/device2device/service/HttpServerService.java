@@ -1,7 +1,6 @@
 package com.tsymiar.device2device.service;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -170,13 +169,9 @@ public class HttpServerService extends Service {
         if (notificationManager == null) {
             notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "HTTP 文件服务", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("HTTP 文件服务后台运行常驻通知");
-            channel.setShowBadge(false);
-            notificationManager.createNotificationChannel(channel);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, "HTTP 文件服务", NotificationManager.IMPORTANCE_LOW,
+                "HTTP 文件服务后台运行常驻通知", false);
 
         Intent open = new Intent(this, SelectActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -195,7 +190,7 @@ public class HttpServerService extends Service {
         } else {
             builder = new Notification.Builder(this);
         }
-        builder.setSmallIcon(R.mipmap.ic_launcher)
+        builder.setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle("HTTP 文件服务运行中")
                 .setContentText("访问地址 " + url + " · " + folder)
                 .setCategory(Notification.CATEGORY_SERVICE)
@@ -252,12 +247,16 @@ public class HttpServerService extends Service {
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.d(TAG, "release WakeLock failed", e);
+        }
         try {
             if (wifiLock != null && wifiLock.isHeld()) {
                 wifiLock.release();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.d(TAG, "release WifiLock failed", e);
+        }
     }
 
     private void broadcastState(String state) {

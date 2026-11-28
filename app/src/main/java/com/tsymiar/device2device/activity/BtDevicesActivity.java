@@ -34,6 +34,8 @@ import java.util.Set;
 
 public class BtDevicesActivity extends Activity {
     private static final String TAG = "BtDevicesActivity";
+    private static final int REQ_BT_CONNECT = 1001;
+    private static final int REQ_BT_SCAN = 1002;
 
     private BluetoothAdapter mBtAdapter;
     private ArrayAdapter<String> mPairedDevicesArrayAdapter;
@@ -90,7 +92,7 @@ public class BtDevicesActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
+                        new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT_CONNECT);
             }
             return;
         }
@@ -138,7 +140,7 @@ public class BtDevicesActivity extends Activity {
                     != PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     ActivityCompat.requestPermissions(this,
-                            new String[]{Manifest.permission.BLUETOOTH_SCAN}, 0);
+                            new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT_SCAN);
                 }
                 // Don't return here — still try to unregister
             } else {
@@ -147,7 +149,9 @@ public class BtDevicesActivity extends Activity {
         }
         try {
             unregisterReceiver(mReceiver);
-        } catch (IllegalArgumentException ignored) {}
+        } catch (IllegalArgumentException e) {
+            Log.d(TAG, "receiver was not registered", e);
+        }
     }
 
     private void doDiscovery() {
@@ -159,7 +163,7 @@ public class BtDevicesActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.BLUETOOTH_SCAN}, 0);
+                        new String[]{Manifest.permission.BLUETOOTH_SCAN}, REQ_BT_SCAN);
             }
             return;
         }
@@ -191,7 +195,7 @@ public class BtDevicesActivity extends Activity {
                 if (!hasConnectPermission()) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         ActivityCompat.requestPermissions(BtDevicesActivity.this,
-                                new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
+                                new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT_CONNECT);
                     }
                     return;
                 }
@@ -215,18 +219,19 @@ public class BtDevicesActivity extends Activity {
                 // 不配对直接连 SPP 在多数 Android 版本上会失败（尤其需要 PIN 的设备）。
                 mPendingConnectAddress = address;
                 String label = device.getName();
-                Toast.makeText(this, "正在配对 "
-                        + (label == null || label.trim().isEmpty() ? device.getAddress() : label)
-                        + "…", Toast.LENGTH_SHORT).show();
+                String name = label == null || label.trim().isEmpty()
+                        ? device.getAddress() : label;
+                Toast.makeText(this, getString(R.string.bt_pairing, name),
+                        Toast.LENGTH_SHORT).show();
                 try {
                     if (!device.createBond()) {
                         mPendingConnectAddress = null;
-                        Toast.makeText(this, "配对发起失败", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, R.string.bt_pair_start_failed, Toast.LENGTH_SHORT).show();
                     }
                 } catch (Exception e) {
                     mPendingConnectAddress = null;
                     Log.e(TAG, "createBond failed: " + address, e);
-                    Toast.makeText(this, "配对失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, getString(R.string.bt_pair_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
                 }
             };
 
@@ -291,7 +296,7 @@ public class BtDevicesActivity extends Activity {
                         != PackageManager.PERMISSION_GRANTED) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         ActivityCompat.requestPermissions(BtDevicesActivity.this,
-                                new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 0);
+                                new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT_CONNECT);
                     }
                     return;
                 }
@@ -313,11 +318,11 @@ public class BtDevicesActivity extends Activity {
                         + " state=" + state + " pending=" + mPendingConnectAddress);
                 if (state == BluetoothDevice.BOND_BONDED) {
                     mPendingConnectAddress = null;
-                    Toast.makeText(BtDevicesActivity.this, "配对成功，正在连接…", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(BtDevicesActivity.this, R.string.bt_pair_success_connecting, Toast.LENGTH_SHORT).show();
                     connectTo(device.getAddress());
                 } else if (state == BluetoothDevice.BOND_NONE) {
                     mPendingConnectAddress = null;
-                    Toast.makeText(BtDevicesActivity.this, "配对失败或被取消", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(BtDevicesActivity.this, R.string.bt_pair_failed_cancelled, Toast.LENGTH_SHORT).show();
                 }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 setProgressBarIndeterminateVisibility(false);

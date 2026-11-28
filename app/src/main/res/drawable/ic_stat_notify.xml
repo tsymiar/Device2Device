@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知栏小图标：纯白剪影，系统按通知样式自动着色；体积远小于原先复用的启动大图。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,6h16v12H4z M6,8v8h12V8z M2,9h2v6H2z M20,9h2v6h-2z" />
+</vector>

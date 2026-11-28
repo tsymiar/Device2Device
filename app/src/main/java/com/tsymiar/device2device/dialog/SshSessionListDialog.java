@@ -75,7 +75,7 @@ public class SshSessionListDialog {
             }
             updateKeyName();
         } catch (Exception e) {
-            Toast.makeText(mActivity, "导入私钥失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(mActivity, mActivity.getString(R.string.ssh_import_key_failed, e.getMessage()), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -89,7 +89,8 @@ public class SshSessionListDialog {
         if (mSessions.isEmpty()) {
             TextView empty = new TextView(mActivity);
             empty.setText(R.string.ssh_session_empty);
-            empty.setTextColor(mActivity.getResources().getColor(R.color.ui_text_dim));
+            empty.setTextColor(androidx.core.content.ContextCompat.getColor(
+                    mActivity, R.color.ui_text_dim));
             empty.setTextSize(12);
             empty.setPadding(4, 24, 4, 24);
             mContainer.addView(empty);
@@ -148,7 +149,7 @@ public class SshSessionListDialog {
     private void confirmDelete(SshConnection c) {
         new AlertDialog.Builder(mActivity)
                 .setTitle(R.string.ssh_session_delete)
-                .setMessage("确定删除会话「" + c.displayName() + "」？")
+                .setMessage(mActivity.getString(R.string.ssh_delete_session, c.displayName()))
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                     if (c.authType == SshConnection.AUTH_KEY) {
@@ -185,7 +186,13 @@ public class SshSessionListDialog {
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("*/*");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            mActivity.startActivityForResult(intent, REQ_PICK_KEY);
+            if (mActivity instanceof com.tsymiar.device2device.utils.ActivityResultRequester) {
+                ((com.tsymiar.device2device.utils.ActivityResultRequester) mActivity)
+                        .launchForResult(intent, REQ_PICK_KEY);
+            } else {
+                // 宿主未实现 ActivityResultRequester 时的兼容路径
+                mActivity.startActivityForResult(intent, REQ_PICK_KEY);
+            }
         });
 
         AlertDialog dialog = new AlertDialog.Builder(mActivity)

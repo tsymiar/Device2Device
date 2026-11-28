@@ -727,11 +727,11 @@ public class ChatBoxDialog extends Dialog {
 
     private void onSendClicked() {
         if (mTarget == null) {
-            Toast.makeText(getContext(), "请先选一个可用的服务", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.chat_no_service, Toast.LENGTH_SHORT).show();
             return;
         }
         if (mThinking) {
-            Toast.makeText(getContext(), "上一条还在等回复", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.chat_busy, Toast.LENGTH_SHORT).show();
             return;
         }
         String text = etMessage != null && etMessage.getText() != null
@@ -991,8 +991,14 @@ public class ChatBoxDialog extends Dialog {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        Intent choose = Intent.createChooser(intent, "选择文件");
-        mActivity.startActivityForResult(choose, CHAT_FILE_REQUEST);
+        Intent choose = Intent.createChooser(intent, getContext().getString(R.string.chat_pick_file));
+        if (mActivity instanceof com.tsymiar.device2device.utils.ActivityResultRequester) {
+            ((com.tsymiar.device2device.utils.ActivityResultRequester) mActivity)
+                    .launchForResult(choose, CHAT_FILE_REQUEST);
+        } else {
+            // 宿主未实现 ActivityResultRequester 时的兼容路径
+            mActivity.startActivityForResult(choose, CHAT_FILE_REQUEST);
+        }
     }
 
     public void handleFileResult(Uri fileUri) {
@@ -1149,8 +1155,12 @@ public class ChatBoxDialog extends Dialog {
                 }
             } else if (holder instanceof ReceivedMessageHolder) {
                 ReceivedMessageHolder receivedHolder = (ReceivedMessageHolder) holder;
-                // 模型回复按 Markdown 渲染；自己发出去的保持原样
-                receivedHolder.tvContent.setText(MarkdownUtils.render(message.getContent()));
+                // 模型回复按 Markdown 渲染；内容没变时复用上次结果，避免滑动时反复解析
+                String markdown = message.getContent();
+                if (!markdown.equals(receivedHolder.renderedSource)) {
+                    receivedHolder.tvContent.setText(MarkdownUtils.render(markdown));
+                    receivedHolder.renderedSource = markdown;
+                }
                 receivedHolder.tvTime.setText(TimeUtils.smartTimeFormat(message.getTimestamp()));
                 // 进度条：只有"思考中…"那条占位气泡转，收到回复后收起来
                 if (message.getStatus() == Message.MessageStatus.RECEIVING) {
@@ -1212,6 +1222,7 @@ public class ChatBoxDialog extends Dialog {
         static class ReceivedMessageHolder extends RecyclerView.ViewHolder {
             TextView tvContent, tvTime;
             ProgressBar progressBar;
+            String renderedSource;
             ReceivedMessageHolder(View itemView) {
                 super(itemView);
                 tvContent = itemView.findViewById(R.id.tv_content);

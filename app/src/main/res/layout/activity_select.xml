@@ -793,7 +793,7 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- 默认折叠，点标题栏展开 -->
+            <!-- 默认折叠：内容用 ViewStub 延迟 inflate，首次展开才创建 -->
             <LinearLayout
                 android:id="@+id/game_content"
                 android:layout_width="match_parent"
@@ -801,16 +801,11 @@
                 android:visibility="gone"
                 android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_deduction"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                <ViewStub
+                    android:id="@+id/game_stub"
+                    android:layout="@layout/stub_game_content"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:text="@string/deduction_board"
-                    app:cornerRadius="20dp"
-                    app:strokeColor="@color/ui_accent"
-                    app:strokeWidth="1dp" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
             <!-- 分割线 -->

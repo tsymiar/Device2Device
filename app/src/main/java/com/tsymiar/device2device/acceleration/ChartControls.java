@@ -51,7 +51,8 @@ public final class ChartControls {
 
     private ChartControls(View root, Callback callback) {
         mCallback = callback;
-        mCard = root.findViewById(R.id.chart_root);
+        // dialog_view_chart.xml 已去掉冗余的 FrameLayout 父容器，根即 chart_root
+        mCard = root;
         mContent = new View[]{root.findViewById(R.id.show), root.findViewById(R.id.toor)};
         mDragHandle = root.findViewById(R.id.click);
         mPauseBtn = root.findViewById(R.id.pause_bn);

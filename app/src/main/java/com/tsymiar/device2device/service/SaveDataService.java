@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
 
-import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.utils.AppDataPaths;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 
 public class SaveDataService extends Service {
     private static final String TAG = "SaveDataService";
@@ -34,22 +36,20 @@ public class SaveDataService extends Service {
     private void saveData(String cmd) {
         new Thread(() -> {
             try {
-                File dir = new File(android.os.Environment.getExternalStorageDirectory()
-                        + "/Device2Device");
-                if (!dir.exists() && !dir.mkdirs()) {
+                File file = AppDataPaths.getSensorDataFile(SaveDataService.this);
+                File dir = file.getParentFile();
+                if (dir != null && !dir.exists() && !dir.mkdirs()) {
                     Log.e(TAG, "mkdirs failed");
                     return;
                 }
-                File file = new File(dir, getString(R.string.file_local));
                 if (!file.exists() && !file.createNewFile()) {
                     Log.e(TAG, "createNewFile failed");
                     return;
                 }
-                OutputStreamWriter writer = new OutputStreamWriter(
-                        new java.io.FileOutputStream(file, true));
-                writer.write(cmd + "\t");
-                writer.flush();
-                writer.close();
+                try (OutputStreamWriter writer = new OutputStreamWriter(
+                        new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
+                    writer.write(cmd + "\t");
+                }
             } catch (Exception e) {
                 Log.e(TAG, "saveData failed", e);
             }

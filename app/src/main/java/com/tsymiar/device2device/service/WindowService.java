@@ -13,6 +13,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Vibrator;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -26,6 +27,7 @@ import java.lang.ref.WeakReference;
 import com.tsymiar.device2device.R;
 
 public class WindowService extends Service {
+    private static final String TAG = "WindowService";
     private WindowManager wm;
     private WindowManager.LayoutParams wmParams;
     private View dialog;
@@ -112,7 +114,8 @@ public class WindowService extends Service {
                     updateViewPosition();
                     break;
                 case MotionEvent.ACTION_UP:
-                    textView.setTextColor(getResources().getColor(R.color.white));
+                    textView.setTextColor(androidx.core.content.ContextCompat.getColor(
+                            WindowService.this, R.color.white));
                     updateViewPosition();
                     mTouchStartX = mTouchStartY = 0;
                     break;
@@ -139,7 +142,9 @@ public class WindowService extends Service {
         if (wm != null && dialog != null) {
             try {
                 wm.removeView(dialog);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException e) {
+                Log.d(TAG, "view already detached from window manager", e);
+            }
         }
         added = false;
         super.onDestroy();

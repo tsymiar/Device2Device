@@ -14,7 +14,6 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -31,6 +30,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
@@ -39,6 +40,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.tsymiar.device2device.R;
+import com.tsymiar.device2device.utils.AppDataPaths;
 import com.tsymiar.device2device.utils.LocalFile;
 import com.tsymiar.device2device.utils.SamplePlayer;
 import com.tsymiar.device2device.utils.SoundRecord;
@@ -58,8 +60,6 @@ import java.util.Locale;
 public class WaveActivity extends AppCompatActivity {
 
     private static final String TAG = "WaveActivity";
-    static final String DATA_DIRECTORY = Environment.getExternalStorageDirectory()
-            + "/files/record/";
 
     private static final int FREQUENCY = 16000;
     private static final int CHANNEL_CONFIGURATION = AudioFormat.CHANNEL_IN_MONO;
@@ -266,7 +266,7 @@ public class WaveActivity extends AppCompatActivity {
             intent.setType("*/*");
             intent.putExtra(Intent.EXTRA_MIME_TYPES,
                     new String[]{"audio/*", "application/octet-stream"});
-            startActivityForResult(intent, REQUEST_CODE_PICK_AUDIO);
+            pickAudioLauncher.launch(intent);
         });
 
         mRecordBtn = findViewById(R.id.wave_record);
@@ -333,8 +333,9 @@ public class WaveActivity extends AppCompatActivity {
                         dialog.dismiss();
                         Toast.makeText(this, R.string.enable_storage_record_permission, Toast.LENGTH_SHORT).show();
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            startActivityForResult(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    Uri.parse("package:" + getPackageName())), RequestAudio);
+                            settingsLauncher.launch(new Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:" + getPackageName())));
                         }
                     })
                     .setNegativeButton(android.R.string.no, (dialog, which) -> dialog.dismiss())
@@ -386,8 +387,8 @@ public class WaveActivity extends AppCompatActivity {
         };
         final int[] picked = {0};
         new AlertDialog.Builder(this)
-                .setTitle("PCM 音频格式")
-                .setMessage("裸 PCM 没有文件头，请选择录制时的采样率与声道")
+                .setTitle(R.string.pcm_format_title)
+                .setMessage(R.string.pcm_format_message)
                 .setSingleChoiceItems(items, 0, (dialog, which) -> picked[0] = which)
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton("加载", (dialog, which) ->
@@ -447,7 +448,8 @@ public class WaveActivity extends AppCompatActivity {
         if (mFileInfoCard == null) return;
         mFileInfoCard.setVisibility(View.VISIBLE);
         if (mFileInfoTitle != null) {
-            mFileInfoTitle.setText("音频文件 · " + record.getFiletype().toUpperCase(Locale.ROOT));
+            mFileInfoTitle.setText(getString(R.string.audio_file_title,
+                    record.getFiletype().toUpperCase(Locale.ROOT)));
         }
         if (mFileInfoDetail != null) {
             float seconds = record.getSampleRate() > 0
@@ -459,7 +461,7 @@ public class WaveActivity extends AppCompatActivity {
                     duration, record.getSampleRate(), record.getChannels(), record.getNumSamples()));
         }
         if (mFileInfoHint != null) {
-            mFileInfoHint.setText("单指左右滑动平移 · 双指缩放 · 双击放大 · 长按框选放大");
+            mFileInfoHint.setText(R.string.wave_hint);
         }
         int totalMs = mWaveform.pixelsToMillisecsTotal();
         if (mSeekProgress != null) {
@@ -708,7 +710,7 @@ public class WaveActivity extends AppCompatActivity {
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.speak_prompt));
 
         try {
-            startActivityForResult(intent, REQUEST_CODE_SPEECH_INPUT);
+            speechLauncher.launch(intent);
         } catch (Exception e) {
             Toast.makeText(this, getString(R.string.speech_error, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
@@ -722,11 +724,12 @@ public class WaveActivity extends AppCompatActivity {
         AudioRecord audioRecord = new AudioRecord(AUDIO_SOURCE, FREQUENCY,
                 CHANNEL_CONFIGURATION, AUDIO_ENCODING, bufSize);
 
-        LocalFile.createDirectory(DATA_DIRECTORY);
+        String dataDirectory = AppDataPaths.getRecordDir(this).getAbsolutePath() + File.separator;
+        LocalFile.createDirectory(dataDirectory);
         mWaveCanvas = new WaveCanvas();
         mWaveCanvas.setBaseLine(mWaveView);
         // bufSize 为字节数，PCM_16BIT 下需转为 short 数量
-        mWaveCanvas.startRecording(audioRecord, bufSize / 2, mWaveView, FILE_NAME, DATA_DIRECTORY,
+        mWaveCanvas.startRecording(audioRecord, bufSize / 2, mWaveView, FILE_NAME, dataDirectory,
                 msg -> true);
         // 实时分贝：WaveCanvas 已经换算成标准声压级（dB SPL），直接交给分贝卡片
         mWaveCanvas.setDecibelListener((db, peak) -> runOnUiThread(() -> {
@@ -752,17 +755,20 @@ public class WaveActivity extends AppCompatActivity {
 
     // ---------- ActivityResult ----------
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == RequestAudio && resultCode == RESULT_OK) {
-            startDrawWave();
-        }
-        if (requestCode == REQUEST_CODE_PICK_AUDIO && resultCode == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            Log.i(TAG, "pick audio result uri=" + uri);
-            if (uri != null) {
+    private final ActivityResultLauncher<Intent> settingsLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) startDrawWave();
+            });
+
+    private final ActivityResultLauncher<Intent> pickAudioLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() != RESULT_OK || data == null) return;
+                Uri uri = data.getData();
+                Log.i(TAG, "pick audio result uri=" + uri);
+                if (uri == null) return;
                 String path = copyUriToFile(uri, queryDisplayName(uri));
                 if (path != null) {
                     mWaveView.setVisibility(View.VISIBLE);
@@ -774,17 +780,20 @@ public class WaveActivity extends AppCompatActivity {
                 } else {
                     handler.sendMessage(handler.obtainMessage(MSG_UPDATE_STATUS, "Failed to read audio file"));
                 }
-            }
-        }
-        if (requestCode == REQUEST_CODE_SPEECH_INPUT && resultCode == RESULT_OK && data != null) {
-            ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            if (result != null && !result.isEmpty()) {
-                mTvResult.setText(result.get(0));
-                // 有结果才占位：空着的时候把下面那块让给分贝图
-                if (mResultCard != null) mResultCard.setVisibility(View.VISIBLE);
-            }
-        }
-    }
+            });
+
+    private final ActivityResultLauncher<Intent> speechLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() != RESULT_OK || data == null) return;
+                ArrayList<String> recognized = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (recognized != null && !recognized.isEmpty()) {
+                    mTvResult.setText(recognized.get(0));
+                    // 有结果才占位：空着的时候把下面那块让给分贝图
+                    if (mResultCard != null) mResultCard.setVisibility(View.VISIBLE);
+                }
+            });
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,

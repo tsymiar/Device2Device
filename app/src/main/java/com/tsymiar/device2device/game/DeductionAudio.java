@@ -3,9 +3,13 @@ package com.tsymiar.device2device.game;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 推演音频合成器
@@ -13,6 +17,7 @@ import java.util.List;
  * （对应 Qt 端 DeductionAudio.h/cpp）
  */
 public class DeductionAudio {
+    private static final String TAG = "DeductionAudio";
 
     private static final float ECHO_PI = 3.14159265f;
 
@@ -100,27 +105,52 @@ public class DeductionAudio {
     }
 
     private void playPCMAsync(final byte[] pcm, final int sampleRate) {
-        // 兼容 API 21：使用旧构造方式
         final int minBuf = AudioTrack.getMinBufferSize(sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        if (minBuf <= 0) return;
         final AudioTrack track = new AudioTrack(
                 AudioManager.STREAM_MUSIC, sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
                 Math.max(minBuf, pcm.length * 2), AudioTrack.MODE_STATIC);
-        Thread t = new Thread(() -> {
-            try {
-                track.write(pcm, 0, pcm.length);
-                track.play();
-                // 等待播放完成（时长约 pcm.length / (2*sampleRate) 秒）
-                Thread.sleep((long) (pcm.length / (2.0 * sampleRate) * 1000.0) + 100);
-            } catch (Exception e) {
-                // 忽略播放异常
-            } finally {
-                try { track.stop(); } catch (Exception ignored) { }
+
+        final Handler mainHandler = new Handler(Looper.getMainLooper());
+        final AtomicBoolean released = new AtomicBoolean(false);
+        final Runnable cleanup = () -> {
+            if (released.compareAndSet(false, true)) {
+                try { track.stop(); } catch (Exception e) { Log.d(TAG, "stop track failed", e); }
                 track.release();
             }
+        };
+        // 播放完成回调释放，不再用 Thread.sleep 占着线程等待
+        track.setPlaybackPositionUpdateListener(new AudioTrack.OnPlaybackPositionUpdateListener() {
+            @Override
+            public void onMarkerReached(AudioTrack audioTrack) {
+                mainHandler.removeCallbacks(cleanup);
+                mainHandler.post(cleanup);
+            }
+
+            @Override
+            public void onPeriodicNotification(AudioTrack audioTrack) { }
         });
+
+        Thread t = new Thread(() -> {
+            try {
+                int written = track.write(pcm, 0, pcm.length);
+                if (written <= 0) {
+                    mainHandler.post(cleanup);
+                    return;
+                }
+                // 16bit 单声道：帧数 = 字节数 / 2
+                track.setNotificationMarkerPosition(written / 2);
+                track.play();
+            } catch (Exception e) {
+                mainHandler.post(cleanup);
+            }
+        }, "deduction-audio");
         t.setDaemon(true);
         t.start();
+        // 兜底：marker 因设备/路由异常未触发时也要释放资源
+        mainHandler.postDelayed(cleanup,
+                (long) (pcm.length / (2.0 * sampleRate) * 1000.0) + 1500);
     }
 }

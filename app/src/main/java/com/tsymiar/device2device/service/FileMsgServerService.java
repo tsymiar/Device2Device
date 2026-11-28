@@ -1,7 +1,6 @@
 package com.tsymiar.device2device.service;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -179,13 +178,9 @@ public class FileMsgServerService extends Service {
         if (notificationManager == null) {
             notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "文件接收服务", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("文件接收服务后台运行常驻通知");
-            channel.setShowBadge(false);
-            notificationManager.createNotificationChannel(channel);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, "文件接收服务", NotificationManager.IMPORTANCE_LOW,
+                "文件接收服务后台运行常驻通知", false);
         startForeground(NOTIFICATION_ID, buildNotification(null, 0));
     }
 
@@ -207,7 +202,7 @@ public class FileMsgServerService extends Service {
         } else {
             builder = new Notification.Builder(this);
         }
-        builder.setSmallIcon(R.mipmap.ic_launcher)
+        builder.setSmallIcon(R.drawable.ic_stat_notify)
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setOngoing(true)

@@ -4,15 +4,13 @@
     android:id="@+id/anim"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical">
+    android:gravity="center">
 
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:contentDescription=""
-        android:src="@drawable/ic_auth"
-        tools:ignore="ContentDescription" />
+        android:contentDescription="@null"
+        android:src="@drawable/ic_auth" />
 
     <ImageView
         android:id="@+id/iv_auth_anim"
@@ -20,7 +18,6 @@
         android:layout_height="30sp"
         android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
-        android:contentDescription=""
-        android:src="@drawable/ic_none"
-        tools:ignore="ContentDescription" />
+        android:contentDescription="@null"
+        android:src="@drawable/ic_none" />
 </RelativeLayout>

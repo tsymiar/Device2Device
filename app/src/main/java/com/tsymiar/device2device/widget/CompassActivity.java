@@ -73,7 +73,7 @@ public class CompassActivity extends Activity implements SensorEventListener {
         mDone = false;
         mGravity = null;
         mGeomagnetic = null;
-        mText.setText("测向中…\n手机放平或竖持保持稳定");
+        mText.setText(R.string.compass_measuring);
         if (mSensorManager == null) {
             mDone = true;
             fail("设备无传感器服务");
@@ -132,7 +132,7 @@ public class CompassActivity extends Activity implements SensorEventListener {
         if (elapsed < WARMUP_MS) return;
         if (!mFused && mMagAccuracy == SensorManager.SENSOR_STATUS_UNRELIABLE
                 && elapsed < TIMEOUT_MS - 1000) {
-            mText.setText("磁力计未校准\n请拿手机画「8」字再测");
+            mText.setText(R.string.compass_uncalibrated);
             return;                                  // 未校准的读数不要写回部件
         }
         float delta = Float.isNaN(mPrevDeg) ? Float.MAX_VALUE : angleDiff(deg, mPrevDeg);
@@ -185,7 +185,7 @@ public class CompassActivity extends Activity implements SensorEventListener {
         mHandler.removeCallbacks(mTimeout);
         if (mSensorManager != null) mSensorManager.unregisterListener(this);
         if (Float.isNaN(deg)) {
-            mText.setText("未能获取方向\n请放平手机，远离磁性物体后重试");
+            mText.setText(R.string.compass_no_direction);
         } else {
             publish(deg);
             mText.setText(String.format(Locale.US, "%.0f°  %s", deg,

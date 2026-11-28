@@ -21,6 +21,9 @@ public class MainActivity extends Activity {
     protected Animation animation;
     private ImageView toTestAnimation;
     private long mCurTime;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable jumpToSelect = () ->
+            startActivity(new Intent(MainActivity.this, SelectActivity.class));
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,9 +38,8 @@ public class MainActivity extends Activity {
         super.onResume();
 
         ViewGroup vg = findViewById(R.id.anim);
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            startActivity(new Intent(MainActivity.this, SelectActivity.class));
-        }, 1000);
+        mainHandler.removeCallbacks(jumpToSelect);
+        mainHandler.postDelayed(jumpToSelect, 1000);
 
         assert vg != null;
         vg.setOnClickListener(arg0 -> {
@@ -74,6 +76,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        mainHandler.removeCallbacks(jumpToSelect);
         super.onPause();
         finish();
     }

@@ -22,6 +22,8 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 
+import androidx.core.content.ContextCompat;
+
 import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.utils.SoundRecord;
 
@@ -146,8 +148,9 @@ public class WaveformsView extends View {
         mTimeValuePaint = new Paint();
         mTimeValuePaint.setTextSize(12);
         mTimeValuePaint.setAntiAlias(true);
-        mTimeValuePaint.setColor(getResources().getColor(R.color.time_value));
-        mTimeValuePaint.setShadowLayer(2, 1, 1, getResources().getColor(R.color.time_value_shadow));
+        mTimeValuePaint.setColor(ContextCompat.getColor(getContext(), R.color.time_value));
+        mTimeValuePaint.setShadowLayer(2, 1, 1,
+                ContextCompat.getColor(getContext(), R.color.time_value_shadow));
         mRegionFillPaint = new Paint();
         mRegionFillPaint.setColor(Color.argb(56, 39, 199, 175));
         mRegionFillPaint.setStyle(Paint.Style.FILL);

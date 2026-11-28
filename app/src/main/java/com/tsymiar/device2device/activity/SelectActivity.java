@@ -26,12 +26,14 @@ import android.os.PowerManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.LayoutInflater;
+import android.view.ViewStub;
 import android.view.ViewGroup;
 import android.text.TextUtils;
 import android.widget.Button;
@@ -40,6 +42,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
@@ -71,13 +76,15 @@ import com.tsymiar.device2device.wrapper.CallbackWrapper;
 import com.tsymiar.device2device.wrapper.NetworkWrapper;
 import com.tsymiar.device2device.wrapper.TimeWrapper;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-public class SelectActivity extends AppCompatActivity implements EventHandle {
+public class SelectActivity extends AppCompatActivity implements EventHandle,
+        com.tsymiar.device2device.utils.ActivityResultRequester {
     private static final String TAG = SelectActivity.class.getCanonicalName();
     public static final int RequestStorage = 10001;
     public static final int RequestFloat = 10002;
@@ -144,7 +151,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             setSshStarting(false);
             showSshState();
             if (!SshServerService.isRunning()) {
-                Toast.makeText(SelectActivity.this, "SSH 服务启动超时", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SelectActivity.this, R.string.ssh_start_timeout, Toast.LENGTH_SHORT).show();
             }
         }
     };
@@ -201,146 +208,159 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
-    @SuppressLint("HandlerLeak")
-    private final Handler handler = new Handler() {
-        @SuppressLint("SetTextI18n")
+    private final Handler handler = new UiHandler(this);
+
+    /** 静态内部类 + 弱引用：处理消息的是主线程 Looper，不能让在途消息把 Activity 留住。 */
+    private static final class UiHandler extends Handler {
+        private final WeakReference<SelectActivity> mActivity;
+
+        UiHandler(SelectActivity activity) {
+            super(Looper.getMainLooper());
+            mActivity = new WeakReference<>(activity);
+        }
+
         @Override
         public void handleMessage(@NonNull Message msg) {
-            super.handleMessage(msg);
-            // Activity 已经销毁后不再碰 UI（轮询线程退出前的在途消息）
-            if (mActivityDestroyed || msg.obj == null) return;
-            switch (msg.what) {
-                case Receiver.MSG_STAT:
-                case Receiver.SUBSCRIBER:
-                    setTextSafely(R.id.txt_status, msg.obj.toString());
-                    break;
-                case Receiver.FILE_PROGRESS: {
-                    // 格式: "status[|落盘路径]|current|total|event"
-                    // 事件码由 native 回调携带，UI 按事件判定状态，不再解析状态字符串。
-                    String data = msg.obj.toString();
-                    FileMsgDialog.Progress progress = FileMsgDialog.Progress.parse(data);
-                    // 路由目标取 FragmentManager 里的活实例：mFileMsgDialog 在关闭重开 /
-                    // Activity 重建后会过期，isShowing() 判断错会把终态事件丢到主界面
-                    androidx.fragment.app.Fragment shown =
-                            getSupportFragmentManager().findFragmentByTag("file_trans");
-                    FileMsgDialog dialog = shown instanceof FileMsgDialog
-                            ? (FileMsgDialog) shown : mFileMsgDialog;
-                    boolean dialogVisible = dialog != null && dialog.isShowing();
-                    if (!progress.valid) {
-                        if (dialogVisible) dialog.updateStatus(data);
-                        else appendFileMsgHint(data);
-                        break;
-                    }
-                    if (dialogVisible) {
-                        dialog.updateProgress(progress.current, progress.total,
-                                progress.status, progress.event);
-                    } else {
-                        // 对话框没开（服务端在后台跑）：把状态打到状态卡片的 txt_hint，
-                        // 用户不打开对话框也能看到收发进度；文件照样要搬。
-                        appendFileMsgHint(progress.hintLine());
-                        // 服务在跑时接收进度同时上通知栏；文件名只在 RECEIVE_START 里带，需先记住
-                        if (FileMsgServerService.isRunning()) {
-                            if (progress.event == FileMsgDialog.Progress.EVT_RECEIVE_START) {
-                                mReceivingFile = receivingName(progress.status);
-                            }
-                            boolean ended = progress.event == FileMsgDialog.Progress.EVT_TRANSFER_COMPLETE
-                                    || progress.event == FileMsgDialog.Progress.EVT_TRANSFER_CANCELLED
-                                    || progress.event == FileMsgDialog.Progress.EVT_DISCONNECTED;
-                            int pct = progress.total > 0
-                                    ? (int) (progress.current * 100 / progress.total) : 0;
-                            FileMsgServerService.showProgress(SelectActivity.this,
-                                    ended ? "" : (mReceivingFile != null ? mReceivingFile : ""),
-                                    ended ? 0 : pct);
-                            if (ended) mReceivingFile = null;
-                        }
-                    }
-                    publishReceived(progress);
-                    break;
-                }
-                case Receiver.FILE_PEER: {
-                    // 发现快照 "ip:port;ip:port"：只更新文件传输对话框的列表
-                    androidx.fragment.app.Fragment fileShown =
-                            getSupportFragmentManager().findFragmentByTag("file_trans");
-                    if (fileShown instanceof FileMsgDialog) {
-                        ((FileMsgDialog) fileShown).onPeerSnapshot(msg.obj.toString());
-                    }
-                    break;
-                }
-                case Receiver.TOAST:
-                    Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
-                    break;
-                case Receiver.TEXTURE:
-                    TextureActivity.log(msg.obj.toString());
-                    break;
-                case Receiver.KCP_VIEW:
-                    if (mKcpBtn != null) {
-                        mKcpBtn.setText(msg.obj.toString());
-                    }
-                    break;
-                case Receiver.KCP_HINT:
-                    appendKcpLog(msg.obj.toString());
-                    break;
-                case Receiver.KCP_CLIENT:
-                    // 客户端的 sn / RTT
-                    appendKcpStatus(msg.obj.toString());
-                    break;
-                case Receiver.MSG_HINT:
-                case Receiver.PUBLISHER:
-                    setTextSafely(R.id.txt_hint, msg.obj.toString());
-                    break;
-                case Receiver.LAN_PEER: {
-                    String peerEvent = msg.obj.toString();
-                    // 设备发现列表：不管对话框开不开都维护，点「发现设备」才看得到
-                    onDiscoverPeerEvent(peerEvent);
-                    // 对话框开着就再交给它维护自己那份
-                    if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
-                        mLanMsgDialog.onPeerEvent(peerEvent);
-                    }
-                    break;
-                }
-                case Receiver.LAN_MESSAGE: {
-                    String lanEvent = msg.obj.toString();
-                    if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
-                        mLanMsgDialog.onMessageEvent(lanEvent);
-                    } else if (mLanMsgDialog != null) {
-                        // 对话框收起了但监听还在跑。三类事件分开对待：
-                        //  - 对端发来的内容：
-                        //      前台把界面弹回来，不然只落到状态卡片上很容易漏看；
-                        //      后台（对话框弹了也看不见）发一条状态栏通知，显示消息内容，
-                        //      点击通知回到本页并展开对话框；
-                        //  - 自己发消息的回执（DELIVERED / UNDELIVERED / SENDFAIL / SENDINGIMG）：
-                        //    照旧转给对话框，那些气泡行还在它里面，不转时回执就落到状态卡片上
-                        //    被丢掉，重新打开对话框看到的一直是"发送中"。
-                        boolean incoming = isIncomingLanMessage(lanEvent);
-                        if (incoming && !SelectActivity.this.isFinishing()
-                                && !SelectActivity.this.isDestroyed()) {
-                            if (mResumed) {
-                                mLanMsgDialog.show();
-                            } else {
-                                notifyIncomingLanMessage(lanEvent);
-                            }
-                        }
-                        mLanMsgDialog.onMessageEvent(lanEvent);
-                    } else {
-                        setTextSafely(R.id.txt_hint, lanEvent);
-                    }
-                    break;
-                }
-                default:
-                    setTextSafely(R.id.txt_hint, msg.obj.toString());
-                    break;
-            }
+            SelectActivity activity = mActivity.get();
+            if (activity != null) activity.handleUiMessage(msg);
         }
-    };
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void handleUiMessage(@NonNull Message msg) {
+        // Activity 已经销毁后不再碰 UI（轮询线程退出前的在途消息）
+        if (mActivityDestroyed || msg.obj == null) return;
+        switch (msg.what) {
+            case Receiver.MSG_STAT:
+            case Receiver.SUBSCRIBER:
+                setTextSafely(R.id.txt_status, msg.obj.toString());
+                break;
+            case Receiver.FILE_PROGRESS: {
+                // 格式: "status[|落盘路径]|current|total|event"
+                // 事件码由 native 回调携带，UI 按事件判定状态，不再解析状态字符串。
+                String data = msg.obj.toString();
+                FileMsgDialog.Progress progress = FileMsgDialog.Progress.parse(data);
+                // 路由目标取 FragmentManager 里的活实例：mFileMsgDialog 在关闭重开 /
+                // Activity 重建后会过期，isShowing() 判断错会把终态事件丢到主界面
+                androidx.fragment.app.Fragment shown =
+                        getSupportFragmentManager().findFragmentByTag("file_trans");
+                FileMsgDialog dialog = shown instanceof FileMsgDialog
+                        ? (FileMsgDialog) shown : mFileMsgDialog;
+                boolean dialogVisible = dialog != null && dialog.isShowing();
+                if (!progress.valid) {
+                    if (dialogVisible) dialog.updateStatus(data);
+                    else appendFileMsgHint(data);
+                    break;
+                }
+                if (dialogVisible) {
+                    dialog.updateProgress(progress.current, progress.total,
+                            progress.status, progress.event);
+                } else {
+                    // 对话框没开（服务端在后台跑）：把状态打到状态卡片的 txt_hint，
+                    // 用户不打开对话框也能看到收发进度；文件照样要搬。
+                    appendFileMsgHint(progress.hintLine());
+                    // 服务在跑时接收进度同时上通知栏；文件名只在 RECEIVE_START 里带，需先记住
+                    if (FileMsgServerService.isRunning()) {
+                        if (progress.event == FileMsgDialog.Progress.EVT_RECEIVE_START) {
+                            mReceivingFile = receivingName(progress.status);
+                        }
+                        boolean ended = progress.event == FileMsgDialog.Progress.EVT_TRANSFER_COMPLETE
+                                || progress.event == FileMsgDialog.Progress.EVT_TRANSFER_CANCELLED
+                                || progress.event == FileMsgDialog.Progress.EVT_DISCONNECTED;
+                        int pct = progress.total > 0
+                                ? (int) (progress.current * 100 / progress.total) : 0;
+                        FileMsgServerService.showProgress(SelectActivity.this,
+                                ended ? "" : (mReceivingFile != null ? mReceivingFile : ""),
+                                ended ? 0 : pct);
+                        if (ended) mReceivingFile = null;
+                    }
+                }
+                publishReceived(progress);
+                break;
+            }
+            case Receiver.FILE_PEER: {
+                // 发现快照 "ip:port;ip:port"：只更新文件传输对话框的列表
+                androidx.fragment.app.Fragment fileShown =
+                        getSupportFragmentManager().findFragmentByTag("file_trans");
+                if (fileShown instanceof FileMsgDialog) {
+                    ((FileMsgDialog) fileShown).onPeerSnapshot(msg.obj.toString());
+                }
+                break;
+            }
+            case Receiver.TOAST:
+                Toast.makeText(getApplicationContext(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+                break;
+            case Receiver.TEXTURE:
+                TextureActivity.log(msg.obj.toString());
+                break;
+            case Receiver.KCP_VIEW:
+                if (mKcpBtn != null) {
+                    mKcpBtn.setText(msg.obj.toString());
+                }
+                break;
+            case Receiver.KCP_HINT:
+                appendKcpLog(msg.obj.toString());
+                break;
+            case Receiver.KCP_CLIENT:
+                // 客户端的 sn / RTT
+                appendKcpStatus(msg.obj.toString());
+                break;
+            case Receiver.MSG_HINT:
+            case Receiver.PUBLISHER:
+                setTextSafely(R.id.txt_hint, msg.obj.toString());
+                break;
+            case Receiver.LAN_PEER: {
+                String peerEvent = msg.obj.toString();
+                // 设备发现列表：不管对话框开不开都维护，点「发现设备」才看得到
+                onDiscoverPeerEvent(peerEvent);
+                // 对话框开着就再交给它维护自己那份
+                if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
+                    mLanMsgDialog.onPeerEvent(peerEvent);
+                }
+                break;
+            }
+            case Receiver.LAN_MESSAGE: {
+                String lanEvent = msg.obj.toString();
+                if (mLanMsgDialog != null && mLanMsgDialog.isShowing()) {
+                    mLanMsgDialog.onMessageEvent(lanEvent);
+                } else if (mLanMsgDialog != null) {
+                    // 对话框收起了但监听还在跑。三类事件分开对待：
+                    //  - 对端发来的内容：
+                    //      前台把界面弹回来，不然只落到状态卡片上很容易漏看；
+                    //      后台（对话框弹了也看不见）发一条状态栏通知，显示消息内容，
+                    //      点击通知回到本页并展开对话框；
+                    //  - 自己发消息的回执（MDV / MUD / MSF / MSI）：
+                    //    照旧转给对话框，那些气泡行还在它里面，不转时回执就落到状态卡片上
+                    //    被丢掉，重新打开对话框看到的一直是"发送中"。
+                    boolean incoming = isIncomingLanMessage(lanEvent);
+                    if (incoming && !SelectActivity.this.isFinishing()
+                            && !SelectActivity.this.isDestroyed()) {
+                        if (mResumed) {
+                            mLanMsgDialog.show();
+                        } else {
+                            notifyIncomingLanMessage(lanEvent);
+                        }
+                    }
+                    mLanMsgDialog.onMessageEvent(lanEvent);
+                } else {
+                    setTextSafely(R.id.txt_hint, lanEvent);
+                }
+                break;
+            }
+            default:
+                setTextSafely(R.id.txt_hint, msg.obj.toString());
+                break;
+        }
+    }
 
     /**
      * 只有对端发来的消息才配把对话框弹回来。
      *
-     * 自己发消息的那些回执（SENT / DELIVERED / SENDFAIL）每发一条都来一次，
+     * 自己发消息的那些回执（MDV / MUD / MSF）每发一条都来一次，
      * 跟着弹界面等于自己打断自己。
      */
     private static boolean isIncomingLanMessage(String event) {
-        return event != null && (event.startsWith("RECV|") || event.startsWith("RECVIMG|"));
+        return event != null && (event.startsWith("MRT|") || event.startsWith("MRI|"));
     }
 
     // ---------- 局域网消息状态栏通知 ----------
@@ -358,15 +378,12 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         String[] p = event.split("\\|");
         if (p.length < 4) return;
         String name = p[2];
-        String body = event.startsWith("RECVIMG|")
+        String body = event.startsWith("MRI|")
                 ? getString(R.string.lan_notify_image) : p[3];
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(LAN_NOTIFY_CHANNEL,
-                    getString(R.string.lan_notify_channel),
-                    NotificationManager.IMPORTANCE_HIGH);
-            nm.createNotificationChannel(ch);
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, LAN_NOTIFY_CHANNEL, getString(R.string.lan_notify_channel),
+                NotificationManager.IMPORTANCE_HIGH, null, true);
 
         Intent intent = new Intent(this, SelectActivity.class)
                 .putExtra(EXTRA_SHOW_LAN_MSG, true)
@@ -378,7 +395,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
 
         NotificationCompat.Builder builder =
                 new NotificationCompat.Builder(this, LAN_NOTIFY_CHANNEL)
-                        .setSmallIcon(R.drawable.ic_launcher)
+                        .setSmallIcon(R.drawable.ic_stat_notify)
                         .setContentTitle(name)
                         .setContentText(body)
                         .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -489,14 +506,15 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
 
         mStopPolling = false;
         mPollThread = new Thread(() -> {
+            // JNI getMessage 只回填传入的 Receiver 字段，对象与 Message 均可复用，
+            // 避免 50ms 一次的高频循环每秒产生 80+ 个短命对象。
+            final Receiver receiver = new Receiver();
+            final CallbackWrapper wrapper = new CallbackWrapper();
             while (!mStopPolling && !Thread.currentThread().isInterrupted()) {
-                Receiver receiver = new Receiver();
-                CallbackWrapper wrapper = new CallbackWrapper();
-                receiver = wrapper.getMessage(receiver);
-                if (receiver != null && receiver.message != null) {
-                    Message msg = new Message();
-                    msg.what = receiver.receiver;
-                    msg.obj = receiver.message;
+                receiver.message = null;
+                receiver.receiver = 0;
+                if (wrapper.getMessage(receiver) != null && receiver.message != null) {
+                    Message msg = handler.obtainMessage(receiver.receiver, receiver.message);
                     handler.sendMessage(msg);
                 }
                 try {
@@ -559,9 +577,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         .setMessage(R.string.overlay_permission_hint)
                         .setPositiveButton(R.string.go_to_settings, (dialog, which) -> {
                             dialog.dismiss();
-                            startActivityForResult(
-                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
-                                    RequestFloat);
+                            launchFor(RequestFloat,
+                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:" + getPackageName())));
                         })
                         .setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss())
                         .show();
@@ -577,9 +595,9 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                         .setMessage(R.string.overlay_permission_hint)
                         .setPositiveButton(R.string.go_to_settings, (dialog, which) -> {
                             dialog.dismiss();
-                            startActivityForResult(
-                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())),
-                                    RequestFloat);
+                            launchFor(RequestFloat,
+                                    new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:" + getPackageName())));
                         })
                         .setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss())
                         .show();
@@ -602,8 +620,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.btn_market).setOnClickListener(v ->
                 startActivity(new Intent(SelectActivity.this, MarketActivity.class)));
         findViewById(R.id.btn_avatar).setOnClickListener(v -> showAvatarEnginePicker());
-        findViewById(R.id.btn_deduction).setOnClickListener(v ->
-                GameDialog.showDeduction(SelectActivity.this));
 
         if (savedInstanceState != null && mChatBoxDialog != null) {
             mChatBoxDialog.restoreState(savedInstanceState);
@@ -630,7 +646,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             Toast.makeText(SelectActivity.this, R.string.http_server_select_hint, Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivityForResult(intent, RequestHttpFolder);
+            launchFor(RequestHttpFolder, intent);
         });
         // HTTP 前台服务只在显式停止时关闭，退出页面不影响后台服务
         findViewById(R.id.btn_http_stop).setOnClickListener(v ->
@@ -673,24 +689,37 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         findViewById(R.id.network_header).setOnClickListener(v -> {
             if (networkContent.getVisibility() == View.VISIBLE) {
                 networkContent.setVisibility(View.GONE);
-                networkArrow.setText("▼");
+                networkArrow.setText(R.string.expand);
             } else {
                 networkContent.setVisibility(View.VISIBLE);
-                networkArrow.setText("▲");
+                networkArrow.setText(R.string.collapse);
             }
         });
-        // 游戏区域折叠/展开：默认收起，点标题栏摊开（与网络服务区同一套写法）
+        // 游戏区域折叠/展开：内容由 ViewStub 延迟创建，首次展开才 inflate
         final LinearLayout gameContent = findViewById(R.id.game_content);
         final TextView gameArrow = findViewById(R.id.game_arrow);
-        findViewById(R.id.game_header).setOnClickListener(v ->
-                setSectionExpanded(gameContent.getVisibility() != View.VISIBLE,
-                        gameContent, gameArrow));
+        final ViewStub gameStub = findViewById(R.id.game_stub);
+        if (gameStub != null) {
+            gameStub.setOnInflateListener((stub, inflated) -> initGameSection(inflated));
+        }
+        findViewById(R.id.game_header).setOnClickListener(v -> {
+            if (gameStub != null && gameStub.getParent() != null) gameStub.inflate();
+            setSectionExpanded(gameContent.getVisibility() != View.VISIBLE,
+                    gameContent, gameArrow);
+        });
 
         // 页面恢复时同步 HTTP / SSH 前台服务运行状态（若已在后台运行）
         showHttpState();
         showSshState();
     }
 
+    /** ViewStub 展开后才绑定推演按钮，避免首屏为隐藏区块做无用的 inflate/findViewById */
+    private void initGameSection(View inflated) {
+        View btn = inflated.findViewById(R.id.btn_deduction);
+        if (btn != null) {
+            btn.setOnClickListener(v -> GameDialog.showDeduction(SelectActivity.this));
+        }
+    }
 
     private class BroadcastReceiverClass extends BroadcastReceiver {
         @SuppressLint("SetTextI18n")
@@ -706,11 +735,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                             Toast.LENGTH_LONG).show();
                     showHttpState();
                 } else if (HttpServerService.STATE_FAILED.equals(state)) {
-                    tvStatus.setText("HTTP 服务启动失败");
+                    tvStatus.setText(R.string.http_start_failed);
                     Toast.makeText(SelectActivity.this,
                             "HTTP 服务启动失败：端口被占用或目录无权访问", Toast.LENGTH_SHORT).show();
                 } else if (HttpServerService.STATE_STOPPED.equals(state)) {
-                    tvStatus.setText("HTTP 文件服务已停止");
+                    tvStatus.setText(R.string.http_stopped);
                     showHttpState();
                 }
                 return;
@@ -722,19 +751,20 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 if (SshServerService.STATE_STARTED.equals(state)) {
                     setSshStarting(false);
                     mSshError = null;
-                    tvStatus.setText("SSH 服务已启动 · " + SshServerService.getConnectionCommand());
-                    Toast.makeText(SelectActivity.this, "SSH 服务已启动", Toast.LENGTH_SHORT).show();
+                    tvStatus.setText(getString(R.string.ssh_started_with_cmd,
+                            SshServerService.getConnectionCommand()));
+                    Toast.makeText(SelectActivity.this, R.string.ssh_started, Toast.LENGTH_SHORT).show();
                     showSshState();
                 } else if (SshServerService.STATE_FAILED.equals(state)) {
                     String reason = intent.getStringExtra(SshServerService.EXTRA_REASON);
                     setSshStarting(false);
                     mSshError = TextUtils.isEmpty(reason) ? "端口被占用或初始化失败" : reason;
-                    tvStatus.setText("SSH 服务启动失败");
+                    tvStatus.setText(R.string.ssh_start_failed);
                     showSshState();   // 失败原因挂在 txt_hint 上，不再弹 Toast
                 } else if (SshServerService.STATE_STOPPED.equals(state)) {
                     setSshStarting(false);
                     mSshError = null;
-                    tvStatus.setText("SSH 服务已停止");
+                    tvStatus.setText(R.string.ssh_stopped);
                     showSshState();
                 }
                 return;
@@ -766,14 +796,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 int ret = CallbackWrapper.StartSubscribe(PubSubSetting.getAddr(), PubSubSetting.getPort(),
                         PubSubSetting.getTopic(), "txt_status", R.id.txt_status);
                 if (ret < 0) {
-                    tvStatus.setText("Subscribe failed!");
+                    tvStatus.setText(R.string.subscribe_failed);
                     Log.e(TAG, "Subscribe failed with error code: " + ret);
                 } else {
-                    Toast.makeText(SelectActivity.this, "Success", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(SelectActivity.this, R.string.success, Toast.LENGTH_SHORT).show();
                 }
             } else if (subscribe != null) {
                 Log.i(TAG, "Subscribe with " + subscribe);
-                tvStatus.setText("Subscribe: " + subscribe);
+                tvStatus.setText(getString(R.string.subscribe_status, subscribe));
             }
             String publish = intent.getStringExtra("Publish");
             if ("SUCCESS".equals(publish)) {
@@ -782,11 +812,11 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                     Log.i(TAG, "Publish status ==> " + publish + ":\n" + setting);
                 }
                 if (PubSubSetting.getAddr().isEmpty() || PubSubSetting.getPort() == 0) {
-                    Toast.makeText(SelectActivity.this, "confirm subscribe first", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(SelectActivity.this, R.string.confirm_subscribe_first, Toast.LENGTH_SHORT).show();
                 } else {
                     String topic = PubSubSetting.getTopic();
                     if (topic == null || topic.isEmpty()) {
-                        Toast.makeText(SelectActivity.this, "publish topic is empty", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(SelectActivity.this, R.string.publish_topic_empty, Toast.LENGTH_SHORT).show();
                     } else {
                         CallbackWrapper.Publish(topic, PubSubSetting.getPayload(), PubSubSetting.getAddr(),
                                 PubSubSetting.getPort(), PubSubSetting.getTarget());
@@ -989,7 +1019,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             return;
         }
         if (!mBtAdapter.isEnabled()) {
-            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), RequestEnableBt);
+            launchFor(RequestEnableBt, new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
             return;
         }
         startBtScan();
@@ -1077,17 +1107,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         return subnet;
     }
 
-    /**
-     * 设备发现事件：CLEAR 清空、ADD|ip|port|name 加入或改名、DEL|ip|port|name 下线。
-     * 只维护列表展示，解析规则与 LanMsgDialog.onPeerEvent 一致。
-     */
+    /** 设备发现事件：PCL 清空、PAD|ip|port|device 加入/改名、PDL|ip|port|device 下线。 */
     private void onDiscoverPeerEvent(String event) {
         // 蓝牙模式忽略 LAN 事件
         if (mDiscoverMode != MODE_LAN) return;
         if (event == null || event.isEmpty()) return;
         String[] p = event.split("\\|");
         if (p.length == 0) return;
-        if ("CLEAR".equals(p[0])) {
+        if ("PCL".equals(p[0])) {
             mDiscoverPeers.clear();
             updateDiscoverList();
             return;
@@ -1100,10 +1127,10 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             return;
         }
         String key = p[1] + ":" + port;
-        if ("ADD".equals(p[0])) {
+        if ("PAD".equals(p[0])) {
             mDiscoverPeers.put(key, new String[]{p[3], p[1], String.valueOf(port)});
             updateDiscoverList();
-        } else if ("DEL".equals(p[0])) {
+        } else if ("PDL".equals(p[0])) {
             mDiscoverPeers.remove(key);
             updateDiscoverList();
         }
@@ -1162,10 +1189,29 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
+    private int mPendingResultCode = -1;
+
+    private final ActivityResultLauncher<Intent> mResultLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            this::dispatchActivityResult);
+
+    /** Dialog 通过此接口借用宿主的 Activity Result 注册点 */
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+    public void launchForResult(Intent intent, int requestCode) {
+        launchFor(requestCode, intent);
+    }
+
+    private void launchFor(int requestCode, Intent intent) {
+        mPendingResultCode = requestCode;
+        mResultLauncher.launch(intent);
+    }
+
+    private void dispatchActivityResult(ActivityResult result) {
+        int requestCode = mPendingResultCode;
+        mPendingResultCode = -1;
+        int resultCode = result.getResultCode();
+        Intent data = result.getData();
+
         if (requestCode == RequestEnableBt) {
             if (resultCode == RESULT_OK) {
                 startBtDiscovery();
@@ -1180,7 +1226,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
         if (requestCode == RequestFloat) {
             if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.permission_denied, Toast.LENGTH_SHORT).show();
             } else {
                 startService(new Intent(SelectActivity.this, SubscribeService.class));
             }
@@ -1190,7 +1236,6 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 Uri treeUri = data.getData();
                 getContentResolver().takePersistableUriPermission(treeUri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
                 startHttpServer(treeUri);
             }
         }
@@ -1198,7 +1243,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                     && pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                Toast.makeText(this, "已允许忽略电池优化，锁屏保活已加强", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.battery_optimization_allowed, Toast.LENGTH_SHORT).show();
             }
         }
         if (requestCode == ChatBoxDialog.CHAT_FILE_REQUEST && resultCode == RESULT_OK) {
@@ -1255,15 +1300,14 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         }
         sBatteryPromptShown = true;
         new AlertDialog.Builder(this)
-                .setTitle("后台保活")
-                .setMessage("为保证锁屏/切后台后 HTTP 文件服务仍可被访问，建议允许本应用“忽略电池优化”，"
-                        + "系统将不会在息屏后限制本应用的联网。")
-                .setPositiveButton("去设置", (dialog, which) -> {
+                .setTitle(R.string.keep_alive_title)
+                .setMessage(R.string.keep_alive_message)
+                .setPositiveButton(R.string.keep_alive_go_settings, (dialog, which) -> {
                     dialog.dismiss();
                     Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                             Uri.parse("package:" + getPackageName()));
                     try {
-                        startActivityForResult(intent, RequestBatteryOptimize);
+                        launchFor(RequestBatteryOptimize, intent);
                     } catch (Exception e) {
                         startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                     }
@@ -1286,7 +1330,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
                 "高分：Anny · MakeHuman 人体测量形变基"
         };
         new AlertDialog.Builder(this)
-                .setTitle("选择建模引擎")
+                .setTitle(R.string.engine_title)
                 .setSingleChoiceItems(items, current, (dialog, which) -> pick[0] = which)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("进入", (dialog, which) -> {
@@ -1525,7 +1569,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     /** 把当前 HTTP 访问地址复制到系统剪贴板 */
     private void copyHttpAccessUrl() {
         if (!HttpServerService.isRunning()) {
-            Toast.makeText(this, "HTTP 服务未运行，无法复制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.http_not_running, Toast.LENGTH_SHORT).show();
             return;
         }
         String url = HttpServerService.getAccessUrl();
@@ -1578,7 +1622,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
     /** 启动 SSH 服务：已在运行就只提示，启动过程中置灰按钮防连点 */
     private void startSshServer() {
         if (SshServerService.isRunning()) {
-            Toast.makeText(this, "SSH 服务已在运行", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ssh_already_running, Toast.LENGTH_SHORT).show();
             showSshState();
             return;
         }
@@ -1586,7 +1630,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         mSshError = null;      // 重新开始时清掉上一次的错误，别让旧失败信息一直挂着
         TextView tvStatus = findViewById(R.id.txt_status);
         if (tvStatus != null) {
-            tvStatus.setText("SSH 服务启动中…");
+            tvStatus.setText(R.string.ssh_starting);
         }
         refreshServiceHint();
         SshServerService.start(SelectActivity.this);
@@ -1650,7 +1694,7 @@ public class SelectActivity extends AppCompatActivity implements EventHandle {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm != null) {
             cm.setPrimaryClip(ClipData.newPlainText("Device2Device SSH", command));
-            Toast.makeText(this, "连接信息已复制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.connection_info_copied, Toast.LENGTH_SHORT).show();
         }
     }
     @Override

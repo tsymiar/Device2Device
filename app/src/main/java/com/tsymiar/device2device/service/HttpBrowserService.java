@@ -13,6 +13,7 @@ import android.media.ExifInterface;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
 import android.util.Log;
@@ -189,8 +190,9 @@ public class HttpBrowserService {
             String type = split[0];
             String path = split[1];
 
+            String root = Environment.getExternalStorageDirectory().getPath();
             if ("primary".equalsIgnoreCase(type)) {
-                return "/storage/emulated/0/" + (path.isEmpty() ? "" : path);
+                return root + "/" + (path.isEmpty() ? "" : path);
             } else {
                 return "/storage/" + type + "/" + (path.isEmpty() ? "" : path);
             }
@@ -273,7 +275,10 @@ public class HttpBrowserService {
         if (serverThread != null) {
             try {
                 serverThread.join(2000);
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.d(TAG, "interrupted while joining server thread", e);
+            }
         }
         if (clientPool != null) {
             clientPool.shutdownNow();
@@ -294,7 +299,8 @@ public class HttpBrowserService {
         try {
             // TCP 调优：禁用 Nagle（减小目录页/小响应延迟），放大发送缓冲（提升大文件吞吐）
             client.setTcpNoDelay(true);
-            try { client.setSendBufferSize(512 * 1024); } catch (Exception ignored) {}
+            try { client.setSendBufferSize(512 * 1024); }
+            catch (Exception e) { Log.d(TAG, "setSendBufferSize unsupported", e); }
             client.setSoTimeout(10000);
             BufferedReader reader = new BufferedReader(new InputStreamReader(client.getInputStream()));
 
@@ -378,7 +384,7 @@ public class HttpBrowserService {
                 Log.e(TAG, "handleClient error: " + e.getMessage());
             }
         } finally {
-            try { client.close(); } catch (Exception ignored) {}
+            try { client.close(); } catch (Exception e) { Log.d(TAG, "close client failed", e); }
         }
     }
 
@@ -450,7 +456,7 @@ public class HttpBrowserService {
             return null;
         } finally {
             if (cursor != null) {
-                try { cursor.close(); } catch (Exception ignored) {}
+                try { cursor.close(); } catch (Exception e) { Log.d(TAG, "close cursor failed", e); }
             }
         }
     }
@@ -883,7 +889,9 @@ public class HttpBrowserService {
             String val = eq < 0 ? "" : pair.substring(eq + 1);
             try {
                 val = java.net.URLDecoder.decode(val, "UTF-8");
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.d(TAG, "bad zip name encoding: " + val, e);
+            }
             if (!val.isEmpty() && isSafeChildName(val)) {
                 names.add(val);
             }
@@ -1404,7 +1412,9 @@ public class HttpBrowserService {
                 try {
                     int v = Integer.parseInt(part.substring(3));
                     if (v > 0) return v;
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException e) {
+                    Log.d(TAG, "bad page number: " + part, e);
+                }
             }
         }
         return 1;
@@ -1540,7 +1550,9 @@ public class HttpBrowserService {
         try {
             int pg = Integer.parseInt(f[3]);
             if (pg > 0) p.page = pg;
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException e) {
+            Log.d(TAG, "bad page in cookie", e);
+        }
         return p;
     }
 
@@ -1782,7 +1794,9 @@ public class HttpBrowserService {
                         try { deg = exifRotation(new ExifInterface(in)); } finally { close(in); }
                     }
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable e) {
+                Log.d(TAG, "read EXIF orientation failed, use raw bitmap", e);
+            }
             if (deg != 0) {
                 Bitmap r = rotateBitmap(bmp, deg);
                 if (r != bmp) bmp.recycle();
@@ -1799,19 +1813,24 @@ public class HttpBrowserService {
             if (doc != null) ret.setDataSource(context, doc.getUri());
             else ret.setDataSource(file.getAbsolutePath());
         } catch (Throwable e) {
-            try { ret.release(); } catch (Exception ignored) {}
+            Log.d(TAG, "setDataSource failed for video thumb", e);
+            try { ret.release(); } catch (Exception ex) { Log.d(TAG, "release retriever failed", ex); }
             return null;
         }
         Bitmap frame = null;
         try {
             frame = ret.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-        } catch (Throwable ignored) {}
+        } catch (Throwable e) {
+            Log.d(TAG, "frame at 1s unavailable", e);
+        }
         if (frame == null) {
             try {
                 frame = ret.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-            } catch (Throwable ignored) {}
+            } catch (Throwable e) {
+                Log.d(TAG, "frame at 0s unavailable", e);
+            }
         }
-        try { ret.release(); } catch (Exception ignored) {}
+        try { ret.release(); } catch (Exception e) { Log.d(TAG, "release retriever failed", e); }
         if (frame == null) return null;
         return encodeJpegWhite(frame, THUMB_TARGET, 72);
     }
@@ -1848,7 +1867,9 @@ public class HttpBrowserService {
             try {
                 Bitmap s = Bitmap.createScaledBitmap(b, nw, nh, true);
                 if (s != b) { b.recycle(); b = s; }
-            } catch (Throwable ignored) {}
+            } catch (Throwable e) {
+                Log.d(TAG, "scale bitmap failed, use original", e);
+            }
         }
         if (b.hasAlpha()) {
             try {
@@ -1859,7 +1880,9 @@ public class HttpBrowserService {
                 cv.drawBitmap(b, 0, 0, p);
                 b.recycle();
                 b = out;
-            } catch (Throwable ignored) {}
+            } catch (Throwable e) {
+                Log.d(TAG, "flatten alpha failed, use original bitmap", e);
+            }
         }
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream(
@@ -1907,7 +1930,7 @@ public class HttpBrowserService {
 
     private static void close(InputStream in) {
         if (in != null) {
-            try { in.close(); } catch (Exception ignored) {}
+            try { in.close(); } catch (Exception e) { Log.d(TAG, "close thumb stream failed", e); }
         }
     }
 
@@ -1937,7 +1960,9 @@ public class HttpBrowserService {
                     "</body></html>";
             sendResponse(client.getOutputStream(), code + " " + message,
                     "text/html; charset=UTF-8", html.getBytes("UTF-8"), false);
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.w(TAG, "sendError failed: " + code + " " + message, e);
+        }
     }
 
     /**

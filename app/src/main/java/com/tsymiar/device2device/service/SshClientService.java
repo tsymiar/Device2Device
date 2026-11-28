@@ -1,7 +1,6 @@
 package com.tsymiar.device2device.service;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -80,7 +79,7 @@ public class SshClientService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, piFlags);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_auth)
+                .setSmallIcon(R.drawable.ic_stat_notify)
                 .setContentTitle(getString(R.string.ssh_notify_title))
                 .setContentText(title)
                 .setOngoing(true)
@@ -91,14 +90,9 @@ public class SshClientService extends Service {
     }
 
     private void createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(
-                    CHANNEL_ID, getString(R.string.ssh_notify_channel), NotificationManager.IMPORTANCE_LOW);
-            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) {
-                nm.createNotificationChannel(ch);
-            }
-        }
+        com.tsymiar.device2device.utils.NotificationHelper.ensureChannel(
+                this, CHANNEL_ID, getString(R.string.ssh_notify_channel),
+                NotificationManager.IMPORTANCE_LOW, null, false);
     }
 
     @Override
