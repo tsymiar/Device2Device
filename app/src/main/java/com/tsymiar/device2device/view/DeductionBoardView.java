@@ -85,6 +85,9 @@ public class DeductionBoardView extends View {
     /** 顶部固定区按标题宽度给「第 N 章」留位，两处共用 */
     private static final String TITLE = "声纹推演盘";
 
+    /** 竖屏多行文本行距系数：黑体默认行距对中文偏紧 */
+    private static final float PORTRAIT_LINE_SPACING = 1.12f;
+
     // 竖屏布局常量（逻辑画布 640 宽）
     private static final float P_L = 24f, P_R = 616f;
     private static final float P_REL_Y = 68f, P_REL_X0 = 336f;
@@ -351,7 +354,7 @@ public class DeductionBoardView extends View {
         float visH = (getHeight() - mBottomBarH) / s;
 
         // 基线 54：放大后标题顶部不被裁切；标题与章节各自在半宽内量宽，超出缩字号
-        drawText(c, P_L, 54, TITLE, Color.rgb(0, 220, 200),
+        drawTitle(c, P_L, 54, TITLE, Color.rgb(0, 220, 200),
                 fitScale(TITLE, 1.2f, P_REL_X0 - P_L - 8f));
         String chapter = "第 " + (mChapter + 1) + " 章";
         drawText(c, P_REL_X0, 54, chapter, Color.argb(170, 150, 180, 210),
@@ -398,12 +401,12 @@ public class DeductionBoardView extends View {
             mPaint.setStrokeWidth(2f);
             c.drawLine(mDragStartX, mDragStartY, mDragX, mDragY, mPaint);
             drawText(c, mDragX + 10, mDragY, "▶ " + smp.name,
-                    GameUi.withAlpha(smp.color(), 200), 0.4f);
+                    GameUi.withAlpha(smp.color(), 200), 0.5f);
         }
     }
 
     private float renderPortraitSamples(Canvas c, float py) {
-        drawText(c, P_L, py, "声纹样本库", Color.rgb(0, 200, 255), 0.85f);
+        drawTitle(c, P_L, py, "声纹样本库", Color.rgb(0, 200, 255), 0.85f);
         List<DeductionData.DeductionSample> samples = mEngine.samples();
         int n = samples.size();
         if (n <= 0) return P_LIB_Y + 56;
@@ -420,7 +423,7 @@ public class DeductionBoardView extends View {
     private float renderPortraitProposition(Canvas c, float py) {
         DeductionData.Proposition p = mEngine.currentProposition();
         if (p == null) return py;
-        drawText(c, P_L, py, "待验证命题", Color.rgb(255, 210, 100), P_SECTION_TITLE_S);
+        drawTitle(c, P_L, py, "待验证命题", Color.rgb(255, 210, 100), P_SECTION_TITLE_S);
         py += 40;
         int w = (int) (P_R - P_L - 20);
         int n = wrappedLineCount(p.text, 0.5f, w);
@@ -431,7 +434,7 @@ public class DeductionBoardView extends View {
 
     private float renderPortraitSliders(Canvas c, float py) {
         if (mChapter < 1) return py;
-        drawText(c, P_L, py, "陈远山动机锚定偏差", Color.rgb(180, 160, 200), 0.6f);
+        drawTitle(c, P_L, py, "陈远山动机锚定偏差", Color.rgb(180, 160, 200), 0.6f);
         // 标题与标签都有 descent，间距不足会重叠
         py += 50;
         mGreedY = py;
@@ -450,7 +453,7 @@ public class DeductionBoardView extends View {
     }
 
     private float renderPortraitSlots(Canvas c, float py) {
-        drawText(c, P_L, py, "三槽：拖拽样本至此", Color.rgb(0, 220, 200), 0.72f);
+        drawTitle(c, P_L, py, "三槽：拖拽样本至此", Color.rgb(0, 220, 200), 0.72f);
         py += 40;
         mSlotsY0 = py;
         // 文字区左右各留 16，居中后不会顶到边框
@@ -477,7 +480,8 @@ public class DeductionBoardView extends View {
                         Color.argb(120, 80, 100, 130), 0.5f);
             }
         }
-        return py + 3 * (P_SLOT_H + P_SLOT_GAP) - P_SLOT_GAP + 26;
+        // 尾距须大于小节标题的上升部，否则「声灵」会顶进槽 3
+        return py + 3 * (P_SLOT_H + P_SLOT_GAP) - P_SLOT_GAP + 52;
     }
 
     private float renderPortraitSpirits(Canvas c, float py) {
@@ -488,7 +492,7 @@ public class DeductionBoardView extends View {
         boolean hasChips = (mChapter == 3 && mEngine.spirits().size() > 0)
                 || (mChapter == 4 && !chapterSpiritKinds().isEmpty());
         if (!any && !hasChips) return py;
-        drawText(c, P_L, py, "声灵", Color.rgb(200, 180, 255), P_SECTION_TITLE_S);
+        drawTitle(c, P_L, py, "声灵", Color.rgb(200, 180, 255), P_SECTION_TITLE_S);
         py += 40;
         for (DeductionData.SpiritInfo sp : mEngine.spirits()) {
             if (sp.affinity <= 0.0f) continue;
@@ -553,7 +557,7 @@ public class DeductionBoardView extends View {
         int total = frags.size();
         if (total <= 0) return py;
         float t = nowSec();
-        drawText(c, P_L, py, String.format("灵魂碎片 %d/%d",
+        drawTitle(c, P_L, py, String.format("灵魂碎片 %d/%d",
                         mEngine.collectedSoulFragmentCount(), total),
                 Color.rgb(255, 220, 120), 0.6f);
         py += 38;
@@ -582,7 +586,7 @@ public class DeductionBoardView extends View {
 
     private float renderPortraitDeviation(Canvas c, float py) {
         DeductionData.DeviationEnergy dev = mEngine.deviation();
-        drawText(c, P_L, py, String.format("偏差能量 %d%%", (int) (dev.amount * 100)),
+        drawTitle(c, P_L, py, String.format("偏差能量 %d%%", (int) (dev.amount * 100)),
                 Color.argb(200, 180, 160, 255), 0.6f);
         py += 40;
         // 全宽条与左右边距对齐，避免左端缩进
@@ -599,13 +603,16 @@ public class DeductionBoardView extends View {
 
     private float renderPortraitTip(Canvas c, float py) {
         String tip = "长按样本锁存 | 点槽左半切动作 右半切锚点 | 长按槽清空";
-        drawText(c, P_L, py, tip, Color.argb(140, 100, 130, 160), fitScale(tip, 0.5f, P_R - P_L));
-        return py + 44;
+        // 窄屏不缩字号，按全宽折行
+        int w = (int) (P_R - P_L);
+        int n = wrappedLineCount(tip, 0.5f, w);
+        drawTextWrapped(c, P_L, py, tip, Color.argb(140, 100, 130, 160), 0.5f, w);
+        return py + n * lineHeight(0.5f) + 16;
     }
 
     private float renderPortraitResult(Canvas c, float py) {
         int w = (int) (P_R - P_L - 20);
-        drawText(c, P_L, py, "推演结果", Color.rgb(0, 220, 160), 0.72f);
+        drawTitle(c, P_L, py, "推演结果", Color.rgb(0, 220, 160), 0.72f);
         py += 40;
         int n1 = wrappedLineCount(mLastResult.audioDescription, 0.5f, w);
         drawTextWrapped(c, P_L, py, mLastResult.audioDescription, Color.rgb(160, 220, 200), 0.5f, w);
@@ -623,7 +630,7 @@ public class DeductionBoardView extends View {
         }
         if (mChapter == 4) {
             DeductionData.PersonalityProfile pp = mEngine.generatePersonalityProfile();
-            drawText(c, P_L, py, "推演板对你的侧写", Color.rgb(255, 210, 100), 0.6f);
+            drawTitle(c, P_L, py, "推演板对你的侧写", Color.rgb(255, 210, 100), 0.6f);
             py += 40;
             int n3 = wrappedLineCount(pp.summary, 0.5f, w);
             drawTextWrapped(c, P_L, py, pp.summary, Color.rgb(200, 190, 170), 0.5f, w);
@@ -1156,16 +1163,21 @@ public class DeductionBoardView extends View {
     }
 
     private void drawText(Canvas c, float x, float y, String t, int color, float s) {
+        drawText(c, x, y, t, color, s, false);
+    }
+
+    /** @param bold 小节标题用粗体，与正文拉开层级；正文统一系统黑体 */
+    private void drawText(Canvas c, float x, float y, String t, int color, float s, boolean bold) {
         if (t == null || t.isEmpty()) return;
         mPaint.reset();
         mPaint.setAntiAlias(true);
         mPaint.setColor(color);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         String[] lines = t.split("\n");
         if (mPortrait) {
             // 竖屏：逻辑字号按画布缩放/屏幕密度换算，使最终物理字号 ≈ 28*s 像素密度 sp
             mPaint.setTextSize(fontLogicalPx(s));
-            float lh = mPaint.getFontSpacing();
+            float lh = mPaint.getFontSpacing() * PORTRAIT_LINE_SPACING;
             for (int li = 0; li < lines.length; ++li) c.drawText(lines[li], x, y + li * lh, mPaint);
             return;
         }
@@ -1179,16 +1191,21 @@ public class DeductionBoardView extends View {
         c.restore();
     }
 
+    /** 小节标题：加粗绘制，层级高于正文 */
+    private void drawTitle(Canvas c, float x, float y, String t, int color, float s) {
+        drawText(c, x, y, t, color, s, true);
+    }
+
     private void drawTextWrapped(Canvas c, float x, float y, String t, int color, float s, int maxPx) {
         if (t == null || t.isEmpty()) return;
         mPaint.reset();
         mPaint.setAntiAlias(true);
         mPaint.setColor(color);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         if (mPortrait) {
             mPaint.setTextSize(fontLogicalPx(s));
             List<String> lines = wrapText(t, maxPx);
-            float lh = mPaint.getFontSpacing();
+            float lh = mPaint.getFontSpacing() * PORTRAIT_LINE_SPACING;
             for (int li = 0; li < lines.size(); ++li) c.drawText(lines.get(li), x, y + li * lh, mPaint);
             return;
         }
@@ -1213,16 +1230,18 @@ public class DeductionBoardView extends View {
     private float lineHeight(float s) {
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(fontLogicalPx(s));
-        return mPaint.getFontSpacing();
+        float spacing = mPaint.getFontSpacing();
+        // 布局行距与绘制行距同源（drawText/drawTextWrapped 竖屏都乘这一档）
+        return mPortrait ? spacing * PORTRAIT_LINE_SPACING : spacing;
     }
 
     /** 横屏行高换算成 GL 归一化 y 增量（与 gy2y 同一套坐标模型，避免结果区多行互相压） */
     private float lhLand(float s) {
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(16f * s * 2.5f);
         return mPaint.getFontSpacing() / (mLogH / 2f);
     }
@@ -1231,7 +1250,7 @@ public class DeductionBoardView extends View {
         if (t == null || t.isEmpty()) return 0;
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(fontLogicalPx(s));
         return wrapText(t, maxPx).size();
     }
@@ -1240,7 +1259,7 @@ public class DeductionBoardView extends View {
     private float measureTextWidth(String t, float s) {
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(fontLogicalPx(s));
         return mPaint.measureText(t);
     }
@@ -1262,7 +1281,7 @@ public class DeductionBoardView extends View {
     private float baselineInBox(float top, float h, float s) {
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(fontLogicalPx(s));
         Paint.FontMetrics fm = mPaint.getFontMetrics();
         return top + h / 2f - (fm.ascent + fm.descent) / 2f;
@@ -1294,7 +1313,7 @@ public class DeductionBoardView extends View {
     private List<String> wrappedLines(String t, int maxPx, float s) {
         mPaint.reset();
         mPaint.setAntiAlias(true);
-        mPaint.setTypeface(Typeface.MONOSPACE);
+        mPaint.setTypeface(Typeface.DEFAULT);
         mPaint.setTextSize(fontLogicalPx(s));
         return wrapText(t, maxPx);
     }

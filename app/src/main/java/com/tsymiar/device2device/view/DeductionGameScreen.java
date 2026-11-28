@@ -6,9 +6,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.tsymiar.device2device.R;
 import com.tsymiar.device2device.game.DeductionAudio;
 import com.tsymiar.device2device.game.DeductionEngine;
 
@@ -33,33 +35,42 @@ public class DeductionGameScreen extends FrameLayout {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // ── 底部控制条：章节切换 + 推演按钮 ──
+        // ── 底部控制条：chips 可横向滑动占剩余宽度，推演按钮固定在右（窄屏不溢出） ──
         LinearLayout bottomBar = new LinearLayout(context);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setPadding(12, 8, 12, 8);
+        bottomBar.setPadding(dp(12), dp(8), dp(12), dp(8));
         bottomBar.setBackgroundColor(GameUi.withAlpha(GameUi.PANEL, 0xCC));
 
+        LinearLayout chipRow = new LinearLayout(context);
+        chipRow.setOrientation(LinearLayout.HORIZONTAL);
         String[] chapters = { "序章", "一章", "二章", "三章", "终章" };
         for (int i = 0; i < chapters.length; ++i) {
             final int idx = i;
             TextView btn = makeChip(chapters[i]);
             btn.setOnClickListener(v -> mBoardView.loadChapter(idx));
-            bottomBar.addView(btn);
+            chipRow.addView(btn);
         }
+        HorizontalScrollView chipScroll = new HorizontalScrollView(context);
+        chipScroll.setHorizontalScrollBarEnabled(false);
+        chipScroll.addView(chipRow);
 
         TextView deduceBtn = new TextView(context);
-        deduceBtn.setText("推演 ▶");
+        deduceBtn.setText(R.string.game_deduce);
         deduceBtn.setTextColor(GameUi.BG);
         deduceBtn.setTextSize(16);
         deduceBtn.setTypeface(Typeface.DEFAULT_BOLD);
         deduceBtn.setGravity(Gravity.CENTER);
-        deduceBtn.setPadding(24, 12, 24, 12);
+        deduceBtn.setPadding(dp(24), dp(12), dp(24), dp(12));
         GradientDrawable dg = new GradientDrawable();
         dg.setColor(GameUi.PRIMARY);
-        dg.setCornerRadius(28);
+        dg.setCornerRadius(dp(28));
         deduceBtn.setBackground(dg);
         deduceBtn.setOnClickListener(v -> mBoardView.performDeduction());
+
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        bottomBar.addView(chipScroll, scrollLp);
         bottomBar.addView(deduceBtn);
 
         FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(
@@ -77,17 +88,21 @@ public class DeductionGameScreen extends FrameLayout {
         btn.setTextColor(Color.rgb(200, 225, 235));
         btn.setTextSize(14);
         btn.setGravity(Gravity.CENTER);
-        btn.setPadding(14, 8, 14, 8);
+        btn.setPadding(dp(14), dp(8), dp(14), dp(8));
         GradientDrawable d = new GradientDrawable();
         d.setColor(0x44224466);
-        d.setCornerRadius(20);
+        d.setCornerRadius(dp(20));
         d.setStroke(1, GameUi.withAlpha(GameUi.PRIMARY, 0x66));
         btn.setBackground(d);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(4, 0, 4, 0);
+        lp.setMargins(dp(4), 0, dp(4), 0);
         btn.setLayoutParams(lp);
         return btn;
+    }
+
+    private int dp(float v) {
+        return Math.round(GameUi.dp(getContext(), v));
     }
 }
