@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 一条消息：气泡 + 下面的时间戳。
-     左右对齐、气泡底色、文字色都由代码按说话方（我 / 对端 / 系统 / 报错）改。
+<!-- 一条消息：发送者名（仅对端，可隐藏）+ 气泡 + 时间/送达状态。
+     左右对齐、气泡底色、文字色都由代码按说话方（我 / 对端 / 系统 / 报错）改；
+     气泡底用 bg_lan_bubble_self / bg_lan_bubble_peer 分别指定（带小尾巴收角）。
      textIsSelectable 让长按能选中文字并复制。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -9,20 +10,37 @@
     android:layout_marginBottom="6dp"
     android:orientation="vertical">
 
+    <!-- 对端发送者名：连续同一人的消息只在第一行显示，其余由代码隐藏 -->
+    <TextView
+        android:id="@+id/bubble_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/lan_accent"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        tools:text="设备名" />
+
     <TextView
         android:id="@+id/bubble_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="start"
-        android:background="@drawable/bg_lan_bubble_chat"
-        android:maxWidth="250dp"
-        android:paddingStart="10dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="10dp"
-        android:paddingBottom="6dp"
+        android:background="@drawable/bg_lan_bubble_peer"
+        android:maxWidth="@dimen/lan_bubble_max_width"
+        android:paddingStart="12dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="7dp"
         android:textColor="@color/lan_text"
         android:textIsSelectable="true"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        tools:text="消息内容" />
 
     <!-- 图片消息用它顶替 bubble_text；adjustViewBounds 让高度跟着图片的宽高比走 -->
     <ImageView
@@ -31,8 +49,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start"
         android:adjustViewBounds="true"
-        android:maxWidth="200dp"
-        android:maxHeight="260dp"
+        android:maxWidth="@dimen/lan_image_max_width"
+        android:maxHeight="@dimen/lan_image_max_height"
         android:visibility="gone"
         tools:ignore="ContentDescription" />
 
@@ -44,5 +62,6 @@
         android:layout_marginStart="6dp"
         android:layout_marginTop="2dp"
         android:textColor="@color/lan_text_dim"
-        android:textSize="10sp" />
+        android:textSize="10sp"
+        tools:text="12:30 · 已送达" />
 </LinearLayout>

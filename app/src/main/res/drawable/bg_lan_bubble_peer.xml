@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 对端发来的消息气泡：淡青，左下角收成小圆当"尾巴"，无描边更显柔和 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/lan_bubble_peer" />
+    <corners
+        android:radius="16dp"
+        android:bottomLeftRadius="4dp" />
+</shape>

@@ -3,6 +3,8 @@
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
+    <!-- 启动图标自适应图层的品牌底色（与原始图标背景一致） -->
+    <color name="ic_launcher_background">#4C909B</color>
     <color name="playback_indicator">#ffff66</color>
     <color name="grid_line">#66ffffff</color>
     <color name="time_value">#ddffffdd</color>
@@ -86,6 +88,14 @@
     <color name="lan_bubble_peer">#FFE0F2F1</color>
     <color name="lan_bubble_error">#FFFDECEA</color>
     <color name="lan_bubble_stroke">#FFCFD8DC</color>
+    <color name="lan_error_stroke">#66B71C1C</color>
+    <!-- 对端发送者名的可辨色板：按名字哈希取色，不同设备一眼可分 -->
+    <color name="lan_name_1">#FF1565C0</color>
+    <color name="lan_name_2">#FF6A1B9A</color>
+    <color name="lan_name_3">#FFE65100</color>
+    <color name="lan_name_4">#FF2E7D32</color>
+    <color name="lan_name_5">#FFAD1457</color>
+    <color name="lan_name_6">#FF4527A0</color>
 
     <!-- 行情桌面小部件（浅色）：底色与次要文字跟 market_* 那套同值，只有描边和主文字不一样 -->
     <color name="market_widget_stroke">#FFCBD5E1</color>
@@ -95,6 +105,14 @@
     <!-- 聊天输入卡片 -->
     <color name="chat_card">#FFFFFFFF</color>
     <color name="chat_card_stroke">#FFE8E8E8</color>
+
+    <!-- 从布局/样式中抽出的写死色值 -->
+    <color name="chart_pull_text">#FF8D00</color>
+    <color name="chart_hint_text">#FFFFE9D5</color>
+    <color name="chart_min_text">#FFFF0000</color>
+    <color name="text_style_fg">#4E342E</color>
+    <color name="avatar_bg">#FF0E1116</color>
+    <color name="avatar_panel">#FF2A3342</color>
 
     <!-- ===== 通用语义色（浅色）=====
          布局一律引 ui_* token，不写死 #rrggbb；每个 token 在 values-night 都有对应值 -->

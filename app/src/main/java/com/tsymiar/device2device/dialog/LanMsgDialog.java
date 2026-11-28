@@ -17,6 +17,7 @@ import android.os.Looper;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -63,8 +64,9 @@ import java.util.Map;
  * 转发走的是主线程 Handler，所以这里可以直接碰 View。
  */
 public class LanMsgDialog extends Dialog {
+    private static final String TAG = "LanMsgDialog";
 
-    /** 选图请求码：SelectActivity.onActivityResult 按它把结果转发回来 */
+    /** 选图请求码：SelectActivity 的 Activity Result 回调按它把结果转发回来 */
     public static final int LAN_IMAGE_REQUEST = 1002;
 
     private static final class Peer {
@@ -156,20 +158,28 @@ public class LanMsgDialog extends Dialog {
     private final SimpleDateFormat mTimeFormat =
             new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
+    /** 日期分隔条用的"天"格式；跨天时在消息流里插一条居中的日期提示 */
+    private final SimpleDateFormat mDayFormat =
+            new SimpleDateFormat("yyyy年M月d日", Locale.getDefault());
+    /** 上一条消息的日期（yyyy-MM-dd），用于判断是否要插日期分隔条 */
+    private String mLastChatDayKey = null;
+    /** 上一条对端消息的发送者名；连续同一人时下一行不再重复显示名字 */
+    private String mLastPeerSender = null;
+
     /** 选图要 startActivityForResult，不是 Activity 就没法发起 */
     private final android.app.Activity mActivity;
     private Button btnImage;
-    /** 刚发出去的那张图的气泡行；SENDINGIMG 事件回来后按它把消息 id 绑上去 */
+    /** 刚发出去的那张图的气泡行；MSI 事件回来后按它把消息 id 绑上去 */
     /**
-     * 等着 SENDINGIMG 事件回来绑 id 的图片气泡行，按发送顺序排。
+     * 等着 MSI 事件回来绑 id 的图片气泡行，按发送顺序排。
      *
      * 必须是队列而不能是单个字段：图片气泡建出来时还没有 id，id 由 native 在
-     * sendLanImage 里同步抛出的 SENDINGIMG 事件带回来，而轮询线程最迟 50ms 才取到它。
+     * sendLanImage 里同步抛出的 MSI 事件带回来，而轮询线程最迟 50ms 才取到它。
      * 这期间再发一张，单个字段就会被覆盖 —— 第一条永远绑不上，第二条绑的是第一条的 id，
      * 两张图一起卡在"发送中"。图文交替连发时这个窗口必中。
      */
     private final java.util.ArrayDeque<View> mPendingImageRows = new java.util.ArrayDeque<>();
-    /** 本地气泡等待 SENDING 事件绑定 id */
+    /** 本地气泡等待 MST 事件绑定 id */
     private final java.util.ArrayDeque<View> mPendingTextRows = new java.util.ArrayDeque<>();
 
     public LanMsgDialog(@NonNull Context context) {
@@ -270,7 +280,8 @@ public class LanMsgDialog extends Dialog {
             lvPeers.setItemChecked(position, true);
         }
         if (tvState != null) {
-            tvState.setText("发给 " + picked.name + "  " + picked.ip + ":" + picked.port);
+            tvState.setText(getContext().getString(R.string.lan_send_to,
+                    picked.name, picked.ip, picked.port));
         }
         updateSendEnabled();
     }
@@ -330,6 +341,11 @@ public class LanMsgDialog extends Dialog {
      * bg_lan_peer_row 的 state_activated 负责 —— ListView.setItemChecked() 会把
      * 激活态设于行上，ViewGroup 再将其传递给子控件，文字色因而随之变化。
      */
+    private static final class PeerHolder {
+        TextView name;
+        TextView addr;
+    }
+
     private final class PeerAdapter extends BaseAdapter {
 
         @Override
@@ -350,10 +366,19 @@ public class LanMsgDialog extends Dialog {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            View row = convertView != null ? convertView
-                    : LayoutInflater.from(getContext()).inflate(R.layout.item_lan_peer, parent, false);
-            TextView tvName = row.findViewById(R.id.tv_peer_name);
-            TextView tvAddr = row.findViewById(R.id.tv_peer_addr);
+            View row = convertView;
+            PeerHolder holder;
+            if (row == null) {
+                row = LayoutInflater.from(getContext()).inflate(R.layout.item_lan_peer, parent, false);
+                holder = new PeerHolder();
+                holder.name = row.findViewById(R.id.tv_peer_name);
+                holder.addr = row.findViewById(R.id.tv_peer_addr);
+                row.setTag(holder);
+            } else {
+                holder = (PeerHolder) row.getTag();
+            }
+            TextView tvName = holder.name;
+            TextView tvAddr = holder.addr;
             Peer peer = peerAt(position);
             if (peer == null) {
                 // 占位行：次级灰、不加粗
@@ -402,7 +427,7 @@ public class LanMsgDialog extends Dialog {
 
     private int resolveColor(int resId) {
         try {
-            return getContext().getResources().getColor(resId);
+            return ContextCompat.getColor(getContext(), resId);
         } catch (Exception e) {
             return Color.GRAY;
         }
@@ -616,7 +641,9 @@ public class LanMsgDialog extends Dialog {
             if (mMulticastLock != null && mMulticastLock.isHeld()) {
                 mMulticastLock.release();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            Log.d(TAG, "release multicast lock failed", e);
+        }
     }
 
     // ---------- 发送 ----------
@@ -637,9 +664,9 @@ public class LanMsgDialog extends Dialog {
             Toast.makeText(getContext(), R.string.lan_msg_empty, Toast.LENGTH_SHORT).show();
             return;
         }
-        // 本机气泡立刻画出来，不等 native 的 SENDING 事件：
-        // 事件队列延迟/丢事件时至少自己发的内容一直在，送达状态由事件回填
-        View row = appendChat("我 → " + mTarget.ip + "：" + text, KIND_SELF, null,
+        // 本机气泡立刻画出来，不等 native 的 MST 事件；只显示正文，
+        // 自发消息靠右对齐已表明方向，与收到的消息样式一致
+        View row = appendChat(text, KIND_SELF, null,
                 getContext().getString(R.string.lan_msg_sending));
         int ret = NetworkWrapper.sendLanMessage(mTarget.ip, mTarget.port, text);
         if (ret < 0) {
@@ -674,12 +701,19 @@ public class LanMsgDialog extends Dialog {
         Intent intent = new Intent(Intent.ACTION_PICK,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         intent.setType("image/*");
-        mActivity.startActivityForResult(Intent.createChooser(intent,
-                getContext().getString(R.string.lan_msg_pick_image)), LAN_IMAGE_REQUEST);
+        Intent chooser = Intent.createChooser(intent,
+                getContext().getString(R.string.lan_msg_pick_image));
+        if (mActivity instanceof com.tsymiar.device2device.utils.ActivityResultRequester) {
+            ((com.tsymiar.device2device.utils.ActivityResultRequester) mActivity)
+                    .launchForResult(chooser, LAN_IMAGE_REQUEST);
+        } else {
+            // 宿主未实现 ActivityResultRequester 时的兼容路径
+            mActivity.startActivityForResult(chooser, LAN_IMAGE_REQUEST);
+        }
     }
 
     /**
-     * 由 SelectActivity.onActivityResult 转发进来。
+     * 由 SelectActivity 的 Activity Result 回调转发进来。
      *
      * 编码在调用方线程上跑，可能上百毫秒，所以先派到后台再回来发；否则点完图库回来
      * 界面会卡住一下。
@@ -707,16 +741,16 @@ public class LanMsgDialog extends Dialog {
             // 缩到显示尺寸要在编码之后：编码那一步不回收传入的 bitmap，但这里缩完会回收原件
             final Bitmap show = downscaleForDisplay(bmp);
             new Handler(Looper.getMainLooper()).post(() -> {
-                // 气泡先绘制（小图），大图留给点击预览；id 由随后的 SENDINGIMG 事件绑定
+                // 气泡先绘制（小图），大图留给点击预览；id 由随后的 MSI 事件绑定
                 View row = appendImage(show, KIND_SELF, null,
                         getContext().getString(R.string.lan_msg_sending), bmp);
-                // 建失败就别入队：native 也不会为这次发送抛 SENDINGIMG，队列会错位
+                // 建失败就别入队：native 也不会为这次发送抛 MSI，队列会错位
                 if (row != null) {
                     mPendingImageRows.add(row);
                 }
                 int ret = NetworkWrapper.sendLanImage(target.ip, target.port, base64);
                 if (ret < 0) {
-                    // 这三个错误码都在 native 入队之前就返回了，不会有 SENDINGIMG 回来，
+                    // 这三个错误码都在 native 入队之前就返回了，不会有 MSI 回来，
                     // 所以这里直接把队首那条划掉
                     View failed = mPendingImageRows.poll();
                     if (failed != null) {
@@ -875,19 +909,17 @@ public class LanMsgDialog extends Dialog {
 
     // ---------- native 事件 ----------
 
-    /**
-     * 对端表变化：CLEAR 清空、ADD|ip|port|name 加入或改名、DEL|ip|port|name 下线。
-     */
+    /** 对端表变化：PCL 清空、PAD|ip|port|device 加入/改名、PDL|ip|port|device 下线。 */
     @SuppressLint("SetTextI18n")
     public void onPeerEvent(String event) {
         if (event == null || event.isEmpty()) return;
         String[] p = event.split("\\|");
         if (p.length == 0) return;
-        if (p[0].equals("CLEAR")) {
+        if (p[0].equals("PCL")) {
             /**
-             * 只清列表，不清选中目标：CLEAR 后面紧跟着一轮重新 ADD，对端还在时马上就回来，
+             * 只清列表，不清选中目标：PCL 后面紧跟着一轮 PAD，对端还在时马上就回来，
              * 连 mTarget 一起清时每点一次「发现设备」就要重选一次目标，像是连接断开。
-             * 真离线的设备走 DEL 才清。
+             * 真离线的设备走 PDL 才清。
              */
             mPeers.clear();
             refreshPeerLabels();
@@ -903,13 +935,13 @@ public class LanMsgDialog extends Dialog {
         }
         String name = p[3];
         Peer peer = new Peer(ip, port, name);
-        if (p[0].equals("ADD")) {
+        if (p[0].equals("PAD")) {
             boolean isNew = !mPeers.containsKey(peer.key());
             mPeers.put(peer.key(), peer);
             refreshPeerLabels();
             if (mTarget != null && mTarget.key().equals(peer.key())) {
                 mTarget = peer;
-                // 列表刚被 CLEAR 重建过，高亮要跟着重新打上，否则选中项看着是空的
+                // 列表刚被 PCL 重建过，高亮要跟着重新打上，否则选中项看着是空的
                 int at = positionOf(peer);
                 if (lvPeers != null && at >= 0) {
                     lvPeers.setItemChecked(at, true);
@@ -918,7 +950,7 @@ public class LanMsgDialog extends Dialog {
                 // 第一台被发现的设备自动选为目标：只有一台时不该还要用户额外点一下
                 selectTarget(peer, 0);
             }
-        } else if (p[0].equals("DEL")) {
+        } else if (p[0].equals("PDL")) {
             if (mTarget != null && mTarget.key().equals(peer.key())) {
                 mTarget = null;
                 updateSendEnabled();
@@ -929,15 +961,15 @@ public class LanMsgDialog extends Dialog {
         }
     }
 
-    /** 收发内容与启动结果：LISTEN / RECV / SENT / SENDFAIL */
+    /** 收发内容与启动结果：MLN / MST / MSI / MDV / MUD / MSF / MRT / MRI */
     @SuppressLint("SetTextI18n")
     public void onMessageEvent(String event) {
         if (event == null || event.isEmpty()) return;
         String[] p = event.split("\\|");
         if (p.length == 0) return;
         switch (p[0]) {
-            case "LISTEN":
-                // p = [LISTEN, ip, port, name]
+            case "MLN":
+                // p = [MLN, ip, port, device]
                 if (p.length >= 4) {
                     int port = 0;
                     try {
@@ -950,41 +982,41 @@ public class LanMsgDialog extends Dialog {
                     appendChat("本机已开始监听 " + p[1] + ":" + p[2], KIND_SYS);
                 }
                 break;
-            case "RECVIMG":
-                // p = [RECVIMG, peerIp, name, base64]
+            case "MRI":
+                // p = [MRI, peerIp, device, base64]
                 if (p.length >= 4) {
                     Bitmap full = decodeReceived(p[3]);
                     if (full != null) {
                         // 气泡里放小图，点开看按发送尺寸解码的大图
-                        appendImage(downscaleForDisplay(full), KIND_PEER, null, p[2], full);
+                        appendPeerImage(downscaleForDisplay(full), p[2], full);
                     } else {
                         appendChat(p[2] + " 发来一张图片（解码失败）", KIND_ERROR);
                     }
                     ensurePeer(p[1], p[2]);
                 }
                 break;
-            case "RECV":
-                // p = [RECV, peerIp, name, text]
+            case "MRT":
+                // p = [MRT, peerIp, device, text]
                 if (p.length >= 4) {
-                    appendChat(p[2] + "：" + p[3], KIND_PEER);
+                    appendPeerChat(p[2], p[3]);
                     ensurePeer(p[1], p[2]);
                 }
                 break;
-            case "SENDING":
-                // p = [SENDING, ip, id, body]：气泡已在 sendMessage() 里画好，这里只绑 id。
+            case "MST":
+                // p = [MST, ip, id, body]：气泡已在 sendMessage() 里画好，这里只绑 id。
                 // 队列为空说明是别处发来的事件（比如页面重建后），兜底补一条气泡。
                 if (p.length >= 3) {
                     View row = mPendingTextRows.poll();
                     if (row != null) {
                         row.setTag(p[2]);
                     } else if (p.length >= 4) {
-                        appendChat("我 → " + p[1] + "：" + p[3], KIND_SELF, p[2],
+                        appendChat(p[3], KIND_SELF, p[2],
                                 getContext().getString(R.string.lan_msg_sending));
                     }
                 }
                 break;
-            case "SENDINGIMG":
-                // p = [SENDINGIMG, ip, id]：图片本体不随事件走，把 id 绑到最早那条没绑上的图片行上
+            case "MSI":
+                // p = [MSI, ip, id]：图片本体不随事件走，把 id 绑到最早那条没绑上的图片行上
                 if (p.length >= 3) {
                     View row = mPendingImageRows.poll();
                     if (row != null) {
@@ -992,22 +1024,22 @@ public class LanMsgDialog extends Dialog {
                     }
                 }
                 break;
-            case "DELIVERED":
-                // p = [DELIVERED, ip, id]：对端回了确认
+            case "MDV":
+                // p = [MDV, ip, id]：对端回了确认
                 if (p.length >= 3) {
                     updateBubbleStatus(p[2], getContext().getString(R.string.lan_msg_delivered),
                             false);
                 }
                 break;
-            case "UNDELIVERED":
-                // p = [UNDELIVERED, ip, id, reason]：重试几次都没等到确认
+            case "MUD":
+                // p = [MUD, ip, id, reason]：重试几次都没等到确认
                 if (p.length >= 3) {
                     updateBubbleStatus(p[2], getContext().getString(R.string.lan_msg_undelivered),
                             true);
                 }
                 break;
-            case "SENDFAIL":
-                // p = [SENDFAIL, ip, id, reason]：连不上对端
+            case "MSF":
+                // p = [MSF, ip, id, reason]：连不上对端
                 if (p.length >= 3) {
                     if (!updateBubbleStatus(p[2], getContext().getString(R.string.lan_msg_undelivered),
                             true)) {
@@ -1029,21 +1061,31 @@ public class LanMsgDialog extends Dialog {
     }
 
     private void appendChat(String line, int kind) {
-        appendRow(line, null, kind, null, null);
+        appendRow(line, null, null, kind, null, null);
     }
 
     private View appendChat(String line, int kind, String tagId, String status) {
-        return appendRow(line, null, kind, tagId, status);
+        return appendRow(line, null, null, kind, tagId, status);
+    }
+
+    /** 对端文本消息：发送者名显示在气泡上方（按名字哈希取色），正文可整段选中复制 */
+    private View appendPeerChat(String sender, String line) {
+        return appendRow(line, null, sender, KIND_PEER, null, null);
     }
 
     /** 图片消息：正文位置放一张图，时间戳和送达状态跟文本消息一样 */
     private View appendImage(Bitmap image, int kind, String tagId, String status) {
-        return appendRow(null, image, image, kind, tagId, status);
+        return appendRow(null, image, null, image, kind, tagId, status);
     }
 
     /** @param preview 点击气泡时放大的原图；为 null 时用气泡里的缩略图 */
     private View appendImage(Bitmap image, int kind, String tagId, String status, Bitmap preview) {
-        return appendRow(null, image, preview, kind, tagId, status);
+        return appendRow(null, image, null, preview, kind, tagId, status);
+    }
+
+    /** 对端图片消息：发送者名同样显示在气泡上方 */
+    private View appendPeerImage(Bitmap image, String sender, Bitmap preview) {
+        return appendRow(null, image, sender, preview, KIND_PEER, null, null);
     }
 
     /**
@@ -1059,19 +1101,22 @@ public class LanMsgDialog extends Dialog {
      * @param status 时间戳后面跟的那截状态（发送中 / 已送达 / 未送达）
      * @return 这一行的 root View，null 表示没加进去
      */
-    private View appendRow(String line, Bitmap image, int kind, String tagId, String status) {
-        return appendRow(line, image, image, kind, tagId, status);
+    private View appendRow(String line, Bitmap image, String sender,
+                           int kind, String tagId, String status) {
+        return appendRow(line, image, sender, image, kind, tagId, status);
     }
 
-    private View appendRow(String line, Bitmap image, Bitmap preview,
+    private View appendRow(String line, Bitmap image, String sender, Bitmap preview,
                            int kind, String tagId, String status) {
         if (llChat == null) return null;
         if ((line == null || line.isEmpty()) && image == null) return null;
+        maybeInsertDaySeparator();
         View row = LayoutInflater.from(getContext())
                 .inflate(R.layout.item_lan_bubble, llChat, false);
         TextView bubble = row.findViewById(R.id.bubble_text);
         ImageView photo = row.findViewById(R.id.bubble_image);
         TextView time = row.findViewById(R.id.bubble_time);
+        TextView name = row.findViewById(R.id.bubble_name);
 
         int gravity = Gravity.START;
         if (kind == KIND_SELF) {
@@ -1093,19 +1138,30 @@ public class LanMsgDialog extends Dialog {
             bubble.setText(line);
             if (kind == KIND_ERROR) {
                 bubble.setBackgroundResource(R.drawable.bg_lan_bubble_error);
-                bubble.setActivated(false);
             } else if (kind == KIND_SYS) {
                 bubble.setBackgroundResource(0);   // 系统提示不要气泡底
-                bubble.setActivated(false);
+            } else if (kind == KIND_SELF) {
+                bubble.setBackgroundResource(R.drawable.bg_lan_bubble_self);
             } else {
-                // 自己发的 / 对端来的共用 bg_lan_bubble_chat，靠 activated 切淡蓝 / 淡青
-                bubble.setBackgroundResource(R.drawable.bg_lan_bubble_chat);
-                bubble.setActivated(kind == KIND_SELF);
+                bubble.setBackgroundResource(R.drawable.bg_lan_bubble_peer);
             }
             bubble.setTextColor(resolveColor(textColorOf(kind)));
             if (kind == KIND_SYS) {
                 // 系统提示是辅助信息（启动/停止/离线），比聊天气泡小一号，别抢正文的注意力
                 bubble.setTextSize(TypedValue.COMPLEX_UNIT_SP, SYS_TEXT_SP);
+            }
+        }
+        if (name != null) {
+            // 连续同一人的对端消息只在首行显示名字
+            boolean showName = kind == KIND_PEER && sender != null
+                    && !sender.equals(mLastPeerSender);
+            if (showName) {
+                name.setText(sender);
+                name.setTextColor(resolveColor(nameColorOf(sender)));
+                name.setVisibility(View.VISIBLE);
+                applyLayoutGravity(name, gravity);
+            } else {
+                name.setVisibility(View.GONE);
             }
         }
         if (time != null) {
@@ -1117,6 +1173,8 @@ public class LanMsgDialog extends Dialog {
         if (tagId != null) {
             row.setTag(tagId);
         }
+        // 记录上一个说话人，供下一条判断是否隐藏名字行
+        mLastPeerSender = kind == KIND_PEER ? sender : null;
         // XML 里 layout_gravity 默认是 start，自己发的那条要放在右边
         applyLayoutGravity(bubble, gravity);
         applyLayoutGravity(time, gravity);
@@ -1212,6 +1270,8 @@ public class LanMsgDialog extends Dialog {
         llChat.removeAllViews();
         mPendingTextRows.clear();
         mPendingImageRows.clear();
+        mLastChatDayKey = null;
+        mLastPeerSender = null;
         if (tvChatHint != null) {
             tvChatHint.setVisibility(View.VISIBLE);
         }
@@ -1236,6 +1296,39 @@ public class LanMsgDialog extends Dialog {
             case KIND_SYS:   return R.color.lan_text_dim;
             default:         return R.color.lan_text;
         }
+    }
+
+    /** 发送者名按哈希取 6 色色板，同一设备永远同色 */
+    private int nameColorOf(String sender) {
+        int[] palette = {
+                R.color.lan_name_1, R.color.lan_name_2, R.color.lan_name_3,
+                R.color.lan_name_4, R.color.lan_name_5, R.color.lan_name_6
+        };
+        return resolveColor(palette[Math.abs(sender.hashCode()) % palette.length]);
+    }
+
+    /** 日期变了（或第一条消息）就在消息流顶部插一条居中的日期分隔 */
+    private void maybeInsertDaySeparator() {
+        Date now = new Date();
+        String key = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now);
+        if (key.equals(mLastChatDayKey)) return;
+        mLastChatDayKey = key;
+        TextView sep = new TextView(getContext());
+        sep.setText(mDayFormat.format(now));
+        sep.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+        sep.setTextColor(resolveColor(R.color.lan_text_dim));
+        sep.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        lp.topMargin = dp(4);
+        lp.bottomMargin = dp(4);
+        sep.setLayoutParams(lp);
+        llChat.addView(sep);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getContext().getResources().getDisplayMetrics().density);
     }
 
     private static void applyLayoutGravity(View child, int gravity) {

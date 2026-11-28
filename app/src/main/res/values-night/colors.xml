@@ -69,6 +69,14 @@
     <color name="lan_accent">#FF80CBC4</color>
     <color name="lan_field_bg">#FF2A3238</color>
     <color name="lan_field_stroke">#FF546E7A</color>
+    <color name="lan_error_stroke">#66FF8A80</color>
+    <!-- 对端发送者名色板（夜间提亮一档） -->
+    <color name="lan_name_1">#FF64B5F6</color>
+    <color name="lan_name_2">#FFCE93D8</color>
+    <color name="lan_name_3">#FFFFB74D</color>
+    <color name="lan_name_4">#FF81C784</color>
+    <color name="lan_name_5">#FFF48FB1</color>
+    <color name="lan_name_6">#FF9FA8DA</color>
     <!-- 通用输入框 -->
     <color name="edit_bg">#2A3238</color>
     <color name="market_rebound">#FFEC407A</color>

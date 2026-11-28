@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通用间距：布局只引用语义尺寸，便于统一适配不同屏幕与字体缩放 -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">6dp</dimen>
+    <dimen name="spacing_md">10dp</dimen>
+    <dimen name="spacing_lg">16dp</dimen>
+
+    <!-- 控件尺寸 -->
+    <dimen name="icon_size">34dp</dimen>
+    <dimen name="hit_target">40dp</dimen>
+
+    <!-- LAN 消息气泡 -->
+    <dimen name="lan_bubble_max_width">280dp</dimen>
+    <dimen name="lan_image_max_width">220dp</dimen>
+    <dimen name="lan_image_max_height">280dp</dimen>
+
+    <!-- 字号 -->
+    <dimen name="text_title">30sp</dimen>
+    <dimen name="text_body">14sp</dimen>
+    <dimen name="text_body_large">16sp</dimen>
+    <dimen name="text_caption">9sp</dimen>
+</resources>
