@@ -9,12 +9,9 @@ import androidx.annotation.NonNull;
 import androidx.viewpager.widget.ViewPager;
 
 /**
- * 高度跟着页面内容走的 ViewPager。
- *
- * 标准 ViewPager 在 wrap_content 下会直接吃掉父容器给的 AT_MOST 上限，
- * 对话框就永远撑到接近满屏；这里先按两页里较高的一页测出自然高度，
- * 再用 EXACTLY 传回去，内容少时收窄、展开文件面板时长高。
- * 超过上限时仍给 EXACTLY，页面内部自己的 NestedScrollView 负责滚动。
+ * 高度跟着当前页内容走的 ViewPager：wrap_content 下标准 ViewPager 会撑满父容器上限，
+ * 按当前页测高可避免短页下方留白；切页时 onPageSelected 里 requestLayout 重测。
+ * 超过屏高 40% 上限时夹紧，页面内部由 NestedScrollView 负责滚动。
  */
 public class WrapContentViewPager extends ViewPager {
     /** 页面最多占屏高 40%：剩下还要留给标题、页签、状态卡片和日志区 */
@@ -30,41 +27,57 @@ public class WrapContentViewPager extends ViewPager {
 
     public WrapContentViewPager(@NonNull Context context) {
         super(context);
+        syncHeightOnPageChange();
     }
 
     public WrapContentViewPager(@NonNull Context context, AttributeSet attrs) {
         super(context, attrs);
+        syncHeightOnPageChange();
+    }
+
+    /** 两页高度不同，切页后要重测高度 */
+    private void syncHeightOnPageChange() {
+        addOnPageChangeListener(new SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                requestLayout();
+            }
+        });
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int contentHeight = 0;
-        View[] pages = measuredPages;
-        if (pages == null || pages.length == 0) {
-            pages = new View[getChildCount()];
-            for (int i = 0; i < getChildCount(); i++) {
-                pages[i] = getChildAt(i);
-            }
-        }
-        for (View page : pages) {
-            if (page == null) continue;
+        View current = currentPageView();
+        if (current != null) {
             // 页面里的 NestedScrollView 在 UNSPECIFIED 下会展开成内容自然高度
-            page.measure(widthMeasureSpec,
+            current.measure(widthMeasureSpec,
                     MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
-            contentHeight = Math.max(contentHeight, page.getMeasuredHeight());
-        }
-
-        if (contentHeight > 0) {
-            int screen = getResources().getDisplayMetrics().heightPixels;
-            int limit = MeasureSpec.getSize(heightMeasureSpec);
-            int mode = MeasureSpec.getMode(heightMeasureSpec);
-            int maxHeight = (int) (screen * MAX_HEIGHT_RATIO);
-            if (limit > 0 && (mode == MeasureSpec.AT_MOST || mode == MeasureSpec.EXACTLY)) {
-                maxHeight = Math.min(maxHeight, limit);
+            int contentHeight = current.getMeasuredHeight();
+            if (contentHeight > 0) {
+                int screen = getResources().getDisplayMetrics().heightPixels;
+                int limit = MeasureSpec.getSize(heightMeasureSpec);
+                int mode = MeasureSpec.getMode(heightMeasureSpec);
+                int maxHeight = (int) (screen * MAX_HEIGHT_RATIO);
+                if (limit > 0 && (mode == MeasureSpec.AT_MOST || mode == MeasureSpec.EXACTLY)) {
+                    maxHeight = Math.min(maxHeight, limit);
+                }
+                int height = Math.min(contentHeight, maxHeight);
+                heightMeasureSpec = MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY);
             }
-            int height = Math.min(contentHeight, maxHeight);
-            heightMeasureSpec = MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY);
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    /** 当前页 View：优先取 setMeasuredPages 传入的数组，拿不到退回子 View */
+    private View currentPageView() {
+        int index = getCurrentItem();
+        if (measuredPages != null && index >= 0 && index < measuredPages.length
+                && measuredPages[index] != null) {
+            return measuredPages[index];
+        }
+        if (index >= 0 && index < getChildCount()) {
+            return getChildAt(index);
+        }
+        return null;
     }
 }
