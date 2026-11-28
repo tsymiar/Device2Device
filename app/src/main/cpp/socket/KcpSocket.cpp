@@ -58,7 +58,7 @@ static void setupKcp(KcpPeer* peer, IUINT32 conv)
 {
     ikcpcb* kcp = ikcp_create(conv, (void*)peer);
     kcp->output = udpOutput;
-    ikcp_nodelay(kcp, 0, 10, 0, 0);
+    ikcp_nodelay(kcp, 1, 10, 2, 1);
     // 收发窗口 128：给丢包重发留足余量
     ikcp_wndsize(kcp, 128, 128);
     peer->kcp = kcp;
@@ -230,7 +230,7 @@ int KcpSocket::sendEcho(const char* payload, int len)
     return ikcp_send(m_kcpMsg.pkcp, buf, len + KCP_ECHO_HDR);
 }
 
-int KcpSocket::sendTo(const char* ip, int port, const char* data, int len)
+int KcpSocket::sendMsgTo(const char* ip, int port, const char* data, int len)
 {
     if (!m_running || data == nullptr || len <= 0 || ip == nullptr || port <= 0) {
         return -1;
@@ -252,7 +252,7 @@ int KcpSocket::sendTo(const char* ip, int port, const char* data, int len)
     peer->lastActiveMs = kcpClockMs();
     int ret = ikcp_send(peer->kcp, data, len);
     if (ret < 0) {
-        LOGE("sendTo %s:%d ikcp_send fail: %d\n", ip, port, ret);
+        LOGE("sendMsgTo %s:%d ikcp_send fail: %d\n", ip, port, ret);
     }
     return ret;
 }
@@ -312,7 +312,7 @@ KcpPeer* KcpSocket::findOrCreatePeerByAddrLocked(const char* ip, int port)
     addr.sin_family = AF_INET;
     addr.sin_port = htons((unsigned short)port);
     if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1) {
-        LOGE("sendTo: bad address %s\n", ip == nullptr ? "(null)" : ip);
+        LOGE("sendMsgTo: bad address %s\n", ip == nullptr ? "(null)" : ip);
         return nullptr;
     }
     // 这个地址上可能已经有一份收包时建的会话（它的 conv 是对端的），优先复用：

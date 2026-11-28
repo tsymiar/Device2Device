@@ -30,33 +30,11 @@
 
 namespace {
 
-/** Announcement packet: type | self id | device name | text-message port */
-const char* const kAnnounce = "D2DPEER";
-/**
- * 对"喊话"的回应：字段与 kAnnounce 相同，只单播给喊话那一方。
- * 没有它，新上线的设备要等对方下一轮广播（秒级）才知道对方存在；
- * 有它，两边一个往返就互相认识。回应本身不再引发回应，否则会你一回我一发形成乒乓。
- */
-const char* const kReply = "D2DPEEROK";
-/**
- * Wire format of a text message:
- * D2DMSG | type | id | name | ip | port | selfId | body
- *
- * selfId 是发送方这一轮 start() 的会话标识（见 start() 里那段拼接）。没有它，
- * 去重只能按 "ip:id" 判：发送方的 app 进程重启后 id 又从 1 开始数，接收方的
- * 去重缓存里还留着上一轮的 "ip:1"，新消息就被当成重复悄悄丢掉 —— 发送端显示已送达，
- * 接收端什么也不显示。带上 selfId 之后，重启就是另一个发送方，不会撞车。
- *
- * 少一个字段（7 段）的是不带 selfId 的报文，按 7 段解析，去重也退回到 "ip:id"。
- */
-const char* const kMsgMagic = "D2DMSG";
-/**
- * Wire format of one piece of a split message:
- * D2DFRG | type | id | seq | total | name | ip | port | selfId | body
- *
- * selfId 的用处见上面 kMsgMagic。同样兼容少一个字段（不带 selfId）的报文。
- */
-const char* const kFragMagic = "D2DFRG";
+/** 3-char wire magic — 1st char = type, last 2 = function code. WAN/WRP announce-reply, WMS/WFR message-fragment. device = display name. */
+const char* const kAnnounce = "WAN";
+const char* const kReply = "WRP";
+const char* const kMsgMagic = "WMS";
+const char* const kFragMagic = "WFR";
 
 /** 报文里没带 selfId 时，去重键退回到用 ip */
 const std::string kEmpty;
@@ -183,7 +161,7 @@ int LanMessenger::start(const std::string& name, const std::string& selfIp, int 
 
     // ---- Messaging: KCP over UDP ----
     // One socket bound to 0.0.0.0:m_port plays both roles: it takes whatever the LAN sends
-    // to it, and sendTo() builds the peer's ikcp session on demand when we send out.
+    // to it, and sendMsgTo() builds the peer's ikcp session on demand when we send out.
     // Echo has to be off, or two peers would bounce every message back and forth forever.
     if (m_kcp.init(m_port, false) < 0) {
         LOGE("kcp init %d fail\n", m_port);
@@ -199,9 +177,9 @@ int LanMessenger::start(const std::string& name, const std::string& selfIp, int 
     m_discoveryThread = new std::thread([this]() { discoveryLoop(); });
     m_sendThread = new std::thread([this]() { sendLoop(); });
 
-    pushEvent(LAN_PEER, "CLEAR");
+    pushEvent(LAN_PEER, "PCL");
     pushEvent(LAN_MESSAGE,
-              "LISTEN|" + m_selfIp + "|" + std::to_string(m_port) + "|" + m_name);
+              "MLN|" + m_selfIp + "|" + std::to_string(m_port) + "|" + m_name);
     LOGI("LAN messenger started: name=%s self=%s chat=%d discovery=%d\n",
          m_name.c_str(), m_selfIp.c_str(), m_port, m_discoveryPort.load());
     return 0;
@@ -242,7 +220,7 @@ void LanMessenger::stop()
     }
     {
         std::lock_guard<std::mutex> lock(m_pendingMutex);
-        // No UNDELIVERED events here: the peer list is going away with the session anyway
+        // No MUD events here: the peer list is going away with the session anyway
         m_pending.clear();
         m_seenIds.clear();
         m_seenOrder.clear();
@@ -414,7 +392,7 @@ bool LanMessenger::onDiscoveryPacket(const std::string& payload, const std::stri
     }
     // 只有新设备才上报：否则每秒一封广播会把消息队列刷满
     if (isNew) {
-        pushEvent(LAN_PEER, "ADD|" + fromIp + "|" + std::to_string(port) + "|" + name);
+        pushEvent(LAN_PEER, "PAD|" + fromIp + "|" + std::to_string(port) + "|" + name);
     }
     return true;
 }
@@ -424,7 +402,7 @@ void LanMessenger::pruneLocked(long long now)
     for (auto it = m_peers.begin(); it != m_peers.end();) {
         if (now - it->second.lastSeenMs > LAN_PEER_TIMEOUT_MS) {
             pushEvent(LAN_PEER,
-                      "DEL|" + it->second.ip + "|" + std::to_string(it->second.port)
+                      "PDL|" + it->second.ip + "|" + std::to_string(it->second.port)
                       + "|" + it->second.name);
             it = m_peers.erase(it);
         } else {
@@ -436,7 +414,7 @@ void LanMessenger::pruneLocked(long long now)
 void LanMessenger::pushPeersLocked()
 {
     for (auto& kv : m_peers) {
-        pushEvent(LAN_PEER, "ADD|" + kv.second.ip + "|" + std::to_string(kv.second.port)
+        pushEvent(LAN_PEER, "PAD|" + kv.second.ip + "|" + std::to_string(kv.second.port)
                             + "|" + kv.second.name);
     }
 }
@@ -522,7 +500,7 @@ void LanMessenger::touchPeer(const std::string& ip, int port, const std::string&
         peer.name = name;
         peer.lastSeenMs = nowMs();
         m_peers[key] = peer;
-        pushEvent(LAN_PEER, "ADD|" + ip + "|" + std::to_string(port) + "|" + name);
+        pushEvent(LAN_PEER, "PAD|" + ip + "|" + std::to_string(port) + "|" + name);
     } else {
         it->second.lastSeenMs = nowMs();
         it->second.name = name;
@@ -562,7 +540,7 @@ void LanMessenger::handleWire(const std::string& text, const std::string& peerIp
 
     std::string magic = std::string(kMsgMagic) + "|";
     if (text.size() > magic.size() && text.compare(0, magic.size(), magic) == 0) {
-        // D2DMSG | type | id | name | ip | port | selfId | body（selfId 可选，见 kMsgMagic）
+        // WMS|type|id|device|ip|port|selfId|body
         std::vector<std::string> parts = split(text, '|', 8);
         if (parts.size() < 7) {
             return;
@@ -590,7 +568,7 @@ void LanMessenger::handleWire(const std::string& text, const std::string& peerIp
                 wasWaiting = m_pending.erase(id) > 0;
             }
             if (wasWaiting) {
-                pushEvent(LAN_MESSAGE, "DELIVERED|" + fromIp + "|" + std::to_string(id));
+                pushEvent(LAN_MESSAGE, "MDV|" + fromIp + "|" + std::to_string(id));
             }
             touchPeer(fromIp, fromPort, name);
             return;
@@ -602,7 +580,7 @@ void LanMessenger::handleWire(const std::string& text, const std::string& peerIp
 
     std::string fragMagic = std::string(kFragMagic) + "|";
     if (text.size() > fragMagic.size() && text.compare(0, fragMagic.size(), fragMagic) == 0) {
-        // D2DFRG | type | id | seq | total | name | ip | port | selfId | body
+        // WFR|type|id|seq|total|device|ip|port|selfId|chunk
         std::vector<std::string> parts = split(text, '|', 10);
         if (parts.size() < 9) {
             return;
@@ -640,7 +618,7 @@ void LanMessenger::handleWire(const std::string& text, const std::string& peerIp
         return;
     }
     touchPeer(fromIp, m_port, name);
-    pushEvent(LAN_MESSAGE, "RECV|" + fromIp + "|" + name + "|" + body);
+    pushEvent(LAN_MESSAGE, "MRT|" + fromIp + "|" + name + "|" + body);
     LOGI("LAN recv (legacy) from %s (%s): %s\n", fromIp.c_str(), name.c_str(), body.c_str());
 }
 
@@ -730,7 +708,7 @@ void LanMessenger::onMessageComplete(char type, unsigned long long id, const std
      */
     queueAck(fromIp, fromPort, id);
     if (fresh) {
-        const char* event = (type == 'I') ? "RECVIMG" : "RECV";
+        const char* event = (type == 'I') ? "MRI" : "MRT";
         pushEvent(LAN_MESSAGE, std::string(event) + "|" + fromIp + "|" + name + "|" + body);
         LOGI("LAN recv %s from %s (%s), %zu bytes\n", (type == 'I') ? "image" : "text",
              fromIp.c_str(), name.c_str(), body.size());
@@ -759,9 +737,9 @@ bool LanMessenger::sendOnce(const std::string& ip, int port, char type,
 {
     std::string payload = buildPayload(type, id, body);
     if ((int)payload.size() <= LAN_CHUNK_BODY) {
-        // One KCP message is enough: sendTo() picks the peer's ikcp session, creating it if
+        // One KCP message is enough: sendMsgTo() picks the peer's ikcp session, creating it if
         // this is the first thing we ever said to that address.
-        return m_kcp.sendTo(ip.c_str(), port, payload.data(), (int)payload.size()) >= 0;
+        return m_kcp.sendMsgTo(ip.c_str(), port, payload.data(), (int)payload.size()) >= 0;
     }
 
     /**
@@ -787,7 +765,7 @@ bool LanMessenger::sendOnce(const std::string& ip, int port, char type,
             len = (size_t)LAN_CHUNK_BODY;
         }
         std::string piece = buildFragment(type, id, seq, total, body.substr(off, len));
-        if (m_kcp.sendTo(ip.c_str(), port, piece.data(), (int)piece.size()) < 0) {
+        if (m_kcp.sendMsgTo(ip.c_str(), port, piece.data(), (int)piece.size()) < 0) {
             ok = false;
         }
     }
@@ -826,9 +804,9 @@ int LanMessenger::sendText(const std::string& ip, int port, const std::string& t
         return -1;
     }
     unsigned long long id = enqueue('C', ip, port, body);
-    // The bubble appears right away in "sending" state; DELIVERED / UNDELIVERED follow.
+    // The bubble appears right away in "sending" state; MDV / MUD follow.
     pushEvent(LAN_MESSAGE,
-              "SENDING|" + ip + "|" + std::to_string(id) + "|" + body);
+              "MST|" + ip + "|" + std::to_string(id) + "|" + body);
     return 0;
 }
 
@@ -850,7 +828,7 @@ int LanMessenger::sendImage(const std::string& ip, int port, const std::string& 
     unsigned long long id = enqueue('I', ip, port, base64);
     // The image itself is not carried by the event: the Java side already has the bitmap and
     // drew the bubble, so the event only needs to bring the id back for the delivery state
-    pushEvent(LAN_MESSAGE, "SENDINGIMG|" + ip + "|" + std::to_string(id));
+    pushEvent(LAN_MESSAGE, "MSI|" + ip + "|" + std::to_string(id));
     return 0;
 }
 
@@ -897,7 +875,9 @@ bool LanMessenger::sendOnceById(unsigned long long id)
     it->second.inFlight = false;
     if (ok) {
         it->second.waitingAck = true;
-        it->second.dueMs = now + LAN_ACK_TIMEOUT_MS;
+        long long timeout = (snapshot.type == 'I') ? LAN_IMAGE_ACK_TIMEOUT_MS
+                                                   : LAN_ACK_TIMEOUT_MS;
+        it->second.dueMs = now + timeout;
     } else {
         it->second.waitingAck = false;
         it->second.dueMs = now + LAN_RETRY_DELAY_MS;
@@ -916,10 +896,10 @@ std::vector<unsigned long long> LanMessenger::serviceDueLocked(long long nowMs)
         }
         if (p.attempt >= LAN_SEND_MAX_ATTEMPTS) {
             if (p.waitingAck) {
-                pushEvent(LAN_MESSAGE, "UNDELIVERED|" + p.ip + "|" + std::to_string(p.id)
+                pushEvent(LAN_MESSAGE, "MUD|" + p.ip + "|" + std::to_string(p.id)
                           + "|对方未确认");
             } else {
-                pushEvent(LAN_MESSAGE, "SENDFAIL|" + p.ip + "|" + std::to_string(p.id)
+                pushEvent(LAN_MESSAGE, "MSF|" + p.ip + "|" + std::to_string(p.id)
                           + "|连不上对端");
             }
             it = m_pending.erase(it);
@@ -986,6 +966,6 @@ void LanMessenger::refresh()
     }
     announceOnce();
     std::lock_guard<std::mutex> lock(m_peerMutex);
-    pushEvent(LAN_PEER, "CLEAR");
+    pushEvent(LAN_PEER, "PCL");
     pushPeersLocked();
 }

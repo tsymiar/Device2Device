@@ -79,7 +79,7 @@ public:
      * 客户端忽略地址，发给自己那唯一一份会话。
      * 局域网消息就靠它：一个绑 0.0.0.0 的 socket 既能收谁的也能主动发给谁。
      */
-    int sendTo(const char* ip, int port, const char* data, int len);
+    int sendMsgTo(const char* ip, int port, const char* data, int len);
     /** 发一包「8 字节头(sn + 时间戳) + 载荷」：服务端会原样回射，客户端据此算 RTT */
     int sendEcho(const char* payload, int len);
     /** 服务端收到包后是否原样回射。两端都是服务端时必须关掉，否则会无限对打 */
@@ -102,7 +102,7 @@ private:
 
     /** 按来源地址 + conv 找会话，没有就新建一个（调用方必须已持有 m_lock） */
     KcpPeer* findOrCreatePeerLocked(const struct sockaddr_in& from, IUINT32 conv);
-    /** 按 ip:port 找会话，没有就新建一个（sendTo 主动发话时用；调用方必须已持有 m_lock） */
+    /** 按 ip:port 找会话，没有就新建一个（sendMsgTo 主动发话时用；调用方必须已持有 m_lock） */
     KcpPeer* findOrCreatePeerByAddrLocked(const char* ip, int port);
     /** 回收超时未再发报文的对端（调用方必须已持有 m_lock） */
     void prunePeersLocked(unsigned long nowMs);

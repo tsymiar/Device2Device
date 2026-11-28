@@ -37,6 +37,8 @@
 #define LAN_SEND_MAX_ATTEMPTS 3
 /** How long to wait for the peer's ACK before sending the same message again */
 #define LAN_ACK_TIMEOUT_MS 3000
+/** Images need longer to arrive and be reassembled */
+#define LAN_IMAGE_ACK_TIMEOUT_MS 15000
 /** Pause between two attempts when the send itself failed */
 #define LAN_RETRY_DELAY_MS 1500
 /**
@@ -44,15 +46,8 @@
  * usable quality. The Java side (IMAGE_MAX_CHARS) has to stay in step with this.
  */
 #define LAN_MAX_IMAGE_CHARS (256 * 1024)
-/**
- * Largest body one KCP message carries; anything bigger is split into pieces.
- *
- * ikcp_send() refuses a message that would need (IKCP_WND_RCV - 1) = 127 segments or more,
- * i.e. about 170KB at the default MTU, so 256KB of base64 has to be chopped. 64KB is ~48
- * segments — comfortably under the ceiling, and it keeps UDP fragmentation where KCP was
- * tuned for it.
- */
-#define LAN_CHUNK_BODY (64 * 1024)
+/** Max body per KCP message; 32KB ≈ 24 segments, keeps each send within the window */
+#define LAN_CHUNK_BODY (32 * 1024)
 /** Sanity cap on how many pieces one message may be split into */
 #define LAN_MAX_FRAGS 64
 /** How long a half-reassembled message is kept before it is thrown away */
@@ -121,7 +116,7 @@ struct LanFragment {
  * Messaging: KCP over UDP, one socket playing both roles.
  *            The socket binds 0.0.0.0:port, so any machine on the LAN can reach it, and it
  *            keeps one ikcp session per peer address — a session is created on demand, so
- *            sending is just "sendTo(ip, port)" and receiving is a KCP callback. No broker,
+ *            sending is just "sendMsgTo(ip, port)" and receiving is a KCP callback. No broker,
  *            no subscriber, no per-message connection.
  *
  * Events go into the Message queue and are drained by the polling thread that already exists
@@ -181,7 +176,7 @@ private:
         a JNIEnv */
     static void onKcpMessage(const char* data, int len, const char* peerIp, int peerPort,
         void* user);
-    /** Handles one decoded wire payload: D2DMSG (a whole message) or D2DFRG (one piece) */
+    /** Handles one wire payload: WMS (whole) or WFR (piece) */
     void handleWire(const std::string& payload, const std::string& fromIp, int fromPort);
     /** Stores one piece and, when the last one lands, hands the whole message on */
     void assembleFragment(char type, unsigned long long id, int seq, int total,
@@ -203,10 +198,9 @@ private:
     void pushPeersLocked();
     void pushEvent(int type, const std::string& text);
 
-    /** Builds the wire payload: D2DMSG|type|id|name|ip|port|selfId|body */
+    /** WMS|type|id|device|ip|port|selfId|body */
     std::string buildPayload(char type, unsigned long long id, const std::string& body) const;
-    /** Builds one piece of a split message:
-        D2DFRG|type|id|seq|total|name|ip|port|selfId|chunk */
+    /** WFR|type|id|seq|total|device|ip|port|selfId|chunk */
     std::string buildFragment(char type, unsigned long long id, int seq, int total,
                              const std::string& chunk) const;
     /** Sends one message, splitting the body when it is too big for a single ikcp_send() */

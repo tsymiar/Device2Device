@@ -25,12 +25,15 @@ enum MASSAGER {
     KCP_HINT,
     /** KCP 客户端的消息（启动 / 发送 / 收到的回射包）：Java 侧打到页面 status 区 */
     KCP_CLIENT,
-    /** 局域网文本消息：发现到的对端（CLEAR / ADD|ip|port|name / DEL|...） */
-    LAN_PEER,
-    /** 局域网文本消息：收到的内容 / 发送结果（RECV / SENT / SENDFAIL / LISTEN） */
-    LAN_MESSAGE,
     /** 文件传输发现到的对端快照："ip:port;ip:port"，空串表示一台都没有 */
-    FILE_PEER
+    FILE_PEER,
+    /**
+     * LAN chat events, 3-char verb: 1st char = type (P=peer, M=message), last 2 = function code.
+     * 值仅在本 app 内使用（JNI 按枚举名传值，不落盘、不跨进程），与 Mac 不必一致；
+     * 新类型一律追加到末尾，避免既有值移位。
+     */
+    LAN_PEER,
+    LAN_MESSAGE
 };
 
 struct Messaging {
